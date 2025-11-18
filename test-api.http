@@ -1,0 +1,107 @@
+### WP Sign API Testing
+### Sử dụng với REST Client extension trong VS Code
+
+@baseUrl = http://localhost:4000/api/v1
+@accessToken = 
+
+### 1. Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@tenant1.com",
+  "password": "password123"
+}
+
+### 2. Get Tenant Info
+GET {{baseUrl}}/tenants/me
+Authorization: Bearer {{accessToken}}
+
+### 3. Upload Document
+POST {{baseUrl}}/documents
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "fileName": "test-contract.pdf",
+  "base64": "JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKL01lZGlhQm94IFswIDAgNjEyIDc5Ml0KPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovQ29udGVudHMgNCAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL0xlbmd0aCAzMwo+PgpzdHJlYW0KQlQKL0YxIDEyIFRmCjEwMCA3MDAgVGQKKFRlc3QpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDUKMDAwMDAwMDAwMCA2NTUzNSBmCjAwMDAwMDAwMDkgMDAwMDAgbgowMDAwMDAwMDU4IDAwMDAwIG4KMDAwMDAwMDEzNiAwMDAwMCBuCjAwMDAwMDAxOTYgMDAwMDAgbgp0cmFpbGVyCjw8Ci9TaXplIDUKL1Jvb3QgMSAwIFIKPj4Kc3RhcnR4cmVmCjI3OAolJUVPRg=="
+}
+
+### 4. List Documents
+GET {{baseUrl}}/documents
+Authorization: Bearer {{accessToken}}
+
+### 5. Get Document Detail
+GET {{baseUrl}}/documents/1
+Authorization: Bearer {{accessToken}}
+
+### 6. Create Sign Request
+POST {{baseUrl}}/sign-requests
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "document_id": 1,
+  "title": "Hợp đồng thuê nhà",
+  "message": "Vui lòng xem và ký tài liệu này",
+  "workflow_type": "sequential",
+  "signers": [
+    {
+      "email": "signer1@example.com",
+      "name": "Nguyễn Văn A",
+      "role": "signer"
+    },
+    {
+      "email": "signer2@example.com",
+      "name": "Trần Thị B",
+      "role": "approver"
+    }
+  ]
+}
+
+### 7. Get Sign Request
+GET {{baseUrl}}/sign-requests/1
+Authorization: Bearer {{accessToken}}
+
+### 8. Send OTP to Signer
+POST {{baseUrl}}/signers/1/send-otp
+Authorization: Bearer {{accessToken}}
+
+### 9. Sign Document with OTP
+POST {{baseUrl}}/signers/1/sign
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "otp": "123456",
+  "signature_data": {
+    "x": 100,
+    "y": 200,
+    "width": 150,
+    "height": 50,
+    "page": 1
+  }
+}
+
+### 10. Cancel Sign Request
+POST {{baseUrl}}/sign-requests/1/cancel
+Authorization: Bearer {{accessToken}}
+
+### 11. Get Audit Logs
+GET {{baseUrl}}/audit/1
+Authorization: Bearer {{accessToken}}
+
+### 12. Register Webhook
+POST {{baseUrl}}/webhooks/register
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "url": "https://webhook.site/your-unique-url",
+  "events": ["sign.completed", "document.uploaded"],
+  "secret": "your-webhook-secret"
+}
+
+### 13. Delete Document
+DELETE {{baseUrl}}/documents/1
+Authorization: Bearer {{accessToken}}

@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: linear-gradient(135deg, #eef2ff, #f5f7fb 40%, #f8fbff 100%);
+  --foreground: #0f172a;
+  --card-bg: rgba(255, 255, 255, 0.9);
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-image: var(--background);
+  min-height: 100vh;
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+.card {
+  @apply rounded-3xl border border-white/80 bg-white/80 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur;
+  @apply p-6;
+}
+
+.button-primary {
+  @apply inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 to-blue-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/30 transition hover:brightness-105;
+}
+
+.input {
+  @apply w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-2.5 text-sm shadow-inner shadow-white/40 focus:outline-none focus:ring-2 focus:ring-brand-500;
+}
+
+.chip {
+  @apply inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-medium text-slate-600 shadow-sm;
+}

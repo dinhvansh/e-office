@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model tenants {
+  id         Int         @id @default(autoincrement())
+  name       String?
+  domain     String?
+  logo_url   String?
+  plan       String?
+  status     String?
+  created_at DateTime    @default(now())
+  users      users[]
+  documents  documents[]
+  sign_requests sign_requests[]
+  departments departments[]
+  roles      roles[]
+}
+
+model users {
+  id            Int        @id @default(autoincrement())
+  tenant_id     Int
+  email         String     @unique
+  password_hash String
+  full_name     String?
+  phone         String?
+  avatar_url    String?
+  department_id Int?
+  role          String?    @default("user")
+  status        String?    @default("active")
+  created_at    DateTime   @default(now())
+  tenant        tenants    @relation(fields: [tenant_id], references: [id])
+  department    departments? @relation("user_department", fields: [department_id], references: [id])
+  documents     documents[] @relation("documents_owner")
+  audit_logs    audit_logs[]
+  user_roles    user_roles[]
+  managed_departments departments[] @relation("department_manager")
+}
+
+model documents {
+  id           Int           @id @default(autoincrement())
+  tenant_id    Int
+  owner_id     Int?
+  file_path    String
+  hash         String?
+  status       String?
+  version      Int           @default(1)
+  created_at   DateTime      @default(now())
+  tenant       tenants       @relation(fields: [tenant_id], references: [id])
+  owner        users?        @relation("documents_owner", fields: [owner_id], references: [id])
+  sign_requests sign_requests[]
+  audit_logs   audit_logs[]
+}
+
+model sign_requests {
+  id            Int        @id @default(autoincrement())
+  tenant_id     Int
+  document_id   Int
+  title         String?
+  message       String?
+  workflow_type String?
+  status        String?
+  deadline      DateTime?
+  created_at    DateTime   @default(now())
+  tenant        tenants    @relation(fields: [tenant_id], references: [id])
+  document      documents  @relation(fields: [document_id], references: [id])
+  signers       signers[]
+}
+
+model signers {
+  id             Int           @id @default(autoincrement())
+  sign_request_id Int
+  email          String?
+  name           String?
+  role           String?
+  status         String?
+  otp            String?
+  otp_expire     DateTime?
+  signed_at      DateTime?
+  position_data  Json?
+  sign_request   sign_requests @relation(fields: [sign_request_id], references: [id])
+}
+
+model audit_logs {
+  id          Int       @id @default(autoincrement())
+  document_id Int
+  event       String?
+  user_id     Int?
+  ip          String?
+  ua          String?
+  created_at  DateTime  @default(now())
+  document    documents @relation(fields: [document_id], references: [id])
+  user        users?    @relation(fields: [user_id], references: [id])
+}
+
+model license {
+  id          Int      @id @default(autoincrement())
+  tenant      String?
+  license_key String?
+  expire_date DateTime?
+  limit_user  Int?
+  limit_docs  Int?
+  signature   String?
+}
+
+model departments {
+  id          Int       @id @default(autoincrement())
+  tenant_id   Int
+  name        String
+  parent_id   Int?
+  manager_id  Int?
+  description String?
+  created_at  DateTime  @default(now())
+  tenant      tenants   @relation(fields: [tenant_id], references: [id])
+  parent      departments? @relation("department_hierarchy", fields: [parent_id], references: [id])
+  children    departments[] @relation("department_hierarchy")
+  manager     users?    @relation("department_manager", fields: [manager_id], references: [id])
+  users       users[]   @relation("user_department")
+}
+
+model roles {
+  id          Int       @id @default(autoincrement())
+  tenant_id   Int
+  name        String
+  description String?
+  is_system   Boolean   @default(false)
+  created_at  DateTime  @default(now())
+  tenant      tenants   @relation(fields: [tenant_id], references: [id])
+  user_roles  user_roles[]
+  role_permissions role_permissions[]
+  
+  @@unique([tenant_id, name])
+}
+
+model permissions {
+  id          Int       @id @default(autoincrement())
+  resource    String
+  action      String
+  description String?
+  role_permissions role_permissions[]
+  
+  @@unique([resource, action])
+}
+
+model role_permissions {
+  role_id       Int
+  permission_id Int
+  role          roles       @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  permission    permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+  
+  @@id([role_id, permission_id])
+}
+
+model user_roles {
+  user_id     Int
+  role_id     Int
+  assigned_at DateTime  @default(now())
+  user        users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role        roles     @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  
+  @@id([user_id, role_id])
+}
