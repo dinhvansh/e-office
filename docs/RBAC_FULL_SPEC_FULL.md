@@ -640,3 +640,256 @@ Chặn API backend	✔
 Permission string đúng với backend	✔
 Không hardcode role	✔
 Không kiểm tra bằng user.role	✔
+
+17.1. Mục tiêu
+
+Hệ thống hỗ trợ:
+
+SaaS Cloud
+
+On-Premise Self-Hosted
+
+Do đó, cần cơ chế bảo vệ code + bảo vệ license để tránh:
+
+bị copy mã nguồn
+
+bị chạy crack
+
+bị clone máy chủ
+
+bị bỏ qua hạn mức tài liệu
+
+17.2. Yêu cầu bắt buộc đối với On-Premise
+A. Không bao giờ cung cấp source code Raw
+
+Tránh xuất các folder:
+
+/backend/src
+
+/frontend/src
+
+file .ts, .js, .map
+
+B. Backend phải đóng gói thành BINARY hoặc RUNTIME
+
+Khuyến nghị:
+
+Công nghệ	Mục đích	Ghi chú
+pkg	Build Node → binary	Khó dịch ngược
+nexe	Node binary	Hỗ trợ Linux tốt
+Docker (runtime only)	Không chứa source	Không để file map
+17.3. License Enforcement (Bắt buộc)
+17.3.1 License Server (online hoặc offline)
+
+Backend khi khởi chạy:
+
+Lấy:
+
+license_key
+
+hardware_id
+
+Gửi lên License Server
+
+Nhận về:
+
+validity
+
+expiration
+
+quota (docs, users, storage)
+
+feature flags
+
+17.3.2 Offline Activation (Enterprise)
+
+Flow:
+
+Tạo file request:
+request.json (hardware_id, tenant, version)
+
+Server tạo file:
+license.sig (RSA-2048 ký)
+
+Backend verify bằng public key tích hợp
+
+17.3.3 Cấu trúc bảng license
+model license {
+  id             Int      @id @default(autoincrement())
+  tenant_id      Int
+  license_key    String?
+  expire_date    DateTime?
+  limit_user     Int?       // số user tối đa
+  limit_docs     Int?       // tổng số doc
+  limit_docs_month Int?     // số tài liệu / tháng
+  limit_sign_month Int?     // số ký / tháng
+  limit_storage_mb Int?     // giới hạn dung lượng
+  signature      String?     // RSA signature
+  license_type   String?     // SaaS | OnPrem | Offline
+  hardware_id    String?
+}
+
+17.4. Hardware Lock
+
+Hardware ID bao gồm:
+
+CPU ID
+
+MAC Address
+
+Disk Serial
+
+Hostname
+
+Tạo hash:
+
+hwid = SHA256(cpu + mac + disk)
+
+17.5. Module quan trọng phải bảo vệ bằng Native Addon hoặc WASM
+
+Các logic quan trọng:
+
+Generate document number
+
+Verify digital signature
+
+OTP validation
+
+Check license status
+
+File hashing (SHA256)
+
+Watermark / timestamp
+
+Tất cả convert sang:
+
+.wasm
+
+hoặc .node (Native addon)
+
+→ Không thể xem code.
+
+17.6. License Enforcement Middleware
+
+Áp dụng cho mọi API nhạy cảm:
+
+authorizeLicense("document_create", tenant_id)
+
+📦 CHƯƠNG 18 — SAAS QUOTA SYSTEM (QUẢN LÝ GIỚI HẠN SỬ DỤNG)
+18.1. Mục tiêu
+
+Trong SaaS, mỗi tenant cần giới hạn:
+
+số user
+
+số tài liệu tạo
+
+số chữ ký thực hiện
+
+dung lượng file lưu trữ
+
+số workflow kích hoạt
+
+Nếu không sẽ:
+
+không tính tiền được
+
+tenant free xài vô hạn
+
+phá hỏng kiến trúc chi phí
+
+18.2. Bảng Cấu Trúc: tenant_usage
+Prisma Model
+model tenant_usage {
+  id             Int       @id @default(autoincrement())
+  tenant_id      Int
+  month          Int
+  year           Int
+  docs_created   Int       @default(0)
+  docs_signed    Int       @default(0)
+  storage_used   Int       @default(0) // MB
+  updated_at     DateTime  @default(now())
+
+  tenant tenants @relation(fields: [tenant_id], references: [id])
+}
+
+18.3. Trigger logic khi dùng tài nguyên
+1️⃣ Khi tạo Document:
+if usage.docs_created >= license.limit_docs_month:
+    throw new Error("DOCUMENT_LIMIT_EXCEEDED")
+
+2️⃣ Khi ký tài liệu:
+if usage.docs_signed >= license.limit_sign_month:
+    deny("SIGNATURE_LIMIT_EXCEEDED")
+
+3️⃣ Khi upload file:
+file_size_mb + storage_used > limit_storage_mb → BLOCK
+
+4️⃣ Khi thêm user:
+current_users >= license.limit_user → BLOCK
+
+18.4. Quota Middleware
+export async function enforceQuota(action, tenant_id) {
+  const license = await getLicense(tenant_id);
+  const usage   = await getUsageThisMonth(tenant_id);
+
+  if (action === 'document_create') {
+     if (usage.docs_created >= license.limit_docs_month)
+         throw forbidden("DOC_LIMIT");
+  }
+
+  if (action === 'document_sign') {
+     if (usage.docs_signed >= license.limit_sign_month)
+         throw forbidden("SIGN_LIMIT");
+  }
+}
+
+18.5. Quota Dashboard (Admin)
+Hiển thị:
+Resource	Used	Limit	Percent
+Docs Created	X	Y	X/Y
+Docs Signed	X	Y	X/Y
+Storage	X MB	Y MB	X/Y
+Active Users	X	Y	X/Y
+18.6. Monthly Reset
+
+Usage reset mỗi tháng:
+
+docs_created → 0  
+docs_signed → 0  
+
+
+Nhưng tổng số tài liệu vẫn giữ lại (để audit).
+
+18.7. Cache & Performance
+
+Cache license + quota vào Redis:
+
+key: QUOTA:{tenant}:{month}:{year}
+
+
+Refresh mỗi 5 phút.
+
+🎯 CHƯƠNG 19 — INTEGRATION RBAC + LICENSE + QUOTA
+
+Khi kiểm tra quyền cho 1 hành động:
+
+CHECK 1 — Tenant Isolation  
+CHECK 2 — System Role  
+CHECK 3 — Global Permission (RBAC)  
+CHECK 4 — Department Access  
+CHECK 5 — Document Instance Permission  
+CHECK 6 — Workflow Step Permission  
+CHECK 7 — License Permission  
+CHECK 8 — Quota Limit  
+→ ALLOW or DENY
+
+🚨 CHƯƠNG 20 — ANTI-PATTERNS (KHÔNG ĐƯỢC PHẠM)
+
+❌ Không check quota khi tạo document
+❌ On-Premise giao source code đầy đủ
+❌ License check ở frontend → quá nguy hiểm
+❌ Không ràng buộc phần cứng
+❌ Cho phép tắt license middleware bằng config
+❌ Chỉ sử dụng obfuscation JS để bảo vệ code
+❌ Không log lại việc vượt quota
