@@ -10,6 +10,7 @@ const navItems = [
   { href: "/", label: "Tổng quan", caption: "Số liệu hệ thống" },
   { href: "/documents", label: "Tài liệu", caption: "Upload & quản trị" },
   { href: "/sign-requests", label: "Quy trình ký", caption: "Theo dõi tiến độ" },
+  { href: "/document-types", label: "Loại văn bản", caption: "Phân loại & đánh số" },
   { href: "/users", label: "Người dùng", caption: "Quản lý tài khoản" },
   { href: "/departments", label: "Phòng ban", caption: "Cấu trúc tổ chức" },
   { href: "/roles", label: "Vai trò", caption: "Phân quyền hệ thống" },

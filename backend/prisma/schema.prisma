@@ -20,6 +20,9 @@ model tenants {
   sign_requests sign_requests[]
   departments departments[]
   roles      roles[]
+  document_types document_types[]
+  numbering_rules numbering_rules[]
+  external_organizations external_organizations[]
 }
 
 model users {
@@ -43,18 +46,32 @@ model users {
 }
 
 model documents {
-  id           Int           @id @default(autoincrement())
-  tenant_id    Int
-  owner_id     Int?
-  file_path    String
-  hash         String?
-  status       String?
-  version      Int           @default(1)
-  created_at   DateTime      @default(now())
-  tenant       tenants       @relation(fields: [tenant_id], references: [id])
-  owner        users?        @relation("documents_owner", fields: [owner_id], references: [id])
-  sign_requests sign_requests[]
-  audit_logs   audit_logs[]
+  id                 Int           @id @default(autoincrement())
+  tenant_id          Int
+  owner_id           Int?
+  document_type_id   Int?
+  file_path          String
+  hash               String?
+  status             String?
+  version            Int           @default(1)
+  document_number    String?
+  numbering_rule_id  Int?
+  title              String?
+  summary            String?
+  priority_level     String?       @default("normal")
+  confidential_level String?       @default("normal")
+  effective_date     DateTime?
+  expiration_date    DateTime?
+  issued_date        DateTime?
+  created_at         DateTime      @default(now())
+  tenant             tenants       @relation(fields: [tenant_id], references: [id])
+  owner              users?        @relation("documents_owner", fields: [owner_id], references: [id])
+  document_type      document_types? @relation(fields: [document_type_id], references: [id])
+  sign_requests      sign_requests[]
+  audit_logs         audit_logs[]
+  tags               document_tags[]
+  permissions        document_permissions[]
+  versions           document_versions[]
 }
 
 model sign_requests {
@@ -164,4 +181,101 @@ model user_roles {
   role        roles     @relation(fields: [role_id], references: [id], onDelete: Cascade)
   
   @@id([user_id, role_id])
+}
+
+model document_types {
+  id                      Int       @id @default(autoincrement())
+  tenant_id               Int
+  code                    String
+  name                    String
+  description             String?
+  require_numbering       Boolean   @default(true)
+  require_digital_signing Boolean   @default(false)
+  category                String?
+  is_active               Boolean   @default(true)
+  created_at              DateTime  @default(now())
+  
+  tenant                  tenants   @relation(fields: [tenant_id], references: [id])
+  documents               documents[]
+  numbering_rules         numbering_rules[]
+  
+  @@unique([tenant_id, code])
+}
+
+model numbering_rules {
+  id                Int       @id @default(autoincrement())
+  tenant_id         Int
+  document_type_id  Int
+  pattern           String
+  reset_yearly      Boolean   @default(true)
+  last_number       Int       @default(0)
+  last_reset_year   Int?
+  is_active         Boolean   @default(true)
+  created_at        DateTime  @default(now())
+  
+  tenant            tenants   @relation(fields: [tenant_id], references: [id])
+  document_type     document_types @relation(fields: [document_type_id], references: [id])
+  
+  @@unique([tenant_id, document_type_id])
+}
+
+model external_organizations {
+  id             Int       @id @default(autoincrement())
+  tenant_id      Int
+  name           String
+  code           String?
+  category       String?
+  address        String?
+  phone          String?
+  email          String?
+  contact_person String?
+  is_active      Boolean   @default(true)
+  created_at     DateTime  @default(now())
+  
+  tenant         tenants   @relation(fields: [tenant_id], references: [id])
+  
+  @@unique([tenant_id, code])
+}
+
+model document_tags {
+  document_id Int
+  tag         String
+  created_at  DateTime  @default(now())
+  
+  document    documents @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  
+  @@id([document_id, tag])
+}
+
+model document_permissions {
+  id          Int       @id @default(autoincrement())
+  document_id Int
+  subject_type String
+  subject_id  Int
+  can_read    Boolean   @default(true)
+  can_edit    Boolean   @default(false)
+  can_approve Boolean   @default(false)
+  can_share   Boolean   @default(false)
+  can_delete  Boolean   @default(false)
+  granted_by  Int?
+  granted_at  DateTime  @default(now())
+  
+  document    documents @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  
+  @@unique([document_id, subject_type, subject_id])
+}
+
+model document_versions {
+  id          Int       @id @default(autoincrement())
+  document_id Int
+  version_no  Int
+  file_path   String
+  file_size   Int?
+  uploaded_by Int?
+  uploaded_at DateTime  @default(now())
+  comment     String?
+  
+  document    documents @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  
+  @@unique([document_id, version_no])
 }

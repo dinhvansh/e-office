@@ -1,144 +1,121 @@
-# WP Sign - E-Signature Platform
+# 🏢 E-Office - Document Management & Approval System
 
-Enterprise-grade electronic signature solution with multi-tenant support, RBAC, and comprehensive audit trails.
+Enterprise-grade document management and approval workflow system with multi-tenant support.
 
-## 🚀 Features
+## 🚀 Quick Start
 
-### Core Features
-- ✅ **Multi-tenant Architecture** - Isolated data per organization
-- ✅ **Document Management** - Upload, version control, secure storage
-- ✅ **E-Signature Workflows** - Sequential/parallel signing, OTP verification
-- ✅ **Email Integration** - OTP delivery, notifications (Gmail, Outlook, SendGrid, AWS SES, Mailgun)
-- ✅ **RBAC System** - Role-based access control with granular permissions
-- ✅ **Department Management** - Hierarchical organization structure
-- ✅ **User Management** - Full user lifecycle with role assignment
-- ✅ **License Management** - Offline license validation with JWT
-- ✅ **Webhook Support** - Real-time event notifications
-- ✅ **Audit Logs** - Complete activity tracking
+```bash
+# 1. Setup backend
+cd backend
+npm install
+cp .env.example .env
+npx prisma generate
+npx prisma db push
+node scripts/seed.js
+node scripts/seed-rbac.js
+npm run dev
 
-### Tech Stack
+# 2. Setup frontend
+cd frontend
+npm install
+cp .env.example .env.local
+npm run dev
+
+# 3. Access
+Frontend: http://localhost:3000
+Backend: http://localhost:4000
+Login: admin@example.com / admin123
+```
+
+## 📚 Documentation
+
+### Getting Started
+- **[QUICK-START.md](QUICK-START.md)** - Quick setup guide
+- **[QUICK-START-E-OFFICE.md](QUICK-START-E-OFFICE.md)** - E-Office development guide
+- **[README-TESTING.md](README-TESTING.md)** - Testing guide
+
+### Architecture & Planning
+- **[ERD.md](ERD.md)** - Database schema (full E-Office)
+- **[FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md)** - Functional requirements
+- **[ROADMAP-E-OFFICE.md](ROADMAP-E-OFFICE.md)** - 14-week development roadmap
+- **[SYSTEM-COMPARISON.md](SYSTEM-COMPARISON.md)** - Current vs target comparison
+- **[PHASE-1-PLAN.md](PHASE-1-PLAN.md)** - Detailed Phase 1 plan (2 weeks)
+
+### Technical Docs
+- **[docs/testing-guide.md](docs/testing-guide.md)** - Testing strategies
+- **[docs/email-setup.md](docs/email-setup.md)** - Email configuration
+- **[test-api.http](test-api.http)** - API testing (REST Client)
+
+### Setup & Deployment
+- **[docs/setup/](docs/setup/)** - GitHub setup guides
+- **[docs/dev/](docs/dev/)** - Development logs (AGENTS.md, CHANGELOG.md)
+- **[docs/archive/](docs/archive/)** - Old documentation
+
+## ✨ Features
+
+### Current (E-Signature Base) ✅
+- Multi-tenant architecture
+- User/Department/Role management with RBAC
+- Document upload & storage
+- Sign request workflow with OTP
+- Email integration (Gmail, Outlook, SendGrid, AWS SES, Mailgun)
+- License management (offline validation)
+- Webhook notifications
+- Audit logs
+
+### Planned (E-Office Full) 🚧
+- Document types & auto-numbering
+- Multi-step approval workflow
+- Incoming/Outgoing documents
+- Contract management
+- Advanced search & filters
+- Dashboard & KPI reports
+- Real-time notifications
+- Version control & comparison
+
+## 🏗️ Tech Stack
+
+- **Frontend**: Next.js 14, React, TailwindCSS, React Query
 - **Backend**: Node.js, Express, TypeScript, Prisma ORM
-- **Frontend**: Next.js 14 (App Router), React, TailwindCSS
 - **Database**: PostgreSQL
 - **Cache**: Redis
-- **Email**: Nodemailer with SMTP
+- **Email**: Nodemailer
 - **License**: JWT-based offline validation
 
 ## 📁 Project Structure
 
 ```
-e-office/
 ├── backend/              # Express API server
 │   ├── src/
 │   │   ├── modules/      # Feature modules
-│   │   │   ├── auth/
-│   │   │   ├── users/
-│   │   │   ├── departments/
-│   │   │   ├── roles/
-│   │   │   ├── documents/
-│   │   │   ├── signRequests/
-│   │   │   └── ...
 │   │   ├── middleware/   # Auth, permissions
-│   │   └── config/       # Email, database
-│   ├── prisma/           # Database schema & migrations
+│   │   └── config/       # Configuration
+│   ├── prisma/           # Database schema
 │   └── scripts/          # Seed & test scripts
 ├── frontend/             # Next.js dashboard
 │   └── app/
 │       └── (dashboard)/  # Protected routes
-│           ├── users/
-│           ├── departments/
-│           ├── roles/
-│           ├── documents/
-│           └── sign-requests/
-├── license-server/       # License validation service
+├── license-server/       # License validation
+├── docs/                 # Documentation
 └── docker-compose.yml    # Dev environment
 ```
 
-## 🛠️ Setup
+## 🗺️ Development Roadmap
 
-### Prerequisites
-- Node.js 18+
-- PostgreSQL 14+
-- Redis 6+
-- npm or yarn
+| Phase | Duration | Focus | Status |
+|-------|----------|-------|--------|
+| Phase 0 | ✅ Done | E-Signature Base | Complete |
+| Phase 1 | Week 1-2 | Document Types + Numbering | 🔜 Next |
+| Phase 2 | Week 3-4 | Workflow Engine | Pending |
+| Phase 3 | Week 5-6 | In/Out Documents | Pending |
+| Phase 4 | Week 7-8 | Advanced Features | Pending |
+| Phase 5 | Week 9-10 | Dashboard & Reports | Pending |
+| Phase 6 | Week 11-12 | Integrations | Pending |
+| Phase 7 | Week 13-14 | Testing & Polish | Pending |
 
-### Quick Start
+**Total Timeline**: 14 weeks (~3.5 months)
 
-1. **Clone repository**
-```bash
-git clone <your-repo-url>
-cd e-office
-```
-
-2. **Setup Backend**
-```bash
-cd backend
-npm install
-cp .env.example .env
-# Edit .env with your database credentials
-npx prisma generate
-npx prisma db push
-node scripts/seed.js
-node scripts/seed-rbac.js
-```
-
-3. **Setup Frontend**
-```bash
-cd frontend
-npm install
-cp .env.example .env.local
-# Edit NEXT_PUBLIC_API_BASE_URL=http://localhost:4000/api/v1
-```
-
-4. **Setup License Server**
-```bash
-cd license-server
-npm install
-cp .env.example .env
-```
-
-5. **Start Services**
-
-Using Docker (recommended):
-```bash
-docker-compose up -d postgres redis
-```
-
-Or manually start PostgreSQL & Redis, then:
-```bash
-# Terminal 1 - Backend
-cd backend && npm run dev
-
-# Terminal 2 - Frontend
-cd frontend && npm run dev
-
-# Terminal 3 - License Server
-cd license-server && npm run dev
-```
-
-6. **Access Application**
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:4000
-- License Server: http://localhost:5000
-
-**Default Login:**
-- Email: `admin@example.com`
-- Password: `admin123`
-
-## 📧 Email Configuration
-
-Edit `backend/.env`:
-
-```env
-# Gmail
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-
-# Or use other providers (Outlook, SendGrid, AWS SES, Mailgun)
-# See docs/email-setup.md for details
-```
+See [ROADMAP-E-OFFICE.md](ROADMAP-E-OFFICE.md) for details.
 
 ## 🧪 Testing
 
@@ -147,54 +124,35 @@ SMTP_PASS=your-app-password
 cd backend
 npm test
 
-# E2E tests (requires running servers)
+# E2E tests
 cd frontend
 npm run test:e2e
 
-# API testing with REST Client
+# API testing
 # Open test-api.http in VS Code with REST Client extension
 ```
 
-## 📚 Documentation
+## 🔐 Security
 
-- [Quick Start Guide](QUICK-START.md)
-- [Testing Guide](docs/testing-guide.md)
-- [Email Setup](docs/email-setup.md)
-- [API Documentation](test-api.http)
-- [Development Log](AGENTS.md)
+- Role-based access control (RBAC)
+- Granular permissions (27 permissions across 7 resources)
+- JWT authentication
+- Password hashing (bcrypt)
+- Tenant data isolation
+- Audit logging
 
-## 🔐 Security Notes
+## 📧 Email Configuration
 
-**IMPORTANT**: Never commit these files:
-- `.env` files (contains secrets)
-- `uploads/` folder (user documents)
-- Database credentials
-- SMTP passwords
-- License keys
+Supports multiple providers:
+- Gmail
+- Outlook
+- SendGrid
+- AWS SES
+- Mailgun
 
-All sensitive files are already in `.gitignore`.
+See [docs/email-setup.md](docs/email-setup.md) for configuration.
 
-## 🏗️ Architecture
-
-### RBAC System
-- **4 Default Roles**: Admin, Manager, User, Viewer
-- **27 Permissions** across 7 resources
-- **Granular Control**: resource:action format (e.g., `documents:create`)
-
-### Multi-tenant Isolation
-- Tenant-scoped data access
-- Separate license limits per tenant
-- Isolated document storage
-
-### Signing Workflow
-1. Upload document
-2. Create sign request with signers
-3. Send OTP to signers
-4. Signers verify OTP and sign
-5. Document marked as completed
-6. Webhook notifications sent
-
-## 🚀 Deployment
+## 🚢 Deployment
 
 ### Environment Variables
 See `.env.example` files in each service folder.
@@ -220,12 +178,15 @@ cd frontend && npm run build
 
 ## 🤝 Contributing
 
-[Your Contributing Guidelines]
+See [docs/dev/AGENTS.md](docs/dev/AGENTS.md) for development guidelines.
 
 ## 📞 Support
 
-[Your Support Information]
+For issues and questions, please check:
+1. [QUICK-START.md](QUICK-START.md)
+2. [docs/testing-guide.md](docs/testing-guide.md)
+3. [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md)
 
 ---
 
-**Built with ❤️ for secure document signing**
+**Built with ❤️ for enterprise document management**
