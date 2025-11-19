@@ -1,10 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tantml:parameter>
-<parameter name="text">'use client';
-
-import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Building2, Users, Edit, Trash2, ChevronRight } from 'lucide-react';
 

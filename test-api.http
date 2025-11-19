@@ -9,8 +9,8 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "admin@tenant1.com",
-  "password": "password123"
+  "email": "admin@acme.local",
+  "password": "secret123"
 }
 
 ### 2. Get Tenant Info
@@ -104,4 +104,221 @@ Content-Type: application/json
 
 ### 13. Delete Document
 DELETE {{baseUrl}}/documents/1
+Authorization: Bearer {{accessToken}}
+
+### ========================================
+### DOCUMENT TYPES + NUMBERING INTEGRATION
+### ========================================
+
+### 14. List Document Types
+GET {{baseUrl}}/document-types
+Authorization: Bearer {{accessToken}}
+
+### 15. Upload Document WITHOUT document_type_id (backward compatibility)
+POST {{baseUrl}}/documents
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "file_name": "test-no-type.pdf",
+  "file_base64": "JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKL01lZGlhQm94IFswIDAgNjEyIDc5Ml0KPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovQ29udGVudHMgNCAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL0xlbmd0aCAzMwo+PgpzdHJlYW0KQlQKL0YxIDEyIFRmCjEwMCA3MDAgVGQKKFRlc3QpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDUKMDAwMDAwMDAwMCA2NTUzNSBmCjAwMDAwMDAwMDkgMDAwMDAgbgowMDAwMDAwMDU4IDAwMDAwIG4KMDAwMDAwMDEzNiAwMDAwMCBuCjAwMDAwMDAxOTYgMDAwMDAgbgp0cmFpbGVyCjw8Ci9TaXplIDUKL1Jvb3QgMSAwIFIKPj4Kc3RhcnR4cmVmCjI3OAolJUVPRg=="
+}
+
+### 16. Upload Document WITH document_type_id (require_numbering = false)
+# Expected: document_type_id set, document_number NULL
+# Use document type ID from step 14 (e.g., "Hợp đồng" or type without numbering)
+POST {{baseUrl}}/documents
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "file_name": "contract-no-numbering.pdf",
+  "file_base64": "JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKL01lZGlhQm94IFswIDAgNjEyIDc5Ml0KPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovQ29udGVudHMgNCAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL0xlbmd0aCAzMwo+PgpzdHJlYW0KQlQKL0YxIDEyIFRmCjEwMCA3MDAgVGQKKFRlc3QpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDUKMDAwMDAwMDAwMCA2NTUzNSBmCjAwMDAwMDAwMDkgMDAwMDAgbgowMDAwMDAwMDU4IDAwMDAwIG4KMDAwMDAwMDEzNiAwMDAwMCBuCjAwMDAwMDAxOTYgMDAwMDAgbgp0cmFpbGVyCjw8Ci9TaXplIDUKL1Jvb3QgMSAwIFIKPj4Kc3RhcnR4cmVmCjI3OAolJUVPRg==",
+  "document_type_id": 8
+}
+
+### 17. Upload Document WITH document_type_id (require_numbering = true, has rule)
+# Expected: document_type_id set, document_number generated, numbering_rule_id set
+# Use document type ID from step 14 (e.g., "Quyết định" ID=1)
+POST {{baseUrl}}/documents
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "file_name": "decision-with-numbering.pdf",
+  "file_base64": "JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKL01lZGlhQm94IFswIDAgNjEyIDc5Ml0KPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovQ29udGVudHMgNCAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL0xlbmd0aCAzMwo+PgpzdHJlYW0KQlQKL0YxIDEyIFRmCjEwMCA3MDAgVGQKKFRlc3QpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDUKMDAwMDAwMDAwMCA2NTUzNSBmCjAwMDAwMDAwMDkgMDAwMDAgbgowMDAwMDAwMDU4IDAwMDAwIG4KMDAwMDAwMDEzNiAwMDAwMCBuCjAwMDAwMDAxOTYgMDAwMDAgbgp0cmFpbGVyCjw8Ci9TaXplIDUKL1Jvb3QgMSAwIFIKPj4Kc3RhcnR4cmVmCjI3OAolJUVPRg==",
+  "document_type_id": 1
+}
+
+### 18. Upload Document WITH document_type_id (require_numbering = true, NO rule)
+# Expected: 400 error with code "NUMBERING_RULE_NOT_CONFIGURED"
+# First, create a document type without numbering rule, or disable existing rule
+POST {{baseUrl}}/documents
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "file_name": "should-fail.pdf",
+  "file_base64": "JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKL01lZGlhQm94IFswIDAgNjEyIDc5Ml0KPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovQ29udGVudHMgNCAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL0xlbmd0aCAzMwo+PgpzdHJlYW0KQlQKL0YxIDEyIFRmCjEwMCA3MDAgVGQKKFRlc3QpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDUKMDAwMDAwMDAwMCA2NTUzNSBmCjAwMDAwMDAwMDkgMDAwMDAgbgowMDAwMDAwMDU4IDAwMDAwIG4KMDAwMDAwMDEzNiAwMDAwMCBuCjAwMDAwMDAxOTYgMDAwMDAgbgp0cmFpbGVyCjw8Ci9TaXplIDUKL1Jvb3QgMSAwIFIKPj4Kc3RhcnR4cmVmCjI3OAolJUVPRg==",
+  "document_type_id": 999
+}
+
+
+### ========================================
+### PHASE 1: DOCUMENT TAGS, PERMISSIONS, VERSIONS
+### ========================================
+
+### 1. Get All Tags (tenant-wide)
+GET {{baseUrl}}/documents/tags/all
+Authorization: Bearer {{accessToken}}
+
+### 2. Add Tag to Document
+# Replace :id with actual document ID
+POST {{baseUrl}}/documents/1/tags
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "tag": "urgent"
+}
+
+### 3. Add Another Tag
+POST {{baseUrl}}/documents/1/tags
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "tag": "confidential"
+}
+
+### 4. Get Document Tags
+GET {{baseUrl}}/documents/1/tags
+Authorization: Bearer {{accessToken}}
+
+### 5. Remove Tag from Document
+DELETE {{baseUrl}}/documents/1/tags
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "tag": "urgent"
+}
+
+### ========================================
+### DOCUMENT PERMISSIONS
+### ========================================
+
+### 6. Grant Permission to User
+POST {{baseUrl}}/documents/1/permissions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "subject_type": "user",
+  "subject_id": 1,
+  "can_read": true,
+  "can_edit": true,
+  "can_approve": false,
+  "can_share": true,
+  "can_delete": false
+}
+
+### 7. Grant Permission to Department
+POST {{baseUrl}}/documents/1/permissions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "subject_type": "department",
+  "subject_id": 1,
+  "can_read": true,
+  "can_edit": false,
+  "can_approve": true,
+  "can_share": false,
+  "can_delete": false
+}
+
+### 8. Get Document Permissions
+GET {{baseUrl}}/documents/1/permissions
+Authorization: Bearer {{accessToken}}
+
+### 9. Revoke Permission
+DELETE {{baseUrl}}/documents/1/permissions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "subject_type": "user",
+  "subject_id": 1
+}
+
+### ========================================
+### DOCUMENT VERSIONS
+### ========================================
+
+### 10. Create New Version
+POST {{baseUrl}}/documents/1/versions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "file_path": "/storage/documents/doc-v2.pdf",
+  "change_summary": "Updated contract terms and conditions"
+}
+
+### 11. Create Another Version
+POST {{baseUrl}}/documents/1/versions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "file_path": "/storage/documents/doc-v3.pdf",
+  "change_summary": "Fixed typos and formatting"
+}
+
+### 12. Get All Versions
+GET {{baseUrl}}/documents/1/versions
+Authorization: Bearer {{accessToken}}
+
+### 13. Get Latest Version
+GET {{baseUrl}}/documents/1/versions/latest
+Authorization: Bearer {{accessToken}}
+
+### ========================================
+### COMBINED TEST: Upload Document with Tags
+### ========================================
+
+### 14. Upload Document
+POST {{baseUrl}}/documents
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "file_name": "test-document-with-tags.pdf",
+  "file_base64": "JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKL01lZGlhQm94IFswIDAgNjEyIDc5Ml0KPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovQ29udGVudHMgNCAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL0xlbmd0aCAzMwo+PgpzdHJlYW0KQlQKL0YxIDEyIFRmCjEwMCA3MDAgVGQKKFRlc3QpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDUKMDAwMDAwMDAwMCA2NTUzNSBmCjAwMDAwMDAwMDkgMDAwMDAgbgowMDAwMDAwMDU4IDAwMDAwIG4KMDAwMDAwMDEzNiAwMDAwMCBuCjAwMDAwMDAxOTYgMDAwMDAgbgp0cmFpbGVyCjw8Ci9TaXplIDUKL1Jvb3QgMSAwIFIKPj4Kc3RhcnR4cmVmCjI3OAolJUVPRg==",
+  "document_type_id": 1,
+  "title": "Test Document for Tags"
+}
+
+### 15. Add Multiple Tags to New Document
+# Use document ID from previous response
+POST {{baseUrl}}/documents/2/tags
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "tag": "important"
+}
+
+### 16. Add Second Tag
+POST {{baseUrl}}/documents/2/tags
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "tag": "review-needed"
+}
+
+### 17. Verify Tags
+GET {{baseUrl}}/documents/2/tags
 Authorization: Bearer {{accessToken}}

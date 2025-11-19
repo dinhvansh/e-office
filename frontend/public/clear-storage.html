@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clear Storage</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    button {
+      background: #dc2626;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 20px;
+    }
+    button:hover {
+      background: #b91c1c;
+    }
+    .success {
+      color: #16a34a;
+      margin-top: 20px;
+      font-weight: 500;
+    }
+    .info {
+      background: #fef3c7;
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 20px;
+      border-left: 4px solid #f59e0b;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧹 Clear Auth Storage</h1>
+    <p>This will clear all authentication data from localStorage and sessionStorage.</p>
+    
+    <div class="info">
+      <strong>Current Storage:</strong>
+      <pre id="current-storage" style="margin-top: 10px; font-size: 12px;"></pre>
+    </div>
+
+    <button onclick="clearStorage()">Clear All Storage</button>
+    
+    <div id="result"></div>
+  </div>
+
+  <script>
+    function displayCurrentStorage() {
+      const storage = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        storage[key] = localStorage.getItem(key);
+      }
+      document.getElementById('current-storage').textContent = 
+        JSON.stringify(storage, null, 2) || 'Empty';
+    }
+
+    function clearStorage() {
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      document.getElementById('result').innerHTML = 
+        '<div class="success">✅ Storage cleared successfully! You can now close this page and login again.</div>';
+      
+      displayCurrentStorage();
+    }
+
+    displayCurrentStorage();
+  </script>
+</body>
+</html>

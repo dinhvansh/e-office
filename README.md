@@ -24,7 +24,7 @@ npm run dev
 # 3. Access
 Frontend: http://localhost:3000
 Backend: http://localhost:4000
-Login: admin@example.com / admin123
+Login: admin@acme.local / secret123
 ```
 
 ## 📚 Documentation

@@ -2,6 +2,54 @@ import { numberingRepository } from './numbering.repository';
 
 export const numberingService = {
   /**
+   * Generate document number for a new document
+   * Returns both the document number and the rule ID
+   */
+  async generateNumberForDocument(
+    tenantId: number,
+    documentTypeId: number
+  ): Promise<{ documentNumber: string; ruleId: number }> {
+    // Get numbering rule
+    const rule = await numberingRepository.findByDocumentType(tenantId, documentTypeId);
+    
+    if (!rule) {
+      throw new Error('Numbering rule not found for this document type');
+    }
+
+    if (!rule.is_active) {
+      throw new Error('Numbering rule is not active');
+    }
+
+    // Get current date
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+
+    // Increment number (with transaction)
+    const { number } = await numberingRepository.incrementNumber(rule.id, currentYear);
+
+    // Format number with leading zeros (3 digits)
+    const formattedNumber = String(number).padStart(3, '0');
+
+    // Build tokens map
+    const tokens: Record<string, string> = {
+      AUTO: formattedNumber,
+      YEAR: String(currentYear),
+      MONTH: currentMonth,
+      DEPT: '', // Empty for now, will be filled in Phase 2
+      TYPE: rule.document_type.code,
+    };
+
+    // Replace tokens in pattern
+    let documentNumber = rule.pattern;
+    Object.entries(tokens).forEach(([key, value]) => {
+      documentNumber = documentNumber.replace(`{${key}}`, value);
+    });
+
+    return { documentNumber, ruleId: rule.id };
+  },
+
+  /**
    * Generate document number based on numbering rule
    * Pattern tokens:
    * - {AUTO} - Auto increment number (001, 002, ...)

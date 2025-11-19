@@ -53,7 +53,14 @@ class AuthService {
         tenantId: payload.tenantId,
         role: payload.role ?? null,
       };
-    } catch {
+    } catch (error) {
+      // Only log in development to avoid spam
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[AUTH] Token verification failed:', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          tokenPreview: token.substring(0, 20) + '...',
+        });
+      }
       throw ApiError.unauthorized("Invalid token", "INVALID_TOKEN");
     }
   }

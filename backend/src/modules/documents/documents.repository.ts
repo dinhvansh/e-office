@@ -8,6 +8,13 @@ export interface CreateDocumentData {
   hash?: string | null;
   status?: string | null;
   version?: number;
+  document_type_id?: number | null;
+  document_number?: string | null;
+  numbering_rule_id?: number | null;
+  title?: string | null;
+  summary?: string | null;
+  priority_level?: string | null;
+  confidential_level?: string | null;
 }
 
 export class DocumentsRepository {

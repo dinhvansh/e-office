@@ -3,63 +3,56 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, FileText, Edit, Trash2, Settings } from 'lucide-react';
-
-interface DocumentType {
-  id: number;
-  code: string;
-  name: string;
-  description?: string;
-  category?: string;
-  require_numbering: boolean;
-  require_digital_signing: boolean;
-  is_active: boolean;
-  _count: { documents: number };
-  numbering_rules: Array<{
-    id: number;
-    pattern: string;
-    last_number: number;
-  }>;
-}
+import { DocumentType } from '@/lib/types';
+import { useAuth } from '@/components/providers/auth-provider';
 
 export default function DocumentTypesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingType, setEditingType] = useState<DocumentType | null>(null);
+  const [showNumberingPattern, setShowNumberingPattern] = useState(true);
   const queryClient = useQueryClient();
+  const { fetchJson } = useAuth();
 
   const { data: typesData, isLoading } = useQuery({
     queryKey: ['document-types'],
-    queryFn: async () => {
-      const token = localStorage.getItem('token');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/document-types`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!res.ok) throw new Error('Failed to fetch document types');
-      return res.json();
+    queryFn: () => fetchJson<DocumentType[]>('/document-types'),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: Partial<DocumentType>) =>
+      fetchJson('/document-types', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['document-types'] });
+      setShowCreateModal(false);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, ...data }: Partial<DocumentType> & { id: number }) =>
+      fetchJson(`/document-types/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['document-types'] });
+      setShowCreateModal(false);
+      setEditingType(null);
     },
   });
 
   const deleteTypeMutation = useMutation({
-    mutationFn: async (typeId: number) => {
-      const token = localStorage.getItem('token');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/document-types/${typeId}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Failed to delete');
-      }
-      return res.json();
-    },
+    mutationFn: (typeId: number) =>
+      fetchJson(`/document-types/${typeId}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['document-types'] });
     },
   });
 
-  const types: DocumentType[] = typesData?.data || [];
+  const types: DocumentType[] = typesData || [];
+
+  // Ensure _count exists for compatibility
+  const typesWithCount = types.map(type => ({
+    ...type,
+    _count: type._count || { documents: 0 },
+    numbering_rules: type.numbering_rules || [],
+  }));
 
   const categoryColors: Record<string, string> = {
     incoming: 'bg-blue-100 text-blue-700',
@@ -105,7 +98,7 @@ export default function DocumentTypesPage() {
             Chưa có loại văn bản nào
           </div>
         ) : (
-          types.map((type) => (
+          typesWithCount.map((type) => (
             <div
               key={type.id}
               className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow"
@@ -173,6 +166,11 @@ export default function DocumentTypesPage() {
                 </span>
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={() => {
+                      setEditingType(type);
+                      setShowNumberingPattern(type.require_numbering);
+                      setShowCreateModal(true);
+                    }}
                     className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     title="Chỉnh sửa"
                   >
@@ -199,6 +197,224 @@ export default function DocumentTypesPage() {
           ))
         )}
       </div>
+
+      {/* Create/Edit Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black bg-opacity-30" onClick={() => setShowCreateModal(false)} />
+            <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-gray-100">
+              <div className="mb-6">
+                <h3 className="text-xl font-bold text-gray-900">
+                  {editingType ? '✏️ Chỉnh sửa loại văn bản' : '📝 Thêm loại văn bản mới'}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {editingType ? 'Cập nhật thông tin loại văn bản' : 'Tạo loại văn bản để phân loại và quản lý tài liệu'}
+                </p>
+              </div>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const requireNumbering = formData.get('require_numbering') === 'on';
+                  const data = {
+                    code: formData.get('code') as string,
+                    name: formData.get('name') as string,
+                    description: formData.get('description') as string,
+                    category: formData.get('category') as string,
+                    require_numbering: requireNumbering,
+                    require_digital_signing: formData.get('require_digital_signing') === 'on',
+                    numbering_pattern: requireNumbering ? (formData.get('numbering_pattern') as string) : null,
+                  };
+                  if (editingType) {
+                    updateMutation.mutate({ id: editingType.id, ...data });
+                  } else {
+                    createMutation.mutate(data);
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mã *</label>
+                  <input
+                    name="code"
+                    required
+                    defaultValue={editingType?.code}
+                    placeholder="VD: CV, HD, QD"
+                    className="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tên *</label>
+                  <input
+                    name="name"
+                    required
+                    defaultValue={editingType?.name}
+                    placeholder="VD: Công văn, Hợp đồng"
+                    className="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
+                  <textarea
+                    name="description"
+                    rows={3}
+                    defaultValue={editingType?.description || ''}
+                    placeholder="Mô tả chi tiết về loại văn bản..."
+                    className="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Danh mục</label>
+                  <select
+                    name="category"
+                    defaultValue={editingType?.category || ''}
+                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
+                  >
+                    <option value="" className="text-gray-400">Chọn danh mục</option>
+                    <option value="incoming" className="text-gray-900">� VVăn bản đến</option>
+                    <option value="outgoing" className="text-gray-900">📤 Văn bản đi</option>
+                    <option value="internal" className="text-gray-900">🏢 Nội bộ</option>
+                    <option value="contract" className="text-gray-900">📄 Hợp đồng</option>
+                  </select>
+                </div>
+                <div className="space-y-4 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-5 border border-gray-200">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      name="require_numbering"
+                      defaultChecked={editingType?.require_numbering ?? true}
+                      onChange={(e) => setShowNumberingPattern(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
+                    />
+                    <span className="text-sm font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
+                      🔢 Yêu cầu đánh số tự động
+                    </span>
+                  </label>
+
+                  {showNumberingPattern && (
+                    <div className="ml-7 space-y-3 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Cấu hình đánh số
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = document.querySelector('[name="numbering_pattern"]') as HTMLInputElement;
+                            if (input) input.value = (input.value || '') + '{AUTO}';
+                          }}
+                          className="px-3 py-2 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
+                          + Số tự động
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = document.querySelector('[name="numbering_pattern"]') as HTMLInputElement;
+                            if (input) input.value = (input.value || '') + '{YEAR}';
+                          }}
+                          className="px-3 py-2 text-xs font-medium bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
+                        >
+                          + Năm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = document.querySelector('[name="numbering_pattern"]') as HTMLInputElement;
+                            if (input) input.value = (input.value || '') + '{MONTH}';
+                          }}
+                          className="px-3 py-2 text-xs font-medium bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
+                        >
+                          + Tháng
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = document.querySelector('[name="numbering_pattern"]') as HTMLInputElement;
+                            if (input) input.value = (input.value || '') + '{TYPE}';
+                          }}
+                          className="px-3 py-2 text-xs font-medium bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors"
+                        >
+                          + Mã loại
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = document.querySelector('[name="numbering_pattern"]') as HTMLInputElement;
+                            if (input) input.value = (input.value || '') + '/';
+                          }}
+                          className="px-3 py-2 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          + Dấu /
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = document.querySelector('[name="numbering_pattern"]') as HTMLInputElement;
+                            if (input) input.value = (input.value || '') + '-';
+                          }}
+                          className="px-3 py-2 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          + Dấu -
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        name="numbering_pattern"
+                        defaultValue="{AUTO}/{YEAR}"
+                        placeholder="VD: {AUTO}/{YEAR} hoặc {TYPE}-{AUTO}/{MONTH}/{YEAR}"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                      />
+                      <div className="text-xs text-gray-500 space-y-1">
+                        <p className="font-medium">Ví dụ kết quả:</p>
+                        <p className="font-mono bg-gray-50 px-2 py-1 rounded">001/2025 hoặc CV-001/11/2025</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      name="require_digital_signing"
+                      defaultChecked={editingType?.require_digital_signing ?? false}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
+                    />
+                    <span className="text-sm font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
+                      ✍️ Yêu cầu ký số điện tử
+                    </span>
+                  </label>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setEditingType(null);
+                    }}
+                    className="flex-1 rounded-lg border-2 border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={createMutation.isPending || updateMutation.isPending}
+                    className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    {editingType
+                      ? updateMutation.isPending
+                        ? '⏳ Đang cập nhật...'
+                        : '💾 Cập nhật'
+                      : createMutation.isPending
+                      ? '⏳ Đang tạo...'
+                      : '✨ Tạo mới'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

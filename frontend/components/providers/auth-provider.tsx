@@ -11,6 +11,7 @@ type AuthUser = {
 type TenantProfile = {
   id: number;
   name: string | null;
+  domain?: string | null;
   plan: string | null;
   status: string | null;
   created_at?: string | null;
@@ -95,6 +96,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
+    if (!res.ok) {
+      throw new Error('Đăng nhập thất bại');
+    }
     const payload = await res.json();
     if (!payload.success) {
       throw new Error(payload.error?.message ?? 'Đăng nhập thất bại');
@@ -115,20 +119,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!tokens?.refreshToken) {
       return false;
     }
-    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: tokens.refreshToken }),
-    });
-    const payload = await res.json();
-    if (!payload.success) {
-      logout();
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: tokens.refreshToken }),
+      });
+      if (!res.ok) {
+        console.error('[Auth] Refresh failed with status:', res.status);
+        logout();
+        return false;
+      }
+      const payload = await res.json();
+      if (!payload.success) {
+        console.error('[Auth] Refresh failed:', payload.error);
+        logout();
+        return false;
+      }
+      console.log('[Auth] Token refreshed successfully');
+      setTokens(payload.data.tokens);
+      setUser(payload.data.user);
+      setTenant(payload.data.tenant);
+      return true;
+    } catch (error) {
+      console.error('[Auth] Refresh error:', error);
+      // Only logout if it's an auth error, not network error
+      if (error instanceof Error && !error.message.includes('fetch')) {
+        logout();
+      }
       return false;
     }
-    setTokens(payload.data.tokens);
-    setUser(payload.data.user);
-    setTenant(payload.data.tenant);
-    return true;
   }, [logout, tokens?.refreshToken]);
 
   const fetchJson = useCallback(
@@ -143,13 +163,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           },
         });
         if (res.status === 401 && !retry) {
+          console.log('[Auth] Got 401, attempting token refresh...');
           const refreshed = await refreshTokens();
           if (refreshed) {
+            console.log('[Auth] Retry request after refresh');
             return attempt(true);
           }
+          console.error('[Auth] Refresh failed, request aborted');
         }
         const json = await res.json();
         if (!json.success) {
+          console.error('[Auth] Request failed:', json.error);
           throw new Error(json.error?.message ?? 'Request failed');
         }
         return json.data as T;

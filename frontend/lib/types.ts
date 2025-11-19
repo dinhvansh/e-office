@@ -6,6 +6,25 @@ export type DocumentRecord = {
   status: string | null;
   version: number;
   created_at: string;
+  document_type_id?: number | null;
+  document_number?: string | null;
+};
+
+export type DocumentType = {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  category?: string;
+  require_numbering: boolean;
+  require_digital_signing: boolean;
+  is_active: boolean;
+  _count?: { documents: number };
+  numbering_rules?: Array<{
+    id: number;
+    pattern: string;
+    last_number: number;
+  }>;
 };
 
 export type TenantProfile = {

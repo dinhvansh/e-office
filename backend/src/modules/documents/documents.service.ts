@@ -5,12 +5,19 @@ import { ApiError } from "../../core/errors/api-error";
 import { saveBase64Document } from "../../core/utils/fileStorage";
 import { auditService } from "../audit/audit.service";
 import { licenseService } from "../licenses/license.service";
+import { numberingService } from "../numbering/numbering.service";
+import { prisma } from "../../config/prisma";
 import { CreateDocumentData, documentsRepository } from "./documents.repository";
 
 export interface CreateDocumentInput {
   fileName: string;
   base64?: string;
   storagePath?: string;
+  documentTypeId?: number;
+  title?: string;
+  summary?: string;
+  priorityLevel?: string;
+  confidentialLevel?: string;
 }
 
 class DocumentsService {
@@ -42,12 +49,56 @@ class DocumentsService {
       const buffer = await fs.readFile(filePath);
       hash = crypto.createHash("sha256").update(buffer).digest("hex");
     }
+
+    // Handle document type and numbering
+    let documentTypeId: number | null = null;
+    let documentNumber: string | null = null;
+    let numberingRuleId: number | null = null;
+
+    if (input.documentTypeId) {
+      // Load document type
+      const documentType = await prisma.document_types.findFirst({
+        where: {
+          id: input.documentTypeId,
+          tenant_id: tenantId,
+          is_active: true,
+        },
+      });
+
+      if (!documentType) {
+        throw ApiError.notFound("Document type not found", "DOCUMENT_TYPE_NOT_FOUND");
+      }
+
+      documentTypeId = documentType.id;
+
+      // Generate document number if required
+      if (documentType.require_numbering) {
+        try {
+          const result = await numberingService.generateNumberForDocument(tenantId, documentType.id);
+          documentNumber = result.documentNumber;
+          numberingRuleId = result.ruleId;
+        } catch (error) {
+          throw ApiError.badRequest(
+            "Numbering rule not configured for this document type",
+            "NUMBERING_RULE_NOT_CONFIGURED"
+          );
+        }
+      }
+    }
+
     const payload: CreateDocumentData = {
       tenant_id: tenantId,
       owner_id: ownerId,
       file_path: filePath,
       hash,
       status: "draft",
+      document_type_id: documentTypeId,
+      document_number: documentNumber,
+      numbering_rule_id: numberingRuleId,
+      title: input.title,
+      summary: input.summary,
+      priority_level: input.priorityLevel,
+      confidential_level: input.confidentialLevel,
     };
     const document = await documentsRepository.create(payload);
     await auditService.record({

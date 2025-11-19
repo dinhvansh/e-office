@@ -4,13 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { ChangeEvent, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DocumentRecord } from "@/lib/types";
+import { DocumentRecord, DocumentType } from "@/lib/types";
 
 export default function DocumentsPage() {
   const { fetchJson } = useAuth();
   const queryClient = useQueryClient();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
+  const [selectedDocumentTypeId, setSelectedDocumentTypeId] = useState<number | null>(null);
+
   const { data: documents, isLoading } = useQuery({
     queryKey: ["documents"],
     queryFn: async () => {
@@ -19,20 +21,38 @@ export default function DocumentsPage() {
     },
   });
 
+  const { data: documentTypesData } = useQuery({
+    queryKey: ["document-types"],
+    queryFn: async () => {
+      const data = await fetchJson<DocumentType[]>("/document-types");
+      return data;
+    },
+  });
+
+  const activeDocumentTypes = documentTypesData?.filter((type) => type.is_active) || [];
+
   const uploadMutation = useMutation({
     mutationFn: async () => {
       if (!selectedFile) {
-        throw new Error("Vui long chon file PDF");
+        throw new Error("Vui lòng chọn file PDF");
+      }
+      if (!selectedDocumentTypeId) {
+        throw new Error("Vui lòng chọn loại văn bản");
       }
       const base64 = await fileToBase64(selectedFile);
       await fetchJson("/documents", {
         method: "POST",
-        body: JSON.stringify({ file_name: fileName || selectedFile.name, file_base64: base64 }),
+        body: JSON.stringify({
+          file_name: fileName || selectedFile.name,
+          file_base64: base64,
+          document_type_id: selectedDocumentTypeId,
+        }),
       });
     },
     onSuccess: () => {
       setSelectedFile(null);
       setFileName("");
+      setSelectedDocumentTypeId(null);
       queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
   });
@@ -61,29 +81,44 @@ export default function DocumentsPage() {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="text-sm font-medium text-slate-600">
+            Loại văn bản <span className="text-red-500">*</span>
+            <select
+              className="input mt-2"
+              value={selectedDocumentTypeId || ""}
+              onChange={(e) => setSelectedDocumentTypeId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">-- Chọn loại văn bản --</option>
+              {activeDocumentTypes.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name} ({type.code})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-slate-600">
             Tên hiển thị
             <input className="input mt-2" value={fileName} placeholder="Hợp đồng đối tác 2025" onChange={(e) => setFileName(e.target.value)} />
           </label>
-          <label className="text-sm font-medium text-slate-600">
-            Chọn file PDF
-            <div className="mt-2 flex h-32 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white/70 text-slate-500">
-              <input className="absolute h-32 w-full cursor-pointer opacity-0" type="file" accept="application/pdf" onChange={handleFileChange} />
-              <div className="text-center text-xs">
-                {selectedFile ? (
-                  <>
-                    <p className="font-semibold text-slate-700">{selectedFile.name}</p>
-                    <p>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-semibold text-slate-700">Kéo thả PDF vào đây</p>
-                    <p>Hoặc click để chọn file</p>
-                  </>
-                )}
-              </div>
-            </div>
-          </label>
         </div>
+        <label className="text-sm font-medium text-slate-600">
+          Chọn file PDF
+          <div className="mt-2 flex h-32 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white/70 text-slate-500">
+            <input className="absolute h-32 w-full cursor-pointer opacity-0" type="file" accept="application/pdf" onChange={handleFileChange} />
+            <div className="text-center text-xs">
+              {selectedFile ? (
+                <>
+                  <p className="font-semibold text-slate-700">{selectedFile.name}</p>
+                  <p>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold text-slate-700">Kéo thả PDF vào đây</p>
+                  <p>Hoặc click để chọn file</p>
+                </>
+              )}
+            </div>
+          </div>
+        </label>
         <button onClick={() => uploadMutation.mutate()} disabled={uploadMutation.isPending} className="button-primary mt-6">
           {uploadMutation.isPending ? "Đang tải..." : "Tải tài liệu"}
         </button>
@@ -107,6 +142,7 @@ export default function DocumentsPage() {
                 <tr>
                   <th className="px-4 py-3">ID</th>
                   <th className="px-4 py-3">Tên file</th>
+                  <th className="px-4 py-3">Số văn bản</th>
                   <th className="px-4 py-3">Trạng thái</th>
                   <th className="px-4 py-3">Ngày tạo</th>
                   <th className="px-4 py-3 text-right">Thao tác</th>
@@ -117,6 +153,13 @@ export default function DocumentsPage() {
                   <tr key={doc.id} className="border-t border-slate-100 text-slate-600">
                     <td className="px-4 py-3 font-semibold text-slate-900">#{doc.id}</td>
                     <td className="px-4 py-3">{doc.file_path.split("/").pop()}</td>
+                    <td className="px-4 py-3">
+                      {doc.document_number ? (
+                        <span className="font-mono text-xs font-semibold text-blue-600">{doc.document_number}</span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span className="chip capitalize">{doc.status ?? "draft"}</span>
                     </td>
