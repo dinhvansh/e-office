@@ -1,7 +1,8 @@
 # 🗺️ Code Map - Hướng Dẫn Cho AI Assistant
 
-**Last Updated**: 2025-11-18  
-**Purpose**: Giúp AI assistant khác hiểu cấu trúc code và biết file nào làm gì
+**Last Updated**: 2025-11-20  
+**Purpose**: Giúp AI assistant khác hiểu cấu trúc code và biết file nào làm gì  
+**Status**: Phase 1 CRUD - 100% Complete ✅
 
 ---
 
@@ -51,23 +52,30 @@ backend/src/modules/{module-name}/
 
 #### 2. Users Module (`backend/src/modules/users/`)
 - **Purpose**: User management
-- **Key Features**: CRUD, change password, profile
+- **Key Features**: Full CRUD ✅, change password, profile
 - **Routes**: `/api/v1/users`
+- **Frontend**: `/users` - Create ✅, Edit ✅, Delete ✅
+- **Updated**: 2025-11-20 - Added create & edit UI
 
 #### 3. Departments Module (`backend/src/modules/departments/`)
 - **Purpose**: Department hierarchy management
-- **Key Features**: Tree structure, manager assignment
+- **Key Features**: Full CRUD ✅, tree structure, manager assignment
 - **Routes**: `/api/v1/departments`
+- **Frontend**: `/departments` - Create ✅, Edit ✅, Delete ✅
+- **Updated**: 2025-11-19 - Added code field & edit UI
 
 #### 4. Roles Module (`backend/src/modules/roles/`)
 - **Purpose**: Role & permission management
-- **Key Features**: RBAC, permission assignment
+- **Key Features**: Full CRUD ✅, RBAC, permission assignment
 - **Routes**: `/api/v1/roles`
+- **Frontend**: `/roles` - Create ✅, Edit ✅, Delete ✅
+- **Updated**: 2025-11-20 - Added edit UI
 
 #### 5. Document Types Module (`backend/src/modules/documentTypes/`)
 - **Purpose**: Document classification
-- **Key Features**: CRUD, category filtering
+- **Key Features**: Full CRUD ✅, category filtering
 - **Routes**: `/api/v1/document-types`
+- **Frontend**: `/document-types` - Full CRUD ✅
 - **Created**: 2025-11-18 (Phase 1)
 
 #### 6. Numbering Module (`backend/src/modules/numbering/`)
@@ -144,10 +152,11 @@ router.get('/', requirePermission('resource', 'action'), controller.method);
 frontend/app/
 ├── (dashboard)/              # Protected routes
 │   ├── page.tsx             # Dashboard home
-│   ├── users/page.tsx       # User management
-│   ├── departments/page.tsx # Department management
-│   ├── roles/page.tsx       # Role management
-│   ├── document-types/page.tsx  # Document types (NEW)
+│   ├── users/page.tsx       # User management ✅ Full CRUD
+│   ├── departments/page.tsx # Department management ✅ Full CRUD
+│   ├── roles/page.tsx       # Role management ✅ Full CRUD
+│   ├── document-types/page.tsx  # Document types ✅ Full CRUD
+│   ├── external-orgs/page.tsx   # External orgs ✅ Full CRUD
 │   ├── documents/page.tsx   # Document list
 │   ├── sign-requests/
 │   │   ├── page.tsx         # Sign request list
@@ -164,39 +173,116 @@ frontend/app/
 
 ### UI Patterns
 
-**Data Fetching** (React Query):
+**⚠️ IMPORTANT: Use fetchJson from useAuth hook** (handles token automatically):
+
 ```typescript
+import { useAuth } from '@/components/providers/auth-provider';
+import { toast } from 'sonner';
+
+const { fetchJson } = useAuth();
+
+// Data Fetching (React Query)
 const { data, isLoading } = useQuery({
   queryKey: ['resource'],
-  queryFn: async () => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/resource`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    return res.json();
-  },
+  queryFn: () => fetchJson<any>('/resource'),
+  staleTime: 0,
+  refetchOnMount: 'always',
 });
+
+// Note: fetchJson already unwraps .data, so use data directly, not data?.data
+const items = (data as any) || [];
 ```
 
-**Mutations**:
+**Create/Edit Mutation Pattern** (RECOMMENDED):
 ```typescript
+const [showModal, setShowModal] = useState(false);
+const [editingItem, setEditingItem] = useState<Item | null>(null);
+const [formData, setFormData] = useState(initialState);
+
 const mutation = useMutation({
-  mutationFn: async (data) => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${API_URL}/resource`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
+  mutationFn: (data) => {
+    if (editingItem) {
+      return fetchJson(`/resource/${editingItem.id}`, { 
+        method: 'PUT', 
+        body: JSON.stringify(data) 
+      });
+    }
+    return fetchJson('/resource', { 
+      method: 'POST', 
+      body: JSON.stringify(data) 
     });
-    return res.json();
   },
   onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['resource'] });
+    setShowModal(false);
+    setEditingItem(null);
+    setFormData(initialState);
+    toast.success(editingItem ? 'Cập nhật thành công!' : 'Tạo thành công!');
+    setTimeout(() => queryClient.refetchQueries({ queryKey: ['resource'] }), 300);
+  },
+  onError: (error: any) => {
+    const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
+    toast.error(`Lỗi: ${message}`);
   },
 });
+
+// Create button
+<Button onClick={() => setShowModal(true)}>
+  <Plus /> Tạo mới
+</Button>
+
+// Edit button
+<Button onClick={() => {
+  setEditingItem(item);
+  setFormData({ ...item });
+  setShowModal(true);
+}}>
+  <Edit />
+</Button>
+
+// Dynamic dialog
+<Dialog open={showModal} onOpenChange={(open) => {
+  setShowModal(open);
+  if (!open) {
+    setEditingItem(null);
+    setFormData(initialState);
+  }
+}}>
+  <DialogTitle>
+    {editingItem ? 'Chỉnh sửa' : 'Tạo mới'}
+  </DialogTitle>
+  <form onSubmit={(e) => {
+    e.preventDefault();
+    mutation.mutate(formData);
+  }}>
+    {/* Form fields */}
+    <Button type="submit">
+      {editingItem ? 'Cập nhật' : 'Tạo'}
+    </Button>
+  </form>
+</Dialog>
+```
+
+**Delete Mutation**:
+```typescript
+const deleteMutation = useMutation({
+  mutationFn: (id: number) => fetchJson(`/resource/${id}`, { method: 'DELETE' }),
+  onSuccess: () => {
+    toast.success('Xóa thành công!');
+    queryClient.invalidateQueries({ queryKey: ['resource'] });
+  },
+  onError: (error: any) => {
+    toast.error(`Lỗi: ${error?.message || 'Có lỗi xảy ra'}`);
+  },
+});
+
+// Delete button
+<Button onClick={() => {
+  if (confirm('Bạn có chắc muốn xóa?')) {
+    deleteMutation.mutate(item.id);
+  }
+}}>
+  <Trash2 />
+</Button>
 ```
 
 ---
@@ -385,13 +471,63 @@ frontend/app/(dashboard)/{page-name}/page.tsx
 
 ---
 
+## ✅ Phase 1 CRUD Status (2025-11-20)
+
+| Module | Create | Read | Update | Delete | Frontend Page | Status |
+|--------|--------|------|--------|--------|---------------|--------|
+| Departments | ✅ | ✅ | ✅ | ✅ | `/departments` | Complete |
+| Roles | ✅ | ✅ | ✅ | ✅ | `/roles` | Complete |
+| Users | ✅ | ✅ | ✅ | ✅ | `/users` | Complete |
+| External Orgs | ✅ | ✅ | ✅ | ✅ | `/external-orgs` | Complete |
+| Document Types | ✅ | ✅ | ✅ | ✅ | `/document-types` | Complete |
+
+**All Phase 1 CRUD operations: 100% Complete! 🎉**
+
+---
+
 ## 📚 Related Documentation
 
-- **AGENTS.md** - Development progress log
-- **PHASE-1-PLAN.md** - Current phase details
+### For Development
+- **AGENTS.md** - Development progress log (READ THIS FIRST!)
+- **START-HERE-FOR-AI.md** - Onboarding guide for AI assistants
+- **LESSONS-LEARNED.md** - Critical patterns & pitfalls
+- **docs/dev/SESSION-2025-11-20-CRUD-COMPLETE.md** - Latest session report
+
+### For Planning
+- **PHASE-1-PLAN.md** - Phase 1 details (COMPLETE ✅)
+- **PHASE-2-PLAN.md** - Next phase: Workflow Engine
+- **ROADMAP-E-OFFICE.md** - 7-phase roadmap (14 weeks)
+
+### For Reference
 - **ERD.md** - Full database schema
 - **FUNCTIONAL_SPEC.md** - Requirements
+- **CODE-MAP.md** - This file (architecture guide)
 - **README.md** - Project overview
+
+### For Testing
+- **TEST-CRUD-COMPLETE.md** - CRUD testing checklist
+- **test-api.http** - REST Client test cases
+- **docs/testing-guide.md** - Testing guide
+
+---
+
+## 🎯 Next Steps for Dev2
+
+1. **Read these files first**:
+   - `AGENTS.md` - See what's been done
+   - `START-HERE-FOR-AI.md` - Onboarding guide
+   - `LESSONS-LEARNED.md` - Avoid common pitfalls
+   - `docs/dev/SESSION-2025-11-20-CRUD-COMPLETE.md` - Latest changes
+
+2. **Test Phase 1 CRUD**:
+   - Use checklist in `TEST-CRUD-COMPLETE.md`
+   - Test all create/edit/delete operations
+   - Verify toast notifications work
+
+3. **Start Phase 2**:
+   - Read `PHASE-2-PLAN.md`
+   - Implement Workflow Engine
+   - Follow the same patterns from Phase 1
 
 ---
 

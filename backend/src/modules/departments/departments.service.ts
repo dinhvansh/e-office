@@ -19,6 +19,7 @@ export const departmentsService = {
 
   async createDepartment(tenantId: number, data: {
     name: string;
+    code?: string;
     parent_id?: number;
     manager_id?: number;
     description?: string;
@@ -39,6 +40,7 @@ export const departmentsService = {
 
   async updateDepartment(id: number, tenantId: number, data: {
     name?: string;
+    code?: string;
     parent_id?: number;
     manager_id?: number;
     description?: string;

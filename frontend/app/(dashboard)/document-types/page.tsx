@@ -5,6 +5,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, FileText, Edit, Trash2, Settings } from 'lucide-react';
 import { DocumentType } from '@/lib/types';
 import { useAuth } from '@/components/providers/auth-provider';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 export default function DocumentTypesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -73,18 +76,15 @@ export default function DocumentTypesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Loại văn bản</h1>
-          <p className="text-sm text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold tracking-tight">Loại văn bản</h1>
+          <p className="text-muted-foreground mt-2">
             Quản lý phân loại và đánh số văn bản
           </p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
+        <Button onClick={() => setShowCreateModal(true)}>
+          <Plus className="w-4 h-4 mr-2" />
           Thêm loại văn bản
-        </button>
+        </Button>
       </div>
 
       {/* Document Types Grid */}

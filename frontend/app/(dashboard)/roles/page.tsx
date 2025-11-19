@@ -3,6 +3,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Shield, Users, Edit, Trash2, Lock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/components/providers/auth-provider';
+import { toast } from 'sonner';
 
 interface Role {
   id: number;
@@ -23,43 +32,55 @@ interface Role {
 export default function RolesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [formData, setFormData] = useState({ name: '', description: '' });
   const queryClient = useQueryClient();
+  const { fetchJson } = useAuth();
 
-  const { data: rolesData, isLoading } = useQuery({
-    queryKey: ['roles'],
-    queryFn: async () => {
-      const token = localStorage.getItem('token');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/roles`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!res.ok) throw new Error('Failed to fetch roles');
-      return res.json();
+  const createRoleMutation = useMutation({
+    mutationFn: (data: { name: string; description?: string }) => {
+      if (editingRole) {
+        console.log('Updating role:', editingRole.id, data);
+        return fetchJson(`/roles/${editingRole.id}`, { method: 'PUT', body: JSON.stringify(data) });
+      }
+      console.log('Creating role:', data);
+      return fetchJson('/roles', { method: 'POST', body: JSON.stringify(data) });
+    },
+    onSuccess: async () => {
+      console.log(editingRole ? 'Role updated successfully' : 'Role created successfully');
+      setShowCreateModal(false);
+      setEditingRole(null);
+      setFormData({ name: '', description: '' });
+      toast.success(editingRole ? 'Cập nhật vai trò thành công!' : 'Tạo vai trò thành công!');
+      // Small delay to ensure backend has saved
+      setTimeout(async () => {
+        await queryClient.refetchQueries({ queryKey: ['roles'] });
+        console.log('Refetched roles');
+      }, 300);
+    },
+    onError: (error: any) => {
+      console.error('Mutation error:', error);
+      const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
+      toast.error(`Lỗi: ${message}`);
     },
   });
 
+  const { data: rolesData, isLoading } = useQuery({
+    queryKey: ['roles'],
+    queryFn: () => fetchJson<any>('/roles'),
+    staleTime: 0, // Always refetch
+    refetchOnMount: 'always', // Always refetch on mount
+  });
+
   const deleteRoleMutation = useMutation({
-    mutationFn: async (roleId: number) => {
-      const token = localStorage.getItem('token');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/roles/${roleId}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Failed to delete role');
-      }
-      return res.json();
-    },
+    mutationFn: (roleId: number) => fetchJson(`/roles/${roleId}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
     },
   });
 
-  const roles: Role[] = rolesData?.data || [];
+  // Sort by ID descending (newest first)
+  const roles: Role[] = ((rolesData as any) || []).sort((a: Role, b: Role) => b.id - a.id);
 
   // Group permissions by resource
   const groupPermissions = (role: Role) => {
@@ -83,162 +104,159 @@ export default function RolesPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Quản lý vai trò</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Phân quyền và quản lý vai trò người dùng
-          </p>
+    <div className="space-y-6">
+      {/* Header Card */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Quản lý vai trò</h1>
+            <p className="text-muted-foreground mt-2">
+              Phân quyền và quản lý vai trò người dùng
+            </p>
+          </div>
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Tạo vai trò mới
+          </Button>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Tạo vai trò mới
-        </button>
-      </div>
+      </Card>
 
       {/* Roles Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {isLoading ? (
-          <div className="col-span-full p-8 text-center text-gray-500">
+          <div className="col-span-full p-8 text-center text-muted-foreground">
             Đang tải...
           </div>
         ) : roles.length === 0 ? (
-          <div className="col-span-full p-8 text-center text-gray-500">
+          <div className="col-span-full p-8 text-center text-muted-foreground">
             Chưa có vai trò nào
           </div>
         ) : (
           roles.map((role) => {
             const permissions = groupPermissions(role);
             return (
-              <div
-                key={role.id}
-                className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Shield className="w-6 h-6 text-blue-600" />
+              <Card key={role.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Shield className="w-6 h-6 text-primary" />
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg flex items-center gap-2">
                         {role.name}
                         {role.is_system && (
-                          <Lock className="w-4 h-4 text-gray-400" title="Vai trò hệ thống" />
+                          <Badge variant="secondary" className="text-xs">
+                            <Lock className="w-3 h-3 mr-1" />
+                            Hệ thống
+                          </Badge>
                         )}
-                      </h3>
+                      </CardTitle>
                       {role.description && (
-                        <p className="text-sm text-gray-600 mt-1">
+                        <CardDescription className="mt-1">
                           {role.description}
-                        </p>
+                        </CardDescription>
                       )}
                     </div>
                   </div>
-                </div>
+                </CardHeader>
 
-                <div className="space-y-3 mb-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Users className="w-4 h-4" />
                     <span>{role._count.user_roles} người dùng</span>
                   </div>
 
                   <div className="space-y-2">
-                    <div className="text-sm font-medium text-gray-700">Quyền:</div>
-                    <div className="space-y-1">
+                    <div className="text-sm font-medium">Quyền:</div>
+                    <div className="flex flex-wrap gap-1">
                       {Object.entries(permissions).map(([resource, actions]) => (
-                        <div key={resource} className="text-sm text-gray-600">
-                          <span className="font-medium">
-                            {resourceLabels[resource] || resource}:
-                          </span>{' '}
-                          {actions.join(', ')}
-                        </div>
+                        <Badge key={resource} variant="outline" className="text-xs">
+                          {resourceLabels[resource] || resource}
+                        </Badge>
                       ))}
                     </div>
                   </div>
-                </div>
+                </CardContent>
 
-                <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
-                  <button
+                <CardFooter className="flex gap-2 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
                     onClick={() => setSelectedRole(role)}
-                    className="flex-1 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                   >
                     Xem chi tiết
-                  </button>
+                  </Button>
                   {!role.is_system && (
                     <>
-                      <button
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Chỉnh sửa"
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => {
+                          setEditingRole(role);
+                          setFormData({ name: role.name, description: role.description || '' });
+                          setShowCreateModal(true);
+                        }}
                       >
                         <Edit className="w-4 h-4" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => {
                           if (role._count.user_roles > 0) {
-                            alert('Không thể xóa vai trò đang được sử dụng');
+                            toast.error('Không thể xóa vai trò đang được sử dụng');
                             return;
                           }
                           if (confirm(`Bạn có chắc muốn xóa vai trò "${role.name}"?`)) {
                             deleteRoleMutation.mutate(role.id);
                           }
                         }}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Xóa"
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
                     </>
                   )}
-                </div>
-              </div>
+                </CardFooter>
+              </Card>
             );
           })
         )}
       </div>
 
       {/* Role Detail Modal */}
-      {selectedRole && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setSelectedRole(null)}
-        >
-          <div
-            className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Shield className="w-6 h-6 text-blue-600" />
-                {selectedRole.name}
-              </h2>
-              {selectedRole.description && (
-                <p className="text-gray-600 mt-2">{selectedRole.description}</p>
-              )}
-            </div>
-            <div className="p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">
-                Danh sách quyền ({selectedRole.role_permissions.length})
+      <Dialog open={!!selectedRole} onOpenChange={(open) => !open && setSelectedRole(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="w-6 h-6 text-primary" />
+              {selectedRole?.name}
+            </DialogTitle>
+            {selectedRole?.description && (
+              <DialogDescription>{selectedRole.description}</DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-3">
+                Danh sách quyền ({selectedRole?.role_permissions.length || 0})
               </h3>
               <div className="space-y-2">
-                {selectedRole.role_permissions.map((rp) => (
+                {selectedRole?.role_permissions.map((rp) => (
                   <div
                     key={rp.permission.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    className="flex items-center justify-between p-3 bg-muted rounded-lg"
                   >
                     <div>
-                      <div className="font-medium text-gray-900">
+                      <div className="font-medium">
                         {resourceLabels[rp.permission.resource] || rp.permission.resource}
                       </div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-muted-foreground">
                         {rp.permission.action}
                       </div>
                     </div>
                     {rp.permission.description && (
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-muted-foreground">
                         {rp.permission.description}
                       </div>
                     )}
@@ -246,17 +264,82 @@ export default function RolesPage() {
                 ))}
               </div>
             </div>
-            <div className="p-6 border-t border-gray-200 flex justify-end">
-              <button
-                onClick={() => setSelectedRole(null)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Đóng
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedRole(null)}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create/Edit Modal */}
+      <Dialog open={showCreateModal} onOpenChange={(open) => {
+        setShowCreateModal(open);
+        if (!open) {
+          setEditingRole(null);
+          setFormData({ name: '', description: '' });
+        }
+      }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{editingRole ? 'Chỉnh sửa vai trò' : 'Tạo vai trò mới'}</DialogTitle>
+            <DialogDescription>
+              {editingRole 
+                ? 'Cập nhật thông tin vai trò' 
+                : 'Sau khi tạo, bạn có thể assign permissions cho vai trò này.'}
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (formData.name.trim()) {
+                createRoleMutation.mutate(formData);
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="name">Tên vai trò *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Nhập tên vai trò"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Mô tả</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Nhập mô tả vai trò"
+                rows={3}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setEditingRole(null);
+                  setFormData({ name: '', description: '' });
+                }}
+              >
+                Hủy
+              </Button>
+              <Button type="submit" disabled={createRoleMutation.isPending}>
+                {createRoleMutation.isPending 
+                  ? (editingRole ? 'Đang cập nhật...' : 'Đang tạo...') 
+                  : (editingRole ? 'Cập nhật' : 'Tạo')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

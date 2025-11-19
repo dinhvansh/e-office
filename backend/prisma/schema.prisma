@@ -128,6 +128,7 @@ model license {
 model departments {
   id          Int       @id @default(autoincrement())
   tenant_id   Int
+  code        String?   @db.VarChar(50)
   name        String
   parent_id   Int?
   manager_id  Int?
@@ -138,6 +139,8 @@ model departments {
   children    departments[] @relation("department_hierarchy")
   manager     users?    @relation("department_manager", fields: [manager_id], references: [id])
   users       users[]   @relation("user_department")
+
+  @@unique([tenant_id, code], name: "departments_tenant_id_code_key")
 }
 
 model roles {

@@ -2,33 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: linear-gradient(135deg, #eef2ff, #f5f7fb 40%, #f8fbff 100%);
-  --foreground: #0f172a;
-  --card-bg: rgba(255, 255, 255, 0.9);
+@layer base {
+  :root {
+    /* shadcn/ui variables */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+    
+    /* Custom brand colors */
+    --brand-gradient: linear-gradient(135deg, #eef2ff, #f5f7fb 40%, #f8fbff 100%);
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+  }
 }
 
-body {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-image: var(--background);
-  min-height: 100vh;
-  color: var(--foreground);
-  -webkit-font-smoothing: antialiased;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply text-foreground;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #eef2ff, #f5f7fb 40%, #f8fbff 100%);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  
+  /* Override shadcn/ui card to have better visibility on gradient background */
+  .bg-card {
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+  
+  /* Better border for cards on gradient background */
+  .border {
+    border-color: rgba(226, 232, 240, 0.8);
+  }
 }
 
-.card {
-  @apply rounded-3xl border border-white/80 bg-white/80 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur;
-  @apply p-6;
-}
-
-.button-primary {
-  @apply inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 to-blue-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/30 transition hover:brightness-105;
-}
-
-.input {
-  @apply w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-2.5 text-sm shadow-inner shadow-white/40 focus:outline-none focus:ring-2 focus:ring-brand-500;
-}
-
-.chip {
-  @apply inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-medium text-slate-600 shadow-sm;
+/* Custom utility classes for backward compatibility */
+@layer components {
+  .glass-card {
+    @apply rounded-3xl border border-white/80 bg-white/80 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur p-6;
+  }
+  
+  .button-primary {
+    @apply inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:brightness-105;
+  }
+  
+  .input {
+    @apply w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-2.5 text-sm shadow-inner shadow-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500;
+  }
+  
+  .chip {
+    @apply inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-medium text-slate-600 shadow-sm;
+  }
 }

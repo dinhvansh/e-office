@@ -15,7 +15,7 @@ export const departmentsRepository = {
           select: { users: true, children: true },
         },
       },
-      orderBy: { name: 'asc' },
+      orderBy: { id: 'desc' }, // Newest first
     });
   },
 

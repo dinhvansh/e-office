@@ -16,7 +16,7 @@ export const rolesRepository = {
           select: { user_roles: true },
         },
       },
-      orderBy: { name: 'asc' },
+      orderBy: { id: 'desc' }, // Newest first
     });
   },
 
