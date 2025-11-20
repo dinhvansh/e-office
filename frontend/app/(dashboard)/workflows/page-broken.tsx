@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Workflow, Plus, Edit, Trash2, ArrowUp, ArrowDown, Users, User, Building2, UserCog, Settings, FileText, Clock, Search } from 'lucide-react';
+import { Workflow, Plus, Edit, Trash2, ArrowUp, ArrowDown, Users, User, Building2, UserCog, Settings, Search, CheckCircle, XCircle } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/components/providers/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -15,8 +16,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Switch } from '@/components/ui/switch';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface WorkflowStep {
   id: number;
@@ -64,17 +63,10 @@ export default function WorkflowsPage() {
     approver_role_id: '',
     approver_department_id: '',
   });
-
-  // Confirm dialogs
-  const [deleteWorkflowConfirm, setDeleteWorkflowConfirm] = useState<{ open: boolean; id: number | null }>({
-    open: false,
-    id: null,
-  });
-  const [deleteStepConfirm, setDeleteStepConfirm] = useState<{ open: boolean; workflowId: number | null; stepId: number | null }>({
-    open: false,
-    workflowId: null,
-    stepId: null,
-  });
+  
+  // Search & Filter
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   // Fetch workflows
   const { data: workflows, isLoading } = useQuery({
@@ -141,23 +133,6 @@ export default function WorkflowsPage() {
     },
     onSuccess: () => {
       toast.success('Xóa thành công!');
-      queryClient.invalidateQueries({ queryKey: ['workflows'] });
-    },
-    onError: (error: any) => {
-      toast.error(`Lỗi: ${error?.message || 'Có lỗi xảy ra'}`);
-    },
-  });
-
-  // Toggle workflow active status mutation
-  const toggleWorkflowMutation = useMutation({
-    mutationFn: async ({ id, is_active }: { id: number; is_active: boolean }) => {
-      return await fetchJson(`/workflows/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ is_active }),
-      });
-    },
-    onSuccess: () => {
-      toast.success('Cập nhật trạng thái thành công!');
       queryClient.invalidateQueries({ queryKey: ['workflows'] });
     },
     onError: (error: any) => {
@@ -283,13 +258,36 @@ export default function WorkflowsPage() {
     setIsWorkflowDialogOpen(true);
   };
 
-  const handleDeleteWorkflow = (id: number) => {
-    setDeleteWorkflowConfirm({ open: true, id });
+  const handleToggleActive = (workflow: WorkflowData) => {
+    saveWorkflowMutation.mutate();
+    // Update local state immediately for better UX
+    setEditingWorkflow(workflow);
+    setWorkflowFormData({
+      name: workflow.name,
+      description: workflow.description || '',
+    });
+    // Then save with toggled is_active
+    setTimeout(() => {
+      saveWorkflowMutation.mutate();
+    }, 0);
   };
 
-  const confirmDeleteWorkflow = () => {
-    if (deleteWorkflowConfirm.id) {
-      deleteWorkflowMutation.mutate(deleteWorkflowConfirm.id);
+  // Filter workflows
+  const filteredWorkflows = workflows?.filter(workflow => {
+    const matchesSearch = !searchQuery || 
+      workflow.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      workflow.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || 
+      (statusFilter === 'active' && workflow.is_active) ||
+      (statusFilter === 'inactive' && !workflow.is_active);
+    
+    return matchesSearch && matchesStatus;
+  }) || [];
+
+  const handleDeleteWorkflow = (id: number) => {
+    if (confirm('Bạn có chắc chắn muốn xóa quy trình này?')) {
+      deleteWorkflowMutation.mutate(id);
     }
   };
 
@@ -310,24 +308,13 @@ export default function WorkflowsPage() {
   };
 
   const handleDeleteStep = (workflowId: number, stepId: number) => {
-    setDeleteStepConfirm({ open: true, workflowId, stepId });
-  };
-
-  const confirmDeleteStep = () => {
-    if (deleteStepConfirm.workflowId && deleteStepConfirm.stepId) {
-      deleteStepMutation.mutate({ 
-        workflowId: deleteStepConfirm.workflowId, 
-        stepId: deleteStepConfirm.stepId 
-      });
+    if (confirm('Bạn có chắc chắn muốn xóa bước này?')) {
+      deleteStepMutation.mutate({ workflowId, stepId });
     }
   };
 
   const handleReorderStep = (workflowId: number, stepId: number, direction: 'up' | 'down') => {
     reorderStepMutation.mutate({ workflowId, stepId, direction });
-  };
-
-  const handleToggleWorkflow = (id: number, currentStatus: boolean) => {
-    toggleWorkflowMutation.mutate({ id, is_active: !currentStatus });
   };
 
   const getApproverIcon = (type: string) => {
@@ -350,212 +337,182 @@ export default function WorkflowsPage() {
     }
   };
 
-  // Filter workflows
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const filteredWorkflows = workflows?.filter((workflow) => {
-    const matchesStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'active' && workflow.is_active) ||
-      (statusFilter === 'paused' && !workflow.is_active);
-
-    const matchesSearch =
-      !searchQuery ||
-      workflow.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      workflow.description?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    return matchesStatus && matchesSearch;
-  }) || [];
-
-  // Count by status
-  const counts = {
-    all: workflows?.length || 0,
-    active: workflows?.filter((w) => w.is_active).length || 0,
-    paused: workflows?.filter((w) => !w.is_active).length || 0,
+  const displayWorkflows = filteredWorkflows;
+  
+  const getStatusBadge = (isActive: boolean) => {
+    if (isActive) {
+      return (
+        <Badge variant="default" className="bg-green-100 text-green-700 border-green-200 flex items-center gap-1">
+          <CheckCircle className="w-3 h-3" />
+          Đang hoạt động
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="secondary" className="bg-gray-100 text-gray-600 flex items-center gap-1">
+        <XCircle className="w-3 h-3" />
+        Tạm dừng
+      </Badge>
+    );
   };
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        icon={Workflow}
-        title="Quản lý Quy trình Phê duyệt"
-        description="Quản lý các quy trình phê duyệt văn bản"
-        iconColor="text-blue-600"
-        actions={
-          <Button onClick={handleCreateWorkflow} className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="w-4 h-4 mr-2" />
-            Tạo quy trình mới
-          </Button>
-        }
-      />
-
-      {/* Search & Filter */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        {/* Search - Left */}
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Tìm theo tên quy trình..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Quản lý Quy trình Phê duyệt</h1>
+          <p className="text-sm text-gray-500 mt-1">Tạo và quản lý các quy trình phê duyệt văn bản</p>
         </div>
-
-        {/* Filter Tabs - Right */}
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            size="sm"
-            variant={statusFilter === 'all' ? 'default' : 'outline'}
-            onClick={() => setStatusFilter('all')}
-            className={statusFilter === 'all' ? 'bg-blue-500 text-white hover:bg-blue-600' : 'hover:bg-gray-100'}
-          >
-            Tất cả
-            <Badge variant="secondary" className="ml-2 bg-white text-gray-700">{counts.all}</Badge>
-          </Button>
-          <Button
-            size="sm"
-            variant={statusFilter === 'active' ? 'default' : 'outline'}
-            onClick={() => setStatusFilter('active')}
-            className={statusFilter === 'active' ? 'bg-blue-500 text-white hover:bg-blue-600' : 'hover:bg-gray-100'}
-          >
-            Đang hoạt động
-            <Badge variant="secondary" className="ml-2 bg-white text-gray-700">{counts.active}</Badge>
-          </Button>
-          <Button
-            size="sm"
-            variant={statusFilter === 'paused' ? 'default' : 'outline'}
-            onClick={() => setStatusFilter('paused')}
-            className={statusFilter === 'paused' ? 'bg-blue-500 text-white hover:bg-blue-600' : 'hover:bg-gray-100'}
-          >
-            Tạm dừng
-            <Badge variant="secondary" className="ml-2 bg-white text-gray-700">{counts.paused}</Badge>
-          </Button>
-        </div>
+        <Button onClick={handleCreateWorkflow} className="bg-blue-600 hover:bg-blue-700">
+          <Plus className="w-4 h-4 mr-2" />
+          Tạo quy trình mới
+        </Button>
       </div>
 
-      {/* Loading State */}
-      {isLoading && (
+      {/* Search & Filter */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Tìm theo tên quy trình..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={statusFilter === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('all')}
+              >
+                Tất cả
+              </Button>
+              <Button
+                variant={statusFilter === 'active' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('active')}
+                className={statusFilter === 'active' ? 'bg-green-600 hover:bg-green-700' : ''}
+              >
+                Đang hoạt động
+              </Button>
+              <Button
+                variant={statusFilter === 'inactive' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('inactive')}
+              >
+                Tạm dừng
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Workflows Grid */}
+      {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <Card key={i}>
+            <Card key={i} className="animate-pulse">
               <CardContent className="p-6">
-                <Skeleton className="h-48 w-full" />
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
               </CardContent>
             </Card>
           ))}
         </div>
-      )}
+      ) : displayWorkflows && displayWorkflows.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {displayWorkflows.map((workflow) => (
+            <Card 
+              key={workflow.id} 
+              className="hover:shadow-lg transition-shadow border-l-4"
+              style={{ borderLeftColor: workflow.is_active ? '#10b981' : '#9ca3af' }}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg text-gray-900 mb-2">
+                      {workflow.name}
+                    </h3>
+                    {getStatusBadge(workflow.is_active)}
+                  </div>
+                </div>
 
-      {/* Empty State */}
-      {!isLoading && filteredWorkflows.length === 0 && (
+                <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                  {workflow.description || 'Chưa có mô tả'}
+                </p>
+
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">Số bước:</span>
+                    <span className="font-medium text-gray-900">{workflow.steps?.length || 0} bước</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleEditWorkflow(workflow)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Chỉnh sửa"
+                    >
+                      <Edit className="w-4 h-4 text-gray-600" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteWorkflow(workflow.id)}
+                      className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Xóa"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                    </button>
+                    <button
+                      onClick={() => handleManageSteps(workflow)}
+                      className="p-2 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Quản lý bước"
+                    >
+                      <Settings className="w-4 h-4 text-blue-600" />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={workflow.is_active}
+                      onCheckedChange={() => handleToggleActive(workflow)}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+      ) : (
         <Card>
-          <CardContent className="p-12">
-            <EmptyState
-              icon={Workflow}
-              title={searchQuery ? 'Không tìm thấy quy trình' : 'Chưa có quy trình nào'}
-              description={searchQuery ? 'Thử tìm kiếm với từ khóa khác' : 'Tạo quy trình phê duyệt đầu tiên'}
-              action={!searchQuery ? {
-                label: 'Tạo quy trình',
-                onClick: handleCreateWorkflow,
-              } : undefined}
-            />
+          <CardContent className="p-12 text-center">
+            <Workflow className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {searchQuery || statusFilter !== 'all' ? 'Không tìm thấy quy trình' : 'Chưa có quy trình nào'}
+            </h3>
+            <p className="text-gray-500 mb-4">
+              {searchQuery || statusFilter !== 'all' 
+                ? 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm'
+                : 'Tạo quy trình phê duyệt đầu tiên của bạn'
+              }
+            </p>
+            {!searchQuery && statusFilter === 'all' && (
+              <Button onClick={handleCreateWorkflow} className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Tạo quy trình mới
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Card Grid */}
-      {!isLoading && filteredWorkflows.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredWorkflows.map((workflow) => (
-            <Card 
-              key={workflow.id} 
-              className={`hover:shadow-lg transition-all duration-200 border-l-4 ${
-                workflow.is_active 
-                  ? 'border-l-green-500 bg-white' 
-                  : 'border-l-gray-400 bg-gray-50'
-              }`}
-            >
-              <CardContent className="p-6 space-y-4">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg mb-2 text-gray-900">{workflow.name}</h3>
-                    <Badge
-                      variant={workflow.is_active ? 'default' : 'secondary'}
-                      className={workflow.is_active 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-gray-400 text-white'}
-                    >
-                      <span className="mr-1">●</span>
-                      {workflow.is_active ? 'Đang hoạt động' : 'Tạm dừng'}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Description */}
-                {workflow.description && (
-                  <p className="text-sm text-gray-600 line-clamp-2 min-h-[40px]">
-                    {workflow.description}
-                  </p>
-                )}
-
-                {/* Info */}
-                <div className="space-y-2 text-sm text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-gray-500" />
-                    <span>Loại văn bản: <span className="font-medium text-gray-900">{workflow.description || 'Chung'}</span></span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Workflow className="h-4 w-4 text-gray-500" />
-                    <span><span className="font-medium text-gray-900">{workflow.steps.length}</span> bước</span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                  <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleManageSteps(workflow)}
-                      title="Quản lý các bước"
-                      className="hover:bg-gray-100"
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleEditWorkflow(workflow)}
-                      title="Chỉnh sửa"
-                      className="hover:bg-gray-100"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDeleteWorkflow(workflow.id)}
-                      title="Xóa"
-                      className="hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Switch 
-                    checked={workflow.is_active}
-                    onCheckedChange={() => handleToggleWorkflow(workflow.id, workflow.is_active)}
-                    disabled={toggleWorkflowMutation.isPending}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
+      {/* Dialogs */}
       {/* Create/Edit Workflow Dialog */}
       <Dialog open={isWorkflowDialogOpen} onOpenChange={setIsWorkflowDialogOpen}>
         <DialogContent>
@@ -781,32 +738,6 @@ export default function WorkflowsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Confirm Delete Workflow Dialog */}
-      <ConfirmDialog
-        open={deleteWorkflowConfirm.open}
-        onOpenChange={(open) => setDeleteWorkflowConfirm({ open, id: null })}
-        onConfirm={confirmDeleteWorkflow}
-        title="Xác nhận xóa quy trình"
-        description="Bạn có chắc chắn muốn xóa vĩnh viễn quy trình này? Hành động này không thể hoàn tác."
-        confirmText="Xóa quy trình"
-        cancelText="Hủy bỏ"
-        variant="danger"
-        icon="trash"
-      />
-
-      {/* Confirm Delete Step Dialog */}
-      <ConfirmDialog
-        open={deleteStepConfirm.open}
-        onOpenChange={(open) => setDeleteStepConfirm({ open, workflowId: null, stepId: null })}
-        onConfirm={confirmDeleteStep}
-        title="Xác nhận xóa bước"
-        description="Bạn có chắc chắn muốn xóa bước này khỏi quy trình? Hành động này không thể hoàn tác."
-        confirmText="Xóa bước"
-        cancelText="Hủy bỏ"
-        variant="danger"
-        icon="trash"
-      />
     </div>
   );
 }

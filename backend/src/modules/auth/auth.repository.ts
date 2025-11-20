@@ -5,14 +5,28 @@ export class AuthRepository {
   findByEmail(email: string) {
     return prisma.users.findUnique({
       where: { email },
-      include: { tenant: true },
+      include: { 
+        tenant: true,
+        user_roles: {
+          include: {
+            role: true
+          }
+        }
+      },
     });
   }
 
   findById(id: number) {
     return prisma.users.findFirst({
       where: { id },
-      include: { tenant: true },
+      include: { 
+        tenant: true,
+        user_roles: {
+          include: {
+            role: true
+          }
+        }
+      },
     });
   }
 

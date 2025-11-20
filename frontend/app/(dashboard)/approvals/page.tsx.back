@@ -1,0 +1,197 @@
+'use client';
+
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { CheckSquare, Search, Edit, Trash2, FileText, Clock } from 'lucide-react';
+import { useAuth } from '@/components/providers/auth-provider';
+import { PageHeader } from '@/components/ui/page-header';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Switch } from '@/components/ui/switch';
+
+type ApprovalStatus = 'all' | 'active' | 'paused';
+
+interface Approval {
+  id: number;
+  name: string;
+  description: string;
+  document_type: string;
+  steps: number;
+  usage_count: number;
+  is_active: boolean;
+}
+
+export default function ApprovalsPage() {
+  const { fetchJson } = useAuth();
+  const [statusFilter, setStatusFilter] = useState<ApprovalStatus>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const { data: approvals = [], isLoading } = useQuery({
+    queryKey: ['my-pending-approvals'],
+    queryFn: () => fetchJson('/approvals/my-pending'),
+  });
+
+  // Filter approvals
+  const filteredApprovals = (approvals as Approval[]).filter((approval) => {
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' && approval.is_active) ||
+      (statusFilter === 'paused' && !approval.is_active);
+
+    const matchesSearch =
+      !searchQuery ||
+      approval.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      approval.description?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesStatus && matchesSearch;
+  });
+
+  // Count by status
+  const counts = {
+    all: approvals.length,
+    active: approvals.filter((a: Approval) => a.is_active).length,
+    paused: approvals.filter((a: Approval) => !a.is_active).length,
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        icon={CheckSquare}
+        title="Quản lý Quy trình Phê duyệt"
+        description="Quản lý các quy trình phê duyệt văn bản"
+        iconColor="text-blue-600"
+        actions={
+          <Button className="bg-blue-600 hover:bg-blue-700">
+            <CheckSquare className="mr-2 h-4 w-4" />
+            Tạo quy trình mới
+          </Button>
+        }
+      />
+
+      {/* Filter Tabs & Search */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        {/* Filter Tabs */}
+        <div className="flex gap-2">
+          <Button
+            variant={statusFilter === 'all' ? 'default' : 'outline'}
+            onClick={() => setStatusFilter('all')}
+            className={statusFilter === 'all' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : ''}
+          >
+            Tất cả
+            <Badge variant="secondary" className="ml-2">{counts.all}</Badge>
+          </Button>
+          <Button
+            variant={statusFilter === 'active' ? 'default' : 'outline'}
+            onClick={() => setStatusFilter('active')}
+            className={statusFilter === 'active' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : ''}
+          >
+            Đang hoạt động
+            <Badge variant="secondary" className="ml-2">{counts.active}</Badge>
+          </Button>
+          <Button
+            variant={statusFilter === 'paused' ? 'default' : 'outline'}
+            onClick={() => setStatusFilter('paused')}
+            className={statusFilter === 'paused' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : ''}
+          >
+            Tạm dừng
+            <Badge variant="secondary" className="ml-2">{counts.paused}</Badge>
+          </Button>
+        </div>
+
+        {/* Search */}
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Tìm theo tên quy trình..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
+      {/* Loading State */}
+      {isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <Skeleton className="h-32 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && filteredApprovals.length === 0 && (
+        <Card>
+          <CardContent className="p-12">
+            <EmptyState
+              icon={CheckSquare}
+              title={searchQuery ? 'Không tìm thấy quy trình' : 'Chưa có quy trình phê duyệt'}
+              description={searchQuery ? 'Thử tìm kiếm với từ khóa khác' : 'Tạo quy trình phê duyệt đầu tiên của bạn'}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Card Grid */}
+      {!isLoading && filteredApprovals.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredApprovals.map((approval) => (
+            <Card key={approval.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6 space-y-4">
+                {/* Header */}
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg mb-1">{approval.name}</h3>
+                    <Badge
+                      variant={approval.is_active ? 'default' : 'secondary'}
+                      className={approval.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}
+                    >
+                      {approval.is_active ? '● Đang hoạt động' : '● Tạm dừng'}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Info */}
+                <div className="space-y-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    <span>Loại văn bản: {approval.document_type}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckSquare className="h-4 w-4" />
+                    <span>{approval.steps} bước</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span>Đã dùng {approval.usage_count} lần</span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm">
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm">
+                      <Trash2 className="h-4 w-4 text-red-600" />
+                    </Button>
+                  </div>
+                  <Switch checked={approval.is_active} />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -15,14 +15,23 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SelectWithIcon } from '@/components/ui/select-with-icon';
 import { toast } from 'sonner';
 
 export default function DocumentTypesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingType, setEditingType] = useState<DocumentType | null>(null);
   const [showNumberingPattern, setShowNumberingPattern] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const queryClient = useQueryClient();
   const { fetchJson } = useAuth();
+
+  // Sync selectedCategory when dialog opens
+  const handleOpenDialog = (type: DocumentType | null) => {
+    setEditingType(type);
+    setSelectedCategory(type?.category || '');
+    setShowCreateModal(true);
+  };
 
   const { data: typesData, isLoading } = useQuery({
     queryKey: ['document-types'],
@@ -95,6 +104,13 @@ export default function DocumentTypesPage() {
     contract: 'Hợp đồng',
   };
 
+  const categoryOptions = [
+    { value: 'incoming', label: 'Văn bản đến', icon: '📥' },
+    { value: 'outgoing', label: 'Văn bản đi', icon: '📤' },
+    { value: 'internal', label: 'Nội bộ', icon: '🏢' },
+    { value: 'contract', label: 'Hợp đồng', icon: '📋' },
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -103,7 +119,7 @@ export default function DocumentTypesPage() {
         description="Quản lý phân loại và đánh số văn bản"
         iconColor="text-orange-600"
         actions={
-          <Button onClick={() => { setEditingType(null); setShowCreateModal(true); }}>
+          <Button onClick={() => handleOpenDialog(null)}>
             <Plus className="w-4 h-4 mr-2" />
             Thêm loại văn bản
           </Button>
@@ -126,7 +142,7 @@ export default function DocumentTypesPage() {
               description="Tạo loại văn bản đầu tiên để phân loại và quản lý tài liệu"
               action={{
                 label: "Thêm loại văn bản",
-                onClick: () => { setEditingType(null); setShowCreateModal(true); }
+                onClick: () => handleOpenDialog(null)
               }}
             />
           </div>
@@ -203,9 +219,8 @@ export default function DocumentTypesPage() {
                     size="icon"
                     className="h-8 w-8"
                     onClick={() => {
-                      setEditingType(type);
+                      handleOpenDialog(type);
                       setShowNumberingPattern(type.require_numbering);
-                      setShowCreateModal(true);
                     }}
                     title="Chỉnh sửa"
                   >
@@ -302,19 +317,16 @@ export default function DocumentTypesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Danh mục</label>
-                  <select
-                    name="category"
-                    defaultValue={editingType?.category || ''}
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
-                  >
-                    <option value="" className="text-gray-400">Chọn danh mục</option>
-                    <option value="incoming" className="text-gray-900">� VVăn bản đến</option>
-                    <option value="outgoing" className="text-gray-900">📤 Văn bản đi</option>
-                    <option value="internal" className="text-gray-900">🏢 Nội bộ</option>
-                    <option value="contract" className="text-gray-900">📄 Hợp đồng</option>
-                  </select>
-                </div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Danh mục</label>
+                    <input type="hidden" name="category" value={selectedCategory} />
+                    <SelectWithIcon
+                      options={categoryOptions}
+                      value={selectedCategory}
+                      onChange={(value) => setSelectedCategory(String(value))}
+                      placeholder="Chọn danh mục"
+                    />
+                  </div>
+
                 <div className="space-y-4 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-5 border border-gray-200">
                   <label className="flex items-center gap-3 cursor-pointer group">
                     <input

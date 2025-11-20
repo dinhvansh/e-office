@@ -184,7 +184,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             console.log('[Auth] Retry request after refresh');
             return attempt(true);
           }
-          console.error('[Auth] Refresh failed, request aborted');
+          console.error('[Auth] Refresh failed, logging out...');
+          logout();
+          throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
         }
         const json = await res.json();
         if (!json.success) {
@@ -199,7 +201,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       };
       return attempt();
     },
-    [refreshTokens, tokens?.accessToken],
+    [logout, refreshTokens, tokens?.accessToken],
   );
 
   const value = useMemo<AuthContextValue>(

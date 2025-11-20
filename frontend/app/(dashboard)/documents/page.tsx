@@ -16,6 +16,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusTag } from "@/components/ui/status-tag";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SelectWithIcon } from "@/components/ui/select-with-icon";
 
 export default function DocumentsPage() {
   const { fetchJson } = useAuth();
@@ -23,6 +25,7 @@ export default function DocumentsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [selectedDocumentTypeId, setSelectedDocumentTypeId] = useState<number | null>(null);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<number | null>(null);
   const [confidentialLevel, setConfidentialLevel] = useState("normal");
   const [visibilityScope, setVisibilityScope] = useState("public");
 
@@ -42,7 +45,37 @@ export default function DocumentsPage() {
     },
   });
 
+  const { data: workflowsData } = useQuery({
+    queryKey: ["workflows"],
+    queryFn: async () => {
+      const data = await fetchJson<{ workflows: any[] }>("/workflows");
+      return data.workflows;
+    },
+  });
+
   const activeDocumentTypes = documentTypesData?.filter((type) => type.is_active) || [];
+  const activeWorkflows = workflowsData?.filter((wf) => wf.is_active) || [];
+
+  // Map document types to options with icons
+  const getDocumentTypeIcon = (code: string) => {
+    const iconMap: Record<string, string> = {
+      CV_DEN: '📄',
+      CV_DI: '📤',
+      HOP_DONG: '📋',
+      QUYET_DINH: '📜',
+      THONG_BAO: '📢',
+      BIEN_BAN: '📝',
+      DE_XUAT: '💡',
+      BAO_CAO: '📊',
+    };
+    return iconMap[code] || '📄';
+  };
+
+  const documentTypeOptions = activeDocumentTypes.map((type) => ({
+    value: type.id,
+    label: `${type.name} (${type.code})`,
+    icon: getDocumentTypeIcon(type.code),
+  }));
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
@@ -53,21 +86,29 @@ export default function DocumentsPage() {
         throw new Error("Vui lòng chọn loại văn bản");
       }
       const base64 = await fileToBase64(selectedFile);
+      const payload: any = {
+        file_name: fileName || selectedFile.name,
+        file_base64: base64,
+        document_type_id: selectedDocumentTypeId,
+        confidential_level: confidentialLevel,
+        visibility_scope: visibilityScope,
+      };
+      
+      // Add workflow_id if selected
+      if (selectedWorkflowId) {
+        payload.workflow_id = selectedWorkflowId;
+      }
+      
       await fetchJson("/documents", {
         method: "POST",
-        body: JSON.stringify({
-          file_name: fileName || selectedFile.name,
-          file_base64: base64,
-          document_type_id: selectedDocumentTypeId,
-          confidential_level: confidentialLevel,
-          visibility_scope: visibilityScope,
-        }),
+        body: JSON.stringify(payload),
       });
     },
     onSuccess: () => {
       setSelectedFile(null);
       setFileName("");
       setSelectedDocumentTypeId(null);
+      setSelectedWorkflowId(null);
       setConfidentialLevel("normal");
       setVisibilityScope("public");
       toast.success("Tải tài liệu thành công!");
@@ -97,9 +138,18 @@ export default function DocumentsPage() {
     },
   });
 
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
+    open: false,
+    id: null,
+  });
+
   const handleDelete = (id: number) => {
-    if (confirm("Bạn có chắc muốn xóa tài liệu này?")) {
-      deleteMutation.mutate(id);
+    setDeleteConfirm({ open: true, id });
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirm.id) {
+      deleteMutation.mutate(deleteConfirm.id);
     }
   };
 
@@ -134,20 +184,37 @@ export default function DocumentsPage() {
               <Label htmlFor="document-type">
                 Loại văn bản <span className="text-red-500">*</span>
               </Label>
+              <SelectWithIcon
+                options={documentTypeOptions}
+                value={selectedDocumentTypeId}
+                onChange={(value) => setSelectedDocumentTypeId(Number(value))}
+                placeholder="-- Chọn loại văn bản --"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="workflow">
+                Quy trình phê duyệt
+              </Label>
               <select
-                id="document-type"
+                id="workflow"
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={selectedDocumentTypeId || ""}
-                onChange={(e) => setSelectedDocumentTypeId(e.target.value ? Number(e.target.value) : null)}
+                value={selectedWorkflowId || ""}
+                onChange={(e) => setSelectedWorkflowId(e.target.value ? Number(e.target.value) : null)}
               >
-                <option value="">-- Chọn loại văn bản --</option>
-                {activeDocumentTypes.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name} ({type.code})
+                <option value="">-- Không cần phê duyệt --</option>
+                {activeWorkflows.map((workflow) => (
+                  <option key={workflow.id} value={workflow.id}>
+                    {workflow.name} ({workflow.steps.length} bước)
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-muted-foreground">
+                Chọn quy trình nếu văn bản cần phê duyệt
+              </p>
             </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="file-name">Tên hiển thị</Label>
               <Input
@@ -157,9 +224,6 @@ export default function DocumentsPage() {
                 onChange={(e) => setFileName(e.target.value)}
               />
             </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="confidential-level">Mức độ mật</Label>
               <select
@@ -172,10 +236,10 @@ export default function DocumentsPage() {
                 <option value="confidential">🔒 Confidential (Bảo mật)</option>
                 <option value="secret">🔐 Secret (Tuyệt mật)</option>
               </select>
-              <p className="text-xs text-muted-foreground">
-                Mức độ bảo mật của tài liệu
-              </p>
             </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="visibility-scope">Phạm vi hiển thị</Label>
               <select
@@ -188,11 +252,13 @@ export default function DocumentsPage() {
                 <option value="department">🏢 Department (Phòng ban)</option>
                 <option value="private">🔒 Private (Riêng tư)</option>
               </select>
-              <p className="text-xs text-muted-foreground">
-                Ai có thể xem tài liệu này
-              </p>
+            </div>
+            <div className="space-y-2">
+              {/* Empty space for alignment */}
             </div>
           </div>
+
+
 
           {/* File Upload Dropzone */}
           <div className="space-y-2">
@@ -351,6 +417,19 @@ export default function DocumentsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        onOpenChange={(open) => setDeleteConfirm({ open, id: null })}
+        onConfirm={confirmDelete}
+        title="Xác nhận xóa tài liệu"
+        description="Bạn có chắc chắn muốn xóa tài liệu này? Hành động này không thể hoàn tác."
+        confirmText="Xóa tài liệu"
+        cancelText="Hủy bỏ"
+        variant="danger"
+        icon="trash"
+      />
     </div>
   );
 }

@@ -21,7 +21,9 @@ class AuthService {
     if (!isMatch) {
       throw ApiError.unauthorized("Invalid credentials", "INVALID_CREDENTIALS");
     }
-    return this.buildAuthResponse(user.id, user.tenant_id, user.email, user.role, user.tenant?.name ?? null, user.tenant?.plan ?? null, user.tenant?.status ?? null);
+    // Get primary role from user_roles (first role or fallback to user.role)
+    const primaryRole = user.user_roles?.[0]?.role?.name ?? user.role;
+    return this.buildAuthResponse(user.id, user.tenant_id, user.email, primaryRole, user.tenant?.name ?? null, user.tenant?.plan ?? null, user.tenant?.status ?? null);
   }
 
   async refresh(refreshToken: string): Promise<AuthResponse> {
@@ -30,7 +32,9 @@ class AuthService {
     if (!user) {
       throw ApiError.unauthorized("Invalid refresh token", "INVALID_REFRESH_TOKEN");
     }
-    return this.buildAuthResponse(user.id, user.tenant_id, user.email, user.role, user.tenant?.name ?? null, user.tenant?.plan ?? null, user.tenant?.status ?? null);
+    // Get primary role from user_roles (first role or fallback to user.role)
+    const primaryRole = user.user_roles?.[0]?.role?.name ?? user.role;
+    return this.buildAuthResponse(user.id, user.tenant_id, user.email, primaryRole, user.tenant?.name ?? null, user.tenant?.plan ?? null, user.tenant?.status ?? null);
   }
 
   verifyAccessToken(token: string): TokenPayload {
