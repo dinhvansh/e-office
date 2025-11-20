@@ -96,13 +96,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
-    if (!res.ok) {
-      throw new Error('Đăng nhập thất bại');
-    }
+    
     const payload = await res.json();
+    
+    if (!res.ok) {
+      // Handle different error cases
+      if (res.status === 401) {
+        const errorCode = payload.error?.code;
+        if (errorCode === 'INVALID_CREDENTIALS') {
+          throw new Error('Email hoặc mật khẩu không đúng');
+        }
+        throw new Error('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin');
+      }
+      if (res.status === 400) {
+        throw new Error('Thông tin đăng nhập không hợp lệ');
+      }
+      throw new Error(payload.error?.message ?? 'Đăng nhập thất bại');
+    }
+    
     if (!payload.success) {
       throw new Error(payload.error?.message ?? 'Đăng nhập thất bại');
     }
+    
     setTokens(payload.data.tokens);
     setUser(payload.data.user);
     setTenant(payload.data.tenant);
@@ -174,7 +189,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const json = await res.json();
         if (!json.success) {
           console.error('[Auth] Request failed:', json.error);
-          throw new Error(json.error?.message ?? 'Request failed');
+          // Backend returns error as string directly, not as object
+          const errorMessage = typeof json.error === 'string' 
+            ? json.error 
+            : json.error?.message ?? 'Request failed';
+          throw new Error(errorMessage);
         }
         return json.data as T;
       };

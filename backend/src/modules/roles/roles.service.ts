@@ -88,4 +88,17 @@ export const rolesService = {
   async checkPermission(userId: number, resource: string, action: string) {
     return rolesRepository.checkPermission(userId, resource, action);
   },
+
+  async removePermission(roleId: number, permissionId: number, tenantId: number) {
+    const role = await rolesRepository.findById(roleId, tenantId);
+    if (!role) {
+      throw new Error('Role not found');
+    }
+
+    if (role.is_system) {
+      throw new Error('Cannot modify system role permissions');
+    }
+
+    return rolesRepository.removePermission(roleId, permissionId);
+  },
 };

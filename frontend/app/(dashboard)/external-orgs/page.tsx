@@ -5,6 +5,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Building2, Plus, Edit, Trash2, Phone, Mail, User } from 'lucide-react';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
+import { PageHeader } from '@/components/ui/page-header';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { MetricCard } from '@/components/ui/metric-card';
 
 type ExternalOrg = {
   id: number;
@@ -107,224 +118,255 @@ export default function ExternalOrgsPage() {
     );
   };
 
-  if (isLoading) {
-    return <div className="p-8 text-center text-gray-500">Đang tải...</div>;
-  }
-
   return (
-    <div className="space-y-6 p-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Tổ chức bên ngoài</h1>
-          <p className="mt-1 text-sm text-gray-500">Quản lý danh sách tổ chức, đối tác, nhà cung cấp</p>
-        </div>
-        <button
-          onClick={() => {
-            setEditingOrg(null);
-            setShowModal(true);
-          }}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" />
-          Thêm tổ chức
-        </button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={Building2}
+        title="Tổ chức bên ngoài"
+        description="Quản lý danh sách tổ chức, đối tác, nhà cung cấp"
+        iconColor="text-cyan-600"
+        actions={
+          <Button onClick={() => { setEditingOrg(null); setShowModal(true); }}>
+            <Plus className="w-4 h-4 mr-2" />
+            Thêm tổ chức
+          </Button>
+        }
+      />
 
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-        {CATEGORIES.map((cat) => {
-          const count = orgs.filter((o) => o.category === cat.value).length;
-          return (
-            <div key={cat.value} className="rounded-lg border border-gray-200 bg-white p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{cat.label}</p>
-                  <p className="mt-1 text-2xl font-semibold text-gray-900">{count}</p>
-                </div>
-                <Building2 className="h-8 w-8 text-gray-400" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {isLoading ? (
+          <>
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+          </>
+        ) : (
+          CATEGORIES.map((cat) => {
+            const count = orgs.filter((o) => o.category === cat.value).length;
+            return (
+              <MetricCard
+                key={cat.value}
+                title={cat.label}
+                value={count.toString()}
+                icon={Building2}
+              />
+            );
+          })
+        )}
+      </div>
+
+      {/* Organizations List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Danh sách tổ chức</CardTitle>
+          <CardDescription>Quản lý thông tin chi tiết các tổ chức bên ngoài</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+          ) : orgs.length === 0 ? (
+            <EmptyState
+              icon={Building2}
+              title="Chưa có tổ chức"
+              description="Thêm tổ chức bên ngoài đầu tiên để bắt đầu quản lý"
+              action={{
+                label: "Thêm tổ chức",
+                onClick: () => { setEditingOrg(null); setShowModal(true); }
+              }}
+            />
+          ) : (
+            <div className="rounded-lg border">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 border-b">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium">Tổ chức</th>
+                      <th className="px-4 py-3 text-left font-medium">Loại</th>
+                      <th className="px-4 py-3 text-left font-medium">Liên hệ</th>
+                      <th className="px-4 py-3 text-right font-medium">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orgs.map((org) => (
+                      <tr key={org.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-4">
+                          <div>
+                            <div className="font-medium">{org.name}</div>
+                            <div className="text-xs text-muted-foreground">{org.code || '-'}</div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">{getCategoryLabel(org.category)}</td>
+                        <td className="px-4 py-4">
+                          <div className="space-y-1 text-xs">
+                            {org.contact_person && (
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <User className="h-3 w-3" />
+                                {org.contact_person}
+                              </div>
+                            )}
+                            {org.phone && (
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Phone className="h-3 w-3" />
+                                {org.phone}
+                              </div>
+                            )}
+                            {org.email && (
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Mail className="h-3 w-3" />
+                                {org.email}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => { setEditingOrg(org); setShowModal(true); }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => {
+                                if (confirm('Xóa tổ chức này?')) {
+                                  deleteMutation.mutate(org.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-          );
-        })}
-      </div>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Tổ chức
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Loại
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Liên hệ
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                Thao tác
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
-            {orgs.map((org) => (
-              <tr key={org.id} className="hover:bg-gray-50">
-                <td className="whitespace-nowrap px-6 py-4">
-                  <div>
-                    <div className="font-medium text-gray-900">{org.name}</div>
-                    <div className="text-sm text-gray-500">{org.code || '-'}</div>
-                  </div>
-                </td>
-                <td className="whitespace-nowrap px-6 py-4">{getCategoryLabel(org.category)}</td>
-                <td className="px-6 py-4">
-                  <div className="space-y-1 text-sm">
-                    {org.contact_person && (
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <User className="h-3.5 w-3.5" />
-                        {org.contact_person}
-                      </div>
-                    )}
-                    {org.phone && (
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <Phone className="h-3.5 w-3.5" />
-                        {org.phone}
-                      </div>
-                    )}
-                    {org.email && (
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <Mail className="h-3.5 w-3.5" />
-                        {org.email}
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                  <button
-                    onClick={() => {
-                      setEditingOrg(org);
-                      setShowModal(true);
-                    }}
-                    className="mr-3 text-blue-600 hover:text-blue-900"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm('Xóa tổ chức này?')) {
-                        deleteMutation.mutate(org.id);
-                      }
-                    }}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-screen items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black bg-opacity-30" onClick={() => setShowModal(false)} />
-            <div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-              <h3 className="mb-4 text-lg font-medium text-gray-900">
-                {editingOrg ? 'Sửa tổ chức' : 'Thêm tổ chức mới'}
-              </h3>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Tên tổ chức *</label>
-                  <input
-                    name="name"
-                    defaultValue={editingOrg?.name}
-                    required
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Mã</label>
-                  <input
-                    name="code"
-                    defaultValue={editingOrg?.code || ''}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Loại</label>
-                  <select
-                    name="category"
-                    defaultValue={editingOrg?.category || ''}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                  >
-                    <option value="">-- Chọn loại --</option>
-                    {CATEGORIES.map((cat) => (
-                      <option key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Địa chỉ</label>
-                  <input
-                    name="address"
-                    defaultValue={editingOrg?.address || ''}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Số điện thoại</label>
-                  <input
-                    name="phone"
-                    defaultValue={editingOrg?.phone || ''}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Email</label>
-                  <input
-                    name="email"
-                    type="email"
-                    defaultValue={editingOrg?.email || ''}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Người liên hệ</label>
-                  <input
-                    name="contact_person"
-                    defaultValue={editingOrg?.contact_person || ''}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowModal(false);
-                      setEditingOrg(null);
-                    }}
-                    className="flex-1 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                  >
-                    {editingOrg ? 'Cập nhật' : 'Tạo mới'}
-                  </button>
-                </div>
-              </form>
+      {/* Create/Edit Modal */}
+      <Dialog open={showModal} onOpenChange={(open) => {
+        setShowModal(open);
+        if (!open) setEditingOrg(null);
+      }}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingOrg ? 'Sửa tổ chức' : 'Thêm tổ chức mới'}</DialogTitle>
+            <DialogDescription>
+              {editingOrg ? 'Cập nhật thông tin tổ chức' : 'Điền thông tin tổ chức bên ngoài'}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="name">Tên tổ chức *</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  defaultValue={editingOrg?.name}
+                  required
+                  placeholder="Công ty ABC"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="code">Mã</Label>
+                <Input
+                  id="code"
+                  name="code"
+                  defaultValue={editingOrg?.code || ''}
+                  placeholder="ABC-001"
+                />
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+            <div className="space-y-2">
+              <Label htmlFor="category">Loại</Label>
+              <select
+                id="category"
+                name="category"
+                defaultValue={editingOrg?.category || ''}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">-- Chọn loại --</option>
+                {CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Địa chỉ</Label>
+              <Input
+                id="address"
+                name="address"
+                defaultValue={editingOrg?.address || ''}
+                placeholder="123 Đường ABC, Quận 1"
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Số điện thoại</Label>
+                <Input
+                  id="phone"
+                  name="phone"
+                  defaultValue={editingOrg?.phone || ''}
+                  placeholder="0123456789"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  defaultValue={editingOrg?.email || ''}
+                  placeholder="contact@example.com"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact_person">Người liên hệ</Label>
+              <Input
+                id="contact_person"
+                name="contact_person"
+                defaultValue={editingOrg?.contact_person || ''}
+                placeholder="Nguyễn Văn A"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowModal(false);
+                  setEditingOrg(null);
+                }}
+              >
+                Hủy
+              </Button>
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                {createMutation.isPending || updateMutation.isPending
+                  ? 'Đang xử lý...'
+                  : editingOrg ? 'Cập nhật' : 'Tạo mới'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

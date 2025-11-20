@@ -59,7 +59,47 @@ async function main() {
     },
   });
 
-  console.log("Seed complete");
+  // Seed departments with code field
+  const departments = [
+    { code: "IT", name: "Phòng Công nghệ thông tin", description: "Quản lý hệ thống và phát triển phần mềm" },
+    { code: "HR", name: "Phòng Nhân sự", description: "Quản lý nhân sự và tuyển dụng" },
+    { code: "FIN", name: "Phòng Tài chính", description: "Quản lý tài chính và kế toán" },
+    { code: "MKT", name: "Phòng Marketing", description: "Marketing và truyền thông" },
+    { code: "SALE", name: "Phòng Kinh doanh", description: "Bán hàng và chăm sóc khách hàng" },
+  ];
+
+  for (const dept of departments) {
+    // Check if department exists
+    const existing = await prisma.departments.findFirst({
+      where: {
+        tenant_id: tenant.id,
+        code: dept.code,
+      },
+    });
+
+    if (existing) {
+      // Update existing
+      await prisma.departments.update({
+        where: { id: existing.id },
+        data: {
+          name: dept.name,
+          description: dept.description,
+        },
+      });
+    } else {
+      // Create new
+      await prisma.departments.create({
+        data: {
+          tenant_id: tenant.id,
+          code: dept.code,
+          name: dept.name,
+          description: dept.description,
+        },
+      });
+    }
+  }
+
+  console.log("Seed complete: tenant, admin user, license, and 5 departments");
 }
 
 main()

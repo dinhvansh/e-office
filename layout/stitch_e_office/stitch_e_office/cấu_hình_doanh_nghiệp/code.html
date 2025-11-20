@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cấu hình thông tin doanh nghiệp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#2b6cee",
+            "background-light": "#f6f6f8",
+            "background-dark": "#101622",
+          },
+          fontFamily: {
+            "display": ["Inter", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display">
+<div class="relative flex min-h-screen w-full">
+<!-- SideNavBar -->
+<aside class="flex flex-col w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800">
+<div class="flex flex-col justify-between flex-1 h-full p-4">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="Company logo placeholder" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAQJa783UIei4_SEYzRGrX18Bqsxd79HzrjZozpkWWbjyTRcYno0Um5v5KTh1OPVrSUkHLoVafpgTalDaEEJeUJprxI82VckQ5n_QZkrBPafIxJuR3RYgy5Jd3Rrc3rK2G3Tr23GTXzH_i6uMWbDGn0y7_sZ7yF795FE1LjQkjYicu-NwRIVq-bE5Vj1WQtXJKn-mLrdTgYC2LH5N4h_CSFAdPLrzqqJ6jSkEkR6zznJMrVgrhJsT2xGZ0L4EqWZwDZ5B895szLTyJr");'></div>
+<div class="flex flex-col">
+<h1 class="text-gray-900 dark:text-white text-base font-medium leading-normal">Hệ thống E-Office</h1>
+<p class="text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">Admin Panel</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2 mt-4">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-gray-800 dark:text-gray-200">dashboard</span>
+<p class="text-sm font-medium leading-normal">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-gray-800 dark:text-gray-200">folder</span>
+<p class="text-sm font-medium leading-normal">Documents</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-gray-800 dark:text-gray-200">workflow</span>
+<p class="text-sm font-medium leading-normal">Workflows</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-gray-800 dark:text-gray-200">bar_chart</span>
+<p class="text-sm font-medium leading-normal">Reports</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary" href="#">
+<span class="material-symbols-outlined text-primary font-bold">settings</span>
+<p class="text-sm font-bold leading-normal">Settings</p>
+</a>
+</nav>
+</div>
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-gray-800 dark:text-gray-200">help</span>
+<p class="text-sm font-medium leading-normal">Help</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-gray-800 dark:text-gray-200">logout</span>
+<p class="text-sm font-medium leading-normal">Logout</p>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 p-8 overflow-y-auto">
+<div class="max-w-4xl mx-auto">
+<!-- PageHeading -->
+<div class="mb-8">
+<p class="text-gray-900 dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">Cấu hình thông tin doanh nghiệp</p>
+<p class="text-gray-500 dark:text-gray-400 text-base font-normal leading-normal mt-2">Cập nhật thông tin chung, branding và các cài đặt liên quan đến tenant.</p>
+</div>
+<!-- Tabs -->
+<div class="mb-8">
+<div class="flex border-b border-gray-200 dark:border-gray-700 gap-8">
+<a class="flex flex-col items-center justify-center border-b-[3px] border-b-primary text-primary pb-[13px] pt-4" href="#">
+<p class="text-sm font-bold leading-normal tracking-[0.015em]">Thông tin chung</p>
+</a>
+<a class="flex flex-col items-center justify-center border-b-[3px] border-b-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 pb-[13px] pt-4" href="#">
+<p class="text-sm font-bold leading-normal tracking-[0.015em]">Branding</p>
+</a>
+<a class="flex flex-col items-center justify-center border-b-[3px] border-b-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 pb-[13px] pt-4" href="#">
+<p class="text-sm font-bold leading-normal tracking-[0.015em]">Cài đặt nâng cao</p>
+</a>
+</div>
+</div>
+<!-- Content Sections -->
+<div class="space-y-10">
+<!-- Section 1: General Information -->
+<section>
+<h2 class="text-gray-900 dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em] pb-5">Thông tin chung</h2>
+<div class="p-6 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+<div class="md:col-span-2">
+<label class="flex flex-col">
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal pb-2">Tên doanh nghiệp</p>
+<input class="form-input w-full rounded-lg text-gray-900 dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:border-primary dark:focus:border-primary h-12 placeholder:text-gray-400 dark:placeholder:text-gray-500 px-4 text-base font-normal leading-normal" placeholder="Nhập tên doanh nghiệp" value=""/>
+</label>
+</div>
+<div>
+<label class="flex flex-col">
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal pb-2">Mã số thuế</p>
+<input class="form-input w-full rounded-lg text-gray-900 dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:border-primary dark:focus:border-primary h-12 placeholder:text-gray-400 dark:placeholder:text-gray-500 px-4 text-base font-normal leading-normal" placeholder="Nhập mã số thuế" value=""/>
+</label>
+</div>
+<div>
+<label class="flex flex-col">
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal pb-2">Số điện thoại</p>
+<input class="form-input w-full rounded-lg text-gray-900 dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:border-primary dark:focus:border-primary h-12 placeholder:text-gray-400 dark:placeholder:text-gray-500 px-4 text-base font-normal leading-normal" placeholder="Nhập số điện thoại" value=""/>
+</label>
+</div>
+<div class="md:col-span-2">
+<label class="flex flex-col">
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal pb-2">Địa chỉ đăng ký kinh doanh</p>
+<input class="form-input w-full rounded-lg text-gray-900 dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:border-primary dark:focus:border-primary h-12 placeholder:text-gray-400 dark:placeholder:text-gray-500 px-4 text-base font-normal leading-normal" placeholder="Nhập địa chỉ" value=""/>
+</label>
+</div>
+<div>
+<label class="flex flex-col">
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal pb-2">Email hỗ trợ</p>
+<input class="form-input w-full rounded-lg text-gray-900 dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:border-primary dark:focus:border-primary h-12 placeholder:text-gray-400 dark:placeholder:text-gray-500 px-4 text-base font-normal leading-normal" placeholder="example@company.com" value=""/>
+</label>
+</div>
+<div>
+<label class="flex flex-col">
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal pb-2">Website</p>
+<input class="form-input w-full rounded-lg text-gray-900 dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:border-primary dark:focus:border-primary h-12 placeholder:text-gray-400 dark:placeholder:text-gray-500 px-4 text-base font-normal leading-normal" placeholder="https://company.com" value=""/>
+</label>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 2: Branding (Placeholder) -->
+<section>
+<h2 class="text-gray-900 dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em] pb-5">Cài đặt Thương hiệu</h2>
+<div class="relative p-6 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+<div class="absolute inset-0 bg-gray-50/50 dark:bg-gray-950/50 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+<span class="material-symbols-outlined text-4xl text-gray-400 dark:text-gray-600">hourglass_empty</span>
+<p class="mt-2 text-gray-600 dark:text-gray-400 font-semibold">Tính năng đang được phát triển</p>
+<p class="text-gray-500 dark:text-gray-500 text-sm">Chức năng cài đặt logo và màu sắc sẽ sớm ra mắt.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-40">
+<div>
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal pb-2">Logo</p>
+<div class="flex items-center gap-4">
+<div class="size-16 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+<span class="material-symbols-outlined text-gray-400 dark:text-gray-600">image</span>
+</div>
+<button class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600" disabled="">Tải lên</button>
+</div>
+</div>
+<div>
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal pb-2">Favicon</p>
+<div class="flex items-center gap-4">
+<div class="size-16 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+<span class="material-symbols-outlined text-gray-400 dark:text-gray-600">public</span>
+</div>
+<button class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600" disabled="">Tải lên</button>
+</div>
+</div>
+<div>
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal pb-2">Màu sắc chủ đạo</p>
+<div class="h-12 w-full rounded-lg border border-gray-300 dark:border-gray-700 flex items-center px-4 bg-gray-50 dark:bg-gray-800">
+<div class="size-6 rounded-full bg-primary mr-3"></div>
+<span class="text-gray-500">#2B6CEE</span>
+</div>
+</div>
+<div>
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal pb-2">Màu sắc phụ</p>
+<div class="h-12 w-full rounded-lg border border-gray-300 dark:border-gray-700 flex items-center px-4 bg-gray-50 dark:bg-gray-800">
+<div class="size-6 rounded-full bg-gray-300 dark:bg-gray-600 mr-3"></div>
+<span class="text-gray-500">#DBDFE6</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Action Buttons -->
+<div class="flex justify-end items-center gap-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+<button class="px-5 py-2.5 text-sm font-semibold text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700">Hủy bỏ</button>
+<button class="px-5 py-2.5 text-sm font-semibold text-white bg-primary rounded-lg shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Lưu thay đổi</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

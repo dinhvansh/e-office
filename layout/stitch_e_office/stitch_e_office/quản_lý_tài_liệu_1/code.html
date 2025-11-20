@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quản lý tài liệu - Hệ thống trình ký điện tử</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#2b6cee",
+              "background-light": "#f6f6f8",
+              "background-dark": "#101622",
+              "success": "#1E8449",
+              "warning": "#F39C12",
+              "danger": "#C0392B"
+            },
+            fontFamily: {
+              "display": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-gray-900 dark:text-gray-100">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="flex h-full grow">
+<!-- SideNavBar -->
+<aside class="flex flex-col w-64 bg-white dark:bg-background-dark border-r border-gray-200 dark:border-gray-800 p-4 shrink-0">
+<div class="flex items-center gap-3 mb-8">
+<div class="bg-primary text-white rounded-lg p-2 flex items-center justify-center">
+<span class="material-symbols-outlined">draw</span>
+</div>
+<h1 class="text-xl font-bold text-gray-900 dark:text-white">eSign</h1>
+</div>
+<div class="flex flex-col justify-between h-full">
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary">
+<span class="material-symbols-outlined">folder</span>
+<p class="text-sm font-medium leading-normal">Tài liệu của tôi</p>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer">
+<span class="material-symbols-outlined text-gray-700 dark:text-gray-300">edit_document</span>
+<p class="text-sm font-medium leading-normal text-gray-700 dark:text-gray-300">Cần ký</p>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer">
+<span class="material-symbols-outlined text-gray-700 dark:text-gray-300">task_alt</span>
+<p class="text-sm font-medium leading-normal text-gray-700 dark:text-gray-300">Đã hoàn thành</p>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer">
+<span class="material-symbols-outlined text-gray-700 dark:text-gray-300">delete</span>
+<p class="text-sm font-medium leading-normal text-gray-700 dark:text-gray-300">Thùng rác</p>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<div class="border-t border-gray-200 dark:border-gray-800 pt-4">
+<div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer">
+<span class="material-symbols-outlined text-gray-700 dark:text-gray-300">settings</span>
+<p class="text-sm font-medium leading-normal text-gray-700 dark:text-gray-300">Cài đặt</p>
+</div>
+</div>
+<div class="flex gap-3 items-center">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="User avatar image" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBM04RCWfnA6rt8MT-5w_UIfO1OnEfU0AoYXaRjsC6Oz7LRUH46bCISqhcYJerbleCUIZraNIgi8nEjgTp8J_5__8RXEjzlJ-ffPino6rmB5Kkri-4V8-LMOzg45qfufoIHjj88sglRysedq3cd_We7jxX4wlyS_Y-7IKxEpNnLcdEF3SEQxRHKazSU487_bIZ0Ba8P9ZKLCCkjm1XRfcn0f3vosWI5YxSyvY8OTMmJVExcL1TEFLK8qzEk4esjXBHwISAMyjZWa6BG");'></div>
+<div class="flex flex-col">
+<h1 class="text-gray-800 dark:text-white text-base font-medium leading-normal">Nguyễn Văn A</h1>
+<p class="text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">nva@company.com</p>
+</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 p-8">
+<div class="layout-content-container flex flex-col w-full">
+<!-- PageHeading -->
+<div class="flex flex-wrap justify-between gap-4 items-center mb-6">
+<div class="flex flex-col gap-2">
+<p class="text-gray-900 dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">Quản lý tài liệu</p>
+<p class="text-gray-600 dark:text-gray-400 text-base font-normal leading-normal">Xem, tìm kiếm, và quản lý tất cả các tài liệu của bạn.</p>
+</div>
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-12 px-6 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined">upload_file</span>
+<span class="truncate">Tải lên tài liệu</span>
+</button>
+</div>
+<!-- SearchBar and Chips -->
+<div class="mb-4">
+<div class="flex flex-col sm:flex-row gap-4">
+<label class="flex flex-col h-12 w-full flex-1">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full bg-white dark:bg-background-dark dark:border dark:border-gray-700">
+<div class="text-gray-500 dark:text-gray-400 flex items-center justify-center pl-4">
+<span class="material-symbols-outlined">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-r-lg text-gray-800 dark:text-white focus:outline-0 focus:ring-0 border-none bg-transparent h-full placeholder:text-gray-500 dark:placeholder:text-gray-400 px-4 pl-2 text-base font-normal leading-normal" placeholder="Tìm kiếm theo tên tài liệu, email người gửi..." value=""/>
+</div>
+</label>
+<div class="flex gap-3 overflow-x-auto items-center">
+<button class="flex h-12 shrink-0 items-center justify-center gap-x-2 rounded-lg bg-white dark:bg-background-dark dark:border dark:border-gray-700 px-4">
+<span class="material-symbols-outlined text-gray-700 dark:text-gray-300">tune</span>
+<p class="text-gray-700 dark:text-gray-300 text-sm font-medium leading-normal">Trạng thái</p>
+<span class="material-symbols-outlined text-gray-700 dark:text-gray-300">expand_more</span>
+</button>
+<button class="flex h-12 shrink-0 items-center justify-center gap-x-2 rounded-lg bg-white dark:bg-background-dark dark:border dark:border-gray-700 px-4">
+<span class="material-symbols-outlined text-gray-700 dark:text-gray-300">calendar_month</span>
+<p class="text-gray-700 dark:text-gray-300 text-sm font-medium leading-normal">Ngày tháng</p>
+<span class="material-symbols-outlined text-gray-700 dark:text-gray-300">expand_more</span>
+</button>
+<button class="flex h-12 shrink-0 items-center justify-center gap-x-2 rounded-lg bg-white dark:bg-background-dark dark:border dark:border-gray-700 px-4">
+<span class="material-symbols-outlined text-gray-700 dark:text-gray-300">description</span>
+<p class="text-gray-700 dark:text-gray-300 text-sm font-medium leading-normal">Loại</p>
+<span class="material-symbols-outlined text-gray-700 dark:text-gray-300">expand_more</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Table -->
+<div class="w-full @container">
+<div class="flex overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-background-dark">
+<table class="flex-1">
+<thead>
+<tr class="bg-gray-50 dark:bg-white/5">
+<th class="w-12 px-4 py-3 text-left">
+<input class="form-checkbox rounded border-gray-300 dark:border-gray-600 dark:bg-gray-900 text-primary focus:ring-primary/50" type="checkbox"/>
+</th>
+<th class="px-4 py-3 text-left text-gray-600 dark:text-gray-300 w-2/5 text-sm font-medium leading-normal">Tên tài liệu</th>
+<th class="px-4 py-3 text-left text-gray-600 dark:text-gray-300 w-1/5 text-sm font-medium leading-normal">Trạng thái</th>
+<th class="px-4 py-3 text-left text-gray-600 dark:text-gray-300 w-1/5 text-sm font-medium leading-normal">Người gửi/ký</th>
+<th class="px-4 py-3 text-left text-gray-600 dark:text-gray-300 w-1/5 text-sm font-medium leading-normal">Ngày cập nhật</th>
+<th class="px-4 py-3 text-left text-gray-600 dark:text-gray-300 w-auto text-sm font-medium leading-normal">Hành động</th>
+</tr>
+</thead>
+<tbody>
+<tr class="border-t border-t-gray-200 dark:border-t-gray-800 hover:bg-gray-50 dark:hover:bg-white/5 group">
+<td class="px-4 py-2">
+<input class="form-checkbox rounded border-gray-300 dark:border-gray-600 dark:bg-gray-900 text-primary focus:ring-primary/50" type="checkbox"/>
+</td>
+<td class="h-[72px] px-4 py-2 text-gray-900 dark:text-white text-sm font-medium leading-normal">Hợp đồng lao động - Nguyễn Văn B</td>
+<td class="h-[72px] px-4 py-2 text-sm font-normal leading-normal">
+<div class="flex items-center gap-2 text-sm font-medium text-warning-darker bg-warning/20 text-warning px-2.5 py-1 rounded-full w-fit">
+<span class="size-2 bg-warning rounded-full"></span>Chờ ký
+                                            </div>
+</td>
+<td class="h-[72px] px-4 py-2 text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">Phòng nhân sự</td>
+<td class="h-[72px] px-4 py-2 text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">15/07/2024</td>
+<td class="h-[72px] px-4 py-2">
+<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"><span class="material-symbols-outlined text-gray-600 dark:text-gray-300 text-xl">visibility</span></button>
+<button class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"><span class="material-symbols-outlined text-gray-600 dark:text-gray-300 text-xl">edit</span></button>
+<button class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"><span class="material-symbols-outlined text-gray-600 dark:text-gray-300 text-xl">download</span></button>
+</div>
+</td>
+</tr>
+<tr class="border-t border-t-gray-200 dark:border-t-gray-800 hover:bg-gray-50 dark:hover:bg-white/5 group">
+<td class="px-4 py-2">
+<input class="form-checkbox rounded border-gray-300 dark:border-gray-600 dark:bg-gray-900 text-primary focus:ring-primary/50" type="checkbox"/>
+</td>
+<td class="h-[72px] px-4 py-2 text-gray-900 dark:text-white text-sm font-medium leading-normal">Báo giá dự án XYZ</td>
+<td class="h-[72px] px-4 py-2 text-sm font-normal leading-normal">
+<div class="flex items-center gap-2 text-sm font-medium text-success-darker bg-success/20 text-success px-2.5 py-1 rounded-full w-fit">
+<span class="size-2 bg-success rounded-full"></span>Đã hoàn thành
+                                            </div>
+</td>
+<td class="h-[72px] px-4 py-2 text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">Công ty ABC</td>
+<td class="h-[72px] px-4 py-2 text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">14/07/2024</td>
+<td class="h-[72px] px-4 py-2">
+<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"><span class="material-symbols-outlined text-gray-600 dark:text-gray-300 text-xl">visibility</span></button>
+<button class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"><span class="material-symbols-outlined text-gray-600 dark:text-gray-300 text-xl">download</span></button>
+</div>
+</td>
+</tr>
+<tr class="border-t border-t-gray-200 dark:border-t-gray-800 hover:bg-gray-50 dark:hover:bg-white/5 group">
+<td class="px-4 py-2">
+<input class="form-checkbox rounded border-gray-300 dark:border-gray-600 dark:bg-gray-900 text-primary focus:ring-primary/50" type="checkbox"/>
+</td>
+<td class="h-[72px] px-4 py-2 text-gray-900 dark:text-white text-sm font-medium leading-normal">Thỏa thuận bảo mật thông tin</td>
+<td class="h-[72px] px-4 py-2 text-sm font-normal leading-normal">
+<div class="flex items-center gap-2 text-sm font-medium text-danger-darker bg-danger/20 text-danger px-2.5 py-1 rounded-full w-fit">
+<span class="size-2 bg-danger rounded-full"></span>Đã từ chối
+                                            </div>
+</td>
+<td class="h-[72px] px-4 py-2 text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">Đối tác Z</td>
+<td class="h-[72px] px-4 py-2 text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">12/07/2024</td>
+<td class="h-[72px] px-4 py-2">
+<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"><span class="material-symbols-outlined text-gray-600 dark:text-gray-300 text-xl">visibility</span></button>
+</div>
+</td>
+</tr>
+<tr class="border-t border-t-gray-200 dark:border-t-gray-800 hover:bg-gray-50 dark:hover:bg-white/5 group">
+<td class="px-4 py-2">
+<input class="form-checkbox rounded border-gray-300 dark:border-gray-600 dark:bg-gray-900 text-primary focus:ring-primary/50" type="checkbox"/>
+</td>
+<td class="h-[72px] px-4 py-2 text-gray-900 dark:text-white text-sm font-medium leading-normal">Yêu cầu nghỉ phép</td>
+<td class="h-[72px] px-4 py-2 text-sm font-normal leading-normal">
+<div class="flex items-center gap-2 text-sm font-medium text-success-darker bg-success/20 text-success px-2.5 py-1 rounded-full w-fit">
+<span class="size-2 bg-success rounded-full"></span>Đã hoàn thành
+                                            </div>
+</td>
+<td class="h-[72px] px-4 py-2 text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">Trần Thị C</td>
+<td class="h-[72px] px-4 py-2 text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">11/07/2024</td>
+<td class="h-[72px] px-4 py-2">
+<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"><span class="material-symbols-outlined text-gray-600 dark:text-gray-300 text-xl">visibility</span></button>
+<button class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"><span class="material-symbols-outlined text-gray-600 dark:text-gray-300 text-xl">download</span></button>
+</div>
+</td>
+</tr>
+<tr class="border-t border-t-gray-200 dark:border-t-gray-800 hover:bg-gray-50 dark:hover:bg-white/5 group">
+<td class="px-4 py-2">
+<input class="form-checkbox rounded border-gray-300 dark:border-gray-600 dark:bg-gray-900 text-primary focus:ring-primary/50" type="checkbox"/>
+</td>
+<td class="h-[72px] px-4 py-2 text-gray-900 dark:text-white text-sm font-medium leading-normal">Biên bản họp hội đồng</td>
+<td class="h-[72px] px-4 py-2 text-sm font-normal leading-normal">
+<div class="flex items-center gap-2 text-sm font-medium text-warning-darker bg-warning/20 text-warning px-2.5 py-1 rounded-full w-fit">
+<span class="size-2 bg-warning rounded-full"></span>Chờ ký
+                                            </div>
+</td>
+<td class="h-[72px] px-4 py-2 text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">Thư ký</td>
+<td class="h-[72px] px-4 py-2 text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">10/07/2024</td>
+<td class="h-[72px] px-4 py-2">
+<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"><span class="material-symbols-outlined text-gray-600 dark:text-gray-300 text-xl">visibility</span></button>
+<button class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"><span class="material-symbols-outlined text-gray-600 dark:text-gray-300 text-xl">edit</span></button>
+<button class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"><span class="material-symbols-outlined text-gray-600 dark:text-gray-300 text-xl">download</span></button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Pagination -->
+<div class="flex justify-between items-center mt-6">
+<p class="text-sm text-gray-600 dark:text-gray-400">Hiển thị 1-5 trên 50 kết quả</p>
+<div class="flex items-center gap-2">
+<button class="flex items-center justify-center size-9 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-background-dark hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-gray-600 dark:text-gray-300">chevron_left</span>
+</button>
+<button class="flex items-center justify-center size-9 rounded-lg border border-primary bg-primary/10 text-primary">1</button>
+<button class="flex items-center justify-center size-9 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-background-dark hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-600 dark:text-gray-300">2</button>
+<button class="flex items-center justify-center size-9 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-background-dark hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-600 dark:text-gray-300">3</button>
+<span class="text-gray-500 dark:text-gray-400">...</span>
+<button class="flex items-center justify-center size-9 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-background-dark hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-600 dark:text-gray-300">10</button>
+<button class="flex items-center justify-center size-9 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-background-dark hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-gray-600 dark:text-gray-300">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Giao diện Trình ký Điện tử</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings:
+        'FILL' 0,
+        'wght' 400,
+        'GRAD' 0,
+        'opsz' 24
+    }
+  </style>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#2b6cee",
+            "background-light": "#f6f6f8",
+            "background-dark": "#101622",
+          },
+          fontFamily: {
+            "display": ["Inter", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark text-[#333333] dark:text-gray-200">
+<div class="flex h-screen w-full flex-col">
+<!-- Header -->
+<header class="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-[#19202e] px-4 md:px-6">
+<div class="flex items-center gap-4">
+<a class="flex items-center gap-2 font-semibold" href="#">
+<span class="material-symbols-outlined text-primary text-3xl">draw</span>
+<span class="hidden md:inline">Trình Ký Điện Tử</span>
+</a>
+<div class="hidden md:block h-6 w-px bg-gray-200 dark:bg-gray-700"></div>
+<p class="hidden md:block text-sm text-gray-500 dark:text-gray-400">Hợp đồng Dịch vụ ABC - Q4/2024.pdf</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal tracking-[0.015em] border border-gray-300 dark:border-gray-600">
+<span class="truncate">Lưu Nháp</span>
+</button>
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em]">
+<span class="truncate">Gửi Yêu Cầu Ký</span>
+</button>
+</div>
+</header>
+<!-- Main Content -->
+<main class="flex flex-1 flex-row overflow-hidden">
+<!-- Left Panel: Signer & Fields -->
+<aside class="w-72 shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-[#19202e] flex flex-col">
+<div class="flex h-full flex-col justify-between p-4">
+<div class="flex flex-col gap-6">
+<div class="flex flex-col gap-4">
+<h3 class="text-base font-semibold text-gray-800 dark:text-gray-200 px-1">Người Ký</h3>
+<div class="flex flex-col gap-3">
+<div class="flex items-center justify-between p-2 rounded-lg border border-yellow-400/50 bg-yellow-400/10 dark:bg-yellow-400/20">
+<div class="flex gap-3 items-center">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-8" data-alt="Avatar of Nguyễn Văn A" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAA0feFRDT1Lo8ok3wzgOUqC9aZjiCsvkNebT6-n05w4krS1aHR5fMHPwOpqcUsqby5sTrvaapXzB1LeAlmZMy0KivKOt7MY8xNGl4ViZt2ZEHVrXRgoYLpO_Ir_jJF-U17HhaBuXKrIqZou07Ft4eoC-aVqLa_8MzF41cIWkOePV0VUkcazJhhsE_614hzZjjBQZDIceSMIMgo3UHNCs7H0ejZce427IGdPz3gMHq-YtZ6zE_IRO3ZK3v49VqODA-llIB5qyHGkoRC");'></div>
+<div class="flex flex-col">
+<h1 class="text-[#111318] dark:text-gray-100 text-sm font-medium leading-normal">Nguyễn Văn A</h1>
+<p class="text-[#616f89] dark:text-gray-400 text-xs font-normal leading-normal">Ký chính</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-gray-500 dark:text-gray-400 text-lg cursor-pointer">more_vert</span>
+</div>
+<div class="flex items-center justify-between p-2 rounded-lg border border-green-400/50 bg-green-400/10 dark:bg-green-400/20">
+<div class="flex gap-3 items-center">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-8" data-alt="Avatar of Trần Thị B" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuD5Q2_zZxwudB9fpy_3b04yWxVey_uJY4LYRFPLa_dzcMrQMub0UewS5RrurRc6zs80_BpBA8zdTjH0H5aIQV5S1DrwtNVyNWTz_pWdJlr6S2bCTSV3JdcFZ67LigZCDaen-BTCj58t2Mcu1HwVNy70RbsagYtvW__1ORAP0lmCD6v3jFlc-M3cLUNvotrBsHSHBtmMscMLW5pfdWhp80kJ433ocgY87n-P9U7mnJBZi1PE1m2ZHTX_gURX4Mie1ERBVpNq33SBHfpL");'></div>
+<div class="flex flex-col">
+<h1 class="text-[#111318] dark:text-gray-100 text-sm font-medium leading-normal">Trần Thị B</h1>
+<p class="text-[#616f89] dark:text-gray-400 text-xs font-normal leading-normal">Ký nháy</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-gray-500 dark:text-gray-400 text-lg cursor-pointer">more_vert</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<h3 class="text-base font-semibold text-gray-800 dark:text-gray-200 px-1">Trường Dữ Liệu</h3>
+<div class="grid grid-cols-2 gap-3">
+<div class="flex flex-col items-center gap-2 p-3 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700 cursor-move bg-gray-50 dark:bg-gray-800/50 text-center">
+<span class="material-symbols-outlined text-primary text-2xl">signature</span>
+<p class="text-xs font-medium leading-normal">Chữ ký</p>
+</div>
+<div class="flex flex-col items-center gap-2 p-3 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700 cursor-move bg-gray-50 dark:bg-gray-800/50 text-center">
+<span class="material-symbols-outlined text-primary text-2xl">badge</span>
+<p class="text-xs font-medium leading-normal">Họ Tên</p>
+</div>
+<div class="flex flex-col items-center gap-2 p-3 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700 cursor-move bg-gray-50 dark:bg-gray-800/50 text-center">
+<span class="material-symbols-outlined text-primary text-2xl">calendar_today</span>
+<p class="text-xs font-medium leading-normal">Ngày Ký</p>
+</div>
+<div class="flex flex-col items-center gap-2 p-3 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700 cursor-move bg-gray-50 dark:bg-gray-800/50 text-center">
+<span class="material-symbols-outlined text-primary text-2xl">check_box</span>
+<p class="text-xs font-medium leading-normal">Checkbox</p>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-4 pt-4">
+<button class="flex min-w-[84px] w-full max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary/20 dark:bg-primary/30 text-primary dark:text-sky-300 text-sm font-bold leading-normal tracking-[0.015em] gap-2">
+<span class="material-symbols-outlined text-xl">person_add</span>
+<span class="truncate">Thêm người ký</span>
+</button>
+</div>
+</div>
+</aside>
+<!-- Center Panel: Document Viewer -->
+<section class="flex flex-1 flex-col bg-background-light dark:bg-background-dark overflow-y-auto">
+<div class="flex justify-between gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-[#19202e] sticky top-0 z-10">
+<div class="flex gap-2 items-center">
+<button class="p-2 text-[#111318] dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+<span class="material-symbols-outlined">zoom_in</span>
+</button>
+<button class="p-2 text-[#111318] dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+<span class="material-symbols-outlined">zoom_out</span>
+</button>
+<div class="h-6 w-px bg-gray-200 dark:bg-gray-700 mx-1"></div>
+<button class="p-2 text-[#111318] dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+<span class="material-symbols-outlined">description</span>
+</button>
+<button class="p-2 text-[#111318] dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+<span class="material-symbols-outlined">format_underlined</span>
+</button>
+<button class="p-2 text-[#111318] dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+<span class="material-symbols-outlined">edit</span>
+</button>
+<button class="p-2 text-[#111318] dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+<span class="material-symbols-outlined">verified</span>
+</button>
+</div>
+</div>
+<div class="flex-1 flex justify-center items-start p-4 sm:p-6 md:p-8">
+<div class="w-full max-w-4xl flex flex-col items-center gap-4">
+<div class="w-full shadow-lg border border-gray-300 dark:border-gray-700">
+<div class="w-full bg-center bg-no-repeat bg-cover aspect-[2/2.8] flex" data-alt="A page from a legal document about service agreements, with paragraphs of text and section headings." style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCbTQpghIY1mMqFKWAjzNRaArpjC_ZM-lWbV1uPvDAuF3lHCF-Xcq2etZ5vswStl-78owdxCQGsbhJ2ZXbsUFDb263LmdeOcFSvm0HGoCOWCXlVsJ8WcULAGqrLyNypOCVxn9QRhbUqhW7RhLyhEdiHi0Lkl6NQXH_7TfGWZsSbRmCxtdcuh9ZjIXYU_Xj7cS7IPQuw0SLAhOB-AWnNig6a66vvhfmBKOLbiUd8_AcyjgyjEc-RtNw3ZgO28fg3_vAG2J9Oy-JddG3Z");'></div>
+</div>
+<div class="w-full shadow-lg border border-gray-300 dark:border-gray-700">
+<div class="w-full bg-center bg-no-repeat bg-cover aspect-[2/2.8] flex" data-alt="Second page of the legal document, continuing the terms and conditions." style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCBC4Qk4AmsZHylXlRbyWRfEoyPFihI6jBR9Y_B4mrbR6S7YKR-1kvJ6cqmG3KmuMGVJqgSV5whKK8FJCuTdTH9tMmqpbhk774T3QcSahvvthTM9O7ywxiaOAAchnVBESaNM_PriN9uMLBOaoTYlPGhmG-7mZFt8udKN01kSyxy3wi6R2NOPYBzSIY1gfeS4YNqqCMEgxMoKyrOJcBVN7SIF86MzBF98rjQj3cg_hUYDkIzmcCeaJgYNCEt5iIsuRsjm6d7Stl5ozaC");'></div>
+</div>
+</div>
+</div>
+<div class="sticky bottom-0 z-10 flex justify-center py-2 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm">
+<div class="flex items-center justify-center p-1 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md">
+<a class="flex size-8 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" href="#">
+<span class="material-symbols-outlined text-lg">chevron_left</span>
+</a>
+<a class="text-sm font-bold leading-normal flex size-8 items-center justify-center text-white dark:text-gray-900 rounded-full bg-primary" href="#">1</a>
+<a class="text-sm font-normal leading-normal flex size-8 items-center justify-center text-[#111318] dark:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" href="#">2</a>
+<a class="text-sm font-normal leading-normal flex size-8 items-center justify-center text-[#111318] dark:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" href="#">3</a>
+<span class="text-sm font-normal leading-normal flex size-8 items-center justify-center text-[#111318] dark:text-gray-300 rounded-full" href="#">...</span>
+<a class="flex size-8 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" href="#">
+<span class="material-symbols-outlined text-lg">chevron_right</span>
+</a>
+</div>
+</div>
+</section>
+<!-- Right Panel: Configuration -->
+<aside class="w-80 shrink-0 border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-[#19202e] p-4 flex flex-col gap-6 overflow-y-auto">
+<h2 class="text-[#111318] dark:text-gray-100 text-lg font-bold leading-tight tracking-[-0.015em] pt-1">Cài đặt &amp; Gửi đi</h2>
+<div class="flex flex-col gap-4">
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5" for="email-title">Tiêu đề Email</label>
+<input class="w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-primary text-sm bg-white dark:bg-gray-700" id="email-title" type="text" value="Yêu cầu ký tài liệu: Hợp đồng Dịch vụ ABC"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5" for="email-message">Nội dung lời nhắn</label>
+<textarea class="w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-primary text-sm bg-white dark:bg-gray-700" id="email-message" rows="4">Chào bạn, vui lòng xem và ký vào tài liệu đính kèm. Trân trọng.</textarea>
+</div>
+</div>
+<div class="w-full h-px bg-gray-200 dark:bg-gray-700"></div>
+<div class="flex flex-col gap-4">
+<h3 class="text-base font-semibold text-gray-800 dark:text-gray-200">Tùy chọn nâng cao</h3>
+<div class="flex items-center justify-between">
+<span class="text-sm text-gray-600 dark:text-gray-300">Thiết lập thứ tự ký</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-sm text-gray-600 dark:text-gray-300">Đặt ngày hết hạn</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-sm text-gray-600 dark:text-gray-300">Mật khẩu bảo vệ</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+<div class="mt-auto pt-4">
+<button class="flex w-full max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 bg-primary text-white gap-2 text-sm font-bold leading-normal tracking-[0.015em] min-w-0 px-4">
+<span class="material-symbols-outlined text-xl">send</span>
+<span class="truncate">Gửi Yêu Cầu Ký</span>
+</button>
+</div>
+</aside>
+</main>
+</div>
+</body></html>

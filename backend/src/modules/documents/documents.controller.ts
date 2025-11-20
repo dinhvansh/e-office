@@ -13,6 +13,7 @@ const createSchema = z
     summary: z.string().optional(),
     priority_level: z.string().optional(),
     confidential_level: z.string().optional(),
+    visibility_scope: z.string().optional(),
   })
   .refine((data) => data.file_base64 || data.storage_path, {
     message: "file_base64 or storage_path is required",
@@ -23,13 +24,13 @@ const idSchema = z.coerce.number().int().positive();
 
 export class DocumentsController {
   list = async (req: Request, res: Response): Promise<void> => {
-    const documents = await documentsService.listDocuments(req.auth!.tenantId);
+    const documents = await documentsService.listDocuments(req.auth!.tenantId, req.auth!.userId);
     res.json(ok({ documents }));
   };
 
   getById = async (req: Request, res: Response): Promise<void> => {
     const documentId = idSchema.parse(req.params.id);
-    const document = await documentsService.getDocument(documentId, req.auth!.tenantId);
+    const document = await documentsService.getDocument(documentId, req.auth!.tenantId, req.auth!.userId);
     res.json(ok({ document }));
   };
 
@@ -45,6 +46,7 @@ export class DocumentsController {
         summary: body.summary,
         priorityLevel: body.priority_level,
         confidentialLevel: body.confidential_level,
+        visibilityScope: body.visibility_scope,
       },
       req.auth!.tenantId,
       req.auth!.userId,

@@ -48,7 +48,19 @@ export default function LoginPage() {
           <h1 className="text-3xl font-semibold text-slate-900">Đăng nhập Workspace</h1>
           <p className="text-sm text-slate-500">Quản lý tài liệu, luồng ký và license trong một màn hình.</p>
         </div>
-        {error && <p className="mb-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600 shadow-inner shadow-red-100">{error}</p>}
+        {error && (
+          <div className="mb-4 rounded-2xl bg-red-50 px-4 py-3 shadow-inner shadow-red-100 border border-red-100">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-red-900">Đăng nhập thất bại</p>
+                <p className="text-sm text-red-700 mt-1">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
         <label className="mb-4 block text-sm font-medium text-slate-600">
           Email
           <input value={email} onChange={(e) => setEmail(e.target.value)} className="input mt-2" type="email" required />

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quản lý Vai trò và Quyền hạn</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2b6cee",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="flex flex-row min-h-screen">
+<!-- SideNavBar -->
+<aside class="w-64 bg-white dark:bg-gray-900/50 flex-shrink-0 border-r border-gray-200 dark:border-gray-800">
+<div class="flex h-full min-h-[700px] flex-col justify-between p-4">
+<div class="flex flex-col gap-4">
+<div class="flex gap-3 items-center">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="Admin E-Office logo" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDq1KCnJEpvI8TUHtzlbSNWlIrbTSpoKx25Km8z8eGm7sJ8ykO4h3AqFmJ7gOMpNcyDCcS4br6nnljgQzPPGKv46tz_WlCJ-o0gP3Gf3mxbuy2zykSfxrVl20d2mPcGcs-gpQaCLPCIuhgMswo7WIgrfb87iBgv4Ao3ZfPTrxWoYVfrjmrglD1RKfu1D-T8j5CVi4wCuUnuaI0_hhQUvFHMlgTq5ovXVs93teO5PrZbCM_G7s8B5jQW9jTfyUJQojit2phX42ErB0mm");'></div>
+<div class="flex flex-col">
+<h1 class="text-gray-900 dark:text-white text-base font-medium leading-normal">Admin E-Office</h1>
+<p class="text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">admin@eoffice.com</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2 mt-4">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-gray-800 dark:text-gray-200">dashboard</span>
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal">Bảng điều khiển</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-gray-800 dark:text-gray-200">inbox</span>
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal">Văn bản đến</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-gray-800 dark:text-gray-200">outbox</span>
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal">Văn bản đi</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-gray-800 dark:text-gray-200">account_tree</span>
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal">Quản lý quy trình</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary dark:bg-primary/20" href="#">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">settings</span>
+<p class="text-primary text-sm font-medium leading-normal">Thiết lập hệ thống</p>
+</a>
+</nav>
+</div>
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-gray-800 dark:text-gray-200">help</span>
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal">Trợ giúp</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-gray-800 dark:text-gray-200">logout</span>
+<p class="text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal">Đăng xuất</p>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 p-6 lg:p-10">
+<div class="layout-content-container flex flex-col max-w-7xl mx-auto flex-1">
+<!-- PageHeading -->
+<div class="flex flex-wrap justify-between gap-4 items-center mb-6">
+<div class="flex flex-col gap-1">
+<h1 class="text-gray-900 dark:text-white text-3xl font-bold tracking-tight">Quản lý Vai trò và Quyền hạn</h1>
+<p class="text-gray-500 dark:text-gray-400 text-base font-normal leading-normal">Tạo, chỉnh sửa và phân quyền cho các vai trò trong hệ thống.</p>
+</div>
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined text-xl">add_circle</span>
+<span class="truncate">Thêm mới vai trò</span>
+</button>
+</div>
+<!-- SearchBar and Filters -->
+<div class="bg-white dark:bg-gray-900/50 p-4 rounded-xl border border-gray-200 dark:border-gray-800">
+<div class="flex flex-col sm:flex-row gap-4">
+<label class="flex flex-col min-w-40 h-12 w-full sm:w-2/3 lg:w-1/2">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full">
+<div class="text-gray-500 dark:text-gray-400 flex bg-gray-100 dark:bg-gray-800 items-center justify-center pl-4 rounded-l-lg border border-r-0 border-gray-200 dark:border-gray-700">
+<span class="material-symbols-outlined">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-r-lg text-gray-900 dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-l-0 border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 h-full placeholder:text-gray-500 dark:placeholder:text-gray-400 px-4 text-base font-normal leading-normal" placeholder="Tìm kiếm theo tên vai trò..." value=""/>
+</div>
+</label>
+</div>
+</div>
+<!-- Table -->
+<div class="mt-6 @container">
+<div class="flex overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50">
+<table class="w-full">
+<thead class="bg-gray-50 dark:bg-gray-800/50">
+<tr>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tên vai trò</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Mô tả</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Số người dùng</th>
+<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Hành động</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+<tr>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="flex items-center gap-3">
+<span class="text-sm font-medium text-gray-900 dark:text-white">Quản trị viên</span>
+<span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Hệ thống</span>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">Toàn quyền quản lý và cấu hình hệ thống</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">2</td>
+<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+<div class="flex items-center justify-end gap-4">
+<button class="text-primary hover:text-primary/80" title="Chỉnh sửa">
+<span class="material-symbols-outlined">edit</span>
+</button>
+<button class="text-gray-400 dark:text-gray-600 cursor-not-allowed" disabled="" title="Không thể xóa vai trò hệ thống">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">Trưởng phòng</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">Quản lý và phê duyệt văn bản trong phòng ban</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">5</td>
+<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+<div class="flex items-center justify-end gap-4">
+<button class="text-primary hover:text-primary/80" title="Chỉnh sửa">
+<span class="material-symbols-outlined">edit</span>
+</button>
+<button class="text-red-500 hover:text-red-700" title="Xóa">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">Kế toán</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">Xử lý các quy trình và văn bản liên quan đến tài chính</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">3</td>
+<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+<div class="flex items-center justify-end gap-4">
+<button class="text-primary hover:text-primary/80" title="Chỉnh sửa">
+<span class="material-symbols-outlined">edit</span>
+</button>
+<button class="text-red-500 hover:text-red-700" title="Xóa">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="flex items-center gap-3">
+<span class="text-sm font-medium text-gray-900 dark:text-white">Nhân viên</span>
+<span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Hệ thống</span>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">Vai trò cơ bản cho người dùng hệ thống</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">27</td>
+<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+<div class="flex items-center justify-end gap-4">
+<button class="text-primary hover:text-primary/80" title="Chỉnh sửa">
+<span class="material-symbols-outlined">edit</span>
+</button>
+<button class="text-gray-400 dark:text-gray-600 cursor-not-allowed" disabled="" title="Không thể xóa vai trò hệ thống">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">Văn thư</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">Quản lý, lưu trữ và phân phát văn bản</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">2</td>
+<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+<div class="flex items-center justify-end gap-4">
+<button class="text-primary hover:text-primary/80" title="Chỉnh sửa">
+<span class="material-symbols-outlined">edit</span>
+</button>
+<button class="text-red-500 hover:text-red-700" title="Xóa">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Pagination -->
+<div class="flex items-center justify-center p-4 mt-4">
+<a class="flex size-10 items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white" href="#">
+<span class="material-symbols-outlined text-xl">chevron_left</span>
+</a>
+<a class="text-sm font-bold leading-normal flex size-10 items-center justify-center text-white rounded-full bg-primary" href="#">1</a>
+<a class="text-sm font-normal leading-normal flex size-10 items-center justify-center text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800" href="#">2</a>
+<a class="text-sm font-normal leading-normal flex size-10 items-center justify-center text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800" href="#">3</a>
+<span class="text-sm font-normal leading-normal flex size-10 items-center justify-center text-gray-700 dark:text-gray-300 rounded-full">...</span>
+<a class="text-sm font-normal leading-normal flex size-10 items-center justify-center text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800" href="#">8</a>
+<a class="flex size-10 items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white" href="#">
+<span class="material-symbols-outlined text-xl">chevron_right</span>
+</a>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

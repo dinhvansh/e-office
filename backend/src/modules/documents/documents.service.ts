@@ -8,6 +8,7 @@ import { licenseService } from "../licenses/license.service";
 import { numberingService } from "../numbering/numbering.service";
 import { prisma } from "../../config/prisma";
 import { CreateDocumentData, documentsRepository } from "./documents.repository";
+import { canViewDocument, filterViewableDocuments } from "./documents.access";
 
 export interface CreateDocumentInput {
   fileName: string;
@@ -18,18 +19,57 @@ export interface CreateDocumentInput {
   summary?: string;
   priorityLevel?: string;
   confidentialLevel?: string;
+  visibilityScope?: string;
 }
 
 class DocumentsService {
-  async listDocuments(tenantId: number): Promise<documents[]> {
-    return documentsRepository.listByTenant(tenantId);
+  async listDocuments(tenantId: number, userId?: number): Promise<documents[]> {
+    const documents = await documentsRepository.listByTenant(tenantId);
+    
+    // If no userId provided (admin context), return all documents
+    if (!userId) {
+      return documents;
+    }
+    
+    // Get user for permission check
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+    });
+    
+    if (!user || user.tenant_id !== tenantId) {
+      throw ApiError.notFound("User not found", "USER_NOT_FOUND");
+    }
+    
+    // Filter documents based on user permissions
+    return await filterViewableDocuments(user, documents);
   }
 
-  async getDocument(documentId: number, tenantId: number): Promise<documents> {
+  async getDocument(documentId: number, tenantId: number, userId?: number): Promise<documents> {
     const document = await documentsRepository.findById(documentId, tenantId);
     if (!document) {
       throw ApiError.notFound("Document not found", "DOCUMENT_NOT_FOUND");
     }
+    
+    // If no userId provided (admin context), return document
+    if (!userId) {
+      return document;
+    }
+    
+    // Get user for permission check
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+    });
+    
+    if (!user || user.tenant_id !== tenantId) {
+      throw ApiError.notFound("User not found", "USER_NOT_FOUND");
+    }
+    
+    // Check if user can view this document
+    const canView = await canViewDocument(user, document);
+    if (!canView) {
+      throw ApiError.forbidden("You do not have access to this document", "DOCUMENT_ACCESS_DENIED");
+    }
+    
     return document;
   }
 
@@ -99,6 +139,7 @@ class DocumentsService {
       summary: input.summary,
       priority_level: input.priorityLevel,
       confidential_level: input.confidentialLevel,
+      visibility_scope: input.visibilityScope,
     };
     const document = await documentsRepository.create(payload);
     await auditService.record({

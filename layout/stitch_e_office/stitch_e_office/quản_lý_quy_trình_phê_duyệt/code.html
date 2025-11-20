@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quản lý Quy trình Phê duyệt - E-Office</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#2b6cee",
+            "background-light": "#f6f6f8",
+            "background-dark": "#101622",
+          },
+          fontFamily: {
+            "display": ["Inter", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+  </style>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark text-[#101622] dark:text-white">
+<div class="relative flex min-h-screen w-full flex-col group/design-root">
+<div class="flex h-full grow">
+<!-- SideNavBar -->
+<aside class="flex w-64 shrink-0 flex-col bg-white dark:bg-background-dark border-r border-gray-200 dark:border-gray-800">
+<div class="flex h-full flex-col justify-between p-4">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3 px-3">
+<span class="material-symbols-outlined text-primary text-3xl"> all_inbox </span>
+<h1 class="text-[#111318] dark:text-white text-xl font-bold">E-Office</h1>
+</div>
+<div class="flex flex-col gap-2 pt-4">
+<a class="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined"> dashboard </span>
+<p class="text-sm font-medium">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined"> move_to_inbox </span>
+<p class="text-sm font-medium">Văn bản đến</p>
+</a>
+<a class="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined"> outbox </span>
+<p class="text-sm font-medium">Văn bản đi</p>
+</a>
+<a class="flex items-center gap-3 rounded-lg px-3 py-2 bg-primary/10 text-primary" href="#">
+<span class="material-symbols-outlined"> account_tree </span>
+<p class="text-sm font-medium">Quản lý quy trình</p>
+</a>
+<a class="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined"> assessment </span>
+<p class="text-sm font-medium">Báo cáo</p>
+</a>
+</div>
+</div>
+<div class="flex flex-col">
+<div class="flex gap-3 p-3 items-center">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="User avatar image" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBw3jDBrc_dpeQ6JtSgnFuIM8_AUQj-MZiN-hnO3OzAOs63SqyemUNaE2zC62m04k_XA1fCCAiiJ6Fh4Ff8gOrUcaIPmM-BIz9G4Rqh55PnDsD0PylE9T6w8mCGwcnnl67atMlbJeyAnAsGS6XJjwIxcnmCcZTC9VWP3HbcdhPwNHszG8YGjmVarqJakJ9_HMwZkUh4AjFCEuyo_Q3xTgnZbtXnIVESn0f4lfO-hndjnsWqKNIh5e7Tt3Zy22Ou5ulqjdchznXfyhR4");'></div>
+<div class="flex flex-col">
+<h1 class="text-[#111318] dark:text-white text-sm font-medium leading-normal">Nguyễn Văn A</h1>
+<p class="text-gray-500 dark:text-gray-400 text-xs font-normal leading-normal">Quản trị viên</p>
+</div>
+</div>
+<div class="flex flex-col gap-1 border-t border-gray-200 dark:border-gray-800 pt-2">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined"> settings </span>
+<p class="text-sm font-medium">Cài đặt</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined"> logout </span>
+<p class="text-sm font-medium">Đăng xuất</p>
+</a>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 p-8 overflow-y-auto">
+<div class="mx-auto max-w-7xl">
+<!-- PageHeading -->
+<div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+<h1 class="text-[#111318] dark:text-white text-3xl font-bold tracking-tight">Quản lý Quy trình Phê duyệt</h1>
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-medium leading-normal shadow-sm hover:bg-primary/90">
+<span class="material-symbols-outlined text-base"> add_circle </span>
+<span class="truncate">Tạo quy trình mới</span>
+</button>
+</div>
+<!-- Toolbar & Chips -->
+<div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+<div class="flex gap-2">
+<div class="relative w-full max-w-xs">
+<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+<span class="material-symbols-outlined text-gray-400"> search </span>
+</div>
+<input class="block w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 py-2 pl-10 pr-3 text-sm focus:border-primary focus:ring-primary dark:text-gray-200" placeholder="Tìm theo tên quy trình..." type="text"/>
+</div>
+<button class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800">
+<span class="material-symbols-outlined"> filter_list </span>
+</button>
+</div>
+<div class="flex gap-2 overflow-x-auto pb-2">
+<button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-primary/20 px-4 text-primary">
+<p class="text-sm font-medium leading-normal">Tất cả</p>
+</button>
+<button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-gray-100 dark:bg-gray-800 px-4 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
+<p class="text-sm font-medium leading-normal">Đang hoạt động</p>
+</button>
+<button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-gray-100 dark:bg-gray-800 px-4 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
+<p class="text-sm font-medium leading-normal">Tạm dừng</p>
+</button>
+</div>
+</div>
+<!-- Cards Grid -->
+<div class="grid grid-cols-1 gap-6 @container md:grid-cols-2 xl:grid-cols-3">
+<!-- Card 1 -->
+<div class="flex flex-col rounded-xl bg-white dark:bg-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
+<div class="flex flex-col gap-3 p-5">
+<div class="flex items-start justify-between">
+<p class="text-[#111318] dark:text-white text-lg font-bold leading-tight">Quy trình phê duyệt Hợp đồng</p>
+<div class="flex h-6 shrink-0 items-center justify-center gap-x-1.5 rounded-full bg-green-100 dark:bg-green-900/50 px-2.5">
+<div class="size-1.5 rounded-full bg-green-500"></div>
+<p class="text-green-700 dark:text-green-300 text-xs font-medium">Đang hoạt động</p>
+</div>
+</div>
+<div class="flex flex-col gap-1 text-sm text-gray-500 dark:text-gray-400">
+<p>Loại văn bản: Hợp đồng kinh tế</p>
+<p>5 bước · Đã dùng 120 lần</p>
+</div>
+</div>
+<div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-800 p-3">
+<div class="flex gap-1">
+<button class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+<span class="material-symbols-outlined text-base"> edit </span>
+</button>
+<button class="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/50">
+<span class="material-symbols-outlined text-base"> delete </span>
+</button>
+</div>
+<div class="flex items-center gap-2">
+<label class="relative inline-flex cursor-pointer items-center" for="toggle1">
+<input checked="" class="peer sr-only" id="toggle1" type="checkbox" value=""/>
+<div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:border-gray-600 dark:bg-gray-700"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="flex flex-col rounded-xl bg-white dark:bg-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
+<div class="flex flex-col gap-3 p-5">
+<div class="flex items-start justify-between">
+<p class="text-[#111318] dark:text-white text-lg font-bold leading-tight">Quy trình duyệt Đơn xin nghỉ phép</p>
+<div class="flex h-6 shrink-0 items-center justify-center gap-x-1.5 rounded-full bg-green-100 dark:bg-green-900/50 px-2.5">
+<div class="size-1.5 rounded-full bg-green-500"></div>
+<p class="text-green-700 dark:text-green-300 text-xs font-medium">Đang hoạt động</p>
+</div>
+</div>
+<div class="flex flex-col gap-1 text-sm text-gray-500 dark:text-gray-400">
+<p>Loại văn bản: Đơn từ</p>
+<p>3 bước · Đã dùng 532 lần</p>
+</div>
+</div>
+<div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-800 p-3">
+<div class="flex gap-1">
+<button class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+<span class="material-symbols-outlined text-base"> edit </span>
+</button>
+<button class="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/50">
+<span class="material-symbols-outlined text-base"> delete </span>
+</button>
+</div>
+<div class="flex items-center gap-2">
+<label class="relative inline-flex cursor-pointer items-center" for="toggle2">
+<input checked="" class="peer sr-only" id="toggle2" type="checkbox" value=""/>
+<div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:border-gray-600 dark:bg-gray-700"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="flex flex-col rounded-xl bg-white dark:bg-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
+<div class="flex flex-col gap-3 p-5">
+<div class="flex items-start justify-between">
+<p class="text-[#111318] dark:text-white text-lg font-bold leading-tight">Quy trình thanh toán công tác phí</p>
+<div class="flex h-6 shrink-0 items-center justify-center gap-x-1.5 rounded-full bg-gray-200 dark:bg-gray-700 px-2.5">
+<div class="size-1.5 rounded-full bg-gray-500"></div>
+<p class="text-gray-700 dark:text-gray-300 text-xs font-medium">Tạm dừng</p>
+</div>
+</div>
+<div class="flex flex-col gap-1 text-sm text-gray-500 dark:text-gray-400">
+<p>Loại văn bản: Đề nghị thanh toán</p>
+<p>4 bước · Đã dùng 89 lần</p>
+</div>
+</div>
+<div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-800 p-3">
+<div class="flex gap-1">
+<button class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+<span class="material-symbols-outlined text-base"> edit </span>
+</button>
+<button class="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/50">
+<span class="material-symbols-outlined text-base"> delete </span>
+</button>
+</div>
+<div class="flex items-center gap-2">
+<label class="relative inline-flex cursor-pointer items-center" for="toggle3">
+<input class="peer sr-only" id="toggle3" type="checkbox" value=""/>
+<div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:border-gray-600 dark:bg-gray-700"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="flex flex-col rounded-xl bg-white dark:bg-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
+<div class="flex flex-col gap-3 p-5">
+<div class="flex items-start justify-between">
+<p class="text-[#111318] dark:text-white text-lg font-bold leading-tight">Quy trình duyệt yêu cầu mua sắm</p>
+<div class="flex h-6 shrink-0 items-center justify-center gap-x-1.5 rounded-full bg-green-100 dark:bg-green-900/50 px-2.5">
+<div class="size-1.5 rounded-full bg-green-500"></div>
+<p class="text-green-700 dark:text-green-300 text-xs font-medium">Đang hoạt động</p>
+</div>
+</div>
+<div class="flex flex-col gap-1 text-sm text-gray-500 dark:text-gray-400">
+<p>Loại văn bản: Yêu cầu mua sắm</p>
+<p>6 bước · Đã dùng 215 lần</p>
+</div>
+</div>
+<div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-800 p-3">
+<div class="flex gap-1">
+<button class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+<span class="material-symbols-outlined text-base"> edit </span>
+</button>
+<button class="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/50">
+<span class="material-symbols-outlined text-base"> delete </span>
+</button>
+</div>
+<div class="flex items-center gap-2">
+<label class="relative inline-flex cursor-pointer items-center" for="toggle4">
+<input checked="" class="peer sr-only" id="toggle4" type="checkbox" value=""/>
+<div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:border-gray-600 dark:bg-gray-700"></div>
+</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

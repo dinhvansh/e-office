@@ -15,6 +15,7 @@ export interface CreateDocumentData {
   summary?: string | null;
   priority_level?: string | null;
   confidential_level?: string | null;
+  visibility_scope?: string | null;
 }
 
 export class DocumentsRepository {

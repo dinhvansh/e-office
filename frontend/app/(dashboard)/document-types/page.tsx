@@ -2,12 +2,20 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, FileText, Edit, Trash2, Settings } from 'lucide-react';
+import { Plus, FileText, Edit, Trash2, Settings, FileType } from 'lucide-react';
 import { DocumentType } from '@/lib/types';
 import { useAuth } from '@/components/providers/auth-provider';
+import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { toast } from 'sonner';
 
 export default function DocumentTypesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -25,8 +33,14 @@ export default function DocumentTypesPage() {
     mutationFn: (data: Partial<DocumentType>) =>
       fetchJson('/document-types', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
+      toast.success(editingType ? 'Cập nhật loại văn bản thành công!' : 'Tạo loại văn bản thành công!');
       queryClient.invalidateQueries({ queryKey: ['document-types'] });
       setShowCreateModal(false);
+      setEditingType(null);
+    },
+    onError: (error: any) => {
+      const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
+      toast.error(`Lỗi: ${message}`);
     },
   });
 
@@ -34,9 +48,14 @@ export default function DocumentTypesPage() {
     mutationFn: ({ id, ...data }: Partial<DocumentType> & { id: number }) =>
       fetchJson(`/document-types/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     onSuccess: () => {
+      toast.success('Cập nhật loại văn bản thành công!');
       queryClient.invalidateQueries({ queryKey: ['document-types'] });
       setShowCreateModal(false);
       setEditingType(null);
+    },
+    onError: (error: any) => {
+      const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
+      toast.error(`Lỗi: ${message}`);
     },
   });
 
@@ -44,7 +63,12 @@ export default function DocumentTypesPage() {
     mutationFn: (typeId: number) =>
       fetchJson(`/document-types/${typeId}`, { method: 'DELETE' }),
     onSuccess: () => {
+      toast.success('Xóa loại văn bản thành công!');
       queryClient.invalidateQueries({ queryKey: ['document-types'] });
+    },
+    onError: (error: any) => {
+      const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
+      toast.error(`Lỗi: ${message}`);
     },
   });
 
@@ -72,30 +96,39 @@ export default function DocumentTypesPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Loại văn bản</h1>
-          <p className="text-muted-foreground mt-2">
-            Quản lý phân loại và đánh số văn bản
-          </p>
-        </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Thêm loại văn bản
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={FileType}
+        title="Loại văn bản"
+        description="Quản lý phân loại và đánh số văn bản"
+        iconColor="text-orange-600"
+        actions={
+          <Button onClick={() => { setEditingType(null); setShowCreateModal(true); }}>
+            <Plus className="w-4 h-4 mr-2" />
+            Thêm loại văn bản
+          </Button>
+        }
+      />
 
       {/* Document Types Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {isLoading ? (
-          <div className="col-span-full p-8 text-center text-gray-500">
-            Đang tải...
-          </div>
+          <>
+            <Skeleton className="h-64" />
+            <Skeleton className="h-64" />
+            <Skeleton className="h-64" />
+          </>
         ) : types.length === 0 ? (
-          <div className="col-span-full p-8 text-center text-gray-500">
-            Chưa có loại văn bản nào
+          <div className="col-span-full">
+            <EmptyState
+              icon={FileType}
+              title="Chưa có loại văn bản"
+              description="Tạo loại văn bản đầu tiên để phân loại và quản lý tài liệu"
+              action={{
+                label: "Thêm loại văn bản",
+                onClick: () => { setEditingType(null); setShowCreateModal(true); }
+              }}
+            />
           </div>
         ) : (
           typesWithCount.map((type) => (
@@ -165,32 +198,36 @@ export default function DocumentTypesPage() {
                   {type._count.documents} văn bản
                 </span>
                 <div className="flex items-center gap-2">
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
                     onClick={() => {
                       setEditingType(type);
                       setShowNumberingPattern(type.require_numbering);
                       setShowCreateModal(true);
                     }}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     title="Chỉnh sửa"
                   >
                     <Edit className="w-4 h-4" />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => {
                       if (type._count.documents > 0) {
-                        alert('Không thể xóa loại văn bản đang được sử dụng');
+                        toast.error('Không thể xóa loại văn bản đang được sử dụng');
                         return;
                       }
                       if (confirm(`Xóa loại văn bản "${type.name}"?`)) {
                         deleteTypeMutation.mutate(type.id);
                       }
                     }}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     title="Xóa"
                   >
                     <Trash2 className="w-4 h-4" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -199,19 +236,19 @@ export default function DocumentTypesPage() {
       </div>
 
       {/* Create/Edit Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-screen items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black bg-opacity-30" onClick={() => setShowCreateModal(false)} />
-            <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-gray-100">
-              <div className="mb-6">
-                <h3 className="text-xl font-bold text-gray-900">
-                  {editingType ? '✏️ Chỉnh sửa loại văn bản' : '📝 Thêm loại văn bản mới'}
-                </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  {editingType ? 'Cập nhật thông tin loại văn bản' : 'Tạo loại văn bản để phân loại và quản lý tài liệu'}
-                </p>
-              </div>
+      <Dialog open={showCreateModal} onOpenChange={(open) => {
+        setShowCreateModal(open);
+        if (!open) setEditingType(null);
+      }}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingType ? 'Chỉnh sửa loại văn bản' : 'Thêm loại văn bản mới'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingType ? 'Cập nhật thông tin loại văn bản' : 'Tạo loại văn bản để phân loại và quản lý tài liệu'}
+            </DialogDescription>
+          </DialogHeader>
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -385,36 +422,33 @@ export default function DocumentTypesPage() {
                     </span>
                   </label>
                 </div>
-                <div className="flex gap-3 pt-2">
-                  <button
+                <DialogFooter>
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={() => {
                       setShowCreateModal(false);
                       setEditingType(null);
                     }}
-                    className="flex-1 rounded-lg border-2 border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all"
                   >
                     Hủy
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
                     disabled={createMutation.isPending || updateMutation.isPending}
-                    className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     {editingType
                       ? updateMutation.isPending
-                        ? '⏳ Đang cập nhật...'
-                        : '💾 Cập nhật'
+                        ? 'Đang cập nhật...'
+                        : 'Cập nhật'
                       : createMutation.isPending
-                      ? '⏳ Đang tạo...'
-                      : '✨ Tạo mới'}
-                  </button>
-                </div>
+                      ? 'Đang tạo...'
+                      : 'Tạo mới'}
+                  </Button>
+                </DialogFooter>
               </form>
-            </div>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

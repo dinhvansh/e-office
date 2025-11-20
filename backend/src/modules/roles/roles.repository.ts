@@ -114,4 +114,13 @@ export const rolesRepository = {
     const permissions = await this.getUserPermissions(userId);
     return permissions.some(p => p.resource === resource && p.action === action);
   },
+
+  async removePermission(roleId: number, permissionId: number) {
+    return prisma.role_permissions.deleteMany({
+      where: {
+        role_id: roleId,
+        permission_id: permissionId,
+      },
+    });
+  },
 };

@@ -73,4 +73,15 @@ export const rolesController = {
       res.status(500).json({ success: false, error: error.message });
     }
   },
+
+  async removePermission(req: Request, res: Response) {
+    try {
+      const tenantId = (req as any).auth.tenantId;
+      const { id, permissionId } = req.params;
+      await rolesService.removePermission(parseInt(id), parseInt(permissionId), tenantId);
+      res.json({ success: true, message: 'Permission removed from role' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
 };

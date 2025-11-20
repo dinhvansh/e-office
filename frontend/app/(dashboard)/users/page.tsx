@@ -2,13 +2,17 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit, Trash2, Shield } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Shield, Users as UsersIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusTag } from '@/components/ui/status-tag';
+import { PageHeader } from '@/components/ui/page-header';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 
@@ -111,24 +115,21 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header Card */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Quản lý người dùng</h1>
-            <p className="text-muted-foreground mt-2">
-              Quản lý tài khoản, phân quyền và phòng ban
-            </p>
-          </div>
-          <Button onClick={() => setShowCreateModal(true)}>
+      <PageHeader
+        icon={UsersIcon}
+        title="Quản lý người dùng"
+        description="Quản lý tài khoản, phân quyền và phòng ban"
+        iconColor="text-indigo-600"
+        actions={
+          <Button onClick={() => setShowCreateModal(true)} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/30">
             <Plus className="w-4 h-4 mr-2" />
             Thêm người dùng
           </Button>
-        </div>
-      </Card>
+        }
+      />
 
       {/* Filters */}
-      <Card className="p-4">
+      <Card className="p-4 shadow-md border-slate-200">
         <div className="flex gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -153,11 +154,25 @@ export default function UsersPage() {
       </Card>
 
       {/* Users Table */}
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden shadow-lg border-slate-200">
         {isLoading ? (
-          <div className="p-8 text-center text-muted-foreground">Đang tải...</div>
+          <div className="p-6 space-y-4">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
         ) : users.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground">Không có người dùng nào</div>
+          <EmptyState
+            icon={UsersIcon}
+            title="Chưa có người dùng"
+            description="Bắt đầu bằng cách thêm người dùng đầu tiên vào hệ thống"
+            action={{
+              label: "Thêm người dùng",
+              onClick: () => setShowCreateModal(true),
+            }}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -185,7 +200,7 @@ export default function UsersPage() {
               </thead>
               <tbody className="divide-y">
                 {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-muted/50">
+                  <tr key={user.id} className="hover:bg-muted/50 transition-colors">
                     <td className="px-6 py-4">
                       <div>
                         <div className="font-medium">
@@ -213,9 +228,9 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant={user.status === 'active' ? 'default' : 'secondary'}>
-                        {user.status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
-                      </Badge>
+                      <StatusTag 
+                        status={user.status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
+                      />
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">
                       {new Date(user.created_at).toLocaleDateString('vi-VN')}
@@ -225,6 +240,7 @@ export default function UsersPage() {
                         <Button 
                           variant="ghost" 
                           size="icon"
+                          className="hover:bg-primary/10 hover:text-primary transition-colors"
                           onClick={() => {
                             setEditingUser(user);
                             setFormData({
@@ -243,6 +259,7 @@ export default function UsersPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="hover:bg-destructive/10 hover:text-destructive transition-colors"
                           onClick={() => {
                             if (confirm('Bạn có chắc muốn xóa người dùng này?')) {
                               deleteUserMutation.mutate(user.id);
@@ -269,7 +286,7 @@ export default function UsersPage() {
           setFormData({ email: '', password: '', full_name: '', phone: '', department_id: '', role_ids: [] });
         }
       }}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingUser ? 'Chỉnh sửa người dùng' : 'Thêm người dùng mới'}</DialogTitle>
             <DialogDescription>

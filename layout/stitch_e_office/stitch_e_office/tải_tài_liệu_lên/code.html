@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Tải Lên Tài Liệu Trình Ký</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#2b6cee",
+            "background-light": "#f6f6f8",
+            "background-dark": "#101622",
+          },
+          fontFamily: {
+            "display": ["Inter", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24
+    }
+  </style>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark text-[#212529] dark:text-gray-200">
+<div class="relative flex min-h-screen w-full">
+<!-- Side Navigation Bar -->
+<aside class="flex w-64 flex-col bg-white dark:bg-gray-900/50 p-4 border-r border-gray-200 dark:border-gray-800">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3 p-2">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="User avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuD_KchOuVCqQBMl5cyBE_WKekDcPyv-82YX3BuCPxV17JPWfoXdFwr1TO27EQAX9e9fJadxz7DQ4ichpCWZ7KNE8sK_X8jewwKXP9HWeuJr1KzchkAWTHS-qf0qtfp8Qiz0u6BUxZE6dXHvKuOleRQtTXQ6pinDG8kR_GfSd3LsYsr-srTlSy7bdWCvRYVki-OYLMtvfuIXpC7q2dCJ1y69JYYNMzo_xboXi3sFRgz63n9UMDetdd-U8DWu-C6oZ2Fw4D1hinZyo91h");'></div>
+<div class="flex flex-col">
+<h1 class="text-[#111318] dark:text-white text-base font-medium leading-normal">Nguyễn Văn A</h1>
+<p class="text-[#616f89] dark:text-gray-400 text-sm font-normal leading-normal">nv.a@company.com</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2 mt-4">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-[#111318] dark:text-gray-300">home</span>
+<p class="text-[#111318] dark:text-gray-300 text-sm font-medium leading-normal">Trang chủ</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/20 dark:bg-primary/30" href="#">
+<span class="material-symbols-outlined text-primary dark:text-primary-300" style="font-variation-settings: 'FILL' 1;">description</span>
+<p class="text-primary dark:text-primary-300 text-sm font-medium leading-normal">Luồng trình ký</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-[#111318] dark:text-gray-300">folder</span>
+<p class="text-[#111318] dark:text-gray-300 text-sm font-medium leading-normal">Tài liệu</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-[#111318] dark:text-gray-300">file_copy</span>
+<p class="text-[#111318] dark:text-gray-300 text-sm font-medium leading-normal">Mẫu tài liệu</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-[#111318] dark:text-gray-300">settings</span>
+<p class="text-[#111318] dark:text-gray-300 text-sm font-medium leading-normal">Cài đặt</p>
+</a>
+</nav>
+</div>
+<div class="mt-auto flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-[#111318] dark:text-gray-300">help</span>
+<p class="text-[#111318] dark:text-gray-300 text-sm font-medium leading-normal">Trợ giúp</p>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 p-8 overflow-auto">
+<div class="max-w-4xl mx-auto">
+<!-- Page Heading -->
+<header class="flex flex-wrap justify-between gap-3 mb-8">
+<div class="flex flex-col gap-2">
+<p class="text-[#111318] dark:text-white text-3xl font-bold leading-tight tracking-tight">Tải Lên Tài Liệu Trình Ký</p>
+<p class="text-[#616f89] dark:text-gray-400 text-base font-normal leading-normal">Tạo một luồng trình ký mới bằng cách tải lên tài liệu của bạn.</p>
+</div>
+</header>
+<div class="space-y-8">
+<!-- Upload Area & File List -->
+<section class="bg-white dark:bg-gray-900/50 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+<!-- Empty State/Drag-and-Drop Area -->
+<div class="flex flex-col p-4">
+<div class="flex flex-col items-center gap-6 rounded-lg border-2 border-dashed border-[#dbdfe6] dark:border-gray-700 px-6 py-14 hover:border-primary dark:hover:border-primary-400 hover:bg-primary/5 dark:hover:bg-primary/10 transition-colors">
+<span class="material-symbols-outlined text-5xl text-gray-400 dark:text-gray-500">cloud_upload</span>
+<div class="flex max-w-[480px] flex-col items-center gap-2">
+<p class="text-[#111318] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] text-center">Kéo và thả tệp vào đây, hoặc</p>
+<p class="text-[#616f89] dark:text-gray-400 text-sm font-normal leading-normal text-center">Định dạng được hỗ trợ: PDF, DOCX, XLSX. Kích thước tối đa: 25MB.</p>
+</div>
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-gray-100 dark:bg-gray-700 text-[#111318] dark:text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-gray-200 dark:hover:bg-gray-600">
+<span class="truncate">Chọn Tệp từ máy tính</span>
+</button>
+</div>
+</div>
+<!-- Uploaded File List -->
+<div class="mt-6 space-y-4">
+<!-- List Item 1: Uploading -->
+<div class="flex items-center gap-4 bg-white dark:bg-gray-900 px-4 min-h-[72px] py-2 justify-between border-b border-gray-100 dark:border-gray-800">
+<div class="flex items-center gap-4 w-full">
+<div class="text-[#111318] dark:text-white flex items-center justify-center rounded-lg bg-[#f0f2f4] dark:bg-gray-800 shrink-0 size-12">
+<span class="material-symbols-outlined">picture_as_pdf</span>
+</div>
+<div class="flex flex-col justify-center flex-grow">
+<p class="text-[#111318] dark:text-white text-base font-medium leading-normal line-clamp-1">BaoGiaSanPham_Q4.pdf</p>
+<p class="text-[#616f89] dark:text-gray-400 text-sm font-normal leading-normal line-clamp-2">5.2 MB</p>
+</div>
+<div class="flex items-center gap-3 w-40">
+<div class="w-full overflow-hidden rounded-full bg-[#dbdfe6] dark:bg-gray-700 h-2"><div class="h-2 rounded-full bg-primary" style="width: 65%;"></div></div>
+<p class="text-[#111318] dark:text-white text-sm font-medium leading-normal">65%</p>
+</div>
+</div>
+</div>
+<!-- List Item 2: Completed -->
+<div class="flex items-center gap-4 bg-white dark:bg-gray-900 px-4 min-h-[72px] py-2 justify-between border-b border-gray-100 dark:border-gray-800">
+<div class="flex items-center gap-4 w-full">
+<div class="text-[#111318] dark:text-white flex items-center justify-center rounded-lg bg-[#f0f2f4] dark:bg-gray-800 shrink-0 size-12">
+<span class="material-symbols-outlined">description</span>
+</div>
+<div class="flex flex-col justify-center flex-grow">
+<p class="text-[#111318] dark:text-white text-base font-medium leading-normal line-clamp-1">HopDongThueNha_Final.docx</p>
+<p class="text-[#616f89] dark:text-gray-400 text-sm font-normal leading-normal line-clamp-2">1.8 MB</p>
+</div>
+<div class="shrink-0">
+<button class="text-[#DC3545] hover:bg-red-100 dark:hover:bg-red-900/50 flex size-8 items-center justify-center rounded-full transition-colors">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Document Information -->
+<section class="bg-white dark:bg-gray-900/50 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+<h2 class="text-xl font-bold text-[#111318] dark:text-white mb-4">Thông tin tài liệu</h2>
+<div class="space-y-6">
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="document-name">Tên tài liệu <span class="text-red-500">*</span></label>
+<input class="block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200" id="document-name" placeholder="Ví dụ: Hợp đồng dịch vụ Marketing" type="text"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="document-description">Mô tả chi tiết (tùy chọn)</label>
+<textarea class="block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200" id="document-description" placeholder="Nhập mô tả ngắn gọn về nội dung tài liệu..." rows="4"></textarea>
+</div>
+</div>
+</section>
+</div>
+<!-- Action Buttons -->
+<footer class="mt-8 flex justify-end gap-4">
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-gray-200 dark:bg-gray-700 text-[#111318] dark:text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-gray-300 dark:hover:bg-gray-600">
+<span class="truncate">Hủy Bỏ</span>
+</button>
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90">
+<span class="truncate">Tiếp Tục</span>
+</button>
+</footer>
+</div>
+</main>
+</div>
+</body></html>

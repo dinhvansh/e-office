@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Building2, Users, Edit, Trash2, ChevronRight } from 'lucide-react';
+import { Plus, Building2, Users, Edit, Trash2, ChevronRight, Building } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 
@@ -49,8 +52,9 @@ export default function DepartmentsPage() {
     },
     onError: (error: any) => {
       console.error('Mutation error:', error);
+      // Backend already returns detailed Vietnamese message
       const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
-      toast.error(`Lỗi: ${message}`);
+      toast.error(message);
     },
   });
 
@@ -107,6 +111,7 @@ export default function DepartmentsPage() {
             <Button 
               variant="ghost" 
               size="icon"
+              className="hover:bg-primary/10 hover:text-primary transition-colors"
               onClick={() => {
                 setEditingDept(dept);
                 setFormData({ name: dept.name, code: dept.code || '', description: dept.description || '' });
@@ -118,6 +123,7 @@ export default function DepartmentsPage() {
             <Button
               variant="ghost"
               size="icon"
+              className="hover:bg-destructive/10 hover:text-destructive transition-colors"
               onClick={() => {
                 if (dept._count.users > 0) {
                   toast.error('Không thể xóa phòng ban có nhân viên');
@@ -148,30 +154,38 @@ export default function DepartmentsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header Card */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Quản lý phòng ban</h1>
-            <p className="text-muted-foreground mt-2">
-              Tổ chức cấu trúc phòng ban và quản lý
-            </p>
-          </div>
-          <Button onClick={() => setShowCreateModal(true)}>
+      <PageHeader
+        icon={Building}
+        title="Quản lý phòng ban"
+        description="Tổ chức cấu trúc phòng ban và quản lý"
+        iconColor="text-teal-600"
+        actions={
+          <Button onClick={() => setShowCreateModal(true)} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/30">
             <Plus className="w-4 h-4 mr-2" />
             Thêm phòng ban
           </Button>
-        </div>
-      </Card>
+        }
+      />
 
       {/* Departments Tree */}
       <div className="bg-card rounded-xl border overflow-hidden shadow-sm">
         {isLoading ? (
-          <div className="p-8 text-center text-muted-foreground">Đang tải...</div>
-        ) : departments.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground">
-            Chưa có phòng ban nào
+          <div className="p-6 space-y-4">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
           </div>
+        ) : departments.length === 0 ? (
+          <EmptyState
+            icon={Building2}
+            title="Chưa có phòng ban"
+            description="Tạo phòng ban đầu tiên để tổ chức cấu trúc công ty"
+            action={{
+              label: "Thêm phòng ban",
+              onClick: () => setShowCreateModal(true),
+            }}
+          />
         ) : (
           <div>{departments.map((dept) => renderDepartment(dept))}</div>
         )}
@@ -179,7 +193,7 @@ export default function DepartmentsPage() {
 
       {/* Create Modal */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingDept ? 'Chỉnh sửa phòng ban' : 'Thêm phòng ban'}</DialogTitle>
             <DialogDescription>

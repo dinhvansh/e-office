@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quản lý Loại văn bản - E-Office</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#2b6cee",
+            "background-light": "#f6f6f8",
+            "background-dark": "#101622",
+          },
+          fontFamily: {
+            "display": ["Inter", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+     .material-symbols-outlined {
+      font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24
+    }
+    .material-symbols-outlined.fill {
+        font-variation-settings: 'FILL' 1;
+    }
+  </style>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark text-[#111318] dark:text-gray-200">
+<div class="relative flex min-h-screen w-full">
+<!-- SideNavBar -->
+<aside class="flex flex-col w-64 bg-white dark:bg-background-dark dark:border-r dark:border-gray-800 shadow-sm">
+<div class="p-4 border-b border-gray-200 dark:border-gray-800">
+<h1 class="text-xl font-bold text-primary">E-OFFICE</h1>
+</div>
+<div class="flex flex-col justify-between flex-1 p-4">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="Admin user avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCoecU1gnsnlYIEA_UTdKDBl22sOhP56vumyM0HZn3ytP4dZgbyYSAQ29ITaIGzOUFCHn2Z4oZL4vMivdKf0dNd5GC5U90yBR2i0e1JU7jZ1RCKEH-aQTXrOu5O62BiMQFmIdDgt0t3auy8cu08DwvoyhYic9Hj240yBTy8rbHatA5cMzHbNkwNf2JcgJbB7aXnhoP6iq5RXjLkadk0XfNZL6P-kNxs5dFqhFWINs_r5FWOlq-Hw7MNwz_pi9ogqsYosG6NMfSmfU7a");'></div>
+<div class="flex flex-col">
+<h2 class="text-[#111318] dark:text-white text-base font-medium leading-normal">Admin</h2>
+<p class="text-[#616f89] dark:text-gray-400 text-sm font-normal leading-normal">admin@eoffice.com</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2 mt-4">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-[#111318] dark:text-gray-300">dashboard</span>
+<p class="text-[#111318] dark:text-gray-300 text-sm font-medium leading-normal">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-[#111318] dark:text-gray-300">inbox</span>
+<p class="text-[#111318] dark:text-gray-300 text-sm font-medium leading-normal">Văn bản đến</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-[#111318] dark:text-gray-300">send</span>
+<p class="text-[#111318] dark:text-gray-300 text-sm font-medium leading-normal">Văn bản đi</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-[#111318] dark:text-gray-300">work</span>
+<p class="text-[#111318] dark:text-gray-300 text-sm font-medium leading-normal">Văn bản nội bộ</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 dark:bg-primary/20" href="#">
+<span class="material-symbols-outlined text-primary fill">settings</span>
+<p class="text-primary text-sm font-medium leading-normal">Quản lý</p>
+</a>
+</nav>
+</div>
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-gray-100 dark:bg-gray-800 text-[#111318] dark:text-gray-200 text-sm font-bold leading-normal tracking-[0.015em] hover:bg-gray-200 dark:hover:bg-gray-700">
+<span class="truncate">Đăng xuất</span>
+</button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 p-6 lg:p-8">
+<div class="w-full max-w-7xl mx-auto">
+<!-- PageHeading -->
+<header class="flex flex-wrap justify-between items-center gap-4 mb-6">
+<div class="flex flex-col gap-1">
+<h1 class="text-[#111318] dark:text-white text-3xl font-bold leading-tight tracking-tight">Quản lý Loại văn bản</h1>
+<p class="text-[#616f89] dark:text-gray-400 text-base font-normal leading-normal">Tạo mới, chỉnh sửa và quản lý các loại văn bản trong hệ thống.</p>
+</div>
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90">
+<span class="material-symbols-outlined">add_circle</span>
+<span class="truncate">Tạo mới</span>
+</button>
+</header>
+<!-- ToolBar and Filters -->
+<div class="mb-4 p-4 bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-800">
+<div class="flex flex-wrap items-center justify-between gap-4">
+<div class="relative flex-1 min-w-[250px]">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">search</span>
+<input class="w-full h-10 pl-10 pr-4 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-primary focus:border-primary" placeholder="Tìm theo tên loại văn bản..." type="text"/>
+</div>
+<div class="flex flex-wrap gap-2">
+<select class="rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-primary focus:border-primary">
+<option>Phân loại: Tất cả</option>
+<option>Văn bản đến</option>
+<option>Văn bản đi</option>
+<option>Văn bản nội bộ</option>
+</select>
+<select class="rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-primary focus:border-primary">
+<option>Trạng thái: Tất cả</option>
+<option>Hoạt động</option>
+<option>Không hoạt động</option>
+</select>
+<button class="flex items-center justify-center p-2 rounded-lg text-[#111318] dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Table -->
+<div class="overflow-x-auto bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-800">
+<table class="w-full text-sm text-left">
+<thead class="bg-gray-50 dark:bg-gray-900/70 text-xs text-gray-700 dark:text-gray-400 uppercase">
+<tr>
+<th class="p-4 w-12" scope="col">
+<input class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-primary focus:ring-2 focus:ring-primary dark:focus:ring-offset-gray-800" type="checkbox"/>
+</th>
+<th class="px-6 py-3" scope="col">Tên loại văn bản</th>
+<th class="px-6 py-3" scope="col">Mã loại</th>
+<th class="px-6 py-3" scope="col">Phân loại</th>
+<th class="px-6 py-3 text-center" scope="col">Tự động đánh số</th>
+<th class="px-6 py-3 text-center" scope="col">Yêu cầu ký số</th>
+<th class="px-6 py-3" scope="col">Trạng thái</th>
+<th class="px-6 py-3 text-center" scope="col">Hành động</th>
+</tr>
+</thead>
+<tbody>
+<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+<td class="p-4 w-12">
+<input class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-primary focus:ring-2 focus:ring-primary dark:focus:ring-offset-gray-800" type="checkbox"/>
+</td>
+<td class="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">Công văn đến</td>
+<td class="px-6 py-4 text-[#616f89] dark:text-gray-400">CVDEN</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">Văn bản đến</span>
+</td>
+<td class="px-6 py-4 text-center text-green-500"><span class="material-symbols-outlined">check_circle</span></td>
+<td class="px-6 py-4 text-center text-green-500"><span class="material-symbols-outlined">check_circle</span></td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Hoạt động</span>
+</td>
+<td class="px-6 py-4 text-center">
+<button class="p-1 text-gray-500 hover:text-primary dark:hover:text-primary"><span class="material-symbols-outlined">edit</span></button>
+<button class="p-1 text-gray-500 hover:text-red-500"><span class="material-symbols-outlined">delete</span></button>
+</td>
+</tr>
+<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+<td class="p-4 w-12">
+<input class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-primary focus:ring-2 focus:ring-primary dark:focus:ring-offset-gray-800" type="checkbox"/>
+</td>
+<td class="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">Tờ trình</td>
+<td class="px-6 py-4 text-[#616f89] dark:text-gray-400">TTRINH</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">Văn bản đi</span>
+</td>
+<td class="px-6 py-4 text-center text-green-500"><span class="material-symbols-outlined">check_circle</span></td>
+<td class="px-6 py-4 text-center text-gray-400"><span class="material-symbols-outlined">cancel</span></td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Hoạt động</span>
+</td>
+<td class="px-6 py-4 text-center">
+<button class="p-1 text-gray-500 hover:text-primary dark:hover:text-primary"><span class="material-symbols-outlined">edit</span></button>
+<button class="p-1 text-gray-500 hover:text-red-500"><span class="material-symbols-outlined">delete</span></button>
+</td>
+</tr>
+<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+<td class="p-4 w-12">
+<input class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-primary focus:ring-2 focus:ring-primary dark:focus:ring-offset-gray-800" type="checkbox"/>
+</td>
+<td class="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">Hợp đồng nội bộ</td>
+<td class="px-6 py-4 text-[#616f89] dark:text-gray-400">HDNB</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">Văn bản nội bộ</span>
+</td>
+<td class="px-6 py-4 text-center text-gray-400"><span class="material-symbols-outlined">cancel</span></td>
+<td class="px-6 py-4 text-center text-green-500"><span class="material-symbols-outlined">check_circle</span></td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Hoạt động</span>
+</td>
+<td class="px-6 py-4 text-center">
+<button class="p-1 text-gray-500 hover:text-primary dark:hover:text-primary"><span class="material-symbols-outlined">edit</span></button>
+<button class="p-1 text-gray-500 hover:text-red-500"><span class="material-symbols-outlined">delete</span></button>
+</td>
+</tr>
+<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+<td class="p-4 w-12">
+<input class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-primary focus:ring-2 focus:ring-primary dark:focus:ring-offset-gray-800" type="checkbox"/>
+</td>
+<td class="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">Báo cáo tháng</td>
+<td class="px-6 py-4 text-[#616f89] dark:text-gray-400">BCT</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">Văn bản nội bộ</span>
+</td>
+<td class="px-6 py-4 text-center text-green-500"><span class="material-symbols-outlined">check_circle</span></td>
+<td class="px-6 py-4 text-center text-gray-400"><span class="material-symbols-outlined">cancel</span></td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-300">Không hoạt động</span>
+</td>
+<td class="px-6 py-4 text-center">
+<button class="p-1 text-gray-500 hover:text-primary dark:hover:text-primary"><span class="material-symbols-outlined">edit</span></button>
+<button class="p-1 text-gray-500 hover:text-red-500"><span class="material-symbols-outlined">delete</span></button>
+</td>
+</tr>
+<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+<td class="p-4 w-12">
+<input class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-primary focus:ring-2 focus:ring-primary dark:focus:ring-offset-gray-800" type="checkbox"/>
+</td>
+<td class="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">Quyết định nhân sự</td>
+<td class="px-6 py-4 text-[#616f89] dark:text-gray-400">QDNS</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">Văn bản đi</span>
+</td>
+<td class="px-6 py-4 text-center text-green-500"><span class="material-symbols-outlined">check_circle</span></td>
+<td class="px-6 py-4 text-center text-green-500"><span class="material-symbols-outlined">check_circle</span></td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Hoạt động</span>
+</td>
+<td class="px-6 py-4 text-center">
+<button class="p-1 text-gray-500 hover:text-primary dark:hover:text-primary"><span class="material-symbols-outlined">edit</span></button>
+<button class="p-1 text-gray-500 hover:text-red-500"><span class="material-symbols-outlined">delete</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<nav aria-label="Table navigation" class="flex items-center justify-between pt-4">
+<span class="text-sm font-normal text-gray-500 dark:text-gray-400">Showing <span class="font-semibold text-gray-900 dark:text-white">1-5</span> of <span class="font-semibold text-gray-900 dark:text-white">100</span></span>
+<ul class="inline-flex items-center -space-x-px">
+<li>
+<a class="flex items-center justify-center h-8 px-3 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" href="#">
+<span class="material-symbols-outlined text-base">chevron_left</span>
+</a>
+</li>
+<li>
+<a aria-current="page" class="flex items-center justify-center h-8 px-3 text-primary border border-gray-300 bg-primary/10 hover:bg-primary/20 hover:text-primary dark:border-gray-700 dark:bg-gray-700 dark:text-white" href="#">1</a>
+</li>
+<li>
+<a class="flex items-center justify-center h-8 px-3 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" href="#">2</a>
+</li>
+<li>
+<a class="flex items-center justify-center h-8 px-3 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" href="#">3</a>
+</li>
+<li>
+<span class="flex items-center justify-center h-8 px-3 leading-tight text-gray-500 bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">...</span>
+</li>
+<li>
+<a class="flex items-center justify-center h-8 px-3 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" href="#">10</a>
+</li>
+<li>
+<a class="flex items-center justify-center h-8 px-3 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" href="#">
+<span class="material-symbols-outlined text-base">chevron_right</span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</main>
+</div>
+</body></html>

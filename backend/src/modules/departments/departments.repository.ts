@@ -35,6 +35,15 @@ export const departmentsRepository = {
     });
   },
 
+  async findByCode(tenantId: number, code: string) {
+    return prisma.departments.findFirst({
+      where: { 
+        tenant_id: tenantId,
+        code: code,
+      },
+    });
+  },
+
   async create(data: any) {
     return prisma.departments.create({
       data,
@@ -70,15 +79,18 @@ export const departmentsRepository = {
     });
 
     if (!dept) {
-      throw new Error('Department not found');
+      const { throwNotFound } = require('../../utils/errors');
+      throwNotFound('DEPARTMENT_NOT_FOUND');
     }
 
     if (dept._count.users > 0) {
-      throw new Error('Cannot delete department with users');
+      const { throwError } = require('../../utils/errors');
+      throwError('DEPARTMENT_HAS_USERS');
     }
 
     if (dept._count.children > 0) {
-      throw new Error('Cannot delete department with sub-departments');
+      const { throwError } = require('../../utils/errors');
+      throwError('DEPARTMENT_HAS_CHILDREN');
     }
 
     return prisma.departments.delete({

@@ -23,6 +23,7 @@ model tenants {
   document_types document_types[]
   numbering_rules numbering_rules[]
   external_organizations external_organizations[]
+  workflows  workflows[]
 }
 
 model users {
@@ -43,6 +44,7 @@ model users {
   audit_logs    audit_logs[]
   user_roles    user_roles[]
   managed_departments departments[] @relation("department_manager")
+  approvals     document_approvals[]
 }
 
 model documents {
@@ -60,6 +62,7 @@ model documents {
   summary            String?
   priority_level     String?       @default("normal")
   confidential_level String?       @default("normal")
+  visibility_scope   String?       @default("public")
   effective_date     DateTime?
   expiration_date    DateTime?
   issued_date        DateTime?
@@ -72,6 +75,8 @@ model documents {
   tags               document_tags[]
   permissions        document_permissions[]
   versions           document_versions[]
+  workflow_instance  workflow_instances?
+  approvals          document_approvals[]
 }
 
 model sign_requests {
@@ -201,6 +206,7 @@ model document_types {
   tenant                  tenants   @relation(fields: [tenant_id], references: [id])
   documents               documents[]
   numbering_rules         numbering_rules[]
+  workflows               workflows[]
   
   @@unique([tenant_id, code])
 }
@@ -281,4 +287,76 @@ model document_versions {
   document    documents @relation(fields: [document_id], references: [id], onDelete: Cascade)
   
   @@unique([document_id, version_no])
+}
+
+model workflows {
+  id                Int       @id @default(autoincrement())
+  tenant_id         Int
+  name              String
+  description       String?
+  document_type_id  Int?
+  is_active         Boolean   @default(true)
+  created_by        Int?
+  created_at        DateTime  @default(now())
+  
+  tenant            tenants   @relation(fields: [tenant_id], references: [id])
+  document_type     document_types? @relation(fields: [document_type_id], references: [id])
+  steps             workflow_steps[]
+  instances         workflow_instances[]
+  approvals         document_approvals[]
+  
+  @@unique([tenant_id, name])
+}
+
+model workflow_steps {
+  id              Int       @id @default(autoincrement())
+  workflow_id     Int
+  step_order      Int
+  step_name       String
+  approver_type   String    // 'user', 'role', 'department', 'manager'
+  approver_id     Int?
+  due_in_days     Int       @default(3)
+  is_required     Boolean   @default(true)
+  conditions      Json?
+  created_at      DateTime  @default(now())
+  
+  workflow        workflows @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+  approvals       document_approvals[]
+  instances       workflow_instances[] @relation("current_step")
+  
+  @@unique([workflow_id, step_order])
+}
+
+model workflow_instances {
+  id              Int       @id @default(autoincrement())
+  document_id     Int
+  workflow_id     Int
+  current_step_id Int?
+  status          String    @default("in_progress") // 'in_progress', 'completed', 'rejected', 'cancelled'
+  started_at      DateTime  @default(now())
+  completed_at    DateTime?
+  
+  document        documents @relation(fields: [document_id], references: [id])
+  workflow        workflows @relation(fields: [workflow_id], references: [id])
+  current_step    workflow_steps? @relation("current_step", fields: [current_step_id], references: [id])
+  
+  @@unique([document_id])
+}
+
+model document_approvals {
+  id                Int       @id @default(autoincrement())
+  document_id       Int
+  workflow_id       Int
+  workflow_step_id  Int
+  approver_user_id  Int
+  action            String    @default("pending") // 'pending', 'approved', 'rejected', 'request_info'
+  comment           String?
+  acted_at          DateTime?
+  due_date          DateTime?
+  created_at        DateTime  @default(now())
+  
+  document          documents @relation(fields: [document_id], references: [id])
+  workflow          workflows @relation(fields: [workflow_id], references: [id])
+  workflow_step     workflow_steps @relation(fields: [workflow_step_id], references: [id])
+  approver          users @relation(fields: [approver_user_id], references: [id])
 }

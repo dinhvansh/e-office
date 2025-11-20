@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quản lý Gói dịch vụ &amp; Thanh toán</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2b6cee",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings:
+            'FILL' 0,
+            'wght' 400,
+            'GRAD' 0,
+            'opsz' 24
+        }
+    </style>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark text-[#1F2937] dark:text-gray-200">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<!-- TopNavBar -->
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-10 py-3 bg-white dark:bg-gray-800/50 sticky top-0 z-10 backdrop-blur-sm">
+<div class="flex items-center gap-4 text-[#1F2937] dark:text-white">
+<div class="w-8 h-8 text-primary">
+<svg fill="none" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_6_330)">
+<path clip-rule="evenodd" d="M24 0.757355L47.2426 24L24 47.2426L0.757355 24L24 0.757355ZM21 35.7574V12.2426L9.24264 24L21 35.7574Z" fill="currentColor" fill-rule="evenodd"></path>
+</g>
+<defs>
+<clippath id="clip0_6_330"><rect fill="white" height="48" width="48"></rect></clippath>
+</defs>
+</svg>
+</div>
+<h2 class="text-[#1F2937] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">E-Office</h2>
+</div>
+<div class="hidden md:flex items-center gap-9">
+<a class="text-[#1F2937] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary dark:hover:text-primary" href="#">Bảng điều khiển</a>
+<a class="text-primary dark:text-primary text-sm font-medium leading-normal" href="#">Quản lý văn bản</a>
+<a class="text-[#1F2937] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary dark:hover:text-primary" href="#">Quy trình</a>
+<a class="text-[#1F2937] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary dark:hover:text-primary" href="#">Báo cáo</a>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 bg-background-light dark:bg-background-dark text-[#1F2937] dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 gap-2 text-sm font-bold leading-normal tracking-[0.015em] min-w-0 px-2.5">
+<span class="material-symbols-outlined text-xl">notifications</span>
+</button>
+<button class="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 bg-background-light dark:bg-background-dark text-[#1F2937] dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 gap-2 text-sm font-bold leading-normal tracking-[0.015em] min-w-0 px-2.5">
+<span class="material-symbols-outlined text-xl">settings</span>
+</button>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="User avatar placeholder" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDMorvnF2vZDQm0PAaI4gnJnm-b7ZPy1ZeHMEFAWoLQKlBBjxY6l0fHkfwWU3oSiEkgQ2WYsBH2qhgZ5kFd-HMezIsqmIHwPU-ySYVh7-L3EYUD8O4MEg7dsYJ4PE46HTTagJ7O01MeBq7ZLWTPLtpkvZvcE7m5FKjemUA1igdvnRdqQcSffhjcAZmXKw7vKelHX4w3QIpVcPCHsXOPJsE1OWmselshF3Od575ARKxDAUo5kgwd-JRukKXaeTnIOGrU5JqWHFJ5a1tf");'></div>
+</div>
+</header>
+<main class="px-4 sm:px-6 lg:px-10 flex flex-1 justify-center py-5">
+<div class="layout-content-container flex flex-col w-full max-w-6xl flex-1 gap-8">
+<!-- PageHeading -->
+<div class="flex flex-wrap justify-between gap-4">
+<div class="flex flex-col gap-2">
+<p class="text-[#1F2937] dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">Quản lý Gói dịch vụ &amp; Thanh toán</p>
+<p class="text-[#6B7280] dark:text-gray-400 text-base font-normal leading-normal">Tính năng đang được phát triển và sẽ sớm ra mắt.</p>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Left Column -->
+<div class="lg:col-span-2 flex flex-col gap-8">
+<!-- Current Plan Card -->
+<div class="bg-white dark:bg-gray-800/50 rounded-xl shadow-sm p-6 @container">
+<div class="flex flex-col items-stretch justify-start @lg:flex-row @lg:items-start gap-6">
+<div class="w-full @lg:w-1/3 h-48 @lg:h-auto bg-center bg-no-repeat aspect-video bg-cover rounded-lg" data-alt="Abstract gradient representing the Business Plan" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuB7Y1etMhBqWHXS1l6vSS-s2b87C2W6zjjodJmBDY3tnteksuagWRN4uN-R2xtMYYWOixAxWCJUNqhikmIUrik4hs7B-ArwSOfWG9QosqyG8hAnfsUhC7gjlLLsl749aIoPCoJ9DwVUk7oBpinaQLlXzQphul2rtKdNL8yd82Q01AwB0axIwCLPj6H9NOXTfbuIojNv014aot9Z1mRmoOAs6wUsxlCT4X9EUtziphV1FhFuHFfpRnpbq1WP5BMk66BtfqfGHIACRb29");'></div>
+<div class="flex w-full grow flex-col items-stretch justify-center gap-2">
+<p class="text-[#6B7280] dark:text-gray-400 text-sm font-normal leading-normal">Gói dịch vụ hiện tại</p>
+<p class="text-[#1F2937] dark:text-white text-2xl font-bold leading-tight tracking-[-0.015em]">Gói Doanh nghiệp</p>
+<div class="flex flex-col gap-2 mt-2">
+<p class="text-[#6B7280] dark:text-gray-400 text-base font-normal leading-normal flex items-center gap-2">
+<span class="text-[#10B981] material-symbols-outlined text-lg">check_circle</span>
+                                                Trạng thái: <span class="font-medium text-[#10B981]">Đang hoạt động</span>
+</p>
+<p class="text-[#6B7280] dark:text-gray-400 text-base font-normal leading-normal">Gia hạn tiếp theo vào ngày 30/12/2024. Chi phí: 2,500,000đ/tháng.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Tabs Section -->
+<div class="bg-white dark:bg-gray-800/50 rounded-xl shadow-sm">
+<div class="border-b border-gray-200 dark:border-gray-700">
+<nav aria-label="Tabs" class="-mb-px flex gap-6 px-6">
+<a aria-current="page" class="shrink-0 border-b-2 border-primary px-1 py-4 text-sm font-medium text-primary" href="#">Thông tin thanh toán</a>
+<a class="shrink-0 border-b-2 border-transparent px-1 py-4 text-sm font-medium text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-300" href="#">Lịch sử giao dịch</a>
+</nav>
+</div>
+<!-- Payment Information Content -->
+<div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="flex flex-col gap-4">
+<h4 class="font-bold text-[#1F2937] dark:text-white">Phương thức thanh toán</h4>
+<div class="flex items-center gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+<img alt="Visa Logo" class="h-6" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCflS7CGqj48_M6SOaUcoaSqEseF78FH0j5ffJ4iuFKGkoABtISrMm2Q8ojwOexF7E83WqpQHkAZTuCgXJ3uvDfMgofCp0vOpyMc2x006CtQsnYAmP-poMocIHjPlhmdFTt99Z5CMcFwlcqoa4q6EtFa2Nz5pJQufojsmyu0YqEEIH6bjdesO7OaSNjhTCShG3f9PDW7vIArYcXiYo3u1z_Ck2AfJJbqT2NHU0yUe2puTLstT4zXcW1e2bviFCOHSfMKR2PAA-lYVDi"/>
+<div>
+<p class="font-medium text-[#1F2937] dark:text-white">Visa kết thúc bằng 1234</p>
+<p class="text-sm text-[#6B7280] dark:text-gray-400">Hết hạn 12/2025</p>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center justify-center rounded-lg h-10 px-4 text-sm font-bold bg-primary text-white">
+<span>Thay đổi</span>
+</button>
+<button class="flex items-center justify-center rounded-lg h-10 px-4 text-sm font-bold bg-background-light dark:bg-background-dark border border-gray-300 dark:border-gray-600 text-[#1F2937] dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
+<span>Xóa</span>
+</button>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<h4 class="font-bold text-[#1F2937] dark:text-white">Thông tin xuất hóa đơn</h4>
+<div class="text-sm text-[#6B7280] dark:text-gray-400 space-y-1">
+<p><span class="font-medium text-[#1F2937] dark:text-gray-300">Công ty TNHH ABC</span></p>
+<p>123 Đường Nguyễn Huệ, Quận 1</p>
+<p>Thành phố Hồ Chí Minh, Việt Nam</p>
+<p>MST: 0312345678</p>
+</div>
+<button class="flex items-center justify-center rounded-lg h-10 px-4 text-sm font-bold bg-background-light dark:bg-background-dark border border-gray-300 dark:border-gray-600 text-[#1F2937] dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 self-start">
+<span>Cập nhật thông tin</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column -->
+<div class="lg:col-span-1 flex flex-col gap-8">
+<div class="bg-white dark:bg-gray-800/50 rounded-xl shadow-sm">
+<h3 class="text-[#1F2937] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] px-6 pb-2 pt-6">Mức độ sử dụng</h3>
+<div class="p-6 pt-4 flex flex-col gap-6">
+<!-- ProgressBar User -->
+<div class="flex flex-col gap-2">
+<div class="flex gap-6 justify-between items-center">
+<p class="text-[#1F2937] dark:text-white text-base font-medium leading-normal">Người dùng</p>
+<p class="text-[#1F2937] dark:text-gray-300 text-sm font-normal leading-normal">15/20</p>
+</div>
+<div class="rounded-full bg-gray-200 dark:bg-gray-700 h-2"><div class="h-2 rounded-full bg-primary" style="width: 75%;"></div></div>
+<p class="text-[#6B7280] dark:text-gray-400 text-sm font-normal leading-normal">Còn lại 5 người dùng</p>
+</div>
+<!-- ProgressBar Storage -->
+<div class="flex flex-col gap-2">
+<div class="flex gap-6 justify-between items-center">
+<p class="text-[#1F2937] dark:text-white text-base font-medium leading-normal">Dung lượng</p>
+<p class="text-[#1F2937] dark:text-gray-300 text-sm font-normal leading-normal">85GB/100GB</p>
+</div>
+<div class="rounded-full bg-gray-200 dark:bg-gray-700 h-2"><div class="h-2 rounded-full bg-[#F59E0B]" style="width: 85%;"></div></div>
+<p class="text-[#6B7280] dark:text-gray-400 text-sm font-normal leading-normal">Sắp đạt giới hạn dung lượng</p>
+</div>
+<!-- ProgressBar Process -->
+<div class="flex flex-col gap-2">
+<div class="flex gap-6 justify-between items-center">
+<p class="text-[#1F2937] dark:text-white text-base font-medium leading-normal">Quy trình</p>
+<p class="text-[#1F2937] dark:text-gray-300 text-sm font-normal leading-normal">1.500/2.000</p>
+</div>
+<div class="rounded-full bg-gray-200 dark:bg-gray-700 h-2"><div class="h-2 rounded-full bg-primary" style="width: 75%;"></div></div>
+<p class="text-[#6B7280] dark:text-gray-400 text-sm font-normal leading-normal">Đã dùng 75% trong tháng</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Plan Comparison Section -->
+<div class="mt-8">
+<div class="text-center mb-8">
+<h2 class="text-3xl font-extrabold text-[#1F2937] dark:text-white">Nâng cấp gói dịch vụ của bạn</h2>
+<p class="mt-2 text-[#6B7280] dark:text-gray-400">Chọn gói phù hợp nhất với nhu cầu phát triển của doanh nghiệp.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<!-- Basic Plan Card -->
+<div class="border border-gray-200 dark:border-gray-700 rounded-xl p-8 flex flex-col">
+<h3 class="text-lg font-semibold text-[#1F2937] dark:text-white">Gói Cơ bản</h3>
+<p class="mt-4 text-[#6B7280] dark:text-gray-400">Dành cho các đội nhóm nhỏ mới bắt đầu.</p>
+<p class="mt-8 text-4xl font-extrabold text-[#1F2937] dark:text-white">1,000,000<span class="text-base font-medium text-[#6B7280] dark:text-gray-400">đ/tháng</span></p>
+<ul class="mt-8 space-y-4 text-sm text-[#6B7280] dark:text-gray-400">
+<li class="flex items-center gap-3"><span class="material-symbols-outlined text-[#10B981]">check</span>10 người dùng</li>
+<li class="flex items-center gap-3"><span class="material-symbols-outlined text-[#10B981]">check</span>50GB dung lượng</li>
+<li class="flex items-center gap-3"><span class="material-symbols-outlined text-[#10B981]">check</span>Hỗ trợ cơ bản</li>
+</ul>
+<button class="mt-auto flex items-center justify-center rounded-lg h-10 px-4 text-sm font-bold bg-background-light dark:bg-background-dark border border-gray-300 dark:border-gray-600 text-[#1F2937] dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 w-full">
+<span>Hạ cấp</span>
+</button>
+</div>
+<!-- Business Plan Card (Current) -->
+<div class="border-2 border-primary rounded-xl p-8 flex flex-col relative">
+<div class="absolute top-0 -translate-y-1/2 left-1/2 -translate-x-1/2">
+<span class="rounded-full bg-primary px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white">Gói hiện tại</span>
+</div>
+<h3 class="text-lg font-semibold text-primary">Gói Doanh nghiệp</h3>
+<p class="mt-4 text-[#6B7280] dark:text-gray-400">Giải pháp toàn diện cho doanh nghiệp.</p>
+<p class="mt-8 text-4xl font-extrabold text-[#1F2937] dark:text-white">2,500,000<span class="text-base font-medium text-[#6B7280] dark:text-gray-400">đ/tháng</span></p>
+<ul class="mt-8 space-y-4 text-sm text-[#6B7280] dark:text-gray-400">
+<li class="flex items-center gap-3"><span class="material-symbols-outlined text-[#10B981]">check</span>20 người dùng</li>
+<li class="flex items-center gap-3"><span class="material-symbols-outlined text-[#10B981]">check</span>100GB dung lượng</li>
+<li class="flex items-center gap-3"><span class="material-symbols-outlined text-[#10B981]">check</span>Tích hợp nâng cao</li>
+<li class="flex items-center gap-3"><span class="material-symbols-outlined text-[#10B981]">check</span>Hỗ trợ ưu tiên</li>
+</ul>
+<button class="mt-auto flex items-center justify-center rounded-lg h-10 px-4 text-sm font-bold bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed w-full" disabled="">
+<span>Đã chọn</span>
+</button>
+</div>
+<!-- Pro Plan Card -->
+<div class="border border-gray-200 dark:border-gray-700 rounded-xl p-8 flex flex-col">
+<h3 class="text-lg font-semibold text-[#1F2937] dark:text-white">Gói Chuyên nghiệp</h3>
+<p class="mt-4 text-[#6B7280] dark:text-gray-400">Dành cho các tổ chức lớn, yêu cầu cao.</p>
+<p class="mt-8 text-4xl font-extrabold text-[#1F2937] dark:text-white">Liên hệ<span class="text-base font-medium text-[#6B7280] dark:text-gray-400"></span></p>
+<ul class="mt-8 space-y-4 text-sm text-[#6B7280] dark:text-gray-400">
+<li class="flex items-center gap-3"><span class="material-symbols-outlined text-[#10B981]">check</span>Không giới hạn người dùng</li>
+<li class="flex items-center gap-3"><span class="material-symbols-outlined text-[#10B981]">check</span>Dung lượng tùy chỉnh</li>
+<li class="flex items-center gap-3"><span class="material-symbols-outlined text-[#10B981]">check</span>Hỗ trợ chuyên biệt 24/7</li>
+</ul>
+<button class="mt-auto flex items-center justify-center rounded-lg h-10 px-4 text-sm font-bold bg-[#10B981] text-white hover:bg-emerald-600 w-full">
+<span>Nâng cấp</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>
