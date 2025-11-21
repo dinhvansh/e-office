@@ -17,9 +17,13 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
   const [useDefault, setUseDefault] = useState(true);
   const [customSteps, setCustomSteps] = useState<any[]>([]);
 
-  const { data: workflow } = useQuery({
+  const { data: workflowData } = useQuery({
     queryKey: ['workflow', defaultWorkflowId],
-    queryFn: () => fetchJson<any>(`/workflows/${defaultWorkflowId}`),
+    queryFn: async () => {
+      const data: any = await fetchJson(`/workflows/${defaultWorkflowId}`);
+      // Handle nested response structure
+      return data?.workflow || data;
+    },
   });
 
   const { data: usersData } = useQuery({
@@ -28,7 +32,7 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
   });
 
   const users = (usersData as any) || [];
-  const defaultSteps = workflow?.workflow?.steps || [];
+  const defaultSteps = workflowData?.steps || [];
 
   useEffect(() => {
     if (useDefault) {

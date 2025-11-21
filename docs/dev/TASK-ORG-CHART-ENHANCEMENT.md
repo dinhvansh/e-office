@@ -2,8 +2,10 @@
 
 **Owner dev chính**: Kiro (DEV1)  
 **Người thiết kế**: Senior Software Architect (GPT)  
-**Trạng thái**: TODO  
-**Phase**: 1.5 – UX + chuẩn bị cho RBAC/Workflow theo tổ chức
+**Trạng thái**: ✅ COMPLETE (2025-11-21)  
+**Phase**: 1.5 – UX + chuẩn bị cho RBAC/Workflow theo tổ chức  
+**Duration**: ~30 minutes  
+**Report**: See `FEATURE-ORG-CHART-COMPLETE.md`
 
 ---
 

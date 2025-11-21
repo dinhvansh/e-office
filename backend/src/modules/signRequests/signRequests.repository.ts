@@ -27,6 +27,12 @@ export class SignRequestsRepository {
       data: { status },
     });
   }
+
+  async countFields(signRequestId: number): Promise<number> {
+    return prisma.sign_request_fields.count({
+      where: { sign_request_id: signRequestId },
+    });
+  }
 }
 
 export const signRequestsRepository = new SignRequestsRepository();

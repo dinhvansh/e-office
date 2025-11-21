@@ -6,6 +6,7 @@ import { env } from "./config/env";
 import { errorHandler } from "./core/middlewares/errorHandler";
 import { requestContext } from "./core/middlewares/requestContext";
 import { v1Router } from "./router/v1";
+import { publicSignRouter } from "./modules/public/publicSign.routes";
 
 export const app = express();
 
@@ -59,4 +60,5 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/v1", v1Router);
+app.use("/public/sign", publicSignRouter);
 app.use(errorHandler);

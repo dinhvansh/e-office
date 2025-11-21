@@ -11,6 +11,7 @@ export type DocumentRecord = {
   document_number?: string | null;
   confidential_level?: string | null;
   visibility_scope?: string | null;
+  sign_request_id?: number | null;
 };
 
 export type DocumentType = {

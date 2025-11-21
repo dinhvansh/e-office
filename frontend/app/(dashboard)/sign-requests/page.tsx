@@ -88,10 +88,9 @@ export default function SignRequestsPage() {
         ) : signRequests && signRequests.length > 0 ? (
           <div className="space-y-3">
             {signRequests.map((request) => (
-              <a
+              <div
                 key={request.id}
-                href={`/sign-requests/${request.id}`}
-                className="block rounded-xl border border-slate-200 bg-white p-4 transition-all hover:border-brand-300 hover:shadow-md"
+                className="rounded-xl border border-slate-200 bg-white p-4 transition-all hover:border-brand-300 hover:shadow-md"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -108,12 +107,28 @@ export default function SignRequestsPage() {
                       <span>Nguoi ky: {request.signers?.length || 0}</span>
                       <span>{new Date(request.created_at).toLocaleDateString("vi-VN")}</span>
                     </div>
+                    <div className="mt-3 flex gap-2">
+                      <a
+                        href={`/sign-requests/${request.id}`}
+                        className="text-xs text-brand-600 hover:underline"
+                      >
+                        View Details
+                      </a>
+                      {request.status === 'draft' && (
+                        <a
+                          href={`/sign-requests/${request.id}/editor`}
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          📝 Edit Fields
+                        </a>
+                      )}
+                    </div>
                   </div>
                   <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
-              </a>
+              </div>
             ))}
           </div>
         ) : (

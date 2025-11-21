@@ -15,6 +15,7 @@ export interface CreateDocumentInput {
   base64?: string;
   storagePath?: string;
   documentTypeId?: number;
+  departmentId?: number;
   title?: string;
   summary?: string;
   priorityLevel?: string;
@@ -167,6 +168,7 @@ class DocumentsService {
       hash,
       status: initialStatus,
       document_type_id: documentTypeId,
+      department_id: input.departmentId,
       document_number: documentNumber,
       numbering_rule_id: numberingRuleId,
       title: input.title,
@@ -176,6 +178,22 @@ class DocumentsService {
       visibility_scope: input.visibilityScope,
     };
     const document = await documentsRepository.create(payload);
+    
+    // Auto-create sign request if document type requires digital signing
+    if (documentType?.require_digital_signing) {
+      const { signRequestsService } = await import('../signRequests/signRequests.service');
+      const signRequest = await signRequestsService.createDraftSignRequest({
+        document_id: document.id,
+        tenant_id: tenantId,
+        title: document.title || `Sign Request for ${document.original_file_name}`,
+        auto_created: true,
+      });
+      
+      // Link sign request to document
+      await documentsRepository.update(document.id, tenantId, {
+        sign_request_id: signRequest.id,
+      });
+    }
     await auditService.record({
       tenantId,
       documentId: document.id,
@@ -185,7 +203,12 @@ class DocumentsService {
       ua: userAgent,
     });
 
-    // Handle workflow based on 4 modes
+    // NOTE: Workflow auto-submit removed - user must manually click "Trình duyệt"
+    // This allows time to add sign fields before submitting for approval
+    
+    // Handle workflow based on 4 modes - DISABLED FOR NOW
+    // User will manually submit via submitForApproval() method
+    /*
     if (documentType && documentType.require_approval) {
       const { approvalsService } = await import('../approvals/approvals.service');
 
@@ -254,16 +277,44 @@ class DocumentsService {
           ownerId
         );
       }
-
-      // Refresh document to get updated status
-      return await documentsRepository.findById(document.id, tenantId) || document;
     }
+    */
 
     return document;
   }
 
-  async deleteDocument(documentId: number, tenantId: number): Promise<void> {
+  async deleteDocument(documentId: number, tenantId: number, userId?: number): Promise<void> {
     const document = await this.getDocument(documentId, tenantId);
+    
+    // Ownership check: Only owner or admin can delete
+    if (userId) {
+      const user = await prisma.users.findUnique({
+        where: { id: userId },
+        include: {
+          user_roles: {
+            include: {
+              role: true
+            }
+          }
+        }
+      });
+      
+      if (!user || user.tenant_id !== tenantId) {
+        throw ApiError.notFound("User not found", "USER_NOT_FOUND");
+      }
+      
+      // Check if user is admin
+      const isAdmin = user.user_roles.some(ur => 
+        ur.role.name === 'Admin' || ur.role.name === 'admin'
+      );
+      
+      // Check if user is owner
+      const isOwner = document.owner_id === userId;
+      
+      if (!isAdmin && !isOwner) {
+        throw ApiError.forbidden("You can only delete your own documents", "DOCUMENT_DELETE_DENIED");
+      }
+    }
     
     // Delete audit logs first to avoid foreign key constraint
     await prisma.audit_logs.deleteMany({
@@ -468,6 +519,58 @@ class DocumentsService {
     }
     
     return { filePath, fileName, mimeType };
+  }
+
+  /**
+   * Submit document for approval
+   */
+  async submitForApproval(documentId: number, tenantId: number, userId: number, workflowId?: number) {
+    const document = await this.getDocument(documentId, tenantId, userId);
+    
+    // Validate status
+    if (document.status !== 'draft') {
+      throw ApiError.badRequest('Document must be in draft status', 'INVALID_STATUS');
+    }
+    
+    // Get document type
+    const documentType = await prisma.document_types.findUnique({
+      where: { id: document.document_type_id! },
+    });
+    
+    if (!documentType?.require_approval) {
+      throw ApiError.badRequest('This document type does not require approval', 'APPROVAL_NOT_REQUIRED');
+    }
+    
+    // If document has sign request, validate fields
+    if (document.sign_request_id) {
+      const { signRequestFieldsService } = await import('../signRequests/signRequestFields.service');
+      const validation = await signRequestFieldsService.validateFieldsBeforeSend(document.sign_request_id);
+      if (!validation.valid) {
+        throw ApiError.badRequest(validation.message || 'Sign fields validation failed', 'SIGN_FIELDS_INVALID');
+      }
+    }
+    
+    // Determine workflow
+    const finalWorkflowId = workflowId || documentType.default_workflow_id;
+    
+    if (finalWorkflowId) {
+      // Has workflow - submit for approval
+      const { approvalsService } = await import('../approvals/approvals.service');
+      await approvalsService.submitForApproval(documentId, finalWorkflowId, tenantId, userId);
+      
+      // Update status
+      await documentsRepository.update(documentId, tenantId, {
+        status: 'pending_approval',
+      });
+    } else {
+      // No workflow - direct approve (simple approval without workflow)
+      // Just mark as approved
+      await documentsRepository.update(documentId, tenantId, {
+        status: 'approved',
+      });
+    }
+    
+    return await this.getDocument(documentId, tenantId, userId);
   }
 }
 

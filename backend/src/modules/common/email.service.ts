@@ -73,6 +73,248 @@ class EmailService {
     });
   }
 
+  async sendApprovalRequestNotification(data: {
+    recipientEmail: string;
+    recipientName: string;
+    documentTitle: string;
+    documentNumber?: string;
+    submitterName: string;
+    workflowName: string;
+    stepName: string;
+    dueDate?: Date;
+    approvalUrl: string;
+    comment?: string;
+  }): Promise<void> {
+    const dueDateStr = data.dueDate 
+      ? new Date(data.dueDate).toLocaleDateString('vi-VN', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        })
+      : null;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+          .info-box { background: white; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; }
+          .button { display: inline-block; background: #3b82f6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          .urgent { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📋 Yêu cầu phê duyệt</h1>
+          </div>
+          <div class="content">
+            <p>Xin chào <strong>${data.recipientName}</strong>,</p>
+            <p><strong>${data.submitterName}</strong> đã gửi yêu cầu phê duyệt tài liệu:</p>
+            
+            <div class="info-box">
+              <p><strong>📄 Tài liệu:</strong> ${data.documentTitle}</p>
+              ${data.documentNumber ? `<p><strong>📝 Số văn bản:</strong> ${data.documentNumber}</p>` : ''}
+              <p><strong>🔄 Quy trình:</strong> ${data.workflowName}</p>
+              <p><strong>📍 Bước hiện tại:</strong> ${data.stepName}</p>
+              ${dueDateStr ? `<p><strong>⏰ Hạn phê duyệt:</strong> ${dueDateStr}</p>` : ''}
+            </div>
+
+            ${data.comment ? `<p><strong>💬 Lời nhắn:</strong> ${data.comment}</p>` : ''}
+
+            ${dueDateStr ? `
+              <div class="urgent">
+                <strong>⚠️ Lưu ý:</strong> Vui lòng phê duyệt trước ngày ${dueDateStr}
+              </div>
+            ` : ''}
+
+            <p>Vui lòng nhấn vào nút bên dưới để xem và phê duyệt:</p>
+            <a href="${data.approvalUrl}" class="button">Xem và phê duyệt</a>
+            <p style="color: #666; font-size: 14px;">Hoặc copy link sau vào trình duyệt:<br>${data.approvalUrl}</p>
+          </div>
+          <div class="footer">
+            <p>Email này được gửi tự động từ WP Sign E-Office.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `Xin chào ${data.recipientName},
+
+${data.submitterName} đã gửi yêu cầu phê duyệt tài liệu:
+
+Tài liệu: ${data.documentTitle}
+${data.documentNumber ? `Số văn bản: ${data.documentNumber}\n` : ''}Quy trình: ${data.workflowName}
+Bước hiện tại: ${data.stepName}
+${dueDateStr ? `Hạn phê duyệt: ${dueDateStr}\n` : ''}
+${data.comment ? `\nLời nhắn: ${data.comment}\n` : ''}
+Vui lòng truy cập: ${data.approvalUrl}`;
+
+    await sendEmail({
+      to: data.recipientEmail,
+      subject: `[Phê duyệt] ${data.documentTitle}`,
+      html,
+      text,
+    });
+  }
+
+  async sendApprovalActionNotification(data: {
+    recipientEmail: string;
+    recipientName: string;
+    documentTitle: string;
+    documentNumber?: string;
+    approverName: string;
+    action: 'approved' | 'rejected' | 'request_info';
+    comment?: string;
+    documentUrl: string;
+  }): Promise<void> {
+    const actionText = {
+      approved: { title: '✅ Đã phê duyệt', color: '#10b981', emoji: '✅' },
+      rejected: { title: '❌ Đã từ chối', color: '#ef4444', emoji: '❌' },
+      request_info: { title: '❓ Yêu cầu bổ sung', color: '#f59e0b', emoji: '❓' }
+    }[data.action];
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, ${actionText.color} 0%, ${actionText.color}dd 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+          .info-box { background: white; border-left: 4px solid ${actionText.color}; padding: 15px; margin: 20px 0; }
+          .button { display: inline-block; background: ${actionText.color}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>${actionText.emoji} ${actionText.title}</h1>
+          </div>
+          <div class="content">
+            <p>Xin chào <strong>${data.recipientName}</strong>,</p>
+            <p><strong>${data.approverName}</strong> đã ${data.action === 'approved' ? 'phê duyệt' : data.action === 'rejected' ? 'từ chối' : 'yêu cầu bổ sung thông tin cho'} tài liệu:</p>
+            
+            <div class="info-box">
+              <p><strong>📄 Tài liệu:</strong> ${data.documentTitle}</p>
+              ${data.documentNumber ? `<p><strong>📝 Số văn bản:</strong> ${data.documentNumber}</p>` : ''}
+              <p><strong>👤 Người phê duyệt:</strong> ${data.approverName}</p>
+            </div>
+
+            ${data.comment ? `
+              <div style="background: #f3f4f6; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                <p><strong>💬 Nhận xét:</strong></p>
+                <p>${data.comment}</p>
+              </div>
+            ` : ''}
+
+            <p>Vui lòng nhấn vào nút bên dưới để xem chi tiết:</p>
+            <a href="${data.documentUrl}" class="button">Xem tài liệu</a>
+          </div>
+          <div class="footer">
+            <p>Email này được gửi tự động từ WP Sign E-Office.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const actionVerb = data.action === 'approved' ? 'phê duyệt' : data.action === 'rejected' ? 'từ chối' : 'yêu cầu bổ sung thông tin cho';
+    const text = `Xin chào ${data.recipientName},
+
+${data.approverName} đã ${actionVerb} tài liệu:
+
+Tài liệu: ${data.documentTitle}
+${data.documentNumber ? `Số văn bản: ${data.documentNumber}\n` : ''}Người phê duyệt: ${data.approverName}
+
+${data.comment ? `Nhận xét: ${data.comment}\n\n` : ''}Xem chi tiết: ${data.documentUrl}`;
+
+    await sendEmail({
+      to: data.recipientEmail,
+      subject: `[${actionText.title}] ${data.documentTitle}`,
+      html,
+      text,
+    });
+  }
+
+  async sendWorkflowCompletedNotification(data: {
+    recipientEmail: string;
+    recipientName: string;
+    documentTitle: string;
+    documentNumber?: string;
+    workflowName: string;
+    documentUrl: string;
+  }): Promise<void> {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+          .success-box { background: #d1fae5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; }
+          .button { display: inline-block; background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🎉 Quy trình hoàn tất</h1>
+          </div>
+          <div class="content">
+            <p>Xin chào <strong>${data.recipientName}</strong>,</p>
+            <p>Tài liệu của bạn đã hoàn tất quy trình phê duyệt:</p>
+            
+            <div class="success-box">
+              <p><strong>📄 Tài liệu:</strong> ${data.documentTitle}</p>
+              ${data.documentNumber ? `<p><strong>📝 Số văn bản:</strong> ${data.documentNumber}</p>` : ''}
+              <p><strong>🔄 Quy trình:</strong> ${data.workflowName}</p>
+              <p><strong>✅ Trạng thái:</strong> Đã phê duyệt hoàn tất</p>
+            </div>
+
+            <p>Tài liệu hiện đã có hiệu lực và có thể sử dụng.</p>
+            <a href="${data.documentUrl}" class="button">Xem tài liệu</a>
+          </div>
+          <div class="footer">
+            <p>Email này được gửi tự động từ WP Sign E-Office.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `Xin chào ${data.recipientName},
+
+Tài liệu của bạn đã hoàn tất quy trình phê duyệt:
+
+Tài liệu: ${data.documentTitle}
+${data.documentNumber ? `Số văn bản: ${data.documentNumber}\n` : ''}Quy trình: ${data.workflowName}
+Trạng thái: Đã phê duyệt hoàn tất
+
+Xem tài liệu: ${data.documentUrl}`;
+
+    await sendEmail({
+      to: data.recipientEmail,
+      subject: `[Hoàn tất] ${data.documentTitle}`,
+      html,
+      text,
+    });
+  }
+
   async sendSignCompletedNotification(data: {
     recipientEmail: string;
     recipientName: string;

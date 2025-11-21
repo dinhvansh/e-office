@@ -58,6 +58,7 @@ model documents {
   tenant_id          Int
   owner_id           Int?
   document_type_id   Int?
+  department_id      Int?
   file_path          String
   original_file_name String?
   hash               String?
@@ -73,17 +74,24 @@ model documents {
   effective_date     DateTime?
   expiration_date    DateTime?
   issued_date        DateTime?
+  sign_request_id    Int?          @unique
   created_at         DateTime      @default(now())
   tenant             tenants       @relation(fields: [tenant_id], references: [id])
   owner              users?        @relation("documents_owner", fields: [owner_id], references: [id])
   document_type      document_types? @relation(fields: [document_type_id], references: [id])
-  sign_requests      sign_requests[]
+  department         departments?  @relation(fields: [department_id], references: [id])
+  sign_request       sign_requests? @relation("document_sign_request", fields: [sign_request_id], references: [id])
+  sign_requests      sign_requests[] @relation("document_all_sign_requests")
   audit_logs         audit_logs[]
   tags               document_tags[]
   permissions        document_permissions[]
   versions           document_versions[]
   workflow_instance  workflow_instances?
   approvals          document_approvals[]
+  sign_fields        sign_request_fields[]
+
+  @@index([department_id])
+  @@index([sign_request_id])
 }
 
 model sign_requests {
@@ -95,10 +103,13 @@ model sign_requests {
   workflow_type String?
   status        String?
   deadline      DateTime?
+  auto_created  Boolean    @default(false)
   created_at    DateTime   @default(now())
   tenant        tenants    @relation(fields: [tenant_id], references: [id])
-  document      documents  @relation(fields: [document_id], references: [id])
+  document      documents  @relation("document_all_sign_requests", fields: [document_id], references: [id])
+  linked_document documents? @relation("document_sign_request")
   signers       signers[]
+  fields        sign_request_fields[]
 }
 
 model signers {
@@ -112,7 +123,10 @@ model signers {
   otp_expire     DateTime?
   signed_at      DateTime?
   position_data  Json?
+  signing_token  String?       @unique
   sign_request   sign_requests @relation(fields: [sign_request_id], references: [id])
+  assigned_fields sign_request_fields[]
+  field_values   sign_request_field_values[]
 }
 
 model audit_logs {
@@ -151,6 +165,7 @@ model departments {
   children    departments[] @relation("department_hierarchy")
   manager     users?    @relation("department_manager", fields: [manager_id], references: [id])
   users       users[]   @relation("user_department")
+  documents   documents[]
 
   @@unique([tenant_id, code], name: "departments_tenant_id_code_key")
 }
@@ -391,4 +406,48 @@ model document_approvals {
   workflow          workflows @relation(fields: [workflow_id], references: [id])
   workflow_step     workflow_steps @relation(fields: [workflow_step_id], references: [id])
   approver          users @relation(fields: [approver_user_id], references: [id])
+}
+
+model sign_request_fields {
+  id                Int       @id @default(autoincrement())
+  sign_request_id   Int
+  document_id       Int
+  assigned_signer_id Int?
+
+  type              String    // 'signature' | 'text' | 'date' | 'checkbox'
+  page              Int
+  x                 Float
+  y                 Float
+  width             Float?
+  height            Float?
+
+  required          Boolean   @default(true)
+  label             String?
+  placeholder       String?
+  read_only         Boolean   @default(false)
+
+  created_at        DateTime  @default(now())
+
+  sign_request      sign_requests @relation(fields: [sign_request_id], references: [id], onDelete: Cascade)
+  document          documents      @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  assigned_signer   signers?       @relation(fields: [assigned_signer_id], references: [id], onDelete: SetNull)
+  values            sign_request_field_values[]
+
+  @@index([sign_request_id])
+  @@index([document_id])
+}
+
+model sign_request_field_values {
+  id           Int       @id @default(autoincrement())
+  field_id     Int
+  signer_id    Int
+  value        Json
+  filled_at    DateTime  @default(now())
+
+  field        sign_request_fields @relation(fields: [field_id], references: [id], onDelete: Cascade)
+  signer       signers            @relation(fields: [signer_id], references: [id], onDelete: Cascade)
+
+  @@unique([field_id, signer_id], name: "field_id_signer_id")
+  @@index([field_id])
+  @@index([signer_id])
 }

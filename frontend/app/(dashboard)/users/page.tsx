@@ -66,6 +66,7 @@ export default function UsersPage() {
     },
     staleTime: 0,
     refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const { data: departmentsData } = useQuery({
@@ -91,12 +92,28 @@ export default function UsersPage() {
       }
       return fetchJson('/users', { method: 'POST', body: JSON.stringify(data) });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setShowCreateModal(false);
       setEditingUser(null);
       setFormData({ email: '', password: '', full_name: '', phone: '', department_id: '', position_id: '', manager_id: '', role_ids: [] });
       toast.success(editingUser ? 'Cập nhật người dùng thành công!' : 'Tạo người dùng thành công!');
-      setTimeout(() => queryClient.refetchQueries({ queryKey: ['users'] }), 300);
+      
+      // Invalidate all queries that start with 'users' (includes filters)
+      await queryClient.invalidateQueries({ 
+        queryKey: ['users'],
+        refetchType: 'all' 
+      });
+      
+      // Also invalidate departments for org chart
+      await queryClient.invalidateQueries({ 
+        queryKey: ['departments'],
+        refetchType: 'all'
+      });
+      
+      await queryClient.invalidateQueries({ 
+        queryKey: ['departments-tree'],
+        refetchType: 'all'
+      });
     },
     onError: (error: any) => {
       const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';

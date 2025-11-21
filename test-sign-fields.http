@@ -1,0 +1,186 @@
+### Sign Request Fields API Tests
+
+@baseUrl = http://localhost:4000/api/v1
+@token = {{login.response.body.data.token}}
+
+### 1. Login as admin
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@acme.local",
+  "password": "Admin123!@#"
+}
+
+### 2. Create a sign request (draft)
+# @name createSignRequest
+POST {{baseUrl}}/sign-requests
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "document_id": 1,
+  "title": "Test Sign Request with Fields",
+  "message": "Please sign this document",
+  "signers": [
+    {
+      "email": "signer1@example.com",
+      "name": "Signer One",
+      "role": "Approver"
+    },
+    {
+      "email": "signer2@example.com",
+      "name": "Signer Two",
+      "role": "Reviewer"
+    }
+  ]
+}
+
+### 3. Get editor data
+GET {{baseUrl}}/sign-requests/{{createSignRequest.response.body.data.sign_request.id}}/editor
+Authorization: Bearer {{token}}
+
+### 4. Save fields to sign request
+POST {{baseUrl}}/sign-requests/{{createSignRequest.response.body.data.sign_request.id}}/fields
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fields": [
+    {
+      "type": "signature",
+      "page": 1,
+      "x": 100,
+      "y": 200,
+      "width": 200,
+      "height": 80,
+      "required": true,
+      "label": "Signature of Signer 1",
+      "assigned_signer_id": 1
+    },
+    {
+      "type": "text",
+      "page": 1,
+      "x": 100,
+      "y": 300,
+      "width": 300,
+      "height": 40,
+      "required": true,
+      "label": "Full Name",
+      "placeholder": "Enter your full name",
+      "assigned_signer_id": 1
+    },
+    {
+      "type": "date",
+      "page": 1,
+      "x": 100,
+      "y": 350,
+      "width": 150,
+      "height": 40,
+      "required": true,
+      "label": "Date",
+      "assigned_signer_id": 1
+    },
+    {
+      "type": "signature",
+      "page": 1,
+      "x": 400,
+      "y": 200,
+      "width": 200,
+      "height": 80,
+      "required": true,
+      "label": "Signature of Signer 2",
+      "assigned_signer_id": 2
+    }
+  ]
+}
+
+### 5. Get editor data again (should show saved fields)
+GET {{baseUrl}}/sign-requests/{{createSignRequest.response.body.data.sign_request.id}}/editor
+Authorization: Bearer {{token}}
+
+### 6. Update fields (save again with changes)
+POST {{baseUrl}}/sign-requests/{{createSignRequest.response.body.data.sign_request.id}}/fields
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fields": [
+    {
+      "type": "signature",
+      "page": 1,
+      "x": 150,
+      "y": 250,
+      "width": 200,
+      "height": 80,
+      "required": true,
+      "label": "Updated Signature Position",
+      "assigned_signer_id": 1
+    }
+  ]
+}
+
+### 7. Send sign request (generates tokens)
+# @name sendSignRequest
+POST {{baseUrl}}/sign-requests/{{createSignRequest.response.body.data.sign_request.id}}/send
+Authorization: Bearer {{token}}
+
+### 8. Try to save fields after sending (should fail)
+POST {{baseUrl}}/sign-requests/{{createSignRequest.response.body.data.sign_request.id}}/fields
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fields": [
+    {
+      "type": "text",
+      "page": 1,
+      "x": 100,
+      "y": 100,
+      "width": 200,
+      "height": 40,
+      "required": true,
+      "label": "This should fail"
+    }
+  ]
+}
+
+### === PUBLIC SIGNING FLOW ===
+
+### 9. Get signing page data (use token from database)
+# Replace TOKEN_HERE with actual signing_token from signers table
+GET http://localhost:4000/public/sign/TOKEN_HERE
+
+### 10. Get document for viewing
+GET http://localhost:4000/public/sign/TOKEN_HERE/document
+
+### 11. Send OTP
+POST http://localhost:4000/public/sign/TOKEN_HERE/send-otp
+Content-Type: application/json
+
+{
+  "email": "signer1@example.com"
+}
+
+### 12. Submit signature with field values
+POST http://localhost:4000/public/sign/TOKEN_HERE/sign
+Content-Type: application/json
+
+{
+  "otp": "123456",
+  "field_values": [
+    {
+      "field_id": 1,
+      "value": "John Doe Signature"
+    },
+    {
+      "field_id": 2,
+      "value": "John Doe"
+    },
+    {
+      "field_id": 3,
+      "value": "2025-11-22"
+    }
+  ]
+}

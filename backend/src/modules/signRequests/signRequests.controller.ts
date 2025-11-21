@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { ok } from "../../core/utils/response";
 import { signRequestsService } from "./signRequests.service";
+import { signRequestFieldsService } from "./signRequestFields.service";
 
 const signerSchema = z.object({
   email: z.string().email(),
@@ -50,5 +51,53 @@ export class SignRequestsController {
     const id = idSchema.parse(req.params.id);
     await signRequestsService.cancelSignRequest(id, req.auth!.tenantId, req.auth!.userId);
     res.json(ok({ cancelled: true }));
+  };
+
+  // Field Management Endpoints
+
+  getEditor = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id);
+    const editorData = await signRequestFieldsService.getEditorData(
+      id,
+      req.auth!.tenantId,
+      req.auth!.userId
+    );
+    res.json(ok(editorData));
+  };
+
+  saveFields = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id);
+    const fieldsSchema = z.array(
+      z.object({
+        id: z.number().optional(),
+        assigned_signer_id: z.number().nullable().optional(),
+        type: z.enum(['signature', 'text', 'date', 'checkbox']),
+        page: z.number().int().min(1),
+        x: z.number(),
+        y: z.number(),
+        width: z.number().optional(),
+        height: z.number().optional(),
+        required: z.boolean().optional(),
+        label: z.string().optional(),
+        placeholder: z.string().optional(),
+        read_only: z.boolean().optional(),
+      })
+    );
+    const fields = fieldsSchema.parse(req.body.fields);
+    await signRequestFieldsService.saveFields(id, fields, req.auth!.tenantId, req.auth!.userId);
+    res.json(ok({ saved: true }));
+  };
+
+  deleteField = async (req: Request, res: Response): Promise<void> => {
+    const signRequestId = idSchema.parse(req.params.id);
+    const fieldId = idSchema.parse(req.params.fieldId);
+    await signRequestFieldsService.deleteField(fieldId, req.auth!.tenantId, req.auth!.userId);
+    res.json(ok({ deleted: true }));
+  };
+
+  send = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id);
+    const signRequest = await signRequestsService.sendSignRequest(id, req.auth!.tenantId, req.auth!.userId);
+    res.json(ok({ sign_request: signRequest }));
   };
 }

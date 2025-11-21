@@ -35,6 +35,12 @@ export class SignersRepository {
       where: { sign_request_id: signRequestId },
     });
   }
+
+  findBySignRequest(signRequestId: number) {
+    return prisma.signers.findMany({
+      where: { sign_request_id: signRequestId },
+    });
+  }
 }
 
 export const signersRepository = new SignersRepository();

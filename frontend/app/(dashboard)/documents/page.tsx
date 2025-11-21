@@ -55,13 +55,14 @@ export default function DocumentsPage() {
   const { data: workflowsData } = useQuery({
     queryKey: ["workflows"],
     queryFn: async () => {
-      const data = await fetchJson<{ workflows: any[] }>("/workflows");
-      return data.workflows;
+      const data: any = await fetchJson("/workflows");
+      // Handle both response formats
+      return Array.isArray(data) ? data : (data?.workflows || []);
     },
   });
 
   const activeDocumentTypes = documentTypesData?.filter((type) => type.is_active) || [];
-  const activeWorkflows = workflowsData?.filter((wf) => wf.is_active) || [];
+  const activeWorkflows = Array.isArray(workflowsData) ? workflowsData.filter((wf) => wf.is_active) : [];
 
   // Detect workflow mode when document type changes
   useEffect(() => {
@@ -165,6 +166,21 @@ export default function DocumentsPage() {
     mutationFn: (id: number) => fetchJson(`/documents/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       toast.success("Xóa tài liệu thành công!");
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+    onError: (error: any) => {
+      const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
+      toast.error(`Lỗi: ${message}`);
+    },
+  });
+
+  const submitForApprovalMutation = useMutation({
+    mutationFn: (id: number) => fetchJson(`/documents/${id}/submit-for-approval`, { 
+      method: "POST",
+      body: JSON.stringify({})
+    }),
+    onSuccess: () => {
+      toast.success("Đã trình duyệt tài liệu thành công!");
       queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
     onError: (error: any) => {
@@ -341,7 +357,8 @@ export default function DocumentsPage() {
   });
 
   const handleSubmitApproval = (documentId: number) => {
-    setSubmitApprovalDialog({ open: true, documentId });
+    // Direct submit without dialog for now
+    submitForApprovalMutation.mutate(documentId);
   };
 
   const confirmSubmitApproval = () => {
@@ -574,10 +591,13 @@ export default function DocumentsPage() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          <StatusTag 
-                            status={doc.status ?? "draft"} 
-                            variant={doc.status === "active" ? "success" : "default"}
-                          />
+                          {doc.status === 'draft' && <Badge variant="secondary">📝 Nháp</Badge>}
+                          {doc.status === 'pending_approval' && <Badge variant="outline" className="border-yellow-500 text-yellow-700">⏳ Chờ duyệt</Badge>}
+                          {doc.status === 'approved' && <Badge variant="outline" className="border-green-500 text-green-700">✅ Đã duyệt</Badge>}
+                          {doc.status === 'pending_signature' && <Badge variant="outline" className="border-blue-500 text-blue-700">✍️ Chờ ký</Badge>}
+                          {doc.status === 'completed' && <Badge variant="default" className="bg-green-600">✅ Hoàn thành</Badge>}
+                          {doc.status === 'active' && <Badge variant="default">✅ Hoạt động</Badge>}
+                          {doc.status === 'rejected' && <Badge variant="destructive">❌ Từ chối</Badge>}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
                           {dayjs(doc.created_at).format("DD/MM/YYYY HH:mm")}
@@ -602,15 +622,26 @@ export default function DocumentsPage() {
                             >
                               <Download className="w-4 h-4" />
                             </Button>
+                            {doc.status === "draft" && doc.sign_request_id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 hover:bg-blue-50 hover:text-blue-600"
+                                onClick={() => window.location.href = `/sign-requests/${doc.sign_request_id}/editor`}
+                                title="Chỉnh sửa fields ký"
+                              >
+                                📝 Fields
+                              </Button>
+                            )}
                             {doc.status === "draft" && (
                               <Button
                                 variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                                size="sm"
+                                className="h-8 hover:bg-primary/10 hover:text-primary"
                                 onClick={() => handleSubmitApproval(doc.id)}
-                                title="Trình ký"
+                                title="Trình duyệt"
                               >
-                                <Send className="w-4 h-4" />
+                                📤 Trình duyệt
                               </Button>
                             )}
                             <Button

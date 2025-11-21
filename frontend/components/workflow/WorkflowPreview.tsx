@@ -11,9 +11,13 @@ interface WorkflowPreviewProps {
 export function WorkflowPreview({ workflowId }: WorkflowPreviewProps) {
   const { fetchJson } = useAuth();
 
-  const { data: workflow, isLoading } = useQuery({
+  const { data: workflowData, isLoading } = useQuery({
     queryKey: ['workflow', workflowId],
-    queryFn: () => fetchJson<any>(`/workflows/${workflowId}`),
+    queryFn: async () => {
+      const data: any = await fetchJson(`/workflows/${workflowId}`);
+      // Handle nested response structure
+      return data?.workflow || data;
+    },
   });
 
   if (isLoading) {
@@ -24,11 +28,11 @@ export function WorkflowPreview({ workflowId }: WorkflowPreviewProps) {
     );
   }
 
-  if (!workflow) {
+  if (!workflowData) {
     return null;
   }
 
-  const steps = workflow.workflow?.steps || [];
+  const steps = workflowData.steps || [];
 
   return (
     <div className="space-y-3">

@@ -35,8 +35,12 @@
 
 ## 4. E‑Sign nâng cao (Editor trường & UI người ký)
 
-8. `TASK-SIGN-FIELDS-EDITOR.md`  
+8. `TASK-SIGN-FIELDS-EDITOR.md` ✅ **PLANNED**
    - Editor trường dữ liệu cho sender + UI `/sign/:token` cho người ký điền/ký.
+   - **Implementation Plan**: `TASK-SIGN-FIELDS-IMPLEMENTATION-PLAN.md`
+   - **Estimated Time**: 4.5 hours
+   - **Status**: Ready to implement in next session
+   - **Dependencies**: Existing sign_requests module
 
 ---
 

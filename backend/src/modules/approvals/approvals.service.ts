@@ -1,6 +1,7 @@
 import { ApiError } from '../../core/errors/api-error';
 import { approvalsRepository } from './approvals.repository';
 import { prisma } from '../../config/prisma';
+import { emailService } from '../common/email.service';
 
 class ApprovalsService {
   /**
@@ -98,7 +99,35 @@ class ApprovalsService {
       data: { status: 'pending_approval' },
     });
 
-    // TODO: Send email notifications to approvers
+    // Send email notifications to approvers
+    const submitter = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { full_name: true, email: true },
+    });
+
+    const approvers = await prisma.users.findMany({
+      where: { id: { in: approverIds } },
+      select: { id: true, email: true, full_name: true },
+    });
+
+    const approvalUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/approvals`;
+
+    // Send emails in parallel (don't wait)
+    Promise.all(
+      approvers.map(approver =>
+        emailService.sendApprovalRequestNotification({
+          recipientEmail: approver.email,
+          recipientName: approver.full_name || approver.email,
+          documentTitle: document.title,
+          documentNumber: document.document_number || undefined,
+          submitterName: submitter?.full_name || submitter?.email || 'Unknown',
+          workflowName: workflow.name,
+          stepName: firstStep.step_name || `Bước ${firstStep.step_order}`,
+          dueDate,
+          approvalUrl,
+        }).catch(err => console.error(`Failed to send email to ${approver.email}:`, err))
+      )
+    ).catch(err => console.error('Email notification errors:', err));
 
     return {
       instance,
@@ -187,12 +216,59 @@ class ApprovalsService {
         current_step_id: null,
       });
 
-      await prisma.documents.update({
+      // Get document with type info
+      const document = await prisma.documents.findUnique({
         where: { id: approval.document_id },
-        data: { status: 'approved' },
+        include: {
+          document_type: true,
+          sign_request: true,
+        },
       });
 
-      // TODO: Send completion notification
+      // Check if document requires digital signing
+      if (document?.document_type?.require_digital_signing && document.sign_request_id) {
+        // Auto-send sign request
+        await this.autoSendSignRequest(document, tenantId);
+      } else {
+        // No signing required, mark as completed
+        await prisma.documents.update({
+          where: { id: approval.document_id },
+          data: { status: 'completed' },
+        });
+      }
+
+      // Send completion notification to document owner
+      const approver = await prisma.users.findUnique({
+        where: { id: userId },
+        select: { full_name: true, email: true },
+      });
+
+      if (document?.owner) {
+        const documentUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/documents/${document.id}`;
+        
+        emailService.sendWorkflowCompletedNotification({
+          recipientEmail: document.owner.email,
+          recipientName: document.owner.full_name || document.owner.email,
+          documentTitle: document.title,
+          documentNumber: document.document_number || undefined,
+          workflowName: instance.workflow.name,
+          documentUrl,
+        }).catch(err => console.error('Failed to send completion email:', err));
+
+        // Also notify approver
+        if (approver) {
+          emailService.sendApprovalActionNotification({
+            recipientEmail: approver.email,
+            recipientName: approver.full_name || approver.email,
+            documentTitle: document.title,
+            documentNumber: document.document_number || undefined,
+            approverName: approver.full_name || approver.email,
+            action: 'approved',
+            comment,
+            documentUrl,
+          }).catch(err => console.error('Failed to send action email:', err));
+        }
+      }
 
       return {
         message: 'Document approved! Workflow completed.',
@@ -232,7 +308,55 @@ class ApprovalsService {
       current_step_id: nextStep.id,
     });
 
-    // TODO: Send notifications to next approvers
+    // Send notifications to next approvers
+    const document = await prisma.documents.findUnique({
+      where: { id: approval.document_id },
+      include: { owner: true },
+    });
+
+    const approver = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { full_name: true, email: true },
+    });
+
+    const nextApprovers = await prisma.users.findMany({
+      where: { id: { in: nextApproverIds } },
+      select: { id: true, email: true, full_name: true },
+    });
+
+    const approvalUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/approvals`;
+    const documentUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/documents/${approval.document_id}`;
+
+    // Notify next approvers
+    Promise.all(
+      nextApprovers.map(nextApprover =>
+        emailService.sendApprovalRequestNotification({
+          recipientEmail: nextApprover.email,
+          recipientName: nextApprover.full_name || nextApprover.email,
+          documentTitle: document?.title || 'Document',
+          documentNumber: document?.document_number || undefined,
+          submitterName: document?.owner?.full_name || document?.owner?.email || 'Unknown',
+          workflowName: instance.workflow.name,
+          stepName: nextStep.step_name || `Bước ${nextStep.step_order}`,
+          dueDate,
+          approvalUrl,
+        }).catch(err => console.error(`Failed to send email to ${nextApprover.email}:`, err))
+      )
+    ).catch(err => console.error('Email notification errors:', err));
+
+    // Notify document owner about progress
+    if (document?.owner && approver) {
+      emailService.sendApprovalActionNotification({
+        recipientEmail: document.owner.email,
+        recipientName: document.owner.full_name || document.owner.email,
+        documentTitle: document.title,
+        documentNumber: document.document_number || undefined,
+        approverName: approver.full_name || approver.email,
+        action: 'approved',
+        comment,
+        documentUrl,
+      }).catch(err => console.error('Failed to send progress email:', err));
+    }
 
     return {
       message: `Approved! Moved to next step: ${nextStep.step_name}`,
@@ -295,7 +419,31 @@ class ApprovalsService {
       data: { status: 'rejected' },
     });
 
-    // TODO: Send rejection notification to document owner
+    // Send rejection notification to document owner
+    const document = await prisma.documents.findUnique({
+      where: { id: approval.document_id },
+      include: { owner: true },
+    });
+
+    const approver = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { full_name: true, email: true },
+    });
+
+    if (document?.owner && approver) {
+      const documentUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/documents/${document.id}`;
+      
+      emailService.sendApprovalActionNotification({
+        recipientEmail: document.owner.email,
+        recipientName: document.owner.full_name || document.owner.email,
+        documentTitle: document.title,
+        documentNumber: document.document_number || undefined,
+        approverName: approver.full_name || approver.email,
+        action: 'rejected',
+        comment,
+        documentUrl,
+      }).catch(err => console.error('Failed to send rejection email:', err));
+    }
 
     return {
       message: 'Document rejected. Workflow ended.',
@@ -349,7 +497,31 @@ class ApprovalsService {
       acted_at: new Date(),
     });
 
-    // TODO: Send notification to document owner
+    // Send notification to document owner
+    const document = await prisma.documents.findUnique({
+      where: { id: approval.document_id },
+      include: { owner: true },
+    });
+
+    const approver = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { full_name: true, email: true },
+    });
+
+    if (document?.owner && approver) {
+      const documentUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/documents/${document.id}`;
+      
+      emailService.sendApprovalActionNotification({
+        recipientEmail: document.owner.email,
+        recipientName: document.owner.full_name || document.owner.email,
+        documentTitle: document.title,
+        documentNumber: document.document_number || undefined,
+        approverName: approver.full_name || approver.email,
+        action: 'request_info',
+        comment,
+        documentUrl,
+      }).catch(err => console.error('Failed to send request info email:', err));
+    }
 
     return {
       message: 'Information requested. Document owner will be notified.',
@@ -395,6 +567,39 @@ class ApprovalsService {
 
     return approvalsRepository.findWorkflowInstance(documentId);
   }
+
+  /**
+   * Auto-send sign request after approval completes
+   */
+  private async autoSendSignRequest(document: any, tenantId: number) {
+    const { signRequestsService } = await import('../signRequests/signRequests.service');
+    
+    try {
+      // Send sign request (generates tokens & sends emails)
+      await signRequestsService.sendSignRequest(
+        document.sign_request_id,
+        tenantId,
+        null // System auto-send
+      );
+      
+      // Update document status
+      await prisma.documents.update({
+        where: { id: document.id },
+        data: { status: 'pending_signature' },
+      });
+      
+      console.log(`Auto-sent sign request ${document.sign_request_id} for document ${document.id}`);
+    } catch (error) {
+      console.error('Failed to auto-send sign request:', error);
+      // Don't fail the approval, just log the error
+      // Document stays in 'approved' status
+      await prisma.documents.update({
+        where: { id: document.id },
+        data: { status: 'approved' },
+      });
+    }
+  }
 }
 
 export const approvalsService = new ApprovalsService();
+

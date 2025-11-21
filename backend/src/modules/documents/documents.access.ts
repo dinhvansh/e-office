@@ -37,9 +37,22 @@ export async function canViewDocument(
   }
 
   if (scope === 'department') {
-    // TODO: Implement when department_id is added to documents
-    // For now, treat as private
-    return false;
+    // Check if user is in the same department
+    const docDeptId = (doc as any).department_id;
+    const userDeptId = user.department_id;
+    
+    // If document has no department, treat as private
+    if (!docDeptId) {
+      return false;
+    }
+    
+    // If user has no department, deny access
+    if (!userDeptId) {
+      return false;
+    }
+    
+    // Allow if same department
+    return docDeptId === userDeptId;
   }
 
   // Layer 5: Confidential level (for public documents)

@@ -10,6 +10,7 @@ const createSchema = z
     file_base64: z.string().optional(),
     storage_path: z.string().optional(),
     document_type_id: z.coerce.number().int().positive().optional(),
+    department_id: z.coerce.number().int().positive().optional(),
     title: z.string().optional(),
     summary: z.string().optional(),
     priority_level: z.string().optional(),
@@ -58,6 +59,7 @@ export class DocumentsController {
         base64: body.file_base64,
         storagePath: body.storage_path,
         documentTypeId: body.document_type_id,
+        departmentId: body.department_id,
         title: body.title,
         summary: body.summary,
         priorityLevel: body.priority_level,
@@ -77,7 +79,7 @@ export class DocumentsController {
 
   delete = async (req: Request, res: Response): Promise<void> => {
     const documentId = idSchema.parse(req.params.id);
-    await documentsService.deleteDocument(documentId, req.auth!.tenantId);
+    await documentsService.deleteDocument(documentId, req.auth!.tenantId, req.auth!.userId);
     res.json(ok({ deleted: true }));
   };
 
@@ -245,5 +247,19 @@ export class DocumentsController {
         }
       }
     });
+  };
+
+  submitForApproval = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    const { workflow_id } = req.body;
+    
+    const document = await documentsService.submitForApproval(
+      documentId,
+      req.auth!.tenantId,
+      req.auth!.userId,
+      workflow_id
+    );
+    
+    res.json(ok({ document: toDocumentDTO(document) }));
   };
 }

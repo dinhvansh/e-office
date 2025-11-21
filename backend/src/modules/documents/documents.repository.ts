@@ -10,6 +10,7 @@ export interface CreateDocumentData {
   status?: string | null;
   version?: number;
   document_type_id?: number | null;
+  department_id?: number | null;
   document_number?: string | null;
   numbering_rule_id?: number | null;
   title?: string | null;
