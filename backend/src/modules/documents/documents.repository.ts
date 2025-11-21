@@ -5,6 +5,7 @@ export interface CreateDocumentData {
   tenant_id: number;
   owner_id: number;
   file_path: string;
+  original_file_name?: string | null;
   hash?: string | null;
   status?: string | null;
   version?: number;

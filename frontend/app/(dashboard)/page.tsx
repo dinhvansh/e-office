@@ -129,7 +129,7 @@ export default function DashboardPage() {
                       </div>
                       <div>
                         <p className="font-medium text-sm">
-                          {doc.file_path.split("/").pop()?.substring(0, 30)}...
+                          {(doc.original_file_name || doc.title || `Document #${doc.id}`).substring(0, 30)}...
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {dayjs(doc.created_at).fromNow()}

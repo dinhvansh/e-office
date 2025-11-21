@@ -106,6 +106,47 @@ Content-Type: application/json
 DELETE {{baseUrl}}/documents/1
 Authorization: Bearer {{accessToken}}
 
+### 14. View Document (Open in browser) - Use Doc ID 1 or 2 (has real files)
+GET {{baseUrl}}/documents/1/view
+Authorization: Bearer {{accessToken}}
+
+### 15. Download Document - Use Doc ID 1 or 2 (has real files)
+GET {{baseUrl}}/documents/1/download
+Authorization: Bearer {{accessToken}}
+
+### ========================================
+### SECURITY: FILE PATH HARDENING
+
+### 16. Test: file_path not exposed in list response
+GET {{baseUrl}}/documents
+Authorization: Bearer {{accessToken}}
+# Expected: Response should NOT contain file_path field
+# Expected: Response should contain original_file_name field
+
+### 17. Test: Path traversal attack (should be blocked)
+POST {{baseUrl}}/documents
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "file_name": "attack.pdf",
+  "storage_path": "../../../etc/passwd",
+  "document_type_id": 1
+}
+# Expected: 400 Bad Request with code INVALID_STORAGE_PATH
+
+### 18. Test: Storage path outside base directory (should be blocked)
+POST {{baseUrl}}/documents
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "file_name": "attack.pdf",
+  "storage_path": "/tmp/malicious.pdf",
+  "document_type_id": 1
+}
+# Expected: 400 Bad Request with code INVALID_STORAGE_PATH
+
 ### ========================================
 ### DOCUMENT TYPES + NUMBERING INTEGRATION
 ### ========================================

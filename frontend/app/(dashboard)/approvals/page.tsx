@@ -23,7 +23,7 @@ interface ApprovalItem {
     id: number;
     title: string | null;
     document_number: string | null;
-    file_path: string;
+    original_file_name?: string | null;
     document_type: {
       name: string;
       code: string;
@@ -126,7 +126,7 @@ export default function ApprovalsPage() {
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-semibold text-base hover:underline cursor-pointer" onClick={() => router.push(`/documents/${item.document_id}`)}>
-                              {item.document.title || item.document.file_path.split('/').pop()}
+                              {item.document.original_file_name || item.document.title || `Document #${item.document_id}`}
                             </h3>
                             {item.document.document_number && (
                               <Badge variant="outline" className="font-mono text-xs">

@@ -19,6 +19,7 @@ model tenants {
   documents  documents[]
   sign_requests sign_requests[]
   departments departments[]
+  positions  positions[]
   roles      roles[]
   document_types document_types[]
   numbering_rules numbering_rules[]
@@ -35,11 +36,16 @@ model users {
   phone         String?
   avatar_url    String?
   department_id Int?
+  manager_id    Int?       // Quản lý trực tiếp
+  position_id   Int?       // Chức danh
   role          String?    @default("user")
   status        String?    @default("active")
   created_at    DateTime   @default(now())
   tenant        tenants    @relation(fields: [tenant_id], references: [id])
   department    departments? @relation("user_department", fields: [department_id], references: [id])
+  manager       users?     @relation("user_manager", fields: [manager_id], references: [id], onDelete: SetNull)
+  subordinates  users[]    @relation("user_manager")
+  position      positions? @relation("user_position", fields: [position_id], references: [id])
   documents     documents[] @relation("documents_owner")
   audit_logs    audit_logs[]
   user_roles    user_roles[]
@@ -53,6 +59,7 @@ model documents {
   owner_id           Int?
   document_type_id   Int?
   file_path          String
+  original_file_name String?
   hash               String?
   status             String?
   version            Int           @default(1)
@@ -148,6 +155,22 @@ model departments {
   @@unique([tenant_id, code], name: "departments_tenant_id_code_key")
 }
 
+model positions {
+  id          Int       @id @default(autoincrement())
+  tenant_id   Int
+  code        String    @db.VarChar(50)
+  name        String
+  description String?
+  level       Int?
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now())
+  tenant      tenants   @relation(fields: [tenant_id], references: [id])
+  users       users[]   @relation("user_position")
+
+  @@unique([tenant_id, code])
+  @@index([tenant_id])
+}
+
 model roles {
   id          Int       @id @default(autoincrement())
   tenant_id   Int
@@ -199,6 +222,9 @@ model document_types {
   description             String?
   require_numbering       Boolean   @default(true)
   require_digital_signing Boolean   @default(false)
+  require_approval        Boolean   @default(false)
+  default_workflow_id     Int?
+  allow_workflow_override Boolean   @default(false)
   category                String?
   is_active               Boolean   @default(true)
   created_at              DateTime  @default(now())
@@ -207,6 +233,7 @@ model document_types {
   documents               documents[]
   numbering_rules         numbering_rules[]
   workflows               workflows[]
+  default_workflow        workflows? @relation("default_workflow", fields: [default_workflow_id], references: [id])
   
   @@unique([tenant_id, code])
 }
@@ -295,6 +322,9 @@ model workflows {
   name              String
   description       String?
   document_type_id  Int?
+  is_template       Boolean   @default(true)
+  created_for_doc   Int?
+  based_on_template Int?
   is_active         Boolean   @default(true)
   created_by        Int?
   created_at        DateTime  @default(now())
@@ -304,6 +334,7 @@ model workflows {
   steps             workflow_steps[]
   instances         workflow_instances[]
   approvals         document_approvals[]
+  as_default        document_types[] @relation("default_workflow")
   
   @@unique([tenant_id, name])
 }
@@ -317,6 +348,7 @@ model workflow_steps {
   approver_id     Int?
   due_in_days     Int       @default(3)
   is_required     Boolean   @default(true)
+  is_parallel     Boolean   @default(false) // true = gửi cùng lúc với bước trước, false = chờ bước trước xong
   conditions      Json?
   created_at      DateTime  @default(now())
   

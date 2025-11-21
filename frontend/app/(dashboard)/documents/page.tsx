@@ -2,8 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { ChangeEvent, useState } from "react";
-import { FileText, Upload, Trash2, Download, Eye } from "lucide-react";
+import { ChangeEvent, useState, useEffect } from "react";
+import { FileText, Upload, Trash2, Download, Eye, Send } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { DocumentRecord, DocumentType } from "@/lib/types";
 import { PageHeader } from "@/components/ui/page-header";
@@ -18,6 +18,9 @@ import { StatusTag } from "@/components/ui/status-tag";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SelectWithIcon } from "@/components/ui/select-with-icon";
+import { WorkflowPreview } from "@/components/workflow/WorkflowPreview";
+import { WorkflowCustomizer } from "@/components/workflow/WorkflowCustomizer";
+import { AdhocWorkflowBuilder } from "@/components/workflow/AdhocWorkflowBuilder";
 
 export default function DocumentsPage() {
   const { fetchJson } = useAuth();
@@ -28,6 +31,10 @@ export default function DocumentsPage() {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<number | null>(null);
   const [confidentialLevel, setConfidentialLevel] = useState("normal");
   const [visibilityScope, setVisibilityScope] = useState("public");
+  const [workflowMode, setWorkflowMode] = useState<'no_approval' | 'strict' | 'flexible' | 'adhoc' | null>(null);
+  const [selectedDocType, setSelectedDocType] = useState<DocumentType | null>(null);
+  const [customizedSteps, setCustomizedSteps] = useState<any[] | null>(null);
+  const [adhocSteps, setAdhocSteps] = useState<any[] | null>(null);
 
   const { data: documents, isLoading } = useQuery({
     queryKey: ["documents"],
@@ -55,6 +62,32 @@ export default function DocumentsPage() {
 
   const activeDocumentTypes = documentTypesData?.filter((type) => type.is_active) || [];
   const activeWorkflows = workflowsData?.filter((wf) => wf.is_active) || [];
+
+  // Detect workflow mode when document type changes
+  useEffect(() => {
+    if (selectedDocumentTypeId) {
+      const docType = activeDocumentTypes.find((t) => t.id === selectedDocumentTypeId);
+      setSelectedDocType(docType || null);
+      
+      if (!docType) {
+        setWorkflowMode(null);
+        return;
+      }
+
+      if (!docType.require_approval) {
+        setWorkflowMode('no_approval');
+      } else if (!docType.default_workflow_id) {
+        setWorkflowMode('adhoc');
+      } else if (!docType.allow_workflow_override) {
+        setWorkflowMode('strict');
+      } else {
+        setWorkflowMode('flexible');
+      }
+    } else {
+      setWorkflowMode(null);
+      setSelectedDocType(null);
+    }
+  }, [selectedDocumentTypeId, activeDocumentTypes]);
 
   // Map document types to options with icons
   const getDocumentTypeIcon = (code: string) => {
@@ -94,9 +127,11 @@ export default function DocumentsPage() {
         visibility_scope: visibilityScope,
       };
       
-      // Add workflow_id if selected
-      if (selectedWorkflowId) {
-        payload.workflow_id = selectedWorkflowId;
+      // Add workflow data based on mode
+      if (workflowMode === 'adhoc' && adhocSteps && adhocSteps.length > 0) {
+        payload.adhoc_steps = adhocSteps;
+      } else if (workflowMode === 'flexible' && customizedSteps && customizedSteps.length > 0) {
+        payload.customized_steps = customizedSteps;
       }
       
       await fetchJson("/documents", {
@@ -143,13 +178,178 @@ export default function DocumentsPage() {
     id: null,
   });
 
+  const [submitApprovalDialog, setSubmitApprovalDialog] = useState<{
+    open: boolean;
+    documentId: number | null;
+  }>({
+    open: false,
+    documentId: null,
+  });
+
+  const [selectedWorkflowForApproval, setSelectedWorkflowForApproval] = useState<number | null>(null);
+
   const handleDelete = (id: number) => {
     setDeleteConfirm({ open: true, id });
+  };
+
+  const handleView = async (id: number) => {
+    try {
+      // Get token from auth session
+      const sessionStr = localStorage.getItem('esign.auth');
+      const session = sessionStr ? JSON.parse(sessionStr) : null;
+      const token = session?.tokens?.accessToken;
+      
+      if (!token) {
+        throw new Error('Vui lòng đăng nhập lại');
+      }
+      
+      const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${id}/view`;
+      
+      console.log('Viewing document:', { id, url, hasToken: !!token });
+      
+      // Fetch with token, then create blob URL
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      console.log('View response:', { status: response.status, ok: response.ok });
+      
+      if (!response.ok) {
+        // Try to get error message from response
+        const contentType = response.headers.get('content-type');
+        if (contentType?.includes('application/json')) {
+          const errorData = await response.json();
+          console.error('View error data:', errorData);
+          const errorMsg = errorData.error?.message || 'Failed to load document';
+          
+          // User-friendly message for seed data
+          if (errorMsg.includes('seed data')) {
+            throw new Error('Tài liệu này không có file thật. Vui lòng upload tài liệu mới để test.');
+          }
+          
+          throw new Error(errorMsg);
+        }
+        throw new Error(`Failed to load document (${response.status})`);
+      }
+      
+      const blob = await response.blob();
+      console.log('Blob created:', { size: blob.size, type: blob.type });
+      
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+      
+      // Clean up blob URL after a delay
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+    } catch (error: any) {
+      const message = error?.message || 'Không thể xem tài liệu';
+      toast.error(message);
+      console.error('View error:', error);
+    }
+  };
+
+  const handleDownload = async (id: number, fileName?: string) => {
+    try {
+      // Get token from auth session
+      const sessionStr = localStorage.getItem('esign.auth');
+      const session = sessionStr ? JSON.parse(sessionStr) : null;
+      const token = session?.tokens?.accessToken;
+      
+      if (!token) {
+        throw new Error('Vui lòng đăng nhập lại');
+      }
+      
+      const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${id}/download`;
+      
+      console.log('Downloading document:', { id, url, hasToken: !!token });
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      console.log('Download response:', { status: response.status, ok: response.ok });
+      
+      if (!response.ok) {
+        // Try to get error message from response
+        const contentType = response.headers.get('content-type');
+        if (contentType?.includes('application/json')) {
+          const errorData = await response.json();
+          console.error('Download error data:', errorData);
+          const errorMsg = errorData.error?.message || 'Failed to download document';
+          
+          // User-friendly message for seed data
+          if (errorMsg.includes('seed data')) {
+            throw new Error('Tài liệu này không có file thật. Vui lòng upload tài liệu mới để test.');
+          }
+          
+          throw new Error(errorMsg);
+        }
+        throw new Error(`Failed to download document (${response.status})`);
+      }
+      
+      const blob = await response.blob();
+      console.log('Blob created:', { size: blob.size, type: blob.type });
+      
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName || 'document';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      toast.success('Tải tài liệu thành công!');
+    } catch (error: any) {
+      const message = error?.message || 'Không thể tải tài liệu';
+      toast.error(message);
+      console.error('Download error:', error);
+    }
   };
 
   const confirmDelete = () => {
     if (deleteConfirm.id) {
       deleteMutation.mutate(deleteConfirm.id);
+    }
+  };
+
+  const submitApprovalMutation = useMutation({
+    mutationFn: async ({ documentId, workflowId }: { documentId: number; workflowId: number }) => {
+      await fetchJson("/approvals/submit", {
+        method: "POST",
+        body: JSON.stringify({
+          document_id: documentId,
+          workflow_id: workflowId,
+        }),
+      });
+    },
+    onSuccess: () => {
+      toast.success("Trình ký thành công! Người phê duyệt đã được thông báo.");
+      setSubmitApprovalDialog({ open: false, documentId: null });
+      setSelectedWorkflowForApproval(null);
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+    onError: (error: any) => {
+      const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
+      toast.error(`Lỗi: ${message}`);
+    },
+  });
+
+  const handleSubmitApproval = (documentId: number) => {
+    setSubmitApprovalDialog({ open: true, documentId });
+  };
+
+  const confirmSubmitApproval = () => {
+    if (submitApprovalDialog.documentId && selectedWorkflowForApproval) {
+      submitApprovalMutation.mutate({
+        documentId: submitApprovalDialog.documentId,
+        workflowId: selectedWorkflowForApproval,
+      });
     }
   };
 
@@ -179,39 +379,19 @@ export default function DocumentsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="document-type">
-                Loại văn bản <span className="text-red-500">*</span>
-              </Label>
-              <SelectWithIcon
-                options={documentTypeOptions}
-                value={selectedDocumentTypeId}
-                onChange={(value) => setSelectedDocumentTypeId(Number(value))}
-                placeholder="-- Chọn loại văn bản --"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="workflow">
-                Quy trình phê duyệt
-              </Label>
-              <select
-                id="workflow"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={selectedWorkflowId || ""}
-                onChange={(e) => setSelectedWorkflowId(e.target.value ? Number(e.target.value) : null)}
-              >
-                <option value="">-- Không cần phê duyệt --</option>
-                {activeWorkflows.map((workflow) => (
-                  <option key={workflow.id} value={workflow.id}>
-                    {workflow.name} ({workflow.steps.length} bước)
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-muted-foreground">
-                Chọn quy trình nếu văn bản cần phê duyệt
-              </p>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="document-type">
+              Loại văn bản <span className="text-red-500">*</span>
+            </Label>
+            <SelectWithIcon
+              options={documentTypeOptions}
+              value={selectedDocumentTypeId}
+              onChange={(value) => setSelectedDocumentTypeId(Number(value))}
+              placeholder="-- Chọn loại văn bản --"
+            />
+            <p className="text-xs text-muted-foreground">
+              Quy trình phê duyệt sẽ tự động hiển thị dựa trên loại văn bản
+            </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -258,7 +438,34 @@ export default function DocumentsPage() {
             </div>
           </div>
 
+          {/* Workflow Components - Conditional Rendering */}
+          {workflowMode && (
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              {workflowMode === 'no_approval' && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span className="text-lg">ℹ️</span>
+                  <p>Loại văn bản này không cần phê duyệt. Tài liệu sẽ được kích hoạt ngay sau khi upload.</p>
+                </div>
+              )}
 
+              {workflowMode === 'strict' && selectedDocType?.default_workflow_id && (
+                <WorkflowPreview workflowId={selectedDocType.default_workflow_id} />
+              )}
+
+              {workflowMode === 'flexible' && selectedDocType?.default_workflow_id && (
+                <WorkflowCustomizer
+                  defaultWorkflowId={selectedDocType.default_workflow_id}
+                  onCustomize={(steps) => setCustomizedSteps(steps)}
+                />
+              )}
+
+              {workflowMode === 'adhoc' && (
+                <AdhocWorkflowBuilder
+                  onBuild={(steps) => setAdhocSteps(steps)}
+                />
+              )}
+            </div>
+          )}
 
           {/* File Upload Dropzone */}
           <div className="space-y-2">
@@ -352,7 +559,9 @@ export default function DocumentsPage() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <FileText className="w-4 h-4 text-muted-foreground" />
-                            <span className="truncate max-w-xs">{doc.file_path.split("/").pop()}</span>
+                            <span className="truncate max-w-xs">
+                              {doc.original_file_name || doc.title || `Document #${doc.id}`}
+                            </span>
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -380,6 +589,7 @@ export default function DocumentsPage() {
                               size="icon"
                               className="h-8 w-8"
                               title="Xem"
+                              onClick={() => handleView(doc.id)}
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
@@ -388,9 +598,21 @@ export default function DocumentsPage() {
                               size="icon"
                               className="h-8 w-8"
                               title="Tải xuống"
+                              onClick={() => handleDownload(doc.id, doc.original_file_name || doc.title || `document-${doc.id}.pdf`)}
                             >
                               <Download className="w-4 h-4" />
                             </Button>
+                            {doc.status === "draft" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                                onClick={() => handleSubmitApproval(doc.id)}
+                                title="Trình ký"
+                              >
+                                <Send className="w-4 h-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -430,6 +652,76 @@ export default function DocumentsPage() {
         variant="danger"
         icon="trash"
       />
+
+      {/* Submit for Approval Dialog */}
+      {submitApprovalDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                  <Send className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Trình ký văn bản</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Chọn quy trình phê duyệt cho văn bản này
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="approval-workflow">
+                  Quy trình phê duyệt <span className="text-red-500">*</span>
+                </Label>
+                <select
+                  id="approval-workflow"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={selectedWorkflowForApproval || ""}
+                  onChange={(e) => setSelectedWorkflowForApproval(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">-- Chọn quy trình --</option>
+                  {activeWorkflows.map((workflow) => (
+                    <option key={workflow.id} value={workflow.id}>
+                      {workflow.name} ({workflow.steps?.length || 0} bước)
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Văn bản sẽ được gửi đến người phê duyệt theo quy trình đã chọn
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setSubmitApprovalDialog({ open: false, documentId: null });
+                    setSelectedWorkflowForApproval(null);
+                  }}
+                >
+                  Hủy bỏ
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={confirmSubmitApproval}
+                  disabled={!selectedWorkflowForApproval || submitApprovalMutation.isPending}
+                >
+                  {submitApprovalMutation.isPending ? (
+                    "Đang xử lý..."
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      Trình ký
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

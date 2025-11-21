@@ -36,6 +36,12 @@ export const usersRepository = {
         department: {
           select: { id: true, name: true },
         },
+        position: {
+          select: { id: true, code: true, name: true },
+        },
+        manager: {
+          select: { id: true, email: true, full_name: true },
+        },
         user_roles: {
           include: {
             role: {
@@ -53,6 +59,10 @@ export const usersRepository = {
       where: { id, tenant_id: tenantId },
       include: {
         department: true,
+        position: true,
+        manager: {
+          select: { id: true, email: true, full_name: true },
+        },
         user_roles: {
           include: {
             role: {
@@ -82,6 +92,12 @@ export const usersRepository = {
       data,
       include: {
         department: true,
+        position: true,
+        manager: {
+          select: { id: true, email: true, full_name: true },
+        },
+        user_roles: true,
+        managed_departments: true,
       },
     });
   },
@@ -92,11 +108,16 @@ export const usersRepository = {
       data,
       include: {
         department: true,
+        position: true,
+        manager: {
+          select: { id: true, email: true, full_name: true },
+        },
         user_roles: {
           include: {
             role: true,
           },
         },
+        managed_departments: true,
       },
     });
   },

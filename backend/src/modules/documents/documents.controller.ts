@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { ok } from "../../core/utils/response";
 import { documentsService } from "./documents.service";
+import { toDocumentDTO, toDocumentDTOs } from "./documents.dto";
 
 const createSchema = z
   .object({
@@ -14,6 +15,19 @@ const createSchema = z
     priority_level: z.string().optional(),
     confidential_level: z.string().optional(),
     visibility_scope: z.string().optional(),
+    
+    // Workflow options
+    adhoc_steps: z.array(z.object({
+      approver_user_id: z.number(),
+      due_in_days: z.number().min(1).max(365),
+    })).optional(),
+    
+    customized_steps: z.array(z.object({
+      step_name: z.string().optional(),
+      approver_type: z.enum(['user', 'role', 'department', 'manager']),
+      approver_id: z.number(),
+      due_in_days: z.number().min(1).max(365),
+    })).optional(),
   })
   .refine((data) => data.file_base64 || data.storage_path, {
     message: "file_base64 or storage_path is required",
@@ -25,13 +39,15 @@ const idSchema = z.coerce.number().int().positive();
 export class DocumentsController {
   list = async (req: Request, res: Response): Promise<void> => {
     const documents = await documentsService.listDocuments(req.auth!.tenantId, req.auth!.userId);
-    res.json(ok({ documents }));
+    // Security: Use DTO to exclude file_path from response
+    res.json(ok({ documents: toDocumentDTOs(documents) }));
   };
 
   getById = async (req: Request, res: Response): Promise<void> => {
     const documentId = idSchema.parse(req.params.id);
     const document = await documentsService.getDocument(documentId, req.auth!.tenantId, req.auth!.userId);
-    res.json(ok({ document }));
+    // Security: Use DTO to exclude file_path from response
+    res.json(ok({ document: toDocumentDTO(document) }));
   };
 
   create = async (req: Request, res: Response): Promise<void> => {
@@ -47,13 +63,16 @@ export class DocumentsController {
         priorityLevel: body.priority_level,
         confidentialLevel: body.confidential_level,
         visibilityScope: body.visibility_scope,
+        adhocSteps: body.adhoc_steps,
+        customizedSteps: body.customized_steps,
       },
       req.auth!.tenantId,
       req.auth!.userId,
       req.ip,
       req.headers["user-agent"],
     );
-    res.status(201).json(ok({ document }));
+    // Security: Use DTO to exclude file_path from response
+    res.status(201).json(ok({ document: toDocumentDTO(document) }));
   };
 
   delete = async (req: Request, res: Response): Promise<void> => {
@@ -179,5 +198,52 @@ export class DocumentsController {
       req.auth!.tenantId
     );
     res.json(ok({ version }));
+  };
+
+  // Download & View endpoints
+  download = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    const { filePath, fileName, mimeType } = await documentsService.getDocumentFile(
+      documentId,
+      req.auth!.tenantId,
+      req.auth!.userId
+    );
+
+    // Set headers for download
+    res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    
+    // Send file
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error('Error sending file:', err);
+        if (!res.headersSent) {
+          res.status(404).json({ success: false, error: { message: 'File not found' } });
+        }
+      }
+    });
+  };
+
+  view = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    const { filePath, fileName, mimeType } = await documentsService.getDocumentFile(
+      documentId,
+      req.auth!.tenantId,
+      req.auth!.userId
+    );
+
+    // Set headers for inline viewing
+    res.setHeader('Content-Type', mimeType || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    
+    // Send file
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error('Error sending file:', err);
+        if (!res.headersSent) {
+          res.status(404).json({ success: false, error: { message: 'File not found' } });
+        }
+      }
+    });
   };
 }

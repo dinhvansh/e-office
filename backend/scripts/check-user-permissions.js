@@ -1,9 +1,13 @@
+/**
+ * Check user permissions
+ */
+
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-async function checkUserPermissions() {
-  const user = await prisma.user.findFirst({
-    where: { email: 'admin@acme.com' },
+async function main() {
+  const user = await prisma.users.findFirst({
+    where: { email: 'admin@acme.local' },
     include: {
       user_roles: {
         include: {
@@ -11,32 +15,44 @@ async function checkUserPermissions() {
             include: {
               role_permissions: {
                 include: {
-                  permission: true
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+                  permission: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
   if (!user) {
-    console.log('User not found');
+    console.log('❌ User not found');
     return;
   }
 
-  console.log('User:', user.email);
-  console.log('\nRoles:');
-  user.user_roles.forEach(ur => {
-    console.log(`- ${ur.role.name}`);
-    console.log('  Permissions:');
-    ur.role.role_permissions.forEach(rp => {
-      console.log(`    - ${rp.permission.resource}:${rp.permission.action}`);
-    });
-  });
+  console.log('👤 User:', user.email);
+  console.log('📋 Roles:', user.user_roles.length);
 
-  await prisma.$disconnect();
+  for (const ur of user.user_roles) {
+    console.log(`\n🎭 Role: ${ur.role.name}`);
+    console.log(`   Permissions: ${ur.role.role_permissions.length}`);
+    
+    const positionsPerms = ur.role.role_permissions.filter(
+      rp => rp.permission.resource === 'positions'
+    );
+    
+    console.log(`   Positions permissions: ${positionsPerms.length}`);
+    positionsPerms.forEach(rp => {
+      console.log(`   - ${rp.permission.resource}:${rp.permission.action}`);
+    });
+  }
 }
 
-checkUserPermissions().catch(console.error);
+main()
+  .catch((e) => {
+    console.error('❌ Error:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

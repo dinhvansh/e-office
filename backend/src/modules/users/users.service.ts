@@ -23,6 +23,8 @@ export const usersService = {
     full_name?: string;
     phone?: string;
     department_id?: number;
+    manager_id?: number;
+    position_id?: number;
     role_ids?: number[];
   }) {
     // Check if email already exists
@@ -57,6 +59,8 @@ export const usersService = {
     full_name?: string;
     phone?: string;
     department_id?: number;
+    manager_id?: number;
+    position_id?: number;
     status?: string;
     role_ids?: number[];
     password?: string;

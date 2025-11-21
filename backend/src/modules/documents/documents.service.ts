@@ -73,7 +73,15 @@ class DocumentsService {
     return document;
   }
 
-  async createDocument(input: CreateDocumentInput, tenantId: number, ownerId: number, requesterIp?: string, userAgent?: string) {
+  async createDocument(input: CreateDocumentInput & {
+    adhocSteps?: Array<{ approver_user_id: number; due_in_days: number }>;
+    customizedSteps?: Array<{
+      step_name?: string;
+      approver_type: string;
+      approver_id: number;
+      due_in_days: number;
+    }>;
+  }, tenantId: number, ownerId: number, requesterIp?: string, userAgent?: string) {
     if (!input.base64 && !input.storagePath) {
       throw ApiError.badRequest("Either base64 or storagePath must be provided", "DOCUMENT_PAYLOAD_REQUIRED");
     }
@@ -85,7 +93,25 @@ class DocumentsService {
       hash = crypto.createHash("sha256").update(buffer).digest("hex");
       filePath = await saveBase64Document(tenantId, input.fileName, input.base64);
     } else {
-      filePath = input.storagePath!;
+      // Security: Validate storage_path to prevent Local File Read (LFR) attacks
+      const path = require('path');
+      const storagePath = input.storagePath!;
+      
+      // Check for path traversal attempts
+      if (storagePath.includes('..') || storagePath.includes('~')) {
+        throw ApiError.badRequest("Invalid storage path: path traversal detected", "INVALID_STORAGE_PATH");
+      }
+      
+      // Ensure path is within STORAGE_BASE_PATH
+      const { env } = await import('../../config/env');
+      const resolvedPath = path.resolve(process.cwd(), storagePath);
+      const allowedBasePath = path.resolve(process.cwd(), env.STORAGE_BASE_PATH);
+      
+      if (!resolvedPath.startsWith(allowedBasePath)) {
+        throw ApiError.badRequest("Invalid storage path: must be within storage directory", "INVALID_STORAGE_PATH");
+      }
+      
+      filePath = storagePath;
       const buffer = await fs.readFile(filePath);
       hash = crypto.createHash("sha256").update(buffer).digest("hex");
     }
@@ -94,14 +120,18 @@ class DocumentsService {
     let documentTypeId: number | null = null;
     let documentNumber: string | null = null;
     let numberingRuleId: number | null = null;
+    let documentType: any = null;
 
     if (input.documentTypeId) {
-      // Load document type
-      const documentType = await prisma.document_types.findFirst({
+      // Load document type with workflow settings
+      documentType = await prisma.document_types.findFirst({
         where: {
           id: input.documentTypeId,
           tenant_id: tenantId,
           is_active: true,
+        },
+        include: {
+          default_workflow: true,
         },
       });
 
@@ -126,12 +156,16 @@ class DocumentsService {
       }
     }
 
+    // Determine initial status based on approval requirement
+    const initialStatus = documentType?.require_approval ? "draft" : "active";
+
     const payload: CreateDocumentData = {
       tenant_id: tenantId,
       owner_id: ownerId,
       file_path: filePath,
+      original_file_name: input.fileName,
       hash,
-      status: "draft",
+      status: initialStatus,
       document_type_id: documentTypeId,
       document_number: documentNumber,
       numbering_rule_id: numberingRuleId,
@@ -150,17 +184,290 @@ class DocumentsService {
       ip: requesterIp,
       ua: userAgent,
     });
+
+    // Handle workflow based on 4 modes
+    if (documentType && documentType.require_approval) {
+      const { approvalsService } = await import('../approvals/approvals.service');
+
+      // Mode 4: Ad-hoc (No default workflow)
+      if (!documentType.default_workflow_id) {
+        if (!input.adhocSteps || input.adhocSteps.length === 0) {
+          throw ApiError.badRequest(
+            'Loại văn bản này yêu cầu tạo luồng ký thủ công',
+            'AD_HOC_STEPS_REQUIRED'
+          );
+        }
+
+        const workflow = await this.createAdhocWorkflow(
+          input.adhocSteps,
+          document.id,
+          tenantId,
+          ownerId
+        );
+
+        await approvalsService.submitForApproval(
+          document.id,
+          workflow.id,
+          tenantId,
+          ownerId
+        );
+
+        // Refresh document to get updated status
+        return await documentsRepository.findById(document.id, tenantId) || document;
+      }
+
+      // Mode 2: Strict (Use template as-is)
+      if (!documentType.allow_workflow_override) {
+        await approvalsService.submitForApproval(
+          document.id,
+          documentType.default_workflow_id,
+          tenantId,
+          ownerId
+        );
+
+        // Refresh document to get updated status
+        return await documentsRepository.findById(document.id, tenantId) || document;
+      }
+
+      // Mode 3: Flexible (Use customized or default)
+      if (input.customizedSteps && input.customizedSteps.length > 0) {
+        const workflow = await this.createCustomizedWorkflow(
+          documentType.default_workflow_id,
+          input.customizedSteps,
+          document.id,
+          tenantId,
+          ownerId
+        );
+
+        await approvalsService.submitForApproval(
+          document.id,
+          workflow.id,
+          tenantId,
+          ownerId
+        );
+      } else {
+        // Use default template
+        await approvalsService.submitForApproval(
+          document.id,
+          documentType.default_workflow_id,
+          tenantId,
+          ownerId
+        );
+      }
+
+      // Refresh document to get updated status
+      return await documentsRepository.findById(document.id, tenantId) || document;
+    }
+
     return document;
   }
 
   async deleteDocument(documentId: number, tenantId: number): Promise<void> {
     const document = await this.getDocument(documentId, tenantId);
-    await documentsRepository.delete(document.id);
-    await auditService.record({
-      tenantId,
-      documentId: document.id,
-      event: "document.deleted",
+    
+    // Delete audit logs first to avoid foreign key constraint
+    await prisma.audit_logs.deleteMany({
+      where: { document_id: document.id },
     });
+    
+    // Then delete the document
+    await documentsRepository.delete(document.id);
+    
+    // Note: Cannot record audit log after deletion since document_id is required
+    // and the document no longer exists
+  }
+
+  /**
+   * Create ad-hoc workflow from user-provided steps
+   */
+  async createAdhocWorkflow(
+    steps: Array<{ approver_user_id: number; due_in_days: number }>,
+    documentId: number,
+    tenantId: number,
+    userId: number
+  ) {
+    // Validate steps
+    if (!steps || steps.length === 0) {
+      throw ApiError.badRequest('Phải có ít nhất 1 bước phê duyệt', 'AD_HOC_STEPS_REQUIRED');
+    }
+
+    if (steps.length > 10) {
+      throw ApiError.badRequest('Tối đa 10 bước', 'TOO_MANY_STEPS');
+    }
+
+    // Validate approvers exist and belong to tenant
+    for (const step of steps) {
+      const user = await prisma.users.findFirst({
+        where: {
+          id: step.approver_user_id,
+          tenant_id: tenantId,
+        },
+      });
+
+      if (!user) {
+        throw ApiError.badRequest('Người phê duyệt không hợp lệ', 'INVALID_APPROVER');
+      }
+
+      if (step.due_in_days < 1 || step.due_in_days > 365) {
+        throw ApiError.badRequest('Thời hạn phải từ 1-365 ngày', 'INVALID_DUE_DAYS');
+      }
+    }
+
+    // Create ad-hoc workflow
+    const workflow = await prisma.workflows.create({
+      data: {
+        tenant_id: tenantId,
+        name: `Ad-hoc workflow for Document #${documentId}`,
+        description: 'User-created workflow',
+        is_template: false,
+        created_for_doc: documentId,
+        created_by: userId,
+        is_active: true,
+      },
+    });
+
+    // Create workflow steps
+    for (let i = 0; i < steps.length; i++) {
+      await prisma.workflow_steps.create({
+        data: {
+          workflow_id: workflow.id,
+          step_order: i + 1,
+          step_name: `Bước ${i + 1}`,
+          approver_type: 'user',
+          approver_id: steps[i].approver_user_id,
+          due_in_days: steps[i].due_in_days,
+          is_required: true,
+        },
+      });
+    }
+
+    return workflow;
+  }
+
+  /**
+   * Create customized workflow based on template
+   */
+  async createCustomizedWorkflow(
+    templateId: number,
+    customSteps: Array<{
+      step_name?: string;
+      approver_type: string;
+      approver_id: number;
+      due_in_days: number;
+    }>,
+    documentId: number,
+    tenantId: number,
+    userId: number
+  ) {
+    // Get template
+    const template = await prisma.workflows.findFirst({
+      where: {
+        id: templateId,
+        tenant_id: tenantId,
+        is_template: true,
+      },
+    });
+
+    if (!template) {
+      throw ApiError.notFound('Workflow template không tồn tại', 'TEMPLATE_NOT_FOUND');
+    }
+
+    // Validate custom steps
+    if (!customSteps || customSteps.length === 0) {
+      throw ApiError.badRequest('Phải có ít nhất 1 bước', 'CUSTOM_STEPS_REQUIRED');
+    }
+
+    // Create customized workflow
+    const workflow = await prisma.workflows.create({
+      data: {
+        tenant_id: tenantId,
+        name: `${template.name} (Tùy chỉnh cho #${documentId})`,
+        description: `Customized from: ${template.name}`,
+        is_template: false,
+        created_for_doc: documentId,
+        based_on_template: templateId,
+        created_by: userId,
+        is_active: true,
+      },
+    });
+
+    // Create custom steps
+    for (let i = 0; i < customSteps.length; i++) {
+      await prisma.workflow_steps.create({
+        data: {
+          workflow_id: workflow.id,
+          step_order: i + 1,
+          step_name: customSteps[i].step_name || `Bước ${i + 1}`,
+          approver_type: customSteps[i].approver_type,
+          approver_id: customSteps[i].approver_id,
+          due_in_days: customSteps[i].due_in_days,
+          is_required: true,
+        },
+      });
+    }
+
+    return workflow;
+  }
+
+  async getDocumentFile(documentId: number, tenantId: number, userId?: number): Promise<{
+    filePath: string;
+    fileName: string;
+    mimeType: string;
+  }> {
+    const document = await this.getDocument(documentId, tenantId, userId);
+    
+    // Get absolute file path
+    const path = require('path');
+    
+    // Handle different path formats:
+    // 1. "storage/1/file.pdf" -> resolve from cwd
+    // 2. "/uploads/file.pdf" -> resolve from backend/ (legacy seed data)
+    // 3. Absolute paths -> use as-is
+    let filePath: string;
+    
+    if (path.isAbsolute(document.file_path)) {
+      filePath = document.file_path;
+    } else if (document.file_path.startsWith('storage/') || document.file_path.startsWith('storage\\')) {
+      // Real uploaded files (from fileStorage.ts)
+      // Backend server runs from backend/ directory, so resolve from cwd
+      filePath = path.resolve(process.cwd(), document.file_path);
+    } else if (document.file_path.startsWith('/uploads/')) {
+      // Legacy seed data - files don't exist
+      throw ApiError.notFound("File not found (seed data)", "FILE_NOT_FOUND");
+    } else {
+      // Fallback: try relative to cwd
+      filePath = path.resolve(process.cwd(), document.file_path);
+    }
+    
+    // Extract filename from path
+    const fileName = path.basename(document.file_path);
+    
+    // Determine mime type from extension
+    const ext = path.extname(fileName).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      '.pdf': 'application/pdf',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.txt': 'text/plain',
+      '.zip': 'application/zip',
+    };
+    
+    const mimeType = mimeTypes[ext] || 'application/octet-stream';
+    
+    // Check if file exists
+    try {
+      await fs.access(filePath);
+    } catch (error) {
+      throw ApiError.notFound("File not found on disk", "FILE_NOT_FOUND");
+    }
+    
+    return { filePath, fileName, mimeType };
   }
 }
 

@@ -7,6 +7,7 @@ import { signRequestsRouter } from "../modules/signRequests/signRequests.routes"
 import { tenantsRouter } from "../modules/tenants/tenants.routes";
 import { webhooksRouter } from "../modules/webhooks/webhooks.routes";
 import departmentsRouter from "../modules/departments/departments.routes";
+import positionsRouter from "../modules/positions/positions.routes";
 import rolesRouter from "../modules/roles/roles.routes";
 import usersRouter from "../modules/users/users.routes";
 import documentTypesRouter from "../modules/documentTypes/documentTypes.routes";
@@ -21,6 +22,7 @@ v1Router.use("/auth", authRouter);
 v1Router.use("/tenants", tenantsRouter);
 v1Router.use("/users", usersRouter);
 v1Router.use("/departments", departmentsRouter);
+v1Router.use("/positions", positionsRouter);
 v1Router.use("/roles", rolesRouter);
 v1Router.use("/document-types", documentTypesRouter);
 v1Router.use("/numbering-rules", numberingRouter);

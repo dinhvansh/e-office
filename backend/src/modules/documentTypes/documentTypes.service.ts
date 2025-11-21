@@ -20,12 +20,21 @@ export const documentTypesService = {
     category?: string;
     require_numbering?: boolean;
     require_digital_signing?: boolean;
+    require_approval?: boolean;
+    default_workflow_id?: number | null;
+    allow_workflow_override?: boolean;
     numbering_pattern?: string | null;
   }) {
     // Check if code already exists
     const existing = await documentTypesRepository.findByCode(data.code, tenantId);
     if (existing) {
       throw new Error('Document type code already exists');
+    }
+
+    // Validate: if require_approval = true and allow_workflow_override = true
+    // then default_workflow_id must be set
+    if (data.require_approval && data.allow_workflow_override && !data.default_workflow_id) {
+      throw new Error('Phải chọn quy trình mặc định khi cho phép tùy chỉnh');
     }
 
     const documentType = await documentTypesRepository.create({
@@ -35,6 +44,9 @@ export const documentTypesService = {
       category: data.category,
       require_numbering: data.require_numbering,
       require_digital_signing: data.require_digital_signing,
+      require_approval: data.require_approval,
+      default_workflow_id: data.default_workflow_id,
+      allow_workflow_override: data.allow_workflow_override,
       tenant_id: tenantId,
     });
 
@@ -63,6 +75,9 @@ export const documentTypesService = {
     category?: string;
     require_numbering?: boolean;
     require_digital_signing?: boolean;
+    require_approval?: boolean;
+    default_workflow_id?: number | null;
+    allow_workflow_override?: boolean;
     is_active?: boolean;
     numbering_pattern?: string | null;
   }) {
@@ -71,12 +86,21 @@ export const documentTypesService = {
       throw new Error('Document type not found');
     }
 
+    // Validate: if require_approval = true and allow_workflow_override = true
+    // then default_workflow_id must be set
+    if (data.require_approval && data.allow_workflow_override && !data.default_workflow_id) {
+      throw new Error('Phải chọn quy trình mặc định khi cho phép tùy chỉnh');
+    }
+
     const updated = await documentTypesRepository.update(id, {
       name: data.name,
       description: data.description,
       category: data.category,
       require_numbering: data.require_numbering,
       require_digital_signing: data.require_digital_signing,
+      require_approval: data.require_approval,
+      default_workflow_id: data.default_workflow_id,
+      allow_workflow_override: data.allow_workflow_override,
       is_active: data.is_active,
     });
 

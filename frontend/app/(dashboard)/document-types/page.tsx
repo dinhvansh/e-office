@@ -23,13 +23,19 @@ export default function DocumentTypesPage() {
   const [editingType, setEditingType] = useState<DocumentType | null>(null);
   const [showNumberingPattern, setShowNumberingPattern] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [requireApproval, setRequireApproval] = useState(false);
+  const [defaultWorkflowId, setDefaultWorkflowId] = useState<number | null>(null);
+  const [allowWorkflowOverride, setAllowWorkflowOverride] = useState(false);
   const queryClient = useQueryClient();
   const { fetchJson } = useAuth();
 
-  // Sync selectedCategory when dialog opens
+  // Sync form state when dialog opens
   const handleOpenDialog = (type: DocumentType | null) => {
     setEditingType(type);
     setSelectedCategory(type?.category || '');
+    setRequireApproval(type?.require_approval || false);
+    setDefaultWorkflowId(type?.default_workflow_id || null);
+    setAllowWorkflowOverride(type?.allow_workflow_override || false);
     setShowCreateModal(true);
   };
 
@@ -37,6 +43,14 @@ export default function DocumentTypesPage() {
     queryKey: ['document-types'],
     queryFn: () => fetchJson<DocumentType[]>('/document-types'),
   });
+
+  // Fetch workflows for dropdown
+  const { data: workflowsData } = useQuery({
+    queryKey: ['workflows'],
+    queryFn: () => fetchJson<any>('/workflows'),
+  });
+
+  const workflows = workflowsData?.workflows?.filter((w: any) => w.is_template) || [];
 
   const createMutation = useMutation({
     mutationFn: (data: Partial<DocumentType>) =>
@@ -196,6 +210,11 @@ export default function DocumentTypesPage() {
                       ✍️ Ký số
                     </span>
                   )}
+                  {type.require_approval && (
+                    <span className="flex items-center gap-1">
+                      ✅ Phê duyệt
+                    </span>
+                  )}
                 </div>
 
                 {type.numbering_rules[0] && (
@@ -277,6 +296,9 @@ export default function DocumentTypesPage() {
                     require_numbering: requireNumbering,
                     require_digital_signing: formData.get('require_digital_signing') === 'on',
                     numbering_pattern: requireNumbering ? (formData.get('numbering_pattern') as string) : null,
+                    require_approval: requireApproval,
+                    default_workflow_id: defaultWorkflowId,
+                    allow_workflow_override: allowWorkflowOverride,
                   };
                   if (editingType) {
                     updateMutation.mutate({ id: editingType.id, ...data });
@@ -433,6 +455,87 @@ export default function DocumentTypesPage() {
                       ✍️ Yêu cầu ký số điện tử
                     </span>
                   </label>
+                </div>
+
+                {/* Workflow Settings */}
+                <div className="space-y-4 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-5 border border-blue-200">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      name="require_approval"
+                      checked={requireApproval}
+                      onChange={(e) => {
+                        setRequireApproval(e.target.checked);
+                        if (!e.target.checked) {
+                          setDefaultWorkflowId(null);
+                          setAllowWorkflowOverride(false);
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
+                    />
+                    <span className="text-sm font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
+                      ✅ Yêu cầu phê duyệt
+                    </span>
+                  </label>
+
+                  {requireApproval && (
+                    <div className="ml-7 space-y-4 p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+                          Quy trình mặc định
+                        </label>
+                        <input type="hidden" name="default_workflow_id" value={defaultWorkflowId || ''} />
+                        <select
+                          value={defaultWorkflowId || ''}
+                          onChange={(e) => {
+                            const value = e.target.value ? parseInt(e.target.value) : null;
+                            setDefaultWorkflowId(value);
+                            if (!value) {
+                              setAllowWorkflowOverride(false);
+                            }
+                          }}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="">-- Không chọn (User tự tạo) --</option>
+                          {workflows.map((w: any) => (
+                            <option key={w.id} value={w.id}>
+                              {w.name} ({w.steps?.length || 0} bước)
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          💡 Để trống nếu muốn user tự tạo luồng ký (Ad-hoc mode)
+                        </p>
+                      </div>
+
+                      {defaultWorkflowId && (
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            name="allow_workflow_override"
+                            checked={allowWorkflowOverride}
+                            onChange={(e) => setAllowWorkflowOverride(e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
+                          />
+                          <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600 transition-colors">
+                            🔧 Cho phép tùy chỉnh luồng ký
+                          </span>
+                        </label>
+                      )}
+
+                      {/* Mode indicator */}
+                      <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <span className="font-semibold">Chế độ: </span>
+                        {!defaultWorkflowId ? (
+                          <span className="text-purple-600 font-medium">Ad-hoc (User tự tạo workflow)</span>
+                        ) : !allowWorkflowOverride ? (
+                          <span className="text-orange-600 font-medium">Strict (Bắt buộc dùng workflow mặc định)</span>
+                        ) : (
+                          <span className="text-green-600 font-medium">Flexible (Có thể tùy chỉnh workflow)</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button

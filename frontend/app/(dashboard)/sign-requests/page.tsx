@@ -144,7 +144,7 @@ export default function SignRequestsPage() {
               <option value="">-- Chon tai lieu --</option>
               {documents?.map((doc) => (
                 <option key={doc.id} value={doc.id}>
-                  #{doc.id} - {doc.file_path.split("/").pop()}
+                  #{doc.id} - {doc.original_file_name || doc.title || `Document #${doc.id}`}
                 </option>
               ))}
             </select>

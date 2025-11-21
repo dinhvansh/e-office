@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clear Cache</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      text-align: center;
+    }
+    button {
+      background: #0070f3;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px;
+    }
+    button:hover {
+      background: #0051cc;
+    }
+    .success {
+      color: green;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧹 Clear Browser Cache</h1>
+  <p>Click the button below to clear localStorage and reload the page.</p>
+  
+  <button onclick="clearAndReload()">Clear Cache & Reload</button>
+  <button onclick="window.location.href='/'">Go to Home</button>
+  
+  <div id="message"></div>
+
+  <script>
+    function clearAndReload() {
+      // Clear localStorage
+      localStorage.clear();
+      
+      // Clear sessionStorage
+      sessionStorage.clear();
+      
+      // Show message
+      document.getElementById('message').innerHTML = 
+        '<p class="success">✅ Cache cleared! Reloading...</p>';
+      
+      // Reload after 1 second
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
+    }
+  </script>
+</body>
+</html>

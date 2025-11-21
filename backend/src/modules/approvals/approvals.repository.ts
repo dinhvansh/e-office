@@ -202,6 +202,21 @@ export class ApprovalsRepository {
         // TODO: Implement direct manager logic
         // For now, return empty
         break;
+
+      case 'position':
+        if (step.approver_id) {
+          // Get all users with this position
+          const usersWithPosition = await prisma.users.findMany({
+            where: {
+              position_id: step.approver_id,
+              tenant_id: tenantId,
+              status: 'active',
+            },
+            select: { id: true },
+          });
+          approverIds.push(...usersWithPosition.map(u => u.id));
+        }
+        break;
     }
 
     return approverIds;

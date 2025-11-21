@@ -48,6 +48,8 @@ export default function UsersPage() {
     full_name: '',
     phone: '',
     department_id: '',
+    position_id: '',
+    manager_id: '',
     role_ids: [] as number[],
   });
   const queryClient = useQueryClient();
@@ -76,6 +78,11 @@ export default function UsersPage() {
     queryFn: () => fetchJson<any>('/roles'),
   });
 
+  const { data: positionsData } = useQuery({
+    queryKey: ['positions'],
+    queryFn: () => fetchJson<any>('/positions'),
+  });
+
   const createUserMutation = useMutation({
     mutationFn: (data: any) => {
       if (editingUser) {
@@ -87,7 +94,7 @@ export default function UsersPage() {
     onSuccess: () => {
       setShowCreateModal(false);
       setEditingUser(null);
-      setFormData({ email: '', password: '', full_name: '', phone: '', department_id: '', role_ids: [] });
+      setFormData({ email: '', password: '', full_name: '', phone: '', department_id: '', position_id: '', manager_id: '', role_ids: [] });
       toast.success(editingUser ? 'Cập nhật người dùng thành công!' : 'Tạo người dùng thành công!');
       setTimeout(() => queryClient.refetchQueries({ queryKey: ['users'] }), 300);
     },
@@ -112,6 +119,7 @@ export default function UsersPage() {
   const users: User[] = ((usersData as any) || []).sort((a: User, b: User) => b.id - a.id);
   const departments: Department[] = (departmentsData as any) || [];
   const roles: Role[] = (rolesData as any) || [];
+  const positions = ((positionsData as any)?.positions || []).filter((p: any) => p.is_active);
 
   return (
     <div className="space-y-6">
@@ -185,6 +193,12 @@ export default function UsersPage() {
                     Phòng ban
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Chức danh
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Quản lý
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Vai trò
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -215,6 +229,16 @@ export default function UsersPage() {
                     <td className="px-6 py-4">
                       <span className="text-sm">
                         {user.department?.name || '-'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm">
+                        {(user as any).position?.name || '-'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm">
+                        {(user as any).manager?.full_name || (user as any).manager?.email || '-'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -249,6 +273,8 @@ export default function UsersPage() {
                               full_name: user.full_name || '',
                               phone: user.phone || '',
                               department_id: user.department?.id?.toString() || '',
+                              position_id: (user as any).position_id?.toString() || '',
+                              manager_id: (user as any).manager_id?.toString() || '',
                               role_ids: user.user_roles.map(ur => ur.role.id),
                             });
                             setShowCreateModal(true);
@@ -283,7 +309,7 @@ export default function UsersPage() {
         setShowCreateModal(open);
         if (!open) {
           setEditingUser(null);
-          setFormData({ email: '', password: '', full_name: '', phone: '', department_id: '', role_ids: [] });
+          setFormData({ email: '', password: '', full_name: '', phone: '', department_id: '', position_id: '', manager_id: '', role_ids: [] });
         }
       }}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
@@ -299,6 +325,8 @@ export default function UsersPage() {
               const submitData: any = {
                 ...formData,
                 department_id: formData.department_id ? parseInt(formData.department_id) : undefined,
+                position_id: formData.position_id ? parseInt(formData.position_id) : undefined,
+                manager_id: formData.manager_id ? parseInt(formData.manager_id) : undefined,
               };
               if (!editingUser && !submitData.password) {
                 toast.error('Vui lòng nhập mật khẩu');
@@ -376,6 +404,46 @@ export default function UsersPage() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="position_id">Chức danh</Label>
+              <select
+                id="position_id"
+                value={formData.position_id}
+                onChange={(e) => setFormData({ ...formData, position_id: e.target.value })}
+                className="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring"
+              >
+                <option value="">-- Chọn chức danh --</option>
+                {positions.map((pos: any) => (
+                  <option key={pos.id} value={pos.id}>
+                    {pos.name} ({pos.code})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Chức danh công việc của nhân viên
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="manager_id">Quản lý trực tiếp</Label>
+              <select
+                id="manager_id"
+                value={formData.manager_id}
+                onChange={(e) => setFormData({ ...formData, manager_id: e.target.value })}
+                className="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring"
+              >
+                <option value="">-- Không có --</option>
+                {users.filter((u: User) => u.id !== editingUser?.id).map((user: User) => (
+                  <option key={user.id} value={user.id}>
+                    {user.full_name || user.email}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Dùng cho workflow "Quản lý trực tiếp"
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label>Vai trò *</Label>
               <div className="border border-input rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
                 {roles.map((role) => (
@@ -405,7 +473,7 @@ export default function UsersPage() {
                 onClick={() => {
                   setShowCreateModal(false);
                   setEditingUser(null);
-                  setFormData({ email: '', password: '', full_name: '', phone: '', department_id: '', role_ids: [] });
+                  setFormData({ email: '', password: '', full_name: '', phone: '', department_id: '', position_id: '', manager_id: '', role_ids: [] });
                 }}
               >
                 Hủy

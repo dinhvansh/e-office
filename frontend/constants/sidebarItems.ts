@@ -12,6 +12,7 @@ import {
   Building2,
   Workflow,
   CheckSquare,
+  Briefcase,
   LucideIcon
 } from "lucide-react";
 
@@ -90,6 +91,14 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         caption: "Phân quyền hệ thống",
         color: "text-rose-600",
         requiredRoles: ["Admin"]
+      },
+      { 
+        label: "Chức danh", 
+        href: "/positions", 
+        icon: Briefcase,
+        caption: "Quản lý chức danh",
+        color: "text-violet-600",
+        requiredRoles: ["Admin", "Manager"]
       },
     ]
   },
