@@ -6,7 +6,28 @@
 
 ## 📁 Nội Dung
 
-### 1. Setup Documentation
+### 1. Sample Data
+
+#### `sample-database-backup.json` 💾
+**Database backup mẫu với data đầy đủ**
+
+**Nội dung** (329 records):
+- 1 tenant (ACME Corporation)
+- 37 departments (org structure)
+- 15 positions (CEO, Manager, Staff...)
+- 17 users (including admin)
+- 5 roles + 39 permissions
+- 8 document types
+- 7 workflows + 14 steps
+- 41 documents
+- 14 approvals
+- 13 sign requests
+
+**Khi nào dùng**: Setup máy mới với data mẫu sẵn có
+
+---
+
+### 2. Setup Documentation
 
 #### `SETUP-NEW-MACHINE.md` ⭐
 **Hướng dẫn setup đầy đủ cho máy mới**
@@ -25,7 +46,9 @@
 
 ---
 
-### 2. Backup Scripts
+### 3. Backup Scripts
+
+**Note**: Backup scripts nằm trong `backend/scripts/` để access Prisma Client
 
 #### `backup-all.ps1` ⭐
 **Script tổng hợp backup toàn bộ hệ thống**
@@ -49,50 +72,25 @@
 
 ---
 
-#### `backup-database.js`
-**Script backup database ra JSON file**
+#### Database Backup/Restore Scripts
 
-**Chức năng**:
-- Export 20 tables ra 1 file JSON
-- Bao gồm metadata (timestamp, version)
-- Tạo thư mục backups tự động
-- Hiển thị progress và summary
+**Location**: `backend/scripts/`
+
+- `backup-database.js` - Export database to JSON
+- `restore-database.js` - Import database from JSON
 
 **Cách dùng**:
 ```bash
+# Backup
 cd backend
-node ../docs/setup-and-backup/backup-database.js
+node scripts/backup-database.js
+
+# Restore
+cd backend
+node scripts/restore-database.js database-backup-2025-11-23T10-30-00.json
 ```
 
-**Output**:
-- File: `backend/backups/database-backup-YYYY-MM-DDTHH-MM-SS.json`
-
-**Tables được backup** (20 tables):
-- tenants, departments, positions, users
-- permissions, roles, role_permissions, user_roles
-- document_types, numbering_rules, external_organizations
-- workflows, workflow_steps, documents
-- workflow_instances, document_approvals
-- sign_requests, signers, sign_request_fields, sign_request_field_values
-
----
-
-#### `restore-database.js`
-**Script restore database từ backup JSON**
-
-**Chức năng**:
-- Import data từ backup file
-- Respect foreign key order
-- Error handling per table
-- Progress reporting
-
-**Cách dùng**:
-```bash
-cd backend
-node ../docs/setup-and-backup/restore-database.js database-backup-2025-11-23T10-30-00.json
-```
-
-**Lưu ý**: File backup phải nằm trong `backend/backups/`
+**Output**: `backend/backups/database-backup-YYYY-MM-DDTHH-MM-SS.json`
 
 ---
 

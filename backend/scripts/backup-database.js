@@ -1,6 +1,8 @@
 /**
  * Database Backup Script
  * Exports all data to a single JSON file for easy migration
+ * 
+ * Usage: node scripts/backup-database.js (from backend directory)
  */
 
 const { PrismaClient } = require('@prisma/client');
