@@ -61,7 +61,7 @@ export const departmentsService = {
     }
 
     // Check if code already exists (for other department)
-    if (data.code && data.code !== existing.code) {
+    if (data.code && existing && data.code !== existing.code) {
       const duplicate = await departmentsRepository.findByCode(tenantId, data.code);
       if (duplicate && duplicate.id !== id) {
         throwError('DEPARTMENT_CODE_DUPLICATE');

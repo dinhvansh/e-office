@@ -18,14 +18,61 @@ export interface CreateDocumentData {
   priority_level?: string | null;
   confidential_level?: string | null;
   visibility_scope?: string | null;
+  sign_request_id?: number | null;
+}
+
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export class DocumentsRepository {
-  listByTenant(tenantId: number): Promise<documents[]> {
+  async listByTenant(tenantId: number): Promise<documents[]> {
     return prisma.documents.findMany({
       where: { tenant_id: tenantId },
       orderBy: { created_at: "desc" },
     });
+  }
+
+  async listByTenantPaginated(
+    tenantId: number,
+    params: PaginationParams = {}
+  ): Promise<PaginatedResult<documents>> {
+    const page = params.page || 1;
+    const limit = params.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      prisma.documents.findMany({
+        where: { tenant_id: tenantId },
+        orderBy: { created_at: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.documents.count({
+        where: { tenant_id: tenantId },
+      }),
+    ]);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   findById(id: number, tenantId: number): Promise<documents | null> {
@@ -39,6 +86,13 @@ export class DocumentsRepository {
   delete(id: number): Promise<documents> {
     return prisma.documents.delete({
       where: { id },
+    });
+  }
+
+  update(id: number, data: Partial<CreateDocumentData>): Promise<documents> {
+    return prisma.documents.update({
+      where: { id },
+      data,
     });
   }
 }

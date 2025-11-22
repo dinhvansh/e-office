@@ -16,7 +16,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={inter.variable}>
       <body className="bg-slate-50 text-slate-900">
         <AppProviders>{children}</AppProviders>
-        <Toaster />
+        <Toaster 
+          position="top-right"
+          toastOptions={{
+            classNames: {
+              error: 'bg-red-600 text-white border-red-700 text-sm sm:text-base',
+              success: 'bg-green-600 text-white border-green-700 text-sm sm:text-base',
+              warning: 'bg-yellow-600 text-white border-yellow-700 text-sm sm:text-base',
+              info: 'bg-blue-600 text-white border-blue-700 text-sm sm:text-base',
+              toast: 'min-w-[280px] sm:min-w-[320px] p-3 sm:p-4',
+            },
+          }}
+        />
       </body>
     </html>
   );

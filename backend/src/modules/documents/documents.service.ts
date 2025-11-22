@@ -21,6 +21,19 @@ export interface CreateDocumentInput {
   priorityLevel?: string;
   confidentialLevel?: string;
   visibilityScope?: string;
+  signers?: Array<{
+    email: string;
+    name: string;
+    order: number;
+    type: 'manual' | 'external';
+    external_org_id?: number;
+  }>;
+  ccEmails?: string[];
+  attachments?: Array<{
+    file_name: string;
+    file_base64: string;
+    file_type: string;
+  }>;
 }
 
 class DocumentsService {
@@ -43,6 +56,37 @@ class DocumentsService {
     
     // Filter documents based on user permissions
     return await filterViewableDocuments(user, documents);
+  }
+
+  async listDocumentsPaginated(
+    tenantId: number,
+    userId: number | undefined,
+    page: number = 1,
+    limit: number = 10
+  ) {
+    const result = await documentsRepository.listByTenantPaginated(tenantId, { page, limit });
+    
+    // If no userId provided (admin context), return all documents
+    if (!userId) {
+      return result;
+    }
+    
+    // Get user for permission check
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+    });
+    
+    if (!user || user.tenant_id !== tenantId) {
+      throw ApiError.notFound("User not found", "USER_NOT_FOUND");
+    }
+    
+    // Filter documents based on user permissions
+    const filteredData = await filterViewableDocuments(user, result.data);
+    
+    return {
+      data: filteredData,
+      pagination: result.pagination,
+    };
   }
 
   async getDocument(documentId: number, tenantId: number, userId?: number): Promise<documents> {
@@ -190,10 +234,130 @@ class DocumentsService {
       });
       
       // Link sign request to document
-      await documentsRepository.update(document.id, tenantId, {
+      await documentsRepository.update(document.id, {
         sign_request_id: signRequest.id,
       });
+      
+      // ✅ Auto-create signers from workflow if document has workflow
+      if (documentType.require_approval && documentType.default_workflow_id) {
+        const workflow = await prisma.workflows.findUnique({
+          where: { id: documentType.default_workflow_id },
+          include: { steps: { orderBy: { step_order: 'asc' } } }
+        });
+        
+        if (workflow?.steps) {
+          const { signersRepository } = await import('../signers/signers.repository');
+          
+          for (const step of workflow.steps) {
+            // Get approver info based on type
+            let email = '';
+            let name = '';
+            
+            if (step.approver_type === 'user' && step.approver_id) {
+              const user = await prisma.users.findUnique({
+                where: { id: step.approver_id },
+                select: { email: true, full_name: true }
+              });
+              if (user) {
+                email = user.email;
+                name = user.full_name || user.email;
+              }
+            } else if (step.approver_type === 'role' && step.approver_id) {
+              // For role, get first user with that role
+              const userRole = await prisma.user_roles.findFirst({
+                where: { role_id: step.approver_id },
+                include: { user: { select: { email: true, full_name: true } } }
+              });
+              if (userRole?.user) {
+                email = userRole.user.email;
+                name = userRole.user.full_name || userRole.user.email;
+              }
+            } else if (step.approver_type === 'department' && step.approver_id) {
+              // For department, get department manager
+              const dept = await prisma.departments.findUnique({
+                where: { id: step.approver_id },
+                include: { manager: { select: { email: true, full_name: true } } }
+              });
+              if (dept?.manager) {
+                email = dept.manager.email;
+                name = dept.manager.full_name || dept.manager.email;
+              }
+            }
+            
+            // Create signer if we found user info
+            if (email) {
+              await signersRepository.create({
+                sign_request: { connect: { id: signRequest.id } },
+                email,
+                name,
+                role: 'signer',
+                signing_order: step.step_order,
+                status: 'pending',
+              });
+            }
+          }
+        }
+      }
+      
+      // ✅ Create manual signers if provided
+      if (input.signers && input.signers.length > 0) {
+        const { signersRepository } = await import('../signers/signers.repository');
+        
+        for (const signer of input.signers) {
+          await signersRepository.create({
+            sign_request: { connect: { id: signRequest.id } },
+            email: signer.email,
+            name: signer.name,
+            role: 'signer',
+            signing_order: signer.order,
+            status: 'pending',
+          });
+        }
+      }
+      
+      // ✅ Refresh document from DB to get updated sign_request_id
+      const updatedDoc = await documentsRepository.findById(document.id, tenantId);
+      if (updatedDoc) {
+        return updatedDoc;
+      }
     }
+    
+    // ✅ Save CC emails if provided
+    if (input.ccEmails && input.ccEmails.length > 0) {
+      for (const email of input.ccEmails) {
+        await prisma.document_cc_emails.create({
+          data: {
+            document_id: document.id,
+            email,
+          },
+        });
+      }
+    }
+    
+    // ✅ Save attachments if provided
+    if (input.attachments && input.attachments.length > 0) {
+      for (const attachment of input.attachments) {
+        const attachmentPath = await saveBase64Document(
+          tenantId,
+          attachment.file_name,
+          attachment.file_base64
+        );
+        
+        const buffer = Buffer.from(attachment.file_base64, 'base64');
+        const fileSize = buffer.length;
+        
+        await prisma.document_attachments.create({
+          data: {
+            document_id: document.id,
+            file_name: attachment.file_name,
+            file_path: attachmentPath,
+            file_size: BigInt(fileSize),
+            file_type: attachment.file_type,
+          },
+        });
+      }
+    }
+    
     await auditService.record({
       tenantId,
       documentId: document.id,
@@ -285,6 +449,14 @@ class DocumentsService {
 
   async deleteDocument(documentId: number, tenantId: number, userId?: number): Promise<void> {
     const document = await this.getDocument(documentId, tenantId);
+    
+    // ✅ Status check: Cannot delete document in pending_approval or approved status
+    if (document.status === 'pending_approval' || document.status === 'approved') {
+      throw ApiError.badRequest(
+        "Cannot delete document that is pending approval or approved. Please cancel the approval workflow first.",
+        "DOCUMENT_DELETE_DENIED_STATUS"
+      );
+    }
     
     // Ownership check: Only owner or admin can delete
     if (userId) {
@@ -559,13 +731,13 @@ class DocumentsService {
       await approvalsService.submitForApproval(documentId, finalWorkflowId, tenantId, userId);
       
       // Update status
-      await documentsRepository.update(documentId, tenantId, {
+      await documentsRepository.update(documentId, {
         status: 'pending_approval',
       });
     } else {
       // No workflow - direct approve (simple approval without workflow)
       // Just mark as approved
-      await documentsRepository.update(documentId, tenantId, {
+      await documentsRepository.update(documentId, {
         status: 'approved',
       });
     }

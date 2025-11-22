@@ -83,12 +83,12 @@ export const departmentsRepository = {
       throwNotFound('DEPARTMENT_NOT_FOUND');
     }
 
-    if (dept._count.users > 0) {
+    if (dept && dept._count.users > 0) {
       const { throwError } = require('../../utils/errors');
       throwError('DEPARTMENT_HAS_USERS');
     }
 
-    if (dept._count.children > 0) {
+    if (dept && dept._count.children > 0) {
       const { throwError } = require('../../utils/errors');
       throwError('DEPARTMENT_HAS_CHILDREN');
     }

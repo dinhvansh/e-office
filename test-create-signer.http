@@ -1,0 +1,11 @@
+### Test Create Signer
+POST http://localhost:4000/api/v1/sign-requests/16/signers
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "test@example.com",
+  "name": "Test Signer",
+  "role": "Signer",
+  "signing_order": 1
+}

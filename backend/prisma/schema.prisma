@@ -89,6 +89,8 @@ model documents {
   workflow_instance  workflow_instances?
   approvals          document_approvals[]
   sign_fields        sign_request_fields[]
+  cc_emails          document_cc_emails[]
+  attachments        document_attachments[]
 
   @@index([department_id])
   @@index([sign_request_id])
@@ -118,6 +120,7 @@ model signers {
   email          String?
   name           String?
   role           String?
+  signing_order  Int?          // Thứ tự ký (1, 2, 3...) cho sequential signing
   status         String?
   otp            String?
   otp_expire     DateTime?
@@ -450,4 +453,30 @@ model sign_request_field_values {
   @@unique([field_id, signer_id], name: "field_id_signer_id")
   @@index([field_id])
   @@index([signer_id])
+}
+
+model document_cc_emails {
+  id          Int       @id @default(autoincrement())
+  document_id Int
+  email       String
+  sent_at     DateTime?
+  created_at  DateTime  @default(now())
+
+  document    documents @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
+  @@index([document_id])
+}
+
+model document_attachments {
+  id          Int       @id @default(autoincrement())
+  document_id Int
+  file_name   String
+  file_path   String
+  file_size   BigInt?
+  file_type   String?
+  uploaded_at DateTime  @default(now())
+
+  document    documents @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
+  @@index([document_id])
 }

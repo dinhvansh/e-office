@@ -53,6 +53,23 @@ export class SignRequestsController {
     res.json(ok({ cancelled: true }));
   };
 
+  // Signers Management
+
+  addSigner = async (req: Request, res: Response): Promise<void> => {
+    const signRequestId = idSchema.parse(req.params.id);
+    const signerData = signerSchema.extend({
+      signing_order: z.number().int().optional(),
+    }).parse(req.body);
+    
+    const signer = await signRequestsService.addSigner(
+      signRequestId,
+      req.auth!.tenantId,
+      signerData
+    );
+    
+    res.status(201).json(ok({ signer }));
+  };
+
   // Field Management Endpoints
 
   getEditor = async (req: Request, res: Response): Promise<void> => {
@@ -98,6 +115,18 @@ export class SignRequestsController {
   send = async (req: Request, res: Response): Promise<void> => {
     const id = idSchema.parse(req.params.id);
     const signRequest = await signRequestsService.sendSignRequest(id, req.auth!.tenantId, req.auth!.userId);
+    res.json(ok({ sign_request: signRequest }));
+  };
+
+  cancel = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id);
+    const { reason } = req.body;
+    const signRequest = await signRequestsService.cancelSignRequest(
+      id,
+      req.auth!.tenantId,
+      req.auth!.userId,
+      reason
+    );
     res.json(ok({ sign_request: signRequest }));
   };
 }

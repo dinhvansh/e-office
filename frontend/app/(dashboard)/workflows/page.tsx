@@ -354,7 +354,7 @@ export default function WorkflowsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredWorkflows = workflows?.filter((workflow) => {
+  const filteredWorkflows = Array.isArray(workflows) ? workflows.filter((workflow) => {
     const matchesStatus =
       statusFilter === 'all' ||
       (statusFilter === 'active' && workflow.is_active) ||
@@ -366,13 +366,13 @@ export default function WorkflowsPage() {
       workflow.description?.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesStatus && matchesSearch;
-  }) || [];
+  }) : [];
 
   // Count by status
   const counts = {
-    all: workflows?.length || 0,
-    active: workflows?.filter((w) => w.is_active).length || 0,
-    paused: workflows?.filter((w) => !w.is_active).length || 0,
+    all: Array.isArray(workflows) ? workflows.length : 0,
+    active: Array.isArray(workflows) ? workflows.filter((w) => w.is_active).length : 0,
+    paused: Array.isArray(workflows) ? workflows.filter((w) => !w.is_active).length : 0,
   };
 
   return (

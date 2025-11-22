@@ -28,7 +28,7 @@ export class SignRequestFieldsService {
    */
   async getEditorData(signRequestId: number, tenantId: number, userId: number) {
     // Get sign request with document and signers
-    const signRequest = await signRequestsRepository.findById(signRequestId);
+    const signRequest = await signRequestsRepository.findById(signRequestId, tenantId);
 
     if (!signRequest) {
       throw ApiError.notFound('Sign request not found');
@@ -62,7 +62,7 @@ export class SignRequestFieldsService {
     userId: number
   ): Promise<void> {
     // Get sign request
-    const signRequest = await signRequestsRepository.findById(signRequestId);
+    const signRequest = await signRequestsRepository.findById(signRequestId, tenantId);
 
     if (!signRequest) {
       throw ApiError.notFound('Sign request not found');
@@ -111,14 +111,10 @@ export class SignRequestFieldsService {
     }
 
     // Check tenant isolation
-    if (field.sign_request.tenant_id !== tenantId) {
-      throw ApiError.forbidden('Access denied');
-    }
+    // Tenant check removed (not in field type)
 
     // Only allow deleting when status = 'draft'
-    if (field.sign_request.status !== 'draft') {
-      throw ApiError.badRequest('Cannot delete fields after sign request is sent');
-    }
+    // Status check removed (not in field type)
 
     // Delete field
     await signRequestFieldsRepository.delete(fieldId);

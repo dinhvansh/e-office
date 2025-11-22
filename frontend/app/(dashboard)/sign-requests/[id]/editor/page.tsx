@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Send } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { PDFCanvasViewer } from '@/components/pdf/PDFCanvasViewer';
 
 interface Field {
   id?: number;
@@ -14,12 +15,13 @@ interface Field {
   page: number;
   x: number;
   y: number;
-  width?: number;
-  height?: number;
+  width: number;
+  height: number;
   required: boolean;
   label?: string;
   placeholder?: string;
   assigned_signer_id?: number | null;
+  signer_name?: string;
 }
 
 interface Signer {
@@ -108,26 +110,16 @@ export default function SignRequestEditorPage() {
     },
   });
 
+  const [selectedFieldType, setSelectedFieldType] = useState<Field['type']>('signature');
+
   const handleAddField = (type: Field['type']) => {
     if (!selectedSigner) {
       toast.error('Please select a signer first');
       return;
     }
 
-    const newField: Field = {
-      type,
-      page: 1,
-      x: 100 + fields.length * 20,
-      y: 100 + fields.length * 20,
-      width: type === 'signature' ? 200 : type === 'checkbox' ? 30 : 150,
-      height: type === 'signature' ? 80 : type === 'checkbox' ? 30 : 40,
-      required: true,
-      label: `${type.charAt(0).toUpperCase() + type.slice(1)} Field`,
-      assigned_signer_id: selectedSigner,
-    };
-
-    setFields([...fields, newField]);
-    toast.success(`${type} field added`);
+    setSelectedFieldType(type);
+    toast.info(`Click on the PDF to place ${type} field`);
   };
 
   const handleSave = () => {
@@ -238,14 +230,57 @@ export default function SignRequestEditorPage() {
           </div>
         </div>
 
-        {/* Center - PDF Viewer (Placeholder) */}
-        <div className="flex-1 bg-gray-100 p-6 overflow-y-auto">
-          <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg p-8">
-            <div className="text-center text-gray-500 mb-6">
-              <p className="text-lg font-medium">PDF Viewer Placeholder</p>
-              <p className="text-sm">Document: {signRequest?.document?.original_file_name}</p>
-              <p className="text-xs mt-2">Full PDF viewer with drag & drop will be implemented in next iteration</p>
-            </div>
+        {/* Center - PDF Viewer & Fields */}
+        <div className="flex-1 bg-gray-100 overflow-y-auto p-6">
+          <div className="max-w-4xl mx-auto">
+            {/* PDF Viewer */}
+            {signRequest?.document?.id ? (
+              <div className="bg-white shadow-lg rounded-lg mb-6 overflow-hidden" style={{ height: '600px' }}>
+                <PDFCanvasViewer
+                  fileUrl={`${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${signRequest.document.id}/view`}
+                  token={typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('esign.auth') || '{}')?.tokens?.accessToken || '' : ''}
+                  fields={fields.map((f, i) => ({ 
+                    ...f, 
+                    id: `field-${i}`,
+                    signer_name: signers.find(s => s.id === f.assigned_signer_id)?.name 
+                  }))}
+                  signers={signers.map(s => ({ 
+                    id: s.id, 
+                    name: s.name, 
+                    email: s.email, 
+                    signing_order: signers.indexOf(s) + 1 
+                  }))}
+                  selectedSignerId={selectedSigner || undefined}
+                  selectedFieldType={selectedFieldType}
+                  onFieldAdd={(field) => {
+                    const newField: Field = {
+                      ...field,
+                      type: selectedFieldType,
+                      width: selectedFieldType === 'signature' ? 200 : selectedFieldType === 'checkbox' ? 30 : 150,
+                      height: selectedFieldType === 'signature' ? 80 : selectedFieldType === 'checkbox' ? 30 : 40,
+                      required: true,
+                      label: `${selectedFieldType.charAt(0).toUpperCase() + selectedFieldType.slice(1)} Field`,
+                      assigned_signer_id: selectedSigner,
+                    };
+                    setFields([...fields, newField]);
+                    toast.success(`${selectedFieldType} field added`);
+                  }}
+                  onFieldMove={(id, x, y) => {
+                    const index = parseInt(id.replace('field-', ''));
+                    const newFields = [...fields];
+                    newFields[index] = { ...newFields[index], x, y };
+                    setFields(newFields);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="bg-white shadow-lg rounded-lg p-8 mb-6">
+                <div className="text-center text-gray-500">
+                  <p className="text-lg font-medium">No document found</p>
+                  <p className="text-sm">Document: {signRequest?.document?.original_file_name}</p>
+                </div>
+              </div>
+            )}
 
             {/* Fields List */}
             <div className="mt-6">

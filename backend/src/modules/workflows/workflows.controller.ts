@@ -12,7 +12,7 @@ const createWorkflowSchema = z.object({
 const updateWorkflowSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
-  document_type_id: z.coerce.number().int().positive().optional().nullable(),
+  document_type_id: z.coerce.number().int().positive().optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -28,7 +28,7 @@ const createStepSchema = z.object({
 const updateStepSchema = z.object({
   step_name: z.string().min(1).optional(),
   approver_type: z.enum(['user', 'role', 'department', 'manager']).optional(),
-  approver_id: z.coerce.number().int().positive().optional().nullable(),
+  approver_id: z.coerce.number().int().positive().optional(),
   due_in_days: z.coerce.number().int().positive().optional(),
   is_required: z.boolean().optional(),
   conditions: z.any().optional(),

@@ -118,8 +118,8 @@ class ApprovalsService {
         emailService.sendApprovalRequestNotification({
           recipientEmail: approver.email,
           recipientName: approver.full_name || approver.email,
-          documentTitle: document.title,
-          documentNumber: document.document_number || undefined,
+          documentTitle: document.title || 'Untitled',
+          documentNumber: document.document_number || '',
           submitterName: submitter?.full_name || submitter?.email || 'Unknown',
           workflowName: workflow.name,
           stepName: firstStep.step_name || `Bước ${firstStep.step_order}`,
@@ -213,7 +213,7 @@ class ApprovalsService {
       await approvalsRepository.updateWorkflowInstance(approval.document_id, {
         status: 'completed',
         completed_at: new Date(),
-        current_step_id: null,
+        current_step_id: undefined,
       });
 
       // Get document with type info
@@ -222,6 +222,7 @@ class ApprovalsService {
         include: {
           document_type: true,
           sign_request: true,
+          owner: true,
         },
       });
 
@@ -249,8 +250,8 @@ class ApprovalsService {
         emailService.sendWorkflowCompletedNotification({
           recipientEmail: document.owner.email,
           recipientName: document.owner.full_name || document.owner.email,
-          documentTitle: document.title,
-          documentNumber: document.document_number || undefined,
+          documentTitle: document.title || 'Untitled',
+          documentNumber: document.document_number || '',
           workflowName: instance.workflow.name,
           documentUrl,
         }).catch(err => console.error('Failed to send completion email:', err));
@@ -260,8 +261,8 @@ class ApprovalsService {
           emailService.sendApprovalActionNotification({
             recipientEmail: approver.email,
             recipientName: approver.full_name || approver.email,
-            documentTitle: document.title,
-            documentNumber: document.document_number || undefined,
+            documentTitle: document.title || 'Untitled',
+            documentNumber: document.document_number || '',
             approverName: approver.full_name || approver.email,
             action: 'approved',
             comment,
@@ -334,7 +335,7 @@ class ApprovalsService {
           recipientEmail: nextApprover.email,
           recipientName: nextApprover.full_name || nextApprover.email,
           documentTitle: document?.title || 'Document',
-          documentNumber: document?.document_number || undefined,
+          documentNumber: document?.document_number || '',
           submitterName: document?.owner?.full_name || document?.owner?.email || 'Unknown',
           workflowName: instance.workflow.name,
           stepName: nextStep.step_name || `Bước ${nextStep.step_order}`,
@@ -349,8 +350,8 @@ class ApprovalsService {
       emailService.sendApprovalActionNotification({
         recipientEmail: document.owner.email,
         recipientName: document.owner.full_name || document.owner.email,
-        documentTitle: document.title,
-        documentNumber: document.document_number || undefined,
+        documentTitle: document.title || 'Untitled',
+        documentNumber: document.document_number || '',
         approverName: approver.full_name || approver.email,
         action: 'approved',
         comment,
@@ -436,8 +437,8 @@ class ApprovalsService {
       emailService.sendApprovalActionNotification({
         recipientEmail: document.owner.email,
         recipientName: document.owner.full_name || document.owner.email,
-        documentTitle: document.title,
-        documentNumber: document.document_number || undefined,
+        documentTitle: document.title || 'Untitled',
+        documentNumber: document.document_number || '',
         approverName: approver.full_name || approver.email,
         action: 'rejected',
         comment,
@@ -514,8 +515,8 @@ class ApprovalsService {
       emailService.sendApprovalActionNotification({
         recipientEmail: document.owner.email,
         recipientName: document.owner.full_name || document.owner.email,
-        documentTitle: document.title,
-        documentNumber: document.document_number || undefined,
+        documentTitle: document.title || 'Untitled',
+        documentNumber: document.document_number || '',
         approverName: approver.full_name || approver.email,
         action: 'request_info',
         comment,
@@ -579,7 +580,7 @@ class ApprovalsService {
       await signRequestsService.sendSignRequest(
         document.sign_request_id,
         tenantId,
-        null // System auto-send
+        0 // System auto-send
       );
       
       // Update document status

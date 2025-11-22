@@ -425,6 +425,88 @@ Không chia sẻ mã này với bất kỳ ai.
 Email này được gửi tự động từ WP Sign.
     `.trim();
   }
+  /**
+   * Send sign request cancellation notification
+   */
+  async sendSignRequestCancelled(data: {
+    to: string;
+    signerName: string;
+    documentTitle: string;
+    cancelledBy: string;
+    reason: string;
+    signRequestId: number;
+  }): Promise<void> {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+          .info-box { background: white; padding: 20px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #ef4444; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>❌ Yêu cầu ký đã bị hủy</h1>
+          </div>
+          <div class="content">
+            <p>Xin chào <strong>${data.signerName}</strong>,</p>
+            
+            <p>Yêu cầu ký tài liệu sau đã bị hủy:</p>
+            
+            <div class="info-box">
+              <p><strong>📄 Tài liệu:</strong> ${data.documentTitle}</p>
+              <p><strong>🚫 Hủy bởi:</strong> ${data.cancelledBy}</p>
+              <p><strong>📝 Lý do:</strong> ${data.reason}</p>
+              <p><strong>🆔 Mã yêu cầu:</strong> #${data.signRequestId}</p>
+            </div>
+            
+            <p>Bạn không cần thực hiện thêm hành động nào cho yêu cầu này.</p>
+            
+            <p>Nếu có thắc mắc, vui lòng liên hệ với người hủy yêu cầu.</p>
+            
+            <p>Trân trọng,<br><strong>WP Sign System</strong></p>
+          </div>
+          <div class="footer">
+            <p>Email này được gửi tự động từ hệ thống WP Sign</p>
+            <p>Vui lòng không trả lời email này</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `
+Yêu cầu ký đã bị hủy
+
+Xin chào ${data.signerName},
+
+Yêu cầu ký tài liệu sau đã bị hủy:
+
+Tài liệu: ${data.documentTitle}
+Hủy bởi: ${data.cancelledBy}
+Lý do: ${data.reason}
+Mã yêu cầu: #${data.signRequestId}
+
+Bạn không cần thực hiện thêm hành động nào cho yêu cầu này.
+
+Trân trọng,
+WP Sign System
+    `;
+
+    await sendEmail({
+      to: data.to,
+      subject: `❌ Yêu cầu ký đã bị hủy - ${data.documentTitle}`,
+      html,
+      text,
+    });
+  }
 }
 
 export const emailService = new EmailService();

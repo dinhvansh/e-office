@@ -29,6 +29,23 @@ const createSchema = z
       approver_id: z.number(),
       due_in_days: z.number().min(1).max(365),
     })).optional(),
+    
+    // Inline recipients, CC, and attachments
+    signers: z.array(z.object({
+      email: z.string().email(),
+      name: z.string().min(1),
+      order: z.number().int().positive(),
+      type: z.enum(['manual', 'external']),
+      external_org_id: z.number().int().positive().optional(),
+    })).optional(),
+    
+    cc_emails: z.array(z.string().email()).optional(),
+    
+    attachments: z.array(z.object({
+      file_name: z.string().min(1),
+      file_base64: z.string().min(1),
+      file_type: z.string(),
+    })).optional(),
   })
   .refine((data) => data.file_base64 || data.storage_path, {
     message: "file_base64 or storage_path is required",
@@ -39,9 +56,27 @@ const idSchema = z.coerce.number().int().positive();
 
 export class DocumentsController {
   list = async (req: Request, res: Response): Promise<void> => {
-    const documents = await documentsService.listDocuments(req.auth!.tenantId, req.auth!.userId);
-    // Security: Use DTO to exclude file_path from response
-    res.json(ok({ documents: toDocumentDTOs(documents) }));
+    // Check if pagination params exist
+    const page = req.query.page ? parseInt(req.query.page as string) : undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+
+    if (page || limit) {
+      // Use paginated endpoint
+      const result = await documentsService.listDocumentsPaginated(
+        req.auth!.tenantId,
+        req.auth!.userId,
+        page || 1,
+        limit || 10
+      );
+      res.json(ok({
+        documents: toDocumentDTOs(result.data),
+        pagination: result.pagination,
+      }));
+    } else {
+      // Use original non-paginated endpoint (backward compatibility)
+      const documents = await documentsService.listDocuments(req.auth!.tenantId, req.auth!.userId);
+      res.json(ok({ documents: toDocumentDTOs(documents) }));
+    }
   };
 
   getById = async (req: Request, res: Response): Promise<void> => {
@@ -67,6 +102,9 @@ export class DocumentsController {
         visibilityScope: body.visibility_scope,
         adhocSteps: body.adhoc_steps,
         customizedSteps: body.customized_steps,
+        signers: body.signers,
+        ccEmails: body.cc_emails,
+        attachments: body.attachments,
       },
       req.auth!.tenantId,
       req.auth!.userId,

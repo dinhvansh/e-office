@@ -122,6 +122,35 @@ class SignRequestsService {
     });
   }
 
+  async addSigner(
+    signRequestId: number,
+    tenantId: number,
+    signerData: SignerInput & { signing_order?: number }
+  ) {
+    // Verify sign request exists and belongs to tenant
+    const signRequest = await this.getSignRequest(signRequestId, tenantId);
+
+    // Only allow adding signers when status = 'draft'
+    if (signRequest.status !== 'draft') {
+      throw ApiError.badRequest('Cannot add signers after sign request is sent');
+    }
+
+    // Create signer with Prisma relation
+    const signerCreateData: Prisma.signersCreateInput = {
+      sign_request: { connect: { id: signRequestId } },
+      email: signerData.email,
+      name: signerData.name,
+      role: signerData.role,
+      signing_order: signerData.signing_order,
+      status: 'pending',
+      position_data: signerData.position_data as Prisma.InputJsonValue,
+    };
+
+    const signer = await signersRepository.create(signerCreateData);
+
+    return signer;
+  }
+
   async sendSignRequest(id: number, tenantId: number, userId: number) {
     const signRequest = await this.getSignRequest(id, tenantId);
 
@@ -155,6 +184,65 @@ class SignRequestsService {
       documentId: signRequest.document_id,
       event: "sign.sent",
       userId,
+    });
+
+    return this.getSignRequest(id, tenantId);
+  }
+
+  /**
+   * Cancel sign request and notify all signers
+   */
+  async cancelSignRequest(id: number, tenantId: number, userId: number, reason?: string) {
+    const signRequest = await this.getSignRequest(id, tenantId);
+
+    // Only allow canceling pending or in-progress sign requests
+    if (signRequest.status === "completed" || signRequest.status === "cancelled") {
+      throw ApiError.badRequest(
+        `Cannot cancel sign request with status: ${signRequest.status}`,
+        "SIGN_REQUEST_CANCEL_DENIED"
+      );
+    }
+
+    // Get user info for email
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { full_name: true, email: true }
+    });
+
+    // Get all signers to notify
+    const signers = await signersRepository.findBySignRequest(id);
+
+    // Update sign request status
+    await signRequestsRepository.updateStatus(id, tenantId, "cancelled");
+
+    // Update document status back to draft
+    if (signRequest.document_id) {
+      await documentsRepository.update(signRequest.document_id, {
+        status: "draft",
+      });
+    }
+
+    // Send cancellation emails to all signers
+    const { emailService } = await import('../common/email.service');
+    for (const signer of signers) {
+      // Only notify signers who haven't signed yet or already signed
+      await emailService.sendSignRequestCancelled({
+        to: signer.email,
+        signerName: signer.name,
+        documentTitle: signRequest.title || "Document",
+        cancelledBy: user?.full_name || user?.email || "Administrator",
+        reason: reason || "No reason provided",
+        signRequestId: signRequest.id,
+      });
+    }
+
+    // Audit log
+    await auditService.record({
+      tenantId,
+      documentId: signRequest.document_id,
+      event: "sign.cancelled",
+      userId,
+      metadata: { reason, signers_notified: signers.length },
     });
 
     return this.getSignRequest(id, tenantId);

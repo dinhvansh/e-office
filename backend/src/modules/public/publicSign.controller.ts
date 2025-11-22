@@ -200,7 +200,7 @@ export class PublicSignController {
     }
 
     // Save field values
-    await signRequestFieldValuesService.saveFieldValues(signer.id, body.field_values);
+    await signRequestFieldValuesService.saveFieldValues(signer.id, body.field_values as Array<{field_id: number; value: any}>);
 
     // Validate all required fields are filled
     const allFieldsFilled = await signRequestFieldValuesService.validateRequiredFields(signer.id);

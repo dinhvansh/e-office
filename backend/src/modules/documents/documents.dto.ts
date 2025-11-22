@@ -23,6 +23,7 @@ export interface DocumentResponseDTO {
   effective_date: Date | null;
   expiration_date: Date | null;
   issued_date: Date | null;
+  sign_request_id: number | null;
   created_at: Date;
 }
 
@@ -50,6 +51,7 @@ export function toDocumentDTO(doc: documents): DocumentResponseDTO {
     effective_date: (doc as any).effective_date || null,
     expiration_date: (doc as any).expiration_date || null,
     issued_date: (doc as any).issued_date || null,
+    sign_request_id: (doc as any).sign_request_id ?? null,
     created_at: doc.created_at,
   };
 }

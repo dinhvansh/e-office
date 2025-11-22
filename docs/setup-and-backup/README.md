@@ -6,7 +6,23 @@
 
 ## 📁 Nội Dung
 
-### 1. Sample Data
+### 1. Quick Start
+
+#### `SETUP-CHECKLIST.md` ⭐
+**Checklist setup nhanh (30-45 phút)**
+
+**Nội dung**:
+- Pre-setup requirements
+- 7 bước setup chi tiết
+- Common issues & quick fixes
+- Success criteria
+- Verification steps
+
+**Khi nào dùng**: Setup lần đầu hoặc cần reference nhanh
+
+---
+
+### 2. Sample Data
 
 #### `sample-database-backup.json` 💾
 **Database backup mẫu với data đầy đủ**
@@ -27,7 +43,7 @@
 
 ---
 
-### 2. Setup Documentation
+### 3. Setup Documentation
 
 #### `SETUP-NEW-MACHINE.md` ⭐
 **Hướng dẫn setup đầy đủ cho máy mới**
@@ -44,9 +60,76 @@
 
 **Khi nào dùng**: Setup project lần đầu trên máy mới
 
+#### `SETUP-EXPERIENCE-2025-11-22.md` 📖
+**Full setup experience với troubleshooting**
+
+**Nội dung**:
+- Timeline chi tiết (47 phút)
+- 24 lỗi gặp phải & solutions
+- Statistics & metrics
+- Best practices
+- Recommendations
+
+**Khi nào dùng**: Muốn hiểu sâu về setup process hoặc gặp lỗi phức tạp
+
 ---
 
-### 3. Backup Scripts
+### 4. Troubleshooting Guides
+
+#### `QUICK-FIX-TYPESCRIPT-ERRORS.md` 🔧
+**Fix 21 TypeScript errors tự động**
+
+**Nội dung**:
+- Auto-fix script (`fix-all-errors.js`)
+- Chi tiết 21 lỗi & root causes
+- Fix patterns
+- Prevention tips
+
+**Khi nào dùng**: Gặp TypeScript build errors
+
+#### `LESSONS-LEARNED-SETUP.md` 💡
+**Lessons learned & improvements**
+
+**Nội dung**:
+- 5 key learnings
+- Improvements made
+- Immediate/long-term recommendations
+- Metrics comparison
+- Future enhancements
+
+**Khi nào dùng**: Review process, improve workflow
+
+---
+
+### 5. Fix Scripts
+
+#### `fix-all-errors.js` 🤖
+**Auto-fix TypeScript errors**
+
+**Chức năng**:
+- Fix 21 TypeScript errors tự động
+- 7 files affected
+- 5 phút execution time
+
+**Cách dùng**:
+```bash
+cd backend
+node ../docs/setup-and-backup/fix-all-errors.js
+npm run build  # Verify
+```
+
+#### `fix-typescript-errors.js` 🔨
+**Alternative fix script (simpler)**
+
+**Cách dùng**:
+```bash
+cd backend
+node ../docs/setup-and-backup/fix-typescript-errors.js
+```
+
+---
+
+### 6. Backup Scripts
 
 **Note**: Backup scripts nằm trong `backend/scripts/` để access Prisma Client
 
@@ -94,7 +177,26 @@ node scripts/restore-database.js database-backup-2025-11-23T10-30-00.json
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start Guides
+
+### Setup Lần Đầu (Recommended)
+
+```bash
+# 1. Đọc checklist
+cat docs/setup-and-backup/SETUP-CHECKLIST.md
+
+# 2. Follow từng bước
+# - Install dependencies
+# - Fix TypeScript errors
+# - Start Docker
+# - Setup database
+# - Start servers
+
+# 3. Nếu gặp lỗi TypeScript
+cd backend
+node ../docs/setup-and-backup/fix-all-errors.js
+npm run build
+```
 
 ### Backup trên máy cũ
 
@@ -163,6 +265,17 @@ node ../docs/setup-and-backup/restore-database.js database-backup.json
 
 ## 🔧 Troubleshooting
 
+### Lỗi: TypeScript Build Errors (21 errors)
+
+**Giải pháp**:
+```bash
+cd backend
+node ../docs/setup-and-backup/fix-all-errors.js
+npm run build
+```
+
+**Chi tiết**: Xem `QUICK-FIX-TYPESCRIPT-ERRORS.md`
+
 ### Lỗi: "Cannot find backup file"
 
 **Giải pháp**:
@@ -220,14 +333,45 @@ docker-compose up -d
 
 ---
 
+## 📂 File Structure
+
+```
+docs/setup-and-backup/
+├── README.md                           # This file
+│
+├── SETUP-CHECKLIST.md                  # ⭐ Quick reference
+├── SETUP-NEW-MACHINE.md                # ⭐ Full setup guide
+├── SETUP-EXPERIENCE-2025-11-22.md      # Setup experience log
+│
+├── QUICK-FIX-TYPESCRIPT-ERRORS.md      # TypeScript fixes
+├── LESSONS-LEARNED-SETUP.md            # Lessons learned
+│
+├── fix-all-errors.js                   # Auto-fix script
+├── fix-typescript-errors.js            # Alternative fix
+│
+├── sample-database-backup.json         # Sample data (329 records)
+├── backup-all.ps1                      # Full system backup
+└── restore-database.js                 # Database restore
+```
+
 ## 🔗 Tài Liệu Liên Quan
 
-- **Quick Start**: `../../QUICK-START.md`
-- **Testing Guide**: `../../README-TESTING.md`
-- **Architecture**: `../../CODE-MAP.md`
-- **Development Guide**: `../../START-HERE-FOR-AI.md`
-- **Task Checklist**: `../dev/TASK-CHECKLIST-GUIDE.md`
-- **Agents Log**: `../../AGENTS.md`
+**Setup & Backup** (This folder):
+- `SETUP-CHECKLIST.md` - Quick reference
+- `SETUP-NEW-MACHINE.md` - Full guide
+- `SETUP-EXPERIENCE-2025-11-22.md` - Experience log
+- `QUICK-FIX-TYPESCRIPT-ERRORS.md` - Error fixes
+- `LESSONS-LEARNED-SETUP.md` - Lessons learned
+
+**Root Directory**:
+- `../../QUICK-START.md` - Quick start guide
+- `../../README-TESTING.md` - Testing guide
+- `../../CODE-MAP.md` - Architecture
+- `../../START-HERE-FOR-AI.md` - Development guide
+- `../../AGENTS.md` - Session logs
+
+**Other Docs**:
+- `../dev/TASK-CHECKLIST-GUIDE.md` - Task implementation guide
 
 ---
 
