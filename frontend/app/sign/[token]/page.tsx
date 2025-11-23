@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import SignatureModal from '@/components/signature/SignatureModal';
 import PDFSigningViewer from '@/components/pdf/PDFSigningViewer';
+import ProgressHeader from '@/components/signing/ProgressHeader';
 import { toast } from 'sonner';
-import { CheckCircle, FileText, Mail, User, Clock } from 'lucide-react';
+import { CheckCircle, FileText, Mail, User, Clock, Play } from 'lucide-react';
 
 interface SigningData {
   signer: {
@@ -48,6 +49,12 @@ export default function PublicSigningPage() {
   const [signatureData, setSignatureData] = useState('');
   const [signatureType, setSignatureType] = useState<'drawn' | 'uploaded' | 'typed'>('drawn');
   const [submitting, setSubmitting] = useState(false);
+  
+  // Guided flow state
+  const [guidedMode, setGuidedMode] = useState(false);
+  const [currentFieldIndex, setCurrentFieldIndex] = useState(0);
+  const [completedFields, setCompletedFields] = useState<number[]>([]);
+  const [fieldSignatures, setFieldSignatures] = useState<Record<number, string>>({});
 
   useEffect(() => {
     fetchSigningData();
@@ -117,6 +124,65 @@ export default function PublicSigningPage() {
     toast.success('Chữ ký đã được lưu. Nhấn "Hoàn tất ký" để gửi.');
   };
 
+  // Guided flow functions
+  const myFields = (data?.fields || []).filter(
+    (f) => !f.assigned_signer_id || f.assigned_signer_id === data?.signer.id
+  );
+
+  const handleStartGuided = () => {
+    if (!otpSent || otp.length !== 6) {
+      toast.error('Vui lòng xác thực OTP trước khi bắt đầu ký');
+      return;
+    }
+    setGuidedMode(true);
+    setCurrentFieldIndex(0);
+    scrollToField(0);
+  };
+
+  const scrollToField = (index: number) => {
+    if (index >= myFields.length) return;
+    
+    const field = myFields[index];
+    const element = document.getElementById(`field-${field.id}`);
+    if (element) {
+      element.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center',
+        inline: 'center'
+      });
+      
+      // Highlight field with pulse animation
+      setTimeout(() => {
+        element.classList.add('animate-pulse');
+        setTimeout(() => element.classList.remove('animate-pulse'), 2000);
+      }, 500);
+    }
+  };
+
+  const handleFieldComplete = (fieldId: number, signature: string) => {
+    setCompletedFields([...completedFields, fieldId]);
+    setFieldSignatures({ ...fieldSignatures, [fieldId]: signature });
+    
+    if (currentFieldIndex < myFields.length - 1) {
+      // Next field
+      const nextIndex = currentFieldIndex + 1;
+      setCurrentFieldIndex(nextIndex);
+      setTimeout(() => scrollToField(nextIndex), 500);
+    } else {
+      // All done
+      setGuidedMode(false);
+      toast.success('🎉 Đã ký xong tất cả! Nhấn "Hoàn tất" để gửi.');
+    }
+  };
+
+  const handleFieldClick = (field: any) => {
+    if (field.type === 'signature') {
+      // Handle in PDFSigningViewer
+      return;
+    }
+    setShowSignatureModal(true);
+  };
+
   const handleSubmitSignature = async () => {
     if (!signatureData) {
       toast.error('Vui lòng ký tài liệu trước');
@@ -159,6 +225,11 @@ export default function PublicSigningPage() {
       setSubmitting(false);
     }
   };
+
+  // Calculate progress
+  const totalFields = myFields.length;
+  const completedCount = completedFields.length;
+  const progress = totalFields > 0 ? (completedCount / totalFields) * 100 : 0;
 
   if (loading) {
     return (
@@ -204,6 +275,16 @@ export default function PublicSigningPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
+        {/* Progress Header (Guided Mode) */}
+        {guidedMode && (
+          <ProgressHeader
+            currentStep={currentFieldIndex + 1}
+            totalSteps={totalFields}
+            progress={progress}
+            onExit={() => setGuidedMode(false)}
+          />
+        )}
+
         {/* Header */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-start gap-4">
@@ -241,6 +322,30 @@ export default function PublicSigningPage() {
           </div>
         </div>
 
+        {/* Start Guided Button */}
+        {!guidedMode && otpSent && otp.length === 6 && totalFields > 0 && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-md p-6 mb-6 border-2 border-blue-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  🎯 Chế độ hướng dẫn ký
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Hệ thống sẽ dẫn bạn qua từng vị trí cần ký ({totalFields} vị trí)
+                </p>
+              </div>
+              <Button
+                onClick={handleStartGuided}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                size="lg"
+              >
+                <Play className="w-5 h-5 mr-2" />
+                Bắt đầu
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* PDF Viewer with Signature Fields */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
           <h2 className="text-lg font-semibold p-4 border-b">📄 Tài liệu</h2>
@@ -249,15 +354,12 @@ export default function PublicSigningPage() {
               pdfUrl={`http://localhost:4000/public/sign/${token}/document`}
               fields={data.fields || []}
               signerId={data.signer.id}
-              onFieldClick={(field) => {
-                if (!otpSent || otp.length !== 6) {
-                  toast.error('Vui lòng xác thực OTP trước khi ký');
-                  return;
-                }
-                setShowSignatureModal(true);
-              }}
+              onFieldClick={handleFieldClick}
               signatureData={signatureData}
-              currentFieldId={undefined}
+              currentFieldId={guidedMode ? myFields[currentFieldIndex]?.id : undefined}
+              completedFieldIds={completedFields}
+              guidedMode={guidedMode}
+              onFieldComplete={handleFieldComplete}
             />
           </div>
         </div>
