@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import SignatureModal from '@/components/signature/SignatureModal';
+import PDFSigningViewer from '@/components/pdf/PDFSigningViewer';
 import { toast } from 'sonner';
 import { CheckCircle, FileText, Mail, User, Clock } from 'lucide-react';
 
@@ -54,7 +55,8 @@ export default function PublicSigningPage() {
 
   const fetchSigningData = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/public/sign/${token}`);
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:4000';
+      const res = await fetch(`${apiBase}/public/sign/${token}`);
       const result = await res.json();
 
       if (!res.ok) {
@@ -77,8 +79,9 @@ export default function PublicSigningPage() {
 
   const handleSendOtp = async () => {
     try {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:4000';
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/public/sign/${token}/send-otp`,
+        `${apiBase}/public/sign/${token}/send-otp`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -123,8 +126,9 @@ export default function PublicSigningPage() {
     setSubmitting(true);
 
     try {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:4000';
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/public/sign/${token}/sign`,
+        `${apiBase}/public/sign/${token}/sign`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -234,6 +238,27 @@ export default function PublicSigningPage() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* PDF Viewer with Signature Fields */}
+        <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+          <h2 className="text-lg font-semibold p-4 border-b">📄 Tài liệu</h2>
+          <div className="h-[700px]">
+            <PDFSigningViewer
+              pdfUrl={`http://localhost:4000/public/sign/${token}/document`}
+              fields={data.fields || []}
+              signerId={data.signer.id}
+              onFieldClick={(field) => {
+                if (!otpSent || otp.length !== 6) {
+                  toast.error('Vui lòng xác thực OTP trước khi ký');
+                  return;
+                }
+                setShowSignatureModal(true);
+              }}
+              signatureData={signatureData}
+              currentFieldId={undefined}
+            />
           </div>
         </div>
 

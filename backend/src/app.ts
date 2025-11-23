@@ -19,6 +19,8 @@ app.use(
         styleSrc: ["'self'", "'unsafe-inline'"],
         scriptSrc: ["'self'"],
         imgSrc: ["'self'", 'data:', 'https:'],
+        frameSrc: ["'self'", 'http://localhost:3000'],
+        frameAncestors: ["'self'", 'http://localhost:3000'],
       },
     },
     hsts: {
