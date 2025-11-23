@@ -16,14 +16,14 @@ const sendOtpSchema = z.object({
 
 const submitSignatureSchema = z.object({
   otp: z.string().min(6).max(6),
-  signature_data: z.string().optional(), // Base64 image
+  signature_data: z.string().optional(), // Base64 image (optional if using field_values)
   signature_type: z.enum(['drawn', 'uploaded', 'typed', 'certificate']).optional(),
   field_values: z.array(
     z.object({
       field_id: z.number(),
-      value: z.any(),
+      value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
     })
-  ),
+  ).optional().default([]), // Optional, default to empty array
 });
 
 export class PublicSignController {
@@ -64,6 +64,24 @@ export class PublicSignController {
           already_signed: true,
           signed_at: signer.signed_at,
           message: 'You have already signed this document',
+          signer: {
+            id: signer.id,
+            name: signer.name,
+            email: signer.email,
+            role: signer.role,
+            status: signer.status,
+          },
+          sign_request: {
+            id: signer.sign_request.id,
+            title: signer.sign_request.title,
+            message: signer.sign_request.message,
+            deadline: signer.sign_request.deadline,
+            created_at: signer.sign_request.created_at,
+          },
+          document: {
+            ...signer.sign_request.document,
+            created_at: signer.sign_request.created_at,
+          },
         })
       );
       return;
@@ -71,6 +89,46 @@ export class PublicSignController {
 
     // Get fields assigned to this signer with values
     const fields = await signRequestFieldValuesService.getSignerFieldsWithValues(signer.id);
+
+    // Get all signers for this sign request
+    const allSigners = await prisma.signers.findMany({
+      where: { sign_request_id: signer.sign_request_id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        status: true,
+        signed_at: true,
+        role: true,
+        signing_order: true,
+      },
+      orderBy: { signing_order: 'asc' },
+    });
+
+    // Mock activities (in real app, you'd have an audit log table)
+    const activities = [
+      {
+        id: 1,
+        user_name: signer.sign_request.document?.title || 'System',
+        action: 'đã gửi tài liệu',
+        timestamp: signer.sign_request.created_at?.toISOString() || new Date().toISOString(),
+      },
+    ];
+
+    // Add signed activities
+    allSigners.forEach((s) => {
+      if (s.signed_at) {
+        activities.push({
+          id: activities.length + 1,
+          user_name: s.name || s.email || 'Unknown',
+          action: 'đã ký tài liệu',
+          timestamp: s.signed_at.toISOString(),
+        });
+      }
+    });
+
+    // Sort activities by timestamp (newest first)
+    activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     res.json(
       ok({
@@ -86,9 +144,16 @@ export class PublicSignController {
           title: signer.sign_request.title,
           message: signer.sign_request.message,
           deadline: signer.sign_request.deadline,
+          created_at: signer.sign_request.created_at,
         },
-        document: signer.sign_request.document,
+        document: {
+          ...signer.sign_request.document,
+          created_at: signer.sign_request.created_at,
+        },
         fields,
+        signers: allSigners,
+        activities,
+        already_signed: false,
       })
     );
   };
@@ -169,6 +234,18 @@ export class PublicSignController {
    */
   submitSignature = async (req: Request, res: Response): Promise<void> => {
     const { token } = req.params;
+    
+    console.log('📥 Submit signature request:', {
+      token: token.substring(0, 10) + '...',
+      body: {
+        otp: req.body.otp?.substring(0, 2) + '****',
+        signature_data_length: req.body.signature_data?.length || 0,
+        signature_type: req.body.signature_type,
+        field_values_count: req.body.field_values?.length || 0,
+        field_values: req.body.field_values,
+      }
+    });
+    
     const body = submitSignatureSchema.parse(req.body);
 
     // Find signer by token
@@ -201,13 +278,15 @@ export class PublicSignController {
       throw ApiError.badRequest('Invalid OTP');
     }
 
-    // Save field values
-    await signRequestFieldValuesService.saveFieldValues(signer.id, body.field_values as Array<{field_id: number; value: any}>);
+    // Save field values (if provided)
+    if (body.field_values && body.field_values.length > 0) {
+      await signRequestFieldValuesService.saveFieldValues(signer.id, body.field_values as Array<{field_id: number; value: any}>);
 
-    // Validate all required fields are filled
-    const allFieldsFilled = await signRequestFieldValuesService.validateRequiredFields(signer.id);
-    if (!allFieldsFilled) {
-      throw ApiError.badRequest('Please fill all required fields');
+      // Validate all required fields are filled
+      const allFieldsFilled = await signRequestFieldValuesService.validateRequiredFields(signer.id);
+      if (!allFieldsFilled) {
+        throw ApiError.badRequest('Please fill all required fields');
+      }
     }
 
     // Mark as signed

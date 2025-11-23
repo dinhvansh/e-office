@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import SignatureCanvas from '@/components/signature/SignatureCanvas';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configure PDF.js worker
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+}
 
 interface SignatureField {
   id: number;
@@ -40,13 +46,107 @@ export default function PDFSigningViewer({
   guidedMode = false,
   onFieldComplete,
 }: PDFSigningViewerProps) {
+  console.log('🔄 PDFSigningViewer render - guidedMode:', guidedMode);
+  console.log('🔄 currentFieldId:', currentFieldId);
+  console.log('🔄 completedFieldIds:', completedFieldIds);
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<any>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const signaturePadRef = useRef<any>(null);
+  const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
   const [scale, setScale] = useState(1.0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [activeFieldId, setActiveFieldId] = useState<number | null>(null);
   const [fieldSignatures, setFieldSignatures] = useState<Record<number, string>>({});
+  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [pageRendering, setPageRendering] = useState(false);
+  const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 });
+
+  // Initialize SignaturePad when canvas is active
+  useEffect(() => {
+    if (!canvasRef.current || !activeFieldId) return;
+
+    const initSignaturePad = async () => {
+      const SignaturePad = (await import('signature_pad')).default;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      
+      // Set canvas size
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      
+      const pad = new SignaturePad(canvas, {
+        backgroundColor: 'rgb(239, 246, 255)', // bg-blue-50
+        penColor: 'rgb(0, 0, 0)',
+      });
+      
+      signaturePadRef.current = pad;
+    };
+    
+    initSignaturePad();
+    
+    return () => {
+      if (signaturePadRef.current) {
+        signaturePadRef.current.off();
+      }
+    };
+  }, [activeFieldId]);
+
+  // Load PDF document
+  useEffect(() => {
+    const loadPDF = async () => {
+      try {
+        const loadingTask = pdfjsLib.getDocument(pdfUrl);
+        const pdf = await loadingTask.promise;
+        setPdfDoc(pdf);
+        setTotalPages(pdf.numPages);
+        console.log('📄 PDF loaded:', pdf.numPages, 'pages');
+      } catch (error) {
+        console.error('❌ Error loading PDF:', error);
+      }
+    };
+
+    loadPDF();
+  }, [pdfUrl]);
+
+  // Render current page
+  useEffect(() => {
+    if (!pdfDoc || !pdfCanvasRef.current || pageRendering) return;
+
+    const renderPage = async () => {
+      setPageRendering(true);
+      try {
+        const page = await pdfDoc.getPage(currentPage);
+        const canvas = pdfCanvasRef.current!;
+        const context = canvas.getContext('2d')!;
+
+        // Calculate viewport
+        const viewport = page.getViewport({ scale: scale * 1.5 }); // 1.5 for better quality
+        
+        // Set canvas dimensions
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        
+        // Store dimensions for field positioning
+        setPdfDimensions({ width: viewport.width, height: viewport.height });
+
+        // Render PDF page
+        await page.render({
+          canvasContext: context,
+          viewport: viewport,
+        }).promise;
+
+        console.log('✅ Page rendered:', currentPage, 'dimensions:', viewport.width, 'x', viewport.height);
+      } catch (error) {
+        console.error('❌ Error rendering page:', error);
+      } finally {
+        setPageRendering(false);
+      }
+    };
+
+    renderPage();
+  }, [pdfDoc, currentPage, scale]);
 
   // Filter fields for current signer
   const myFields = fields.filter(
@@ -62,24 +162,31 @@ export default function PDFSigningViewer({
   const handleNextPage = () => setCurrentPage((p) => Math.min(p + 1, totalPages));
 
   const handleFieldClick = (field: SignatureField) => {
-    if (field.type === 'signature') {
-      setActiveFieldId(field.id);
-    } else {
-      onFieldClick(field);
-    }
+    console.log('🎯 handleFieldClick called:', field.id, 'type:', field.type);
+    console.log('🎯 Current state:', { activeFieldId, guidedMode, currentFieldId });
+    
+    // Always set active for any field type
+    setActiveFieldId(field.id);
   };
 
   const handleClearSignature = () => {
-    canvasRef.current?.clear();
+    if (signaturePadRef.current) {
+      signaturePadRef.current.clear();
+    }
   };
 
   const handleDoneSignature = () => {
-    if (canvasRef.current?.isEmpty()) {
+    if (!signaturePadRef.current || signaturePadRef.current.isEmpty()) {
+      console.log('❌ Canvas is empty');
       return;
     }
     
-    const signatureData = canvasRef.current?.toDataURL();
+    const signatureData = signaturePadRef.current.toDataURL();
     const fieldId = activeFieldId!;
+    
+    console.log('✍️ Signature done for field:', fieldId);
+    console.log('🎯 Guided mode:', guidedMode);
+    console.log('📞 onFieldComplete exists:', !!onFieldComplete);
     
     setFieldSignatures({
       ...fieldSignatures,
@@ -89,8 +196,10 @@ export default function PDFSigningViewer({
     
     // In guided mode, notify parent component
     if (guidedMode && onFieldComplete) {
+      console.log('📞 Calling onFieldComplete');
       onFieldComplete(fieldId, signatureData);
-    } else {
+    } else if (!guidedMode) {
+      console.log('📞 Calling onFieldClick');
       onFieldClick({ id: fieldId } as SignatureField);
     }
   };
@@ -145,28 +254,24 @@ export default function PDFSigningViewer({
         <div
           className="relative mx-auto bg-white shadow-lg"
           style={{
-            transform: `scale(${scale})`,
-            transformOrigin: 'top center',
-            transition: 'transform 0.2s',
+            width: 'fit-content',
           }}
         >
-          {/* PDF Iframe */}
-          <iframe
-            src={`${pdfUrl}#page=${currentPage}`}
-            className="w-full"
-            style={{ height: '842px', border: 'none' }} // A4 height
-            title="PDF Document"
-            onLoad={(e) => {
-              // Try to get total pages (may not work with iframe)
-              // For now, assume 1 page
-              setTotalPages(1);
-            }}
+          {/* PDF Canvas */}
+          <canvas
+            ref={pdfCanvasRef}
+            className="block"
+            style={{ maxWidth: '100%', height: 'auto' }}
           />
 
           {/* Signature Fields Overlay */}
           <div
-            className="absolute top-0 left-0 w-full h-full pointer-events-none"
-            style={{ zIndex: 10 }}
+            className="absolute top-0 left-0 pointer-events-none"
+            style={{ 
+              width: `${pdfDimensions.width}px`,
+              height: `${pdfDimensions.height}px`,
+              zIndex: 10 
+            }}
           >
             {pageFields.map((field) => {
               const isActive = field.id === activeFieldId;
@@ -174,6 +279,18 @@ export default function PDFSigningViewer({
               const isSignatureField = field.type === 'signature';
               const isCurrent = guidedMode && field.id === currentFieldId;
               const isDisabled = guidedMode && !isCurrent && !hasSigned;
+              
+              // Debug log for each field
+              if (guidedMode) {
+                console.log(`🔍 Field ${field.id}:`, {
+                  isCurrent,
+                  isDisabled,
+                  isActive,
+                  hasSigned,
+                  currentFieldId,
+                  label: field.label
+                });
+              }
 
               return (
                 <div
@@ -191,12 +308,23 @@ export default function PDFSigningViewer({
                       : 'border-yellow-500 bg-yellow-50 hover:bg-yellow-100 hover:shadow-md'
                   }`}
                   style={{
-                    left: `${field.x}%`,
-                    top: `${field.y}%`,
-                    width: isActive ? `${field.width * 1.2}%` : `${field.width}%`,
-                    height: isActive ? `${field.height * 2}%` : `${field.height}%`,
+                    left: `${(field.x / 100) * pdfDimensions.width}px`,
+                    top: `${(field.y / 100) * pdfDimensions.height}px`,
+                    width: isActive 
+                      ? `${(field.width / 100) * pdfDimensions.width * 1.2}px` 
+                      : `${(field.width / 100) * pdfDimensions.width}px`,
+                    height: isActive 
+                      ? `${(field.height / 100) * pdfDimensions.height * 2}px` 
+                      : `${(field.height / 100) * pdfDimensions.height}px`,
                   }}
-                  onClick={() => !isActive && !isDisabled && handleFieldClick(field)}
+                  onClick={() => {
+                    console.log('🖱️ Field clicked:', field.id, { isActive, isDisabled, isCurrent });
+                    if (!isActive && !isDisabled) {
+                      handleFieldClick(field);
+                    } else if (isDisabled) {
+                      console.log('⏳ Field is disabled - waiting for turn');
+                    }
+                  }}
                   title={
                     isCurrent
                       ? '👉 Ký vào đây (Bước hiện tại)'
@@ -206,48 +334,155 @@ export default function PDFSigningViewer({
                   }
                 >
                   {/* Active Signing Mode */}
-                  {isActive && isSignatureField ? (
-                    <div className="flex flex-col h-full p-2">
-                      <div className="text-xs font-semibold mb-1 text-gray-700">
-                        {field.label || 'Chữ ký'}
+                  {isActive ? (
+                    field.type === 'signature' ? (
+                      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl">
+                          <div className="text-lg font-bold mb-4 text-gray-900 flex items-center gap-2">
+                            ✍️ {field.label || 'Chữ ký'}
+                          </div>
+                          <div className="border-2 border-blue-400 rounded-lg bg-blue-50 mb-3 overflow-hidden">
+                            <canvas
+                              ref={canvasRef}
+                              className="w-full h-60 cursor-crosshair"
+                              style={{ touchAction: 'none' }}
+                            />
+                          </div>
+                          <p className="text-sm text-gray-600 mb-4 text-center">
+                            Vẽ chữ ký của bạn trong khung trên
+                          </p>
+                          <div className="grid grid-cols-3 gap-3">
+                            <Button
+                              variant="outline"
+                              onClick={handleClearSignature}
+                              className="h-11"
+                            >
+                              🗑️ Xóa
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={handleCancelSignature}
+                              className="h-11"
+                            >
+                              ❌ Hủy
+                            </Button>
+                            <Button
+                              onClick={handleDoneSignature}
+                              className="bg-blue-600 hover:bg-blue-700 text-white h-11 font-semibold text-base"
+                            >
+                              ✓ Xong
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex-1 border border-gray-300 rounded">
-                        <SignatureCanvas ref={canvasRef} width={200} height={80} />
+                    ) : field.type === 'date' ? (
+                      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full">
+                          <div className="text-lg font-bold mb-4 text-gray-900 flex items-center gap-2">
+                            📅 {field.label || 'Ngày'}
+                          </div>
+                          <input
+                            type="date"
+                            defaultValue={new Date().toISOString().split('T')[0]}
+                            className="w-full border-2 border-blue-400 rounded-lg px-4 py-3 text-lg bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                            onChange={(e) => {
+                              const dateValue = new Date(e.target.value).toLocaleDateString('vi-VN');
+                              setFieldSignatures({
+                                ...fieldSignatures,
+                                [field.id]: dateValue,
+                              });
+                            }}
+                          />
+                          <p className="text-sm text-gray-600 mb-4 text-center">
+                            Chọn ngày ký tài liệu
+                          </p>
+                          <div className="flex gap-3">
+                            <Button
+                              variant="outline"
+                              onClick={handleCancelSignature}
+                              className="flex-1 h-11"
+                            >
+                              ❌ Hủy
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                const dateValue = fieldSignatures[field.id] || new Date().toLocaleDateString('vi-VN');
+                                if (!fieldSignatures[field.id]) {
+                                  setFieldSignatures({
+                                    ...fieldSignatures,
+                                    [field.id]: dateValue,
+                                  });
+                                }
+                                setActiveFieldId(null);
+                                if (guidedMode && onFieldComplete) {
+                                  onFieldComplete(field.id, dateValue);
+                                }
+                              }}
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-11 font-semibold text-base"
+                            >
+                              ✓ Xong
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex gap-1 mt-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleClearSignature}
-                          className="flex-1 text-xs h-7"
-                        >
-                          Xóa
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleCancelSignature}
-                          className="flex-1 text-xs h-7"
-                        >
-                          Hủy
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleDoneSignature}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs h-7"
-                        >
-                          ✓ Xong
-                        </Button>
+                    ) : (
+                      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full">
+                          <div className="text-lg font-bold mb-4 text-gray-900 flex items-center gap-2">
+                            ✏️ {field.label || 'Text'}
+                          </div>
+                          <input
+                            type="text"
+                            placeholder="Nhập nội dung..."
+                            className="w-full border-2 border-blue-400 rounded-lg px-4 py-3 text-lg bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                            onChange={(e) => {
+                              setFieldSignatures({
+                                ...fieldSignatures,
+                                [field.id]: e.target.value,
+                              });
+                            }}
+                          />
+                          <p className="text-sm text-gray-600 mb-4 text-center">
+                            Nhập thông tin vào trường này
+                          </p>
+                          <div className="flex gap-3">
+                            <Button
+                              variant="outline"
+                              onClick={handleCancelSignature}
+                              className="flex-1 h-11"
+                            >
+                              ❌ Hủy
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                const textValue = fieldSignatures[field.id] || '';
+                                setActiveFieldId(null);
+                                if (guidedMode && onFieldComplete) {
+                                  onFieldComplete(field.id, textValue);
+                                }
+                              }}
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-11 font-semibold text-base"
+                            >
+                              ✓ Xong
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    )
                   ) : hasSigned ? (
                     /* Signed Field */
                     <div className="relative h-full">
-                      <img
-                        src={fieldSignatures[field.id]}
-                        alt="Signature"
-                        className="w-full h-full object-contain p-1"
-                      />
+                      {field.type === 'signature' ? (
+                        <img
+                          src={fieldSignatures[field.id]}
+                          alt="Signature"
+                          className="w-full h-full object-contain p-1"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-sm font-semibold text-gray-800 p-1">
+                          {fieldSignatures[field.id]}
+                        </div>
+                      )}
                       <div className="absolute top-0 right-0 bg-green-500 text-white text-xs px-1 rounded-bl">
                         ✓
                       </div>
