@@ -127,6 +127,10 @@ model signers {
   signed_at      DateTime?
   position_data  Json?
   signing_token  String?       @unique
+  signature_data String?       // Base64 image hoặc path to signature file
+  signature_type String?       // 'drawn', 'uploaded', 'typed', 'certificate'
+  ip_address     String?       // IP address khi ký
+  user_agent     String?       // Browser/device info
   sign_request   sign_requests @relation(fields: [sign_request_id], references: [id])
   assigned_fields sign_request_fields[]
   field_values   sign_request_field_values[]
@@ -401,6 +405,8 @@ model document_approvals {
   approver_user_id  Int
   action            String    @default("pending") // 'pending', 'approved', 'rejected', 'request_info'
   comment           String?
+  signature_data    String?   // Base64 image or signature path
+  signature_type    String?   // 'drawn', 'uploaded', 'typed', 'certificate'
   acted_at          DateTime?
   due_date          DateTime?
   created_at        DateTime  @default(now())

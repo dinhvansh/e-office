@@ -10,6 +10,8 @@ const submitSchema = z.object({
 
 const actionSchema = z.object({
   comment: z.string().optional(),
+  signature_data: z.string().optional(), // Base64 image
+  signature_type: z.enum(['drawn', 'uploaded', 'typed', 'certificate']).optional(),
 });
 
 const requestInfoSchema = z.object({
@@ -39,7 +41,9 @@ export class ApprovalsController {
       approvalId,
       req.auth!.userId,
       req.auth!.tenantId,
-      body.comment
+      body.comment,
+      body.signature_data,
+      body.signature_type
     );
     res.json(ok(result));
   };

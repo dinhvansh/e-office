@@ -1,0 +1,80 @@
+'use client';
+
+import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import SignaturePad from 'signature_pad';
+
+interface SignatureCanvasProps {
+  width?: number;
+  height?: number;
+  className?: string;
+}
+
+export interface SignatureCanvasRef {
+  clear: () => void;
+  isEmpty: () => boolean;
+  toDataURL: (type?: string) => string;
+  fromDataURL: (dataURL: string) => void;
+}
+
+const SignatureCanvas = forwardRef<SignatureCanvasRef, SignatureCanvasProps>(
+  ({ width = 500, height = 200, className = '' }, ref) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const signaturePadRef = useRef<SignaturePad | null>(null);
+
+    useEffect(() => {
+      if (!canvasRef.current) return;
+
+      const canvas = canvasRef.current;
+      const signaturePad = new SignaturePad(canvas, {
+        backgroundColor: 'rgb(255, 255, 255)',
+        penColor: 'rgb(0, 0, 0)',
+      });
+
+      signaturePadRef.current = signaturePad;
+
+      // Resize canvas to match display size
+      const resizeCanvas = () => {
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        canvas.width = canvas.offsetWidth * ratio;
+        canvas.height = canvas.offsetHeight * ratio;
+        canvas.getContext('2d')?.scale(ratio, ratio);
+        signaturePad.clear();
+      };
+
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+
+      return () => {
+        window.removeEventListener('resize', resizeCanvas);
+        signaturePad.off();
+      };
+    }, []);
+
+    useImperativeHandle(ref, () => ({
+      clear: () => {
+        signaturePadRef.current?.clear();
+      },
+      isEmpty: () => {
+        return signaturePadRef.current?.isEmpty() ?? true;
+      },
+      toDataURL: (type = 'image/png') => {
+        return signaturePadRef.current?.toDataURL(type) ?? '';
+      },
+      fromDataURL: (dataURL: string) => {
+        signaturePadRef.current?.fromDataURL(dataURL);
+      },
+    }));
+
+    return (
+      <canvas
+        ref={canvasRef}
+        className={`border border-gray-300 rounded-lg ${className}`}
+        style={{ width: `${width}px`, height: `${height}px` }}
+      />
+    );
+  }
+);
+
+SignatureCanvas.displayName = 'SignatureCanvas';
+
+export default SignatureCanvas;

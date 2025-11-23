@@ -16,6 +16,8 @@ const sendOtpSchema = z.object({
 
 const submitSignatureSchema = z.object({
   otp: z.string().min(6).max(6),
+  signature_data: z.string().optional(), // Base64 image
+  signature_type: z.enum(['drawn', 'uploaded', 'typed', 'certificate']).optional(),
   field_values: z.array(
     z.object({
       field_id: z.number(),
@@ -214,6 +216,10 @@ export class PublicSignController {
       data: {
         status: 'completed',
         signed_at: new Date(),
+        signature_data: body.signature_data,
+        signature_type: body.signature_type,
+        ip_address: req.ip || req.socket.remoteAddress,
+        user_agent: req.headers['user-agent'],
         otp: null,
         otp_expire: null,
       },

@@ -1,323 +1,335 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
-import { toast } from 'sonner';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CheckCircle2 } from 'lucide-react';
+import SignatureModal from '@/components/signature/SignatureModal';
+import { toast } from 'sonner';
+import { CheckCircle, FileText, Mail, User, Clock } from 'lucide-react';
 
-interface Field {
-  id: number;
-  type: 'signature' | 'text' | 'date' | 'checkbox';
-  label?: string;
-  placeholder?: string;
-  required: boolean;
-  value: any;
-  filled_at: string | null;
+interface SigningData {
+  signer: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    status: string;
+  };
+  sign_request: {
+    id: number;
+    title: string;
+    message: string;
+    deadline: string;
+  };
+  document: {
+    id: number;
+    title: string;
+    original_file_name: string;
+  };
+  fields: any[];
+  already_signed?: boolean;
+  signed_at?: string;
 }
 
-export default function PublicSignPage() {
+export default function PublicSigningPage() {
   const params = useParams();
+  const router = useRouter();
   const token = params.token as string;
-  const [fieldValues, setFieldValues] = useState<Record<number, any>>({});
+
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<SigningData | null>(null);
+  const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [email, setEmail] = useState('');
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [signatureData, setSignatureData] = useState('');
+  const [signatureType, setSignatureType] = useState<'drawn' | 'uploaded' | 'typed'>('drawn');
+  const [submitting, setSubmitting] = useState(false);
 
-  // Fetch signing page data
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['public-sign', token],
-    queryFn: async () => {
-      const response = await fetch(`http://localhost:4000/public/sign/${token}`);
-      if (!response.ok) {
-        throw new Error('Invalid signing link');
-      }
-      const result = await response.json();
-      return result.data;
-    },
-    retry: false,
-  });
+  useEffect(() => {
+    fetchSigningData();
+  }, [token]);
 
-  // Send OTP mutation
-  const sendOtpMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`http://localhost:4000/public/sign/${token}/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to send OTP');
+  const fetchSigningData = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/public/sign/${token}`);
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.message || 'Failed to load signing data');
       }
-      return response.json();
-    },
-    onSuccess: () => {
+
+      setData(result.data);
+      setEmail(result.data.signer.email);
+
+      // Check if already signed
+      if (result.data.already_signed) {
+        toast.success('Bạn đã ký tài liệu này rồi');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Không thể tải dữ liệu');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/public/sign/${token}/send-otp`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.message || 'Failed to send OTP');
+      }
+
       setOtpSent(true);
-      toast.success('OTP sent to your email');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to send OTP');
-    },
-  });
-
-  // Submit signature mutation
-  const submitMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`http://localhost:4000/public/sign/${token}/sign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          otp,
-          field_values: Object.entries(fieldValues).map(([field_id, value]) => ({
-            field_id: parseInt(field_id),
-            value,
-          })),
-        }),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to submit signature');
-      }
-      return response.json();
-    },
-    onSuccess: (result) => {
-      toast.success('Document signed successfully!');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to submit signature');
-    },
-  });
-
-  const handleFieldChange = (fieldId: number, value: any) => {
-    setFieldValues((prev) => ({ ...prev, [fieldId]: value }));
+      toast.success('Mã OTP đã được gửi đến email của bạn');
+    } catch (error: any) {
+      toast.error(error.message || 'Không thể gửi OTP');
+    }
   };
 
-  const handleSendOtp = () => {
-    if (!email) {
-      toast.error('Please enter your email');
-      return;
-    }
-    sendOtpMutation.mutate();
-  };
-
-  const handleSubmit = () => {
-    // Validate required fields
-    const requiredFields = data?.fields?.filter((f: Field) => f.required) || [];
-    const missingFields = requiredFields.filter((f: Field) => !fieldValues[f.id]);
-    
-    if (missingFields.length > 0) {
-      toast.error('Please fill all required fields');
-      return;
-    }
-
+  const handleOpenSignatureModal = () => {
     if (!otp || otp.length !== 6) {
-      toast.error('Please enter valid 6-digit OTP');
+      toast.error('Vui lòng nhập mã OTP');
+      return;
+    }
+    setShowSignatureModal(true);
+  };
+
+  const handleSignatureConfirm = (data: string, type: 'drawn' | 'uploaded' | 'typed') => {
+    setSignatureData(data);
+    setSignatureType(type);
+    setShowSignatureModal(false);
+    toast.success('Chữ ký đã được lưu. Nhấn "Hoàn tất ký" để gửi.');
+  };
+
+  const handleSubmitSignature = async () => {
+    if (!signatureData) {
+      toast.error('Vui lòng ký tài liệu trước');
       return;
     }
 
-    submitMutation.mutate();
+    setSubmitting(true);
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/public/sign/${token}/sign`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            otp,
+            signature_data: signatureData,
+            signature_type: signatureType,
+            field_values: [], // Empty for now, will add field filling later
+          }),
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.message || 'Failed to submit signature');
+      }
+
+      toast.success('Ký tài liệu thành công!');
+      
+      // Reload to show success state
+      setTimeout(() => {
+        fetchSigningData();
+      }, 1000);
+    } catch (error: any) {
+      toast.error(error.message || 'Không thể ký tài liệu');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading document...</p>
+          <p className="mt-4 text-gray-600">Đang tải...</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (!data) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <p className="text-red-600 font-medium">Invalid or expired signing link</p>
-          <p className="text-sm text-red-500 mt-2">Please contact the document sender</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <p className="text-red-600">Không tìm thấy tài liệu</p>
         </div>
       </div>
     );
   }
 
-  if (data?.already_signed) {
+  // Already signed
+  if (data.already_signed) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
-          <CheckCircle2 className="w-16 h-16 text-green-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-green-900 mb-2">Already Signed</h2>
-          <p className="text-green-700">You have already signed this document</p>
-          <p className="text-sm text-green-600 mt-2">
-            Signed on: {new Date(data.signed_at).toLocaleString()}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (submitMutation.isSuccess) {
-    return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
-          <CheckCircle2 className="w-16 h-16 text-green-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-green-900 mb-2">Successfully Signed!</h2>
-          <p className="text-green-700">Thank you for signing the document</p>
-          {submitMutation.data?.data?.all_signed && (
-            <p className="text-sm text-green-600 mt-2">
-              All signers have completed. The document is now finalized.
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  const signer = data?.signer;
-  const signRequest = data?.sign_request;
-  const document = data?.document;
-  const fields: Field[] = data?.fields || [];
-
-  if (!email) {
-    setEmail(signer?.email || '');
-  }
-
-  return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-lg shadow-lg p-8">
-        {/* Header */}
-        <div className="border-b pb-6 mb-6">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {signRequest?.title || 'Document Signing Request'}
+            Đã ký thành công
           </h1>
-          <p className="text-gray-600">{signRequest?.message}</p>
-          <div className="mt-4 flex items-center gap-4 text-sm text-gray-500">
-            <span>Document: {document?.title || document?.original_file_name}</span>
-            <span>•</span>
-            <span>Signer: {signer?.name}</span>
-          </div>
-        </div>
-
-        {/* Fields */}
-        <div className="space-y-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900">Fields to Complete</h2>
-          {fields.length === 0 ? (
-            <p className="text-gray-500">No fields to fill</p>
-          ) : (
-            <div className="space-y-4">
-              {fields.map((field) => (
-                <div key={field.id} className="border rounded-lg p-4">
-                  <Label className="text-sm font-medium">
-                    {field.label || `${field.type} field`}
-                    {field.required && <span className="text-red-500 ml-1">*</span>}
-                  </Label>
-                  
-                  {field.type === 'text' && (
-                    <Input
-                      type="text"
-                      placeholder={field.placeholder || 'Enter text'}
-                      value={fieldValues[field.id] || ''}
-                      onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                      className="mt-2"
-                    />
-                  )}
-                  
-                  {field.type === 'date' && (
-                    <Input
-                      type="date"
-                      value={fieldValues[field.id] || ''}
-                      onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                      className="mt-2"
-                    />
-                  )}
-                  
-                  {field.type === 'checkbox' && (
-                    <div className="mt-2">
-                      <input
-                        type="checkbox"
-                        checked={fieldValues[field.id] || false}
-                        onChange={(e) => handleFieldChange(field.id, e.target.checked)}
-                        className="mr-2"
-                      />
-                      <span className="text-sm">I agree</span>
-                    </div>
-                  )}
-                  
-                  {field.type === 'signature' && (
-                    <div className="mt-2">
-                      <Input
-                        type="text"
-                        placeholder="Type your full name as signature"
-                        value={fieldValues[field.id] || ''}
-                        onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Full signature canvas will be implemented in next iteration
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* OTP Section */}
-        <div className="border-t pt-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">Verification</h2>
-          
-          <div>
-            <Label>Email</Label>
-            <div className="flex gap-2 mt-2">
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                disabled={otpSent}
-              />
-              <Button
-                onClick={handleSendOtp}
-                disabled={sendOtpMutation.isPending || otpSent}
-              >
-                {otpSent ? 'OTP Sent' : 'Send OTP'}
-              </Button>
-            </div>
-          </div>
-
-          {otpSent && (
-            <div>
-              <Label>OTP Code</Label>
-              <Input
-                type="text"
-                maxLength={6}
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                placeholder="Enter 6-digit OTP"
-                className="mt-2"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Check your email for the OTP code
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Submit Button */}
-        <div className="mt-8">
-          <Button
-            onClick={handleSubmit}
-            disabled={submitMutation.isPending || !otpSent}
-            className="w-full"
-            size="lg"
-          >
-            {submitMutation.isPending ? 'Submitting...' : 'Sign Document'}
+          <p className="text-gray-600 mb-4">
+            Bạn đã ký tài liệu này vào {new Date(data.signed_at!).toLocaleString('vi-VN')}
+          </p>
+          <Button onClick={() => router.push('/')} variant="outline">
+            Đóng
           </Button>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="flex items-start gap-4">
+            <FileText className="w-12 h-12 text-blue-600 flex-shrink-0" />
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                {data.sign_request.title || 'Ký tài liệu'}
+              </h1>
+              {data.sign_request.message && (
+                <p className="text-gray-600 mb-4">{data.sign_request.message}</p>
+              )}
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-gray-400" />
+                  <span className="text-gray-600">Người ký:</span>
+                  <span className="font-semibold">{data.signer.name}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-gray-400" />
+                  <span className="text-gray-600">Email:</span>
+                  <span className="font-semibold">{data.signer.email}</span>
+                </div>
+                {data.sign_request.deadline && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-gray-400" />
+                    <span className="text-gray-600">Hạn ký:</span>
+                    <span className="font-semibold">
+                      {new Date(data.sign_request.deadline).toLocaleDateString('vi-VN')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* OTP Verification */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Xác thực OTP</h2>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={otpSent}
+                className="mt-1"
+              />
+            </div>
+
+            {!otpSent ? (
+              <Button onClick={handleSendOtp} className="w-full">
+                Gửi mã OTP
+              </Button>
+            ) : (
+              <div>
+                <Label htmlFor="otp">Mã OTP (6 số)</Label>
+                <Input
+                  id="otp"
+                  type="text"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  maxLength={6}
+                  className="mt-1"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Kiểm tra email của bạn để lấy mã OTP
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Signature Section */}
+        {otpSent && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-4">Chữ ký</h2>
+            
+            {signatureData ? (
+              <div className="space-y-4">
+                <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                  <img
+                    src={signatureData}
+                    alt="Signature"
+                    className="max-w-full h-auto max-h-32 mx-auto"
+                  />
+                </div>
+                <Button
+                  onClick={() => setShowSignatureModal(true)}
+                  variant="outline"
+                  className="w-full"
+                >
+                  Thay đổi chữ ký
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={handleOpenSignatureModal}
+                className="w-full"
+              >
+                ✍️ Ký tài liệu
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Submit Button */}
+        {signatureData && (
+          <Button
+            onClick={handleSubmitSignature}
+            disabled={submitting}
+            className="w-full bg-green-600 hover:bg-green-700 text-white py-6 text-lg"
+          >
+            {submitting ? 'Đang gửi...' : '📤 Hoàn tất ký'}
+          </Button>
+        )}
+      </div>
+
+      {/* Signature Modal */}
+      <SignatureModal
+        open={showSignatureModal}
+        onClose={() => setShowSignatureModal(false)}
+        onConfirm={handleSignatureConfirm}
+        signerName={data.signer.name}
+      />
     </div>
   );
 }

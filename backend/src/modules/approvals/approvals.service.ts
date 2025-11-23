@@ -144,7 +144,9 @@ class ApprovalsService {
     approvalId: number,
     userId: number,
     tenantId: number,
-    comment?: string
+    comment?: string,
+    signatureData?: string,
+    signatureType?: 'drawn' | 'uploaded' | 'typed' | 'certificate'
   ) {
     // Get approval record
     const approval = await approvalsRepository.findApprovalById(approvalId);
@@ -175,6 +177,8 @@ class ApprovalsService {
     await approvalsRepository.updateApproval(approvalId, {
       action: 'approved',
       comment,
+      signature_data: signatureData,
+      signature_type: signatureType,
       acted_at: new Date(),
     });
 
