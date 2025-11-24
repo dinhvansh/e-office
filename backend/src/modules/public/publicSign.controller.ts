@@ -58,7 +58,7 @@ export class PublicSignController {
     }
 
     // Check if already signed
-    if (signer.status === 'signed') {
+    if (signer.status === 'signed' || signer.status === 'completed') {
       res.json(
         ok({
           already_signed: true,
@@ -223,9 +223,15 @@ export class PublicSignController {
     }
 
     // Send OTP (reuse existing service)
-    await signersService.sendOtp(signer.id, signer.sign_request.tenant_id);
+    const otp = await signersService.sendOtp(signer.id, signer.sign_request.tenant_id);
 
-    res.json(ok({ otp_sent: true }));
+    const payload: Record<string, unknown> = { otp_sent: true };
+    if (process.env.NODE_ENV !== "production") {
+      payload.debug_otp = otp;
+      console.log(`🔑 DEBUG OTP for ${body.email}: ${otp}`);
+    }
+
+    res.json(ok(payload));
   };
 
   /**
@@ -246,6 +252,14 @@ export class PublicSignController {
       }
     });
     
+    try {
+      const body = submitSignatureSchema.parse(req.body);
+      console.log('✅ Validation passed');
+    } catch (validationError) {
+      console.error('❌ Validation failed:', validationError);
+      throw validationError;
+    }
+    
     const body = submitSignatureSchema.parse(req.body);
 
     // Find signer by token
@@ -262,29 +276,48 @@ export class PublicSignController {
 
     // Check if already signed
     if (signer.status === 'completed' || signer.status === 'signed') {
+      console.log('❌ Already signed:', signer.status);
       throw ApiError.badRequest('You have already signed this document');
     }
+    console.log('✅ Signer status OK:', signer.status);
 
     // Verify OTP (inline verification)
+    console.log('🔍 OTP verification:', {
+      hasOtp: !!signer.otp,
+      hasExpiry: !!signer.otp_expire,
+      expiry: signer.otp_expire,
+      now: new Date(),
+      isExpired: signer.otp_expire ? signer.otp_expire < new Date() : 'no expiry'
+    });
+    
     if (!signer.otp || !signer.otp_expire) {
+      console.log('❌ OTP not issued');
       throw ApiError.badRequest('OTP not issued');
     }
     if (signer.otp_expire < new Date()) {
+      console.log('❌ OTP expired');
       throw ApiError.badRequest('OTP expired');
     }
     const bcrypt = require('bcryptjs');
     const isValidOtp = await bcrypt.compare(body.otp, signer.otp);
+    console.log('🔍 OTP comparison result:', isValidOtp);
     if (!isValidOtp) {
+      console.log('❌ Invalid OTP');
       throw ApiError.badRequest('Invalid OTP');
     }
+    console.log('✅ OTP verified successfully');
 
     // Save field values (if provided)
     if (body.field_values && body.field_values.length > 0) {
+      console.log('💾 Saving field values:', body.field_values);
       await signRequestFieldValuesService.saveFieldValues(signer.id, body.field_values as Array<{field_id: number; value: any}>);
 
       // Validate all required fields are filled
+      console.log('🔍 Validating required fields...');
       const allFieldsFilled = await signRequestFieldValuesService.validateRequiredFields(signer.id);
+      console.log('🔍 All fields filled:', allFieldsFilled);
       if (!allFieldsFilled) {
+        console.log('❌ Not all required fields filled');
         throw ApiError.badRequest('Please fill all required fields');
       }
     }

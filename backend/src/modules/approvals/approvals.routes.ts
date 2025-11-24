@@ -8,6 +8,33 @@ const router = Router();
 
 router.use(authGuard);
 
+// List all approvals
+router.get(
+  '/',
+  requirePermission('approvals', 'read'),
+  asyncHandler(approvalsController.list)
+);
+
+// Get my pending approvals (MUST be before /:id)
+router.get(
+  '/my-pending',
+  requirePermission('approvals', 'read'),
+  asyncHandler(approvalsController.getMyPending)
+);
+
+// Get document approvals (MUST be before /:id)
+router.get(
+  '/document/:documentId',
+  requirePermission('documents', 'read'),
+  asyncHandler(approvalsController.getDocumentApprovals)
+);
+
+router.get(
+  '/document/:documentId/workflow',
+  requirePermission('documents', 'read'),
+  asyncHandler(approvalsController.getWorkflowInstance)
+);
+
 // Submit document for approval
 router.post(
   '/submit',
@@ -34,23 +61,11 @@ router.post(
   asyncHandler(approvalsController.requestInfo)
 );
 
-// Get approvals
+// Get approval by ID (MUST be last among GET routes)
 router.get(
-  '/my-pending',
+  '/:id',
   requirePermission('approvals', 'read'),
-  asyncHandler(approvalsController.getMyPending)
-);
-
-router.get(
-  '/document/:documentId',
-  requirePermission('documents', 'read'),
-  asyncHandler(approvalsController.getDocumentApprovals)
-);
-
-router.get(
-  '/document/:documentId/workflow',
-  requirePermission('documents', 'read'),
-  asyncHandler(approvalsController.getWorkflowInstance)
+  asyncHandler(approvalsController.getById)
 );
 
 export default router;

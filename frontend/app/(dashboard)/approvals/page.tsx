@@ -163,7 +163,7 @@ export default function ApprovalsPage() {
                         <Button 
                           size="sm" 
                           className="w-full sm:w-auto"
-                          onClick={() => router.push(`/documents/${item.document.id}`)}
+                          onClick={() => router.push(`/approvals/${item.id}`)}
                         >
                           Xử lý
                           <ArrowRight className="w-4 h-4 ml-2" />

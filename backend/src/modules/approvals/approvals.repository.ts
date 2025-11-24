@@ -97,13 +97,35 @@ export class ApprovalsRepository {
       },
       include: {
         document: {
-          include: {
-            document_type: true,
-            owner: true,
-          },
+          select: {
+            id: true,
+            title: true,
+            original_file_name: true,
+            document_number: true,
+            document_type: {
+              select: {
+                name: true,
+                code: true,
+              }
+            },
+            owner: {
+              select: {
+                full_name: true,
+                email: true,
+              }
+            }
+          }
         },
-        workflow: true,
-        workflow_step: true,
+        workflow: {
+          select: {
+            name: true,
+          }
+        },
+        workflow_step: {
+          select: {
+            step_name: true,
+          }
+        },
       },
       orderBy: {
         due_date: 'asc',

@@ -1,23 +1,33 @@
 const { PrismaClient } = require('@prisma/client');
+
 const prisma = new PrismaClient();
 
 async function checkFields() {
-  const fields = await prisma.sign_request_fields.findMany({
-    where: { sign_request_id: 43 },
-    orderBy: { id: 'asc' },
-  });
-  
-  console.log('\n📋 Fields for Sign Request 43:\n');
-  fields.forEach((f, i) => {
-    console.log(`${i + 1}. Field ID: ${f.id}`);
-    console.log(`   Type: ${f.type}`);
-    console.log(`   Label: ${f.label}`);
-    console.log(`   Assigned Signer: ${f.assigned_signer_id || 'None (all signers)'}`);
-    console.log(`   Page: ${f.page}, Position: (${f.x}%, ${f.y}%)`);
-    console.log('');
-  });
-  
-  await prisma.$disconnect();
+  try {
+    const fields = await prisma.sign_request_fields.findMany({
+      where: { sign_request_id: 1 },
+      select: {
+        id: true,
+        type: true,
+        assigned_signer_id: true,
+        required: true,
+        label: true,
+      }
+    });
+
+    console.log(`📋 Fields for sign request 1: ${fields.length} fields`);
+    fields.forEach(f => {
+      console.log(`Field ID: ${f.id}, Type: ${f.type}, Signer: ${f.assigned_signer_id}, Required: ${f.required}, Label: ${f.label || 'No label'}`);
+    });
+
+    if (fields.length === 0) {
+      console.log('⚠️  No fields found! Need to add fields first.');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 checkFields();

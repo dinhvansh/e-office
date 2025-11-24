@@ -5,6 +5,89 @@ import { emailService } from '../common/email.service';
 
 class ApprovalsService {
   /**
+   * List all approvals for a tenant
+   */
+  async listApprovals(tenantId: number) {
+    return await prisma.document_approvals.findMany({
+      where: { tenant_id: tenantId },
+      include: {
+        document: {
+          select: { id: true, title: true, status: true }
+        },
+        workflow_step: {
+          select: { step_name: true, step_order: true }
+        },
+        approver_user: {
+          select: { id: true, email: true, full_name: true }
+        }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+  }
+
+  /**
+   * Get approval by ID with full details
+   */
+  async getApprovalById(approvalId: number, userId: number, tenantId: number) {
+    const approval = await prisma.document_approvals.findFirst({
+      where: {
+        id: approvalId,
+      },
+      include: {
+        document: {
+          include: {
+            owner: {
+              select: {
+                id: true,
+                email: true,
+                full_name: true,
+              }
+            }
+          }
+        },
+        workflow: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+          }
+        },
+        workflow_step: {
+          select: {
+            id: true,
+            step_order: true,
+            step_name: true,
+            approver_type: true,
+          }
+        },
+        approver: {
+          select: {
+            id: true,
+            email: true,
+            full_name: true,
+          }
+        }
+      }
+    });
+
+    if (!approval) {
+      throw ApiError.notFound('Approval not found', 'APPROVAL_NOT_FOUND');
+    }
+
+    // Verify tenant through document
+    if (approval.document.tenant_id !== tenantId) {
+      throw ApiError.forbidden('Access denied', 'ACCESS_DENIED');
+    }
+
+    // Check if user is the approver
+    if (approval.approver_user_id !== userId) {
+      throw ApiError.forbidden('You are not authorized to view this approval', 'NOT_AUTHORIZED');
+    }
+
+    return approval;
+  }
+
+  /**
    * Submit document for approval
    * Creates workflow instance and approval records for first step
    */

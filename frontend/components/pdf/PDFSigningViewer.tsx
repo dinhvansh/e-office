@@ -318,11 +318,34 @@ export default function PDFSigningViewer({
                       : `${(field.height / 100) * pdfDimensions.height}px`,
                   }}
                   onClick={() => {
-                    console.log('🖱️ Field clicked:', field.id, { isActive, isDisabled, isCurrent });
-                    if (!isActive && !isDisabled) {
-                      handleFieldClick(field);
-                    } else if (isDisabled) {
-                      console.log('⏳ Field is disabled - waiting for turn');
+                    console.log('🖱️ Field clicked:', field.id, { 
+                      isActive, 
+                      isDisabled, 
+                      isCurrent, 
+                      guidedMode,
+                      currentFieldId,
+                      activeFieldId,
+                      hasSigned 
+                    });
+                    
+                    if (guidedMode) {
+                      // In guided mode, only allow clicking current field
+                      if (isCurrent && !isActive) {
+                        console.log('✅ Guided mode: Activating current field');
+                        handleFieldClick(field);
+                      } else if (!isCurrent) {
+                        console.log('⏳ Guided mode: Not current field, ignoring');
+                      } else if (isActive) {
+                        console.log('🔄 Guided mode: Field already active');
+                      }
+                    } else {
+                      // Normal mode
+                      if (!isActive && !isDisabled) {
+                        console.log('✅ Normal mode: Activating field');
+                        handleFieldClick(field);
+                      } else if (isDisabled) {
+                        console.log('⏳ Normal mode: Field is disabled');
+                      }
                     }
                   }}
                   title={

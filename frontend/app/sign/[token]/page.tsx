@@ -9,6 +9,8 @@ import SignatureModal from '@/components/signature/SignatureModal';
 import PDFSigningViewer from '@/components/pdf/PDFSigningViewer';
 import ProgressHeader from '@/components/signing/ProgressHeader';
 import SigningSidebar from '@/components/signing/SigningSidebar';
+import ConfirmationDialog from '@/components/ui/confirmation-dialog';
+import ThankYouPage from '@/components/signing/ThankYouPage';
 import { toast } from 'sonner';
 import { CheckCircle, FileText, Mail, User, Clock, Play } from 'lucide-react';
 
@@ -72,6 +74,9 @@ export default function PublicSigningPage() {
   const [currentFieldIndex, setCurrentFieldIndex] = useState(0);
   const [completedFields, setCompletedFields] = useState<number[]>([]);
   const [fieldSignatures, setFieldSignatures] = useState<Record<number, string>>({});
+  
+  // Confirmation dialog state
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   useEffect(() => {
     fetchSigningData();
@@ -116,19 +121,48 @@ export default function PublicSigningPage() {
       const result = await res.json();
 
       if (!res.ok) {
-        throw new Error(result.message || 'Failed to send OTP');
+        let errorMessage = result.message || 'Không thể gửi OTP';
+        
+        if (res.status === 400) {
+          if (result.message?.includes('Email does not match')) {
+            errorMessage = '📧 Email không khớp với người ký. Vui lòng kiểm tra lại email.';
+          }
+        } else if (res.status === 404) {
+          errorMessage = '🔗 Liên kết ký không hợp lệ hoặc đã hết hạn.';
+        } else if (res.status === 500) {
+          errorMessage = '🔧 Lỗi hệ thống. Vui lòng thử lại sau.';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       setOtpSent(true);
-      toast.success('Mã OTP đã được gửi đến email của bạn');
+      toast.success('📧 Mã OTP đã được gửi đến email của bạn');
+      
+      // Show debug OTP if available (dev mode)
+      if (result.data?.debug_otp) {
+        console.log('🔑 DEBUG OTP:', result.data.debug_otp);
+        toast.info(`🔑 DEBUG OTP: ${result.data.debug_otp}`, { duration: 10000 });
+      }
     } catch (error: any) {
+      console.error('❌ Send OTP error:', error);
       toast.error(error.message || 'Không thể gửi OTP');
     }
   };
 
   const handleOpenSignatureModal = () => {
+    if (!otpSent) {
+      toast.error('📧 Vui lòng gửi mã OTP trước');
+      return;
+    }
+    
     if (!otp || otp.length !== 6) {
-      toast.error('Vui lòng nhập mã OTP');
+      toast.error('🔢 Vui lòng nhập đầy đủ mã OTP (6 số)');
+      return;
+    }
+    
+    if (!/^\d{6}$/.test(otp)) {
+      toast.error('🔢 Mã OTP phải là 6 chữ số');
       return;
     }
     
@@ -183,15 +217,30 @@ export default function PublicSigningPage() {
     console.log('🔢 otp:', otp);
     console.log('📋 myFields:', myFields.map(f => ({ id: f.id, label: f.label, page: f.page, x: f.x, y: f.y })));
     
-    if (!otpSent || otp.length !== 6) {
-      toast.error('Vui lòng xác thực OTP trước khi bắt đầu ký');
+    if (!otpSent) {
+      toast.error('📧 Vui lòng gửi mã OTP trước');
       return;
     }
+    
+    if (!otp || otp.length !== 6) {
+      toast.error('🔢 Vui lòng nhập đầy đủ mã OTP (6 số)');
+      return;
+    }
+    
+    if (!/^\d{6}$/.test(otp)) {
+      toast.error('🔢 Mã OTP phải là 6 chữ số');
+      return;
+    }
+    
+    console.log('🔄 Resetting guided mode state...');
+    // Reset all guided mode state
+    setCompletedFields([]);
+    setFieldSignatures({});
+    setCurrentFieldIndex(0);
     
     console.log('✅ Setting guidedMode to TRUE');
     console.log('🎯 First field ID:', myFields[0]?.id);
     setGuidedMode(true);
-    setCurrentFieldIndex(0);
     scrollToField(0);
   };
 
@@ -219,9 +268,16 @@ export default function PublicSigningPage() {
     console.log('🎯 Field completed:', fieldId);
     console.log('📊 Current index:', currentFieldIndex);
     console.log('📋 Total fields:', myFields.length);
+    console.log('📋 Current completedFields:', completedFields);
     
-    setCompletedFields([...completedFields, fieldId]);
-    setFieldSignatures({ ...fieldSignatures, [fieldId]: signature });
+    const newCompletedFields = [...completedFields, fieldId];
+    const newFieldSignatures = { ...fieldSignatures, [fieldId]: signature };
+    
+    setCompletedFields(newCompletedFields);
+    setFieldSignatures(newFieldSignatures);
+    
+    console.log('📋 New completedFields:', newCompletedFields);
+    console.log('🔍 Check: currentFieldIndex < myFields.length - 1:', currentFieldIndex, '<', myFields.length - 1, '=', currentFieldIndex < myFields.length - 1);
     
     if (currentFieldIndex < myFields.length - 1) {
       // Next field
@@ -237,15 +293,12 @@ export default function PublicSigningPage() {
     } else {
       // All done
       console.log('✅ All fields completed!');
+      console.log('🔄 Setting guidedMode to FALSE');
       setGuidedMode(false);
       
       // Show confirmation dialog
-      const confirmed = window.confirm('🎉 Đã ký xong tất cả!\n\nBạn có muốn gửi tài liệu ngay bây giờ?');
-      if (confirmed) {
-        handleSubmitSignature();
-      } else {
-        toast.info('Bạn có thể xem lại và nhấn "Hoàn tất ký" khi sẵn sàng');
-      }
+      console.log('💬 Showing confirmation dialog...');
+      setShowConfirmDialog(true);
     }
   };
 
@@ -265,6 +318,21 @@ export default function PublicSigningPage() {
       // Handle text/date/checkbox fields here
       console.log('Non-signature field clicked:', field);
     }
+  };
+
+  const handleConfirmSubmit = () => {
+    console.log('📤 User confirmed submit from guided mode...');
+    console.log('🔍 Current fieldSignatures:', fieldSignatures);
+    console.log('🔍 Current signatureData:', signatureData);
+    console.log('🔍 Current otp:', otp);
+    handleSubmitSignature();
+  };
+
+  const handleCancelSubmit = () => {
+    console.log('📋 User chose to review first');
+    toast.success('✅ Đã ký xong tất cả! Bạn có thể xem lại và nhấn "Hoàn tất ký" phía dưới khi sẵn sàng.', {
+      duration: 5000
+    });
   };
 
   // Calculate progress
@@ -329,16 +397,42 @@ export default function PublicSigningPage() {
           statusText: res.statusText,
           result: result,
         });
-        throw new Error(result.message || 'Failed to submit signature');
+        
+        // Handle specific error cases
+        let errorMessage = result.message || 'Không thể ký tài liệu';
+        
+        if (res.status === 400) {
+          if (result.message?.includes('Invalid OTP')) {
+            errorMessage = '❌ Mã OTP không đúng. Vui lòng kiểm tra lại mã OTP trong email.';
+          } else if (result.message?.includes('OTP expired')) {
+            errorMessage = '⏰ Mã OTP đã hết hạn. Vui lòng click "Gửi mã OTP" để nhận mã mới.';
+          } else if (result.message?.includes('OTP not issued')) {
+            errorMessage = '📧 Chưa có mã OTP. Vui lòng click "Gửi mã OTP" trước.';
+          } else if (result.message?.includes('required fields')) {
+            errorMessage = '📝 Vui lòng điền đầy đủ tất cả các trường bắt buộc.';
+          } else if (result.message?.includes('already signed') || result.message?.includes('You have already signed')) {
+            errorMessage = '✅ Bạn đã ký tài liệu này rồi. Trang sẽ tự động tải lại để hiển thị kết quả.';
+            // Auto reload to show thank you page
+            setTimeout(() => {
+              window.location.reload();
+            }, 2000);
+          }
+        } else if (res.status === 404) {
+          errorMessage = '🔗 Liên kết ký không hợp lệ hoặc đã hết hạn.';
+        } else if (res.status === 500) {
+          errorMessage = '🔧 Lỗi hệ thống. Vui lòng thử lại sau.';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       console.log('✅ Submit successful:', result);
-      toast.success('Ký tài liệu thành công!');
+      toast.success('🎉 Ký tài liệu thành công!');
       
-      // Reload to show success/thank you screen
+      // Show success message and reload to show thank you screen
       setTimeout(() => {
         fetchSigningData();
-      }, 1000);
+      }, 1500);
     } catch (error: any) {
       console.error('❌ Submit error:', error);
       toast.error(error.message || 'Không thể ký tài liệu');
@@ -371,132 +465,19 @@ export default function PublicSigningPage() {
   // Already signed - Thank you screen
   if (data.already_signed) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 p-4">
-        <div className="max-w-4xl w-full">
-          {/* Success Card */}
-          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border-t-8 border-green-500">
-            {/* Header with Animation */}
-            <div className="bg-gradient-to-r from-green-500 to-blue-500 p-8 text-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-white opacity-10">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent animate-pulse"></div>
-              </div>
-              
-              <div className="relative z-10">
-                <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl">
-                  <CheckCircle className="w-20 h-20 text-green-600 animate-bounce" />
-                </div>
-                
-                <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
-                  🎉 Cảm ơn bạn!
-                </h1>
-                
-                <p className="text-xl text-white opacity-90">
-                  Tài liệu đã được ký thành công
-                </p>
-              </div>
-            </div>
-            
-            {/* Content */}
-            <div className="p-8 md:p-12">
-              {/* Signing Time */}
-              <div className="text-center mb-8">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 rounded-full border border-green-200">
-                  <Clock className="w-4 h-4 text-green-600" />
-                  <span className="text-sm text-green-800 font-medium">
-                    Thời gian ký: {new Date(data.signed_at!).toLocaleString('vi-VN')}
-                  </span>
-                </div>
-              </div>
-              
-              {/* Document Info Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                {/* Left Column */}
-                <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-200">
-                  <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-blue-600" />
-                    Thông tin tài liệu
-                  </h3>
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <span className="text-gray-600 block mb-1">Tên tài liệu</span>
-                      <span className="font-semibold text-gray-900 block">{data.sign_request.title}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600 block mb-1">File gốc</span>
-                      <span className="font-mono text-xs font-medium text-gray-900 bg-white px-2 py-1 rounded block">
-                        {data.document.original_file_name}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Right Column */}
-                <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-xl p-6 border border-green-200">
-                  <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <User className="w-5 h-5 text-green-600" />
-                    Thông tin người ký
-                  </h3>
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <span className="text-gray-600 block mb-1">Họ và tên</span>
-                      <span className="font-semibold text-gray-900 block">{data.signer.name}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600 block mb-1">Email</span>
-                      <span className="font-medium text-gray-900 block">{data.signer.email}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600 block mb-1">Vai trò</span>
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        {data.signer.role === 'signer' ? 'Người ký' : data.signer.role}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Next Steps */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-6 border border-blue-200">
-                <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                  <Mail className="w-5 h-5 text-blue-600" />
-                  📧 Tiếp theo
-                </h3>
-                <div className="space-y-2 text-sm text-blue-800">
-                  <p className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span>Bạn sẽ nhận được email xác nhận trong vài phút tới</span>
-                  </p>
-                  <p className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span>Tài liệu đã ký sẽ được gửi kèm theo email</span>
-                  </p>
-                  <p className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span>Bạn có thể đóng cửa sổ này</span>
-                  </p>
-                </div>
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button 
-                  onClick={() => window.print()} 
-                  variant="outline"
-                  className="py-6 text-lg border-2 hover:bg-gray-50"
-                >
-                  🖨️ In trang này
-                </Button>
-                <Button 
-                  onClick={() => window.close()} 
-                  className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white py-6 text-lg shadow-lg hover:shadow-xl transition-all"
-                >
-                  ✓ Đóng cửa sổ
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ThankYouPage
+        signerName={data.signer?.name}
+        signerEmail={data.signer?.email}
+        signerRole={data.signer?.role}
+        documentTitle={data.document?.title}
+        originalFileName={data.document?.original_file_name}
+        signedAt={data.signed_at || data.signer?.signed_at}
+        signRequestTitle={data.sign_request?.title}
+        onDownload={() => {
+          // TODO: Implement download functionality
+          toast.info('Tính năng tải xuống sẽ được cập nhật sớm');
+        }}
+      />
     );
   }
 
@@ -813,6 +794,23 @@ export default function PublicSigningPage() {
           activities={data.activities || []}
         />
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleConfirmSubmit}
+        title="Hoàn thành ký tài liệu"
+        message={`🎉 Chúc mừng! Bạn đã ký xong tất cả các trường!
+
+✅ Chữ ký: Đã hoàn thành
+✅ Ngày ký: Đã hoàn thành
+
+📤 Bấm "Gửi ngay" để gửi tài liệu ngay bây giờ
+📋 Bấm "Xem lại" để kiểm tra trước khi gửi`}
+        confirmText="📤 Gửi ngay"
+        cancelText="📋 Xem lại"
+      />
     </div>
   );
 }

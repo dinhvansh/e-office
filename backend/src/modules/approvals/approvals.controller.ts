@@ -21,6 +21,23 @@ const requestInfoSchema = z.object({
 const idSchema = z.coerce.number().int().positive();
 
 export class ApprovalsController {
+  // List all approvals (for admin/debugging)
+  list = async (req: Request, res: Response): Promise<void> => {
+    const result = await approvalsService.listApprovals(req.auth!.tenantId);
+    res.json(ok(result));
+  };
+
+  // Get approval by ID
+  getById = async (req: Request, res: Response): Promise<void> => {
+    const approvalId = idSchema.parse(req.params.id);
+    const result = await approvalsService.getApprovalById(
+      approvalId,
+      req.auth!.userId,
+      req.auth!.tenantId
+    );
+    res.json(ok(result));
+  };
+
   // Submit document for approval
   submit = async (req: Request, res: Response): Promise<void> => {
     const body = submitSchema.parse(req.body);
@@ -80,7 +97,7 @@ export class ApprovalsController {
       req.auth!.userId,
       req.auth!.tenantId
     );
-    res.json(ok({ approvals }));
+    res.json(ok(approvals));
   };
 
   // Get document approvals (history)
