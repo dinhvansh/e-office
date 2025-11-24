@@ -69,9 +69,12 @@ export function SignersSection({ signers, onChange }: SignersSectionProps) {
   };
 
   const updateSigner = (id: string, field: keyof Signer, value: any) => {
+    console.log("🔄 updateSigner called:", { id, field, value });
+    console.log("📊 Current signers:", signers);
     const updated = signers.map((s) => (s.id === id ? { ...s, [field]: value } : s));
-    console.log("🔄 Updating signer:", id, field, value, "Result:", updated);
+    console.log("✅ Updated signers:", updated);
     onChange(updated);
+    console.log("📤 onChange called with updated signers");
   };
 
   return (
@@ -174,8 +177,8 @@ export function SignersSection({ signers, onChange }: SignersSectionProps) {
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor={`signer-order-${signer.id}`} className="text-xs">
-                    Thứ tự ký
+                  <Label htmlFor={`signer-order-${signer.id}`} className="text-xs font-semibold text-purple-700">
+                    🔢 Thứ tự ký *
                   </Label>
                   <Input
                     id={`signer-order-${signer.id}`}
@@ -189,8 +192,12 @@ export function SignersSection({ signers, onChange }: SignersSectionProps) {
                         parseInt(e.target.value) || 1
                       )
                     }
-                    className="h-9"
+                    className="h-9 border-purple-300 focus:border-purple-500"
+                    placeholder="1, 2, 3..."
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    💡 Số nhỏ ký trước. Cùng số = ký song song
+                  </p>
                 </div>
               </div>
             ) : (
@@ -258,8 +265,8 @@ export function SignersSection({ signers, onChange }: SignersSectionProps) {
                   )}
                 </div>
                 <div>
-                  <Label htmlFor={`signer-order-${signer.id}`} className="text-xs">
-                    Thứ tự ký
+                  <Label htmlFor={`signer-order-${signer.id}`} className="text-xs font-semibold text-purple-700">
+                    🔢 Thứ tự ký *
                   </Label>
                   <Input
                     id={`signer-order-${signer.id}`}
@@ -273,8 +280,12 @@ export function SignersSection({ signers, onChange }: SignersSectionProps) {
                         parseInt(e.target.value) || 1
                       )
                     }
-                    className="h-9"
+                    className="h-9 border-purple-300 focus:border-purple-500"
+                    placeholder="1, 2, 3..."
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    💡 Số nhỏ ký trước. Cùng số = ký song song
+                  </p>
                 </div>
               </div>
             )}

@@ -168,10 +168,18 @@ export default function DocumentsPage() {
       };
       
       // Add workflow data based on mode
-      if (workflowMode === 'adhoc' && adhocSteps && adhocSteps.length > 0) {
+      if (workflowMode === 'strict' && selectedDocType?.default_workflow_id) {
+        // Strict mode: use default workflow (backend will auto-create signers)
+        payload.workflow_id = selectedDocType.default_workflow_id;
+      } else if (workflowMode === 'flexible' && selectedDocType?.default_workflow_id) {
+        // Flexible mode: use default workflow but allow customization
+        payload.workflow_id = selectedDocType.default_workflow_id;
+        if (customizedSteps && customizedSteps.length > 0) {
+          payload.customized_steps = customizedSteps;
+        }
+      } else if (workflowMode === 'adhoc' && adhocSteps && adhocSteps.length > 0) {
+        // Ad-hoc mode: create new workflow
         payload.adhoc_steps = adhocSteps;
-      } else if (workflowMode === 'flexible' && customizedSteps && customizedSteps.length > 0) {
-        payload.customized_steps = customizedSteps;
       }
       
       // Add signers if provided
@@ -582,6 +590,11 @@ export default function DocumentsPage() {
                   <p className="text-xs text-muted-foreground">
                     Quy trình phê duyệt sẽ tự động hiển thị dựa trên loại văn bản
                   </p>
+                  {selectedDocType?.require_digital_signing && (
+                    <div className="flex items-center gap-2 p-2 bg-purple-50 rounded border border-purple-200">
+                      <span className="text-purple-600 font-semibold text-xs">✍️ Loại văn bản này yêu cầu chữ ký số</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">

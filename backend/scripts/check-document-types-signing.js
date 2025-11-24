@@ -1,32 +1,53 @@
+/**
+ * Check which document types require digital signing
+ */
+
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-async function checkDocumentTypes() {
-  const types = await prisma.document_types.findMany({
-    select: {
-      id: true,
-      name: true,
-      require_digital_signing: true,
-      require_approval: true,
-      is_active: true,
-    },
-    orderBy: { id: 'asc' }
-  });
+async function main() {
+  console.log('📋 Checking Document Types - Digital Signing Status\n');
 
-  console.log('\n📋 Document Types Configuration:\n');
-  console.log('ID | Name | Digital Signing | Approval | Active');
-  console.log('---|------|-----------------|----------|-------');
-  
-  types.forEach(t => {
-    const signing = t.require_digital_signing ? '✅' : '❌';
-    const approval = t.require_approval ? '✅' : '❌';
-    const active = t.is_active ? '✅' : '❌';
-    console.log(`${t.id.toString().padEnd(3)}| ${t.name.padEnd(30)} | ${signing.padEnd(15)} | ${approval.padEnd(8)} | ${active}`);
-  });
+  try {
+    const docTypes = await prisma.document_types.findMany({
+      where: { tenant_id: 1 },
+      orderBy: { id: 'asc' },
+    });
 
-  console.log('\n💡 Tip: Chọn loại văn bản có "Digital Signing = ✅" để thấy Add Recipients dialog\n');
+    console.log(`Found ${docTypes.length} document types:\n`);
 
-  await prisma.$disconnect();
+    docTypes.forEach((dt) => {
+      const hasSigningField = dt.require_digital_signing !== undefined;
+      const requiresSigning = dt.require_digital_signing === true;
+      
+      console.log(`${dt.id}. ${dt.name} (${dt.code})`);
+      console.log(`   Has field: ${hasSigningField ? '✅' : '❌'}`);
+      console.log(`   Requires signing: ${requiresSigning ? '✅ YES' : '❌ NO'}`);
+      console.log('');
+    });
+
+    // Check if field exists in schema
+    const tableInfo = await prisma.$queryRaw`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'document_types' 
+      AND column_name = 'require_digital_signing'
+    `;
+
+    console.log('\n📊 Schema Check:');
+    if (tableInfo && tableInfo.length > 0) {
+      console.log('✅ Field "require_digital_signing" EXISTS in database');
+      console.log(`   Type: ${tableInfo[0].data_type}`);
+    } else {
+      console.log('❌ Field "require_digital_signing" DOES NOT EXIST in database');
+      console.log('   Need to add migration!');
+    }
+
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
-checkDocumentTypes();
+main();

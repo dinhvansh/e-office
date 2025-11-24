@@ -2,6 +2,7 @@ import { ApiError } from '../../core/errors/api-error';
 import { approvalsRepository } from './approvals.repository';
 import { prisma } from '../../config/prisma';
 import { emailService } from '../common/email.service';
+import { signRequestsService } from '../signRequests/signRequests.service';
 
 class ApprovalsService {
   /**

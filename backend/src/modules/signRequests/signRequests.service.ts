@@ -1,5 +1,6 @@
 import { Prisma, sign_requests } from "@prisma/client";
 import * as crypto from "crypto";
+import { prisma } from "../../config/prisma";
 import { ApiError } from "../../core/errors/api-error";
 import { auditService } from "../audit/audit.service";
 import { documentsRepository } from "../documents/documents.repository";
@@ -28,6 +29,59 @@ export interface CreateSignRequestInput {
 class SignRequestsService {
   async listSignRequests(tenantId: number) {
     return signRequestsRepository.listByTenant(tenantId);
+  }
+
+  /**
+   * Get sign requests created by the current user
+   */
+  async getMySignRequests(userId: number, tenantId: number, status?: string) {
+    const where: Prisma.sign_requestsWhereInput = {
+      tenant_id: tenantId,
+      document: {
+        owner_id: userId
+      }
+    };
+
+    if (status) {
+      where.status = status;
+    }
+
+    const signRequests = await signRequestsRepository.findMany({
+      where,
+      include: {
+        document: {
+          select: {
+            id: true,
+            title: true,
+            original_file_name: true,
+            document_number: true,
+            owner: {
+              select: { 
+                id: true,
+                full_name: true, 
+                email: true 
+              }
+            }
+          }
+        },
+        signers: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            status: true,
+            signed_at: true,
+            signing_order: true
+          },
+          orderBy: {
+            signing_order: 'asc'
+          }
+        }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+
+    return signRequests;
   }
 
   /**
@@ -104,23 +158,7 @@ class SignRequestsService {
     return signRequest;
   }
 
-  async cancelSignRequest(id: number, tenantId: number, userId: number) {
-    const signRequest = await this.getSignRequest(id, tenantId);
-    if (signRequest.status === "completed") {
-      throw ApiError.badRequest("Cannot cancel a completed request", "SIGN_REQUEST_COMPLETED");
-    }
-    await signRequestsRepository.updateStatus(id, tenantId, "cancelled");
-    await auditService.record({
-      tenantId,
-      documentId: signRequest.document_id,
-      event: "sign.cancelled",
-      userId,
-    });
-    await webhookService.emit(tenantId, "sign.declined", {
-      sign_request_id: signRequest.id,
-      document_id: signRequest.document_id,
-    });
-  }
+
 
   async addSigner(
     signRequestId: number,
@@ -222,19 +260,8 @@ class SignRequestsService {
       });
     }
 
-    // Send cancellation emails to all signers
-    const { emailService } = await import('../common/email.service');
-    for (const signer of signers) {
-      // Only notify signers who haven't signed yet or already signed
-      await emailService.sendSignRequestCancelled({
-        to: signer.email,
-        signerName: signer.name,
-        documentTitle: signRequest.title || "Document",
-        cancelledBy: user?.full_name || user?.email || "Administrator",
-        reason: reason || "No reason provided",
-        signRequestId: signRequest.id,
-      });
-    }
+    // TODO: Send cancellation emails to all signers
+    // Email notification will be implemented when sendSignRequestCancelled is added to email service
 
     // Audit log
     await auditService.record({
@@ -242,7 +269,6 @@ class SignRequestsService {
       documentId: signRequest.document_id,
       event: "sign.cancelled",
       userId,
-      metadata: { reason, signers_notified: signers.length },
     });
 
     return this.getSignRequest(id, tenantId);

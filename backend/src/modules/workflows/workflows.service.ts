@@ -13,6 +13,71 @@ class WorkflowsService {
     if (!workflow) {
       throw ApiError.notFound('Workflow not found', 'WORKFLOW_NOT_FOUND');
     }
+    
+    // Enrich steps with approver info
+    if (workflow.steps && workflow.steps.length > 0) {
+      const enrichedSteps = await Promise.all(
+        workflow.steps.map(async (step) => {
+          let approverName = '';
+          let approverEmail = '';
+          
+          if (step.approver_type === 'user' && step.approver_id) {
+            const user = await prisma.users.findUnique({
+              where: { id: step.approver_id },
+              select: { email: true, full_name: true }
+            });
+            if (user) {
+              approverEmail = user.email;
+              approverName = user.full_name || user.email;
+            }
+          } else if (step.approver_type === 'role' && step.approver_id) {
+            const role = await prisma.roles.findUnique({
+              where: { id: step.approver_id },
+              select: { name: true }
+            });
+            if (role) {
+              approverName = `Vai trò: ${role.name}`;
+              // Get first user with this role
+              const userRole = await prisma.user_roles.findFirst({
+                where: { role_id: step.approver_id },
+                include: { user: { select: { email: true, full_name: true } } }
+              });
+              if (userRole?.user) {
+                approverEmail = userRole.user.email;
+                approverName = userRole.user.full_name || userRole.user.email;
+              }
+            }
+          } else if (step.approver_type === 'department' && step.approver_id) {
+            const dept = await prisma.departments.findUnique({
+              where: { id: step.approver_id },
+              include: { manager: { select: { email: true, full_name: true } } }
+            });
+            if (dept) {
+              approverName = `Phòng ban: ${dept.name}`;
+              if (dept.manager) {
+                approverEmail = dept.manager.email;
+                approverName = dept.manager.full_name || dept.manager.email;
+              }
+            }
+          } else if (step.approver_type === 'manager') {
+            approverName = 'Quản lý trực tiếp';
+            approverEmail = '(Tùy theo người tạo)';
+          }
+          
+          return {
+            ...step,
+            approver_name: approverName,
+            approver_email: approverEmail
+          };
+        })
+      );
+      
+      return {
+        ...workflow,
+        steps: enrichedSteps
+      };
+    }
+    
     return workflow;
   }
 

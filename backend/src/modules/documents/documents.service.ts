@@ -21,6 +21,7 @@ export interface CreateDocumentInput {
   priorityLevel?: string;
   confidentialLevel?: string;
   visibilityScope?: string;
+  workflowId?: number;
   signers?: Array<{
     email: string;
     name: string;
@@ -239,19 +240,25 @@ class DocumentsService {
       });
       
       // ✅ Auto-create signers from workflow if document has workflow
-      if (documentType.require_approval && documentType.default_workflow_id) {
+      const workflowId = input.workflowId || documentType.default_workflow_id;
+      
+      if (workflowId) {
         const workflow = await prisma.workflows.findUnique({
-          where: { id: documentType.default_workflow_id },
+          where: { id: workflowId },
           include: { steps: { orderBy: { step_order: 'asc' } } }
         });
         
         if (workflow?.steps) {
           const { signersRepository } = await import('../signers/signers.repository');
           
+          console.log(`[Workflow Signers] Creating signers for ${workflow.steps.length} steps`);
+          
           for (const step of workflow.steps) {
             // Get approver info based on type
             let email = '';
             let name = '';
+            
+            console.log(`[Step ${step.step_order}] Type: ${step.approver_type}, ID: ${step.approver_id}`);
             
             if (step.approver_type === 'user' && step.approver_id) {
               const user = await prisma.users.findUnique({
@@ -261,6 +268,9 @@ class DocumentsService {
               if (user) {
                 email = user.email;
                 name = user.full_name || user.email;
+                console.log(`  ✓ Found user: ${email}`);
+              } else {
+                console.log(`  ✗ User not found`);
               }
             } else if (step.approver_type === 'role' && step.approver_id) {
               // For role, get first user with that role
@@ -271,6 +281,9 @@ class DocumentsService {
               if (userRole?.user) {
                 email = userRole.user.email;
                 name = userRole.user.full_name || userRole.user.email;
+                console.log(`  ✓ Found role user: ${email}`);
+              } else {
+                console.log(`  ✗ No user with this role`);
               }
             } else if (step.approver_type === 'department' && step.approver_id) {
               // For department, get department manager
@@ -281,6 +294,22 @@ class DocumentsService {
               if (dept?.manager) {
                 email = dept.manager.email;
                 name = dept.manager.full_name || dept.manager.email;
+                console.log(`  ✓ Found dept manager: ${email}`);
+              } else {
+                console.log(`  ✗ Department has no manager`);
+              }
+            } else if (step.approver_type === 'manager') {
+              // For manager type, use document owner's manager
+              const owner = await prisma.users.findUnique({
+                where: { id: ownerId },
+                include: { manager: { select: { email: true, full_name: true } } }
+              });
+              if (owner?.manager) {
+                email = owner.manager.email;
+                name = owner.manager.full_name || owner.manager.email;
+                console.log(`  ✓ Found owner's manager: ${email}`);
+              } else {
+                console.log(`  ✗ Owner has no manager`);
               }
             }
             
@@ -294,6 +323,83 @@ class DocumentsService {
                 signing_order: step.step_order,
                 status: 'pending',
               });
+              console.log(`  ✓ Signer created: ${email}`);
+            } else {
+              console.log(`  ✗ Skipped: no email found`);
+            }
+          }
+          
+          console.log(`[Workflow Signers] Completed`);
+        }
+        
+        // ✅ Create workflow instance and approvals if document requires approval
+        if (documentType?.require_approval && workflow) {
+          console.log(`[Workflow Instance] Creating workflow instance for document ${document.id}`);
+          
+          // Create workflow instance
+          const instance = await prisma.workflow_instances.create({
+            data: {
+              document_id: document.id,
+              workflow_id: workflow.id,
+              current_step_id: workflow.steps[0]?.id,
+              status: 'in_progress',
+              started_at: new Date()
+            }
+          });
+          
+          console.log(`[Workflow Instance] Created instance ID: ${instance.id}`);
+          
+          // Create approval for first step
+          if (workflow.steps[0]) {
+            const firstStep = workflow.steps[0];
+            
+            // Get approver user ID based on step type
+            let approverUserId: number | null = null;
+            
+            if (firstStep.approver_type === 'user' && firstStep.approver_id) {
+              approverUserId = firstStep.approver_id;
+            } else if (firstStep.approver_type === 'role' && firstStep.approver_id) {
+              const userRole = await prisma.user_roles.findFirst({
+                where: { role_id: firstStep.approver_id }
+              });
+              approverUserId = userRole?.user_id || null;
+            } else if (firstStep.approver_type === 'department' && firstStep.approver_id) {
+              const dept = await prisma.departments.findUnique({
+                where: { id: firstStep.approver_id }
+              });
+              approverUserId = dept?.manager_id || null;
+            } else if (firstStep.approver_type === 'manager') {
+              const owner = await prisma.users.findUnique({
+                where: { id: ownerId }
+              });
+              approverUserId = owner?.manager_id || null;
+            }
+            
+            if (approverUserId) {
+              const dueDate = new Date();
+              dueDate.setDate(dueDate.getDate() + (firstStep.due_in_days || 7));
+              
+              await prisma.document_approvals.create({
+                data: {
+                  document_id: document.id,
+                  workflow_id: workflow.id,
+                  workflow_step_id: firstStep.id,
+                  approver_user_id: approverUserId,
+                  action: 'pending',
+                  due_date: dueDate
+                }
+              });
+              
+              console.log(`[Workflow Instance] Created approval for user ${approverUserId}`);
+              
+              // Update document status to pending_approval
+              await documentsRepository.update(document.id, {
+                status: 'pending_approval'
+              });
+              
+              console.log(`[Workflow Instance] Document status updated to pending_approval`);
+            } else {
+              console.log(`[Workflow Instance] ⚠️ Could not determine approver for first step`);
             }
           }
         }

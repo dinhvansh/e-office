@@ -10,6 +10,14 @@ export class SignRequestsRepository {
     });
   }
 
+  findMany(params: {
+    where: Prisma.sign_requestsWhereInput;
+    include?: Prisma.sign_requestsInclude;
+    orderBy?: Prisma.sign_requestsOrderByWithRelationInput;
+  }) {
+    return prisma.sign_requests.findMany(params);
+  }
+
   create(data: Prisma.sign_requestsCreateInput) {
     return prisma.sign_requests.create({ data });
   }

@@ -529,6 +529,56 @@ export default function PublicSigningPage() {
                   </div>
                 )}
               </div>
+
+              {/* ✨ NEW: Signing Order Info */}
+              {data.signers && data.signers.length > 1 && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Thứ tự ký:</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {data.signers
+                      .sort((a, b) => (a.signing_order || 0) - (b.signing_order || 0))
+                      .map((signer, index) => {
+                        const isCurrent = signer.id === data.signer.id;
+                        const isSigned = signer.status === 'signed' || signer.status === 'completed';
+                        const isPending = signer.status === 'pending' || signer.status === 'otp_sent';
+                        
+                        return (
+                          <div
+                            key={signer.id}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 ${
+                              isCurrent
+                                ? 'border-blue-500 bg-blue-50'
+                                : isSigned
+                                ? 'border-green-500 bg-green-50'
+                                : 'border-gray-300 bg-gray-50'
+                            }`}
+                          >
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                              isCurrent
+                                ? 'bg-blue-500 text-white'
+                                : isSigned
+                                ? 'bg-green-500 text-white'
+                                : 'bg-gray-300 text-gray-600'
+                            }`}>
+                              {index + 1}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className={`text-sm font-medium ${
+                                isCurrent ? 'text-blue-700' : isSigned ? 'text-green-700' : 'text-gray-600'
+                              }`}>
+                                {signer.name || signer.email}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {isSigned ? '✓ Đã ký' : isPending ? '⏳ Chờ ký' : '○ Chưa đến lượt'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+            </div>
             </div>
           </div>
         </div>

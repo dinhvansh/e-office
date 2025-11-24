@@ -28,6 +28,35 @@ export class SignRequestsController {
     res.json(ok({ sign_requests: signRequests }));
   };
 
+  getMyRequests = async (req: Request, res: Response): Promise<void> => {
+    const status = req.query.status as string | undefined;
+    const signRequests = await signRequestsService.getMySignRequests(
+      req.auth!.userId,
+      req.auth!.tenantId,
+      status
+    );
+    
+    // Calculate progress for each request
+    const requestsWithProgress = signRequests.map(sr => {
+      const totalSigners = sr.signers.length;
+      const signedCount = sr.signers.filter(s => s.status === 'signed').length;
+      const rejectedCount = sr.signers.filter(s => s.status === 'rejected').length;
+      
+      return {
+        ...sr,
+        progress: {
+          total: totalSigners,
+          signed: signedCount,
+          rejected: rejectedCount,
+          pending: totalSigners - signedCount - rejectedCount,
+          percentage: totalSigners > 0 ? Math.round((signedCount / totalSigners) * 100) : 0
+        }
+      };
+    });
+    
+    res.json(ok({ sign_requests: requestsWithProgress }));
+  };
+
   create = async (req: Request, res: Response): Promise<void> => {
     const body = createSchema.parse(req.body);
     const signRequest = await signRequestsService.createSignRequest(req.auth!.tenantId, req.auth!.userId, {

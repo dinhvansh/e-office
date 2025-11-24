@@ -48,8 +48,8 @@ export default function ApprovalsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['my-pending-approvals'],
     queryFn: async () => {
-      const res = await fetchJson<{ approvals: ApprovalItem[] }>('/approvals/my-pending');
-      return res.approvals;
+      const res = await fetchJson<ApprovalItem[]>('/approvals/my-pending');
+      return res;
     },
   });
 

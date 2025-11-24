@@ -1,231 +1,260 @@
-"use client";
+'use client';
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { useAuth } from "@/components/providers/auth-provider";
-import { DocumentRecord, SignRequestRecord } from "@/lib/types";
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/components/providers/auth-provider';
+import { PenTool, Eye, Search } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useRouter } from 'next/navigation';
+import dayjs from 'dayjs';
+
+interface SignRequest {
+  id: number;
+  status: string;
+  created_at: string;
+  document: {
+    id: number;
+    title: string | null;
+    original_file_name: string;
+    document_number: string | null;
+    owner: {
+      id: number;
+      full_name: string | null;
+      email: string;
+    };
+  };
+  signers: Array<{
+    id: number;
+    name: string;
+    email: string;
+    status: string;
+    signed_at: string | null;
+    signing_order: number | null;
+  }>;
+  progress: {
+    total: number;
+    signed: number;
+    rejected: number;
+    pending: number;
+    percentage: number;
+  };
+}
 
 export default function SignRequestsPage() {
   const { fetchJson } = useAuth();
-  const queryClient = useQueryClient();
-  
-  const { data: documents } = useQuery({
-    queryKey: ["documents"],
+  const router = useRouter();
+  const [filter, setFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['my-sign-requests', filter],
     queryFn: async () => {
-      const data = await fetchJson<{ documents: DocumentRecord[] }>("/documents");
-      return data.documents;
+      const params = filter !== 'all' ? `?status=${filter}` : '';
+      const res = await fetchJson<{ sign_requests: SignRequest[] }>(
+        `/sign-requests/my-requests${params}`
+      );
+      return res.sign_requests;
     },
   });
 
-  const { data: signRequests, isLoading: isLoadingRequests } = useQuery({
-    queryKey: ["sign-requests"],
-    queryFn: async () => {
-      const data = await fetchJson<{ sign_requests: SignRequestRecord[] }>("/sign-requests");
-      return data.sign_requests;
-    },
-  });
-  const [title, setTitle] = useState("Hop dong moi");
-  const [message, setMessage] = useState("Vui long ky trong ngay");
-  const [documentId, setDocumentId] = useState<number | null>(null);
-  const [signers, setSigners] = useState([{ email: "", name: "" }]);
-  const [createdRequest, setCreatedRequest] = useState<SignRequestRecord | null>(null);
-
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      if (!documentId) {
-        throw new Error("Vui long chon tai lieu");
-      }
-      const payload = {
-        document_id: documentId,
-        title,
-        message,
-        workflow_type: "sequential",
-        signers: signers.filter((s) => s.email && s.name),
-      };
-      const data = await fetchJson<{ sign_request: SignRequestRecord }>("/sign-requests", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      setCreatedRequest(data.sign_request);
-      queryClient.invalidateQueries({ queryKey: ["sign-requests"] });
-    },
-  });
-
-  const updateSigner = (index: number, field: "email" | "name", value: string) => {
-    setSigners((prev) => prev.map((signer, i) => (i === index ? { ...signer, [field]: value } : signer)));
+  const getStatusBadge = (progress: SignRequest['progress'], status: string) => {
+    if (status === 'cancelled') {
+      return <Badge variant="secondary" className="bg-gray-500 text-white">Đã hủy</Badge>;
+    }
+    if (progress.rejected > 0) {
+      return <Badge variant="destructive">Đã từ chối</Badge>;
+    }
+    if (progress.percentage === 100 || status === 'completed') {
+      return <Badge className="bg-green-500 hover:bg-green-600">Đã hoàn thành</Badge>;
+    }
+    if (status === 'pending' || status === 'in_progress') {
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Chờ ký</Badge>;
+    }
+    return <Badge variant="secondary">Nháp</Badge>;
   };
 
-  const addSigner = () => setSigners((prev) => [...prev, { email: "", name: "" }]);
+  const getProgressColor = (percentage: number, rejected: number, status: string) => {
+    if (status === 'cancelled') return 'bg-gray-400';
+    if (rejected > 0) return 'bg-red-500';
+    if (percentage === 100) return 'bg-green-500';
+    if (percentage > 0) return 'bg-yellow-500';
+    return 'bg-gray-300';
+  };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-green-100 text-green-700";
-      case "draft":
-        return "bg-slate-100 text-slate-700";
-      case "in_progress":
-        return "bg-blue-100 text-blue-700";
-      case "cancelled":
-        return "bg-red-100 text-red-700";
-      default:
-        return "bg-slate-100 text-slate-700";
-    }
+  const filteredData = data?.filter(request => {
+    if (!searchQuery) return true;
+    const searchLower = searchQuery.toLowerCase();
+    const docTitle = request.document.title || request.document.original_file_name;
+    const docNumber = request.document.document_number || '';
+    return docTitle.toLowerCase().includes(searchLower) || 
+           docNumber.toLowerCase().includes(searchLower);
+  });
+
+  const stats = {
+    all: data?.length || 0,
+    pending: data?.filter(r => r.status === 'pending' || r.status === 'in_progress').length || 0,
+    completed: data?.filter(r => r.status === 'completed' || r.progress.percentage === 100).length || 0,
+    rejected: data?.filter(r => r.progress.rejected > 0).length || 0,
   };
 
   return (
-    <div className="space-y-8">
-      {/* Danh sach Sign Requests */}
-      <section className="card">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-slate-900">Quy trinh ky da gui</h2>
-          <span className="text-sm text-slate-500">
-            {isLoadingRequests ? "Dang tai..." : `${signRequests?.length || 0} quy trinh`}
-          </span>
-        </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={PenTool}
+        title="Yêu cầu Ký số"
+        description="Theo dõi và quản lý các yêu cầu ký số bạn đã tạo"
+        iconColor="text-green-600"
+      />
 
-        {isLoadingRequests ? (
-          <div className="py-8 text-center text-slate-500">Dang tai...</div>
-        ) : signRequests && signRequests.length > 0 ? (
-          <div className="space-y-3">
-            {signRequests.map((request) => (
-              <div
-                key={request.id}
-                className="rounded-xl border border-slate-200 bg-white p-4 transition-all hover:border-brand-300 hover:shadow-md"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-semibold text-slate-900">{request.title || "Quy trinh ky"}</h3>
-                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(request.status || "")}`}>
-                        {request.status}
-                      </span>
-                    </div>
-                    {request.message && <p className="mt-1 text-sm text-slate-600">{request.message}</p>}
-                    <div className="mt-2 flex items-center gap-4 text-xs text-slate-500">
-                      <span>ID: #{request.id}</span>
-                      <span>Tai lieu: #{request.document_id}</span>
-                      <span>Nguoi ky: {request.signers?.length || 0}</span>
-                      <span>{new Date(request.created_at).toLocaleDateString("vi-VN")}</span>
-                    </div>
-                    <div className="mt-3 flex gap-2">
-                      <a
-                        href={`/sign-requests/${request.id}`}
-                        className="text-xs text-brand-600 hover:underline"
-                      >
-                        View Details
-                      </a>
-                      {request.status === 'draft' && (
-                        <a
-                          href={`/sign-requests/${request.id}/editor`}
-                          className="text-xs text-blue-600 hover:underline"
-                        >
-                          📝 Edit Fields
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                  <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-xl bg-slate-50 py-12 text-center">
-            <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            <p className="mt-2 text-sm text-slate-600">Chua co quy trinh ky nao</p>
-            <p className="text-xs text-slate-500">Tao quy trinh moi ben duoi</p>
-          </div>
-        )}
-      </section>
-      <section className="card">
-        <h2 className="mb-4 text-xl font-semibold text-slate-900">Tao quy trinh ky</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="text-sm">
-            Tai lieu
-            <select
-              className="input mt-1"
-              value={documentId ?? ""}
-              onChange={(e) => setDocumentId(e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">-- Chon tai lieu --</option>
-              {documents?.map((doc) => (
-                <option key={doc.id} value={doc.id}>
-                  #{doc.id} - {doc.original_file_name || doc.title || `Document #${doc.id}`}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm">
-            Tieu de
-            <input className="input mt-1" value={title} onChange={(e) => setTitle(e.target.value)} />
-          </label>
-          <label className="text-sm md:col-span-2">
-            Loi nhan
-            <textarea className="input mt-1" value={message} onChange={(e) => setMessage(e.target.value)} />
-          </label>
-        </div>
-        <div className="mt-6 space-y-3">
-          <p className="text-sm font-semibold text-slate-700">Nguoi ky</p>
-          {signers.map((signer, index) => (
-            <div key={index} className="grid gap-3 md:grid-cols-2">
-              <input
-                className="input"
-                placeholder="Email"
-                value={signer.email}
-                onChange={(e) => updateSigner(index, "email", e.target.value)}
-              />
-              <input
-                className="input"
-                placeholder="Ten"
-                value={signer.name}
-                onChange={(e) => updateSigner(index, "name", e.target.value)}
-              />
-            </div>
-          ))}
-          <button onClick={addSigner} className="text-sm text-brand-600 hover:underline">
-            + Them nguoi ky
-          </button>
-        </div>
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2 border-b">
         <button
-          onClick={() => createMutation.mutate()}
-          disabled={createMutation.isPending}
-          className="mt-4 rounded-xl bg-brand-600 px-4 py-2 text-white hover:bg-brand-500 disabled:opacity-60"
+          onClick={() => setFilter('all')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            filter === 'all'
+              ? 'border-green-600 text-green-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
         >
-          {createMutation.isPending ? "Dang tao..." : "Gui quy trinh"}
+          Tất cả ({stats.all})
         </button>
-        {createMutation.error && <p className="mt-2 text-sm text-red-600">{(createMutation.error as Error).message}</p>}
-      </section>
-      {createdRequest && (
-        <section className="card">
-          <h2 className="mb-2 text-xl font-semibold text-slate-900">Quy trinh vua tao</h2>
-          <p className="text-sm text-slate-500">ID: {createdRequest.id}</p>
-          <p className="text-sm text-slate-500">Trang thai: {createdRequest.status}</p>
-          <div className="mt-4 space-y-2">
-            {createdRequest.signers?.map((signer) => (
-              <div key={signer.id} className="rounded-xl border border-slate-100 px-4 py-2">
-                <p className="font-medium text-slate-900">{signer.name}</p>
-                <p className="text-sm text-slate-500">{signer.email}</p>
-                <p className="text-xs text-slate-400">{signer.status}</p>
-              </div>
-            ))}
+        <button
+          onClick={() => setFilter('pending')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            filter === 'pending'
+              ? 'border-yellow-600 text-yellow-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Chờ ký ({stats.pending})
+        </button>
+        <button
+          onClick={() => setFilter('completed')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            filter === 'completed'
+              ? 'border-green-600 text-green-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Đã hoàn thành ({stats.completed})
+        </button>
+        <button
+          onClick={() => setFilter('rejected')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            filter === 'rejected'
+              ? 'border-red-600 text-red-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Đã từ chối ({stats.rejected})
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Input
+          placeholder="Tìm theo tên tài liệu hoặc mã số..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      {/* Table */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted/50 border-b">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Mã yêu cầu</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Tên tài liệu</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Người tạo</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Ngày tạo</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Tiến độ</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Trạng thái</th>
+                  <th className="px-4 py-3 text-center text-sm font-medium">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                      Đang tải...
+                    </td>
+                  </tr>
+                ) : filteredData && filteredData.length > 0 ? (
+                  filteredData.map((request) => (
+                    <tr key={request.id} className="border-b hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-sm">
+                          {request.document.document_number || `#${request.id}`}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-medium">
+                          {request.document.title || request.document.original_file_name}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-sm">
+                          {request.document.owner.full_name || request.document.owner.email}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-sm text-muted-foreground">
+                          {dayjs(request.created_at).format('DD/MM/YYYY')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden min-w-[80px]">
+                            <div
+                              className={`h-full transition-all ${getProgressColor(
+                                request.progress.percentage,
+                                request.progress.rejected,
+                                request.status
+                              )}`}
+                              style={{ width: `${request.progress.percentage}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-medium min-w-[50px]">
+                            {request.progress.signed}/{request.progress.total}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {getStatusBadge(request.progress, request.status)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => router.push(`/documents/${request.document.id}`)}
+                          title="Xem chi tiết"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                      {searchQuery ? 'Không tìm thấy yêu cầu ký nào' : 'Chưa có yêu cầu ký nào'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-          <a
-            href={`/sign-requests/${createdRequest.id}`}
-            className="mt-4 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm text-white hover:bg-brand-500"
-          >
-            Xem chi tiet & Gui OTP →
-          </a>
-        </section>
-      )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -281,6 +281,46 @@ export class PublicSignController {
     }
     console.log('✅ Signer status OK:', signer.status);
 
+    // ✨ NEW: Check signing order for sequential workflow
+    if (signer.sign_request.workflow_type === 'sequential') {
+      console.log('🔍 Checking sequential signing order...');
+      
+      // Get all signers ordered by signing_order
+      const allSigners = await prisma.signers.findMany({
+        where: { sign_request_id: signer.sign_request_id },
+        orderBy: { signing_order: 'asc' }
+      });
+
+      // Find previous signers (lower order)
+      const previousSigners = allSigners.filter(s => 
+        (s.signing_order || 0) < (signer.signing_order || 0)
+      );
+
+      // Check if all previous signers have signed
+      const allPreviousSigned = previousSigners.every(s => 
+        s.status === 'completed' || s.status === 'signed'
+      );
+
+      if (!allPreviousSigned) {
+        const pendingSigners = previousSigners.filter(s => 
+          s.status !== 'completed' && s.status !== 'signed'
+        );
+        
+        console.log('❌ Cannot sign yet. Waiting for:', pendingSigners.map(s => ({
+          name: s.name,
+          order: s.signing_order,
+          status: s.status
+        })));
+
+        throw ApiError.badRequest(
+          `Vui lòng đợi người ký trước hoàn thành. ` +
+          `Đang chờ: ${pendingSigners.map(s => s.name || s.email).join(', ')}`
+        );
+      }
+
+      console.log('✅ All previous signers completed. Can proceed.');
+    }
+
     // Verify OTP (inline verification)
     console.log('🔍 OTP verification:', {
       hasOtp: !!signer.otp,
@@ -323,10 +363,11 @@ export class PublicSignController {
     }
 
     // Mark as signed
+    console.log('💾 Updating signer status to completed...');
     await prisma.signers.update({
       where: { id: signer.id },
       data: {
-        status: 'completed',
+        status: 'signed', // Use 'signed' status (will be treated as completed in checks)
         signed_at: new Date(),
         signature_data: body.signature_data,
         signature_type: body.signature_type,
@@ -336,15 +377,29 @@ export class PublicSignController {
         otp_expire: null,
       },
     });
+    console.log('✅ Signer marked as signed');
 
     // Check if all signers have signed
+    console.log('🔍 Checking if all signers completed...');
     const allSigners = await prisma.signers.findMany({
       where: { sign_request_id: signer.sign_request_id },
+      orderBy: { signing_order: 'asc' }
     });
 
-    const allSigned = allSigners.every((s) => s.status === 'completed');
+    console.log('📊 Signers status:', allSigners.map(s => ({
+      name: s.name,
+      order: s.signing_order,
+      status: s.status
+    })));
+
+    // Consider both 'completed' and 'signed' as done
+    const allSigned = allSigners.every((s) => s.status === 'completed' || s.status === 'signed');
+    const signedCount = allSigners.filter(s => s.status === 'completed' || s.status === 'signed').length;
+
+    console.log(`📊 Progress: ${signedCount}/${allSigners.length} signed`);
 
     if (allSigned) {
+      console.log('✅ All signers completed! Updating statuses...');
       // Update sign request status
       await prisma.sign_requests.update({
         where: { id: signer.sign_request_id },
@@ -356,12 +411,27 @@ export class PublicSignController {
         where: { id: signer.sign_request.document_id },
         data: { status: 'completed' },
       });
+      console.log('✅ Sign request and document marked as completed');
     } else {
+      console.log('⏳ Not all signed yet, updating to in_progress...');
       // Update to in_progress
       await prisma.sign_requests.update({
         where: { id: signer.sign_request_id },
         data: { status: 'in_progress' },
       });
+      console.log('✅ Sign request marked as in_progress');
+      
+      // TODO: Send email to next signer in sequential workflow
+      if (signer.sign_request.workflow_type === 'sequential') {
+        const nextSigner = allSigners.find(s => 
+          (s.status === 'pending' || s.status === 'otp_sent') && 
+          s.signing_order > (signer.signing_order || 0)
+        );
+        if (nextSigner) {
+          console.log(`📧 TODO: Send email to next signer: ${nextSigner.name} (${nextSigner.email})`);
+          // Email notification will be implemented later
+        }
+      }
     }
 
     res.json(

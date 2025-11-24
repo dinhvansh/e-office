@@ -18,6 +18,8 @@ const createSchema = z
     visibility_scope: z.string().optional(),
     
     // Workflow options
+    workflow_id: z.coerce.number().int().positive().optional(),
+    
     adhoc_steps: z.array(z.object({
       approver_user_id: z.number(),
       due_in_days: z.number().min(1).max(365),

@@ -11,6 +11,9 @@ signRequestsRouter.use(authGuard);
 signRequestsRouter.get("/", asyncHandler(controller.list));
 signRequestsRouter.post("/", asyncHandler(controller.create));
 
+// My requests route (must come before /:id)
+signRequestsRouter.get("/my-requests", asyncHandler(controller.getMyRequests));
+
 // Specific routes MUST come before generic /:id route
 // Signers management routes
 signRequestsRouter.post("/:id/signers", asyncHandler(controller.addSigner));
