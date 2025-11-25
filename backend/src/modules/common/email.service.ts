@@ -21,6 +21,78 @@ class EmailService {
     });
   }
 
+  async sendSignRequestWithOTP(data: {
+    recipientEmail: string;
+    recipientName: string;
+    documentTitle: string;
+    senderName: string;
+    message?: string;
+    signUrl: string;
+    otp: string;
+    expiryMinutes: number;
+  }): Promise<void> {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+          .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+          .otp-box { background: white; border: 2px dashed #667eea; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; }
+          .otp-code { font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 8px; }
+          .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📝 Yêu cầu ký tài liệu</h1>
+          </div>
+          <div class="content">
+            <p>Xin chào <strong>${data.recipientName}</strong>,</p>
+            <p><strong>${data.senderName}</strong> đã gửi cho bạn yêu cầu ký tài liệu:</p>
+            <p><strong>Tài liệu:</strong> ${data.documentTitle}</p>
+            ${data.message ? `<p><strong>Lời nhắn:</strong> ${data.message}</p>` : ""}
+            
+            <p>Vui lòng nhấn vào nút bên dưới để xem và ký tài liệu:</p>
+            <a href="${data.signUrl}" class="button">Xem và ký tài liệu</a>
+            <p style="color: #666; font-size: 14px;">Hoặc copy link sau vào trình duyệt:<br>${data.signUrl}</p>
+            
+            <div class="otp-box">
+              <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">🔐 Mã OTP xác thực của bạn:</p>
+              <div class="otp-code">${data.otp}</div>
+            </div>
+
+            <div class="warning">
+              <strong>⚠️ Lưu ý:</strong>
+              <ul style="margin: 10px 0; padding-left: 20px;">
+                <li>Mã OTP này có hiệu lực trong <strong>${data.expiryMinutes} phút</strong></li>
+                <li>Nếu mã hết hạn, bạn có thể yêu cầu gửi lại OTP trên trang ký</li>
+                <li>Không chia sẻ mã này với bất kỳ ai</li>
+              </ul>
+            </div>
+          </div>
+          <div class="footer">
+            <p>Email này được gửi tự động từ WP Sign. Vui lòng không trả lời email này.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    await sendEmail({
+      to: data.recipientEmail,
+      subject: `Yêu cầu ký tài liệu: ${data.documentTitle}`,
+      html,
+      text: `Xin chào ${data.recipientName},\n\n${data.senderName} đã gửi cho bạn yêu cầu ký tài liệu: ${data.documentTitle}\n\nVui lòng truy cập: ${data.signUrl}\n\nMã OTP: ${data.otp}\n(Có hiệu lực trong ${data.expiryMinutes} phút)`,
+    });
+  }
+
   async sendSignRequestNotification(data: {
     recipientEmail: string;
     recipientName: string;

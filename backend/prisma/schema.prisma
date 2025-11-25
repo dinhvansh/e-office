@@ -121,6 +121,7 @@ model signers {
   name           String?
   role           String?
   signing_order  Int?          // Thứ tự ký (1, 2, 3...) cho sequential signing
+  is_internal    Boolean       @default(false) // true = internal user, false = external signer
   status         String?
   otp            String?
   otp_expire     DateTime?

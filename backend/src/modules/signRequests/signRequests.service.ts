@@ -215,7 +215,55 @@ class SignRequestsService {
     // Update status to pending
     await signRequestsRepository.updateStatus(id, tenantId, "pending");
 
-    // TODO: Send email notifications with signing links
+    // Reload signers with updated tokens
+    const signersWithTokens = await signersRepository.findBySignRequest(id);
+
+    // Send email notifications with signing links
+    const { emailService } = await import('../common/email.service');
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    
+    // Get sender info
+    const sender = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { full_name: true, email: true }
+    });
+    
+    // Generate OTP and send email to each external signer
+    for (const signer of signersWithTokens) {
+      if (!signer.is_internal && signer.signing_token) {
+        const signUrl = `${frontendUrl}/sign/${signer.signing_token}`;
+        
+        // Generate OTP immediately
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const bcrypt = require('bcrypt');
+        const otpHash = await bcrypt.hash(otp, 10);
+        const otpExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        
+        // Save OTP to database
+        await signersRepository.update(signer.id, {
+          otp: otpHash,
+          otp_expire: otpExpire,
+          status: 'otp_sent'
+        });
+        
+        try {
+          // Send email with both signing URL and OTP
+          await emailService.sendSignRequestWithOTP({
+            recipientEmail: signer.email,
+            recipientName: signer.name,
+            documentTitle: signRequest.title || signRequest.document?.title || 'Document',
+            senderName: sender?.full_name || sender?.email || 'System',
+            message: signRequest.message,
+            signUrl: signUrl,
+            otp: otp,
+            expiryMinutes: 10
+          });
+          console.log(`📧 Sign request email (with OTP) sent to: ${signer.email}`);
+        } catch (error) {
+          console.error(`❌ Failed to send email to ${signer.email}:`, error.message);
+        }
+      }
+    }
 
     await auditService.record({
       tenantId,

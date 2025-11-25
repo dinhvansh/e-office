@@ -5,6 +5,7 @@ import { ok } from '../../core/utils/response';
 import { ApiError } from '../../core/errors/api-error';
 import { signRequestFieldValuesService } from '../signRequests/signRequestFieldValues.service';
 import { signersService } from '../signers/signers.service';
+import { pdfSigningService } from './pdfSigning.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -232,6 +233,47 @@ export class PublicSignController {
     }
 
     res.json(ok(payload));
+  };
+
+  /**
+   * Download signed PDF with all signatures
+   * GET /public/sign/:token/download-signed
+   */
+  downloadSignedPdf = async (req: Request, res: Response): Promise<void> => {
+    const { token } = req.params;
+
+    // Find signer by token
+    const signer = await prisma.signers.findUnique({
+      where: { signing_token: token },
+      include: {
+        sign_request: {
+          include: {
+            document: true,
+          },
+        },
+      },
+    });
+
+    if (!signer) {
+      throw ApiError.notFound('Invalid signing link');
+    }
+
+    // Check if signer has signed
+    if (signer.status !== 'signed' && signer.status !== 'completed') {
+      throw ApiError.badRequest('You must sign the document first');
+    }
+
+    // Generate signed PDF
+    const pdfBuffer = await pdfSigningService.generateSignedPdf(signer.sign_request_id);
+
+    // Send PDF as download
+    const filename = `${signer.sign_request.document.original_file_name || 'document'}_signed.pdf`;
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    res.send(pdfBuffer);
   };
 
   /**

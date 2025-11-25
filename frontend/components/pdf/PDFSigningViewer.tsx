@@ -33,6 +33,7 @@ interface PDFSigningViewerProps {
   completedFieldIds?: number[]; // Fields that have been signed
   guidedMode?: boolean; // Whether in guided mode
   onFieldComplete?: (fieldId: number, signature: string) => void; // Callback when field is signed
+  existingFieldValues?: Record<number, string>; // Existing field values from parent
 }
 
 export default function PDFSigningViewer({
@@ -45,6 +46,7 @@ export default function PDFSigningViewer({
   completedFieldIds = [],
   guidedMode = false,
   onFieldComplete,
+  existingFieldValues = {},
 }: PDFSigningViewerProps) {
   console.log('🔄 PDFSigningViewer render - guidedMode:', guidedMode);
   console.log('🔄 currentFieldId:', currentFieldId);
@@ -57,10 +59,16 @@ export default function PDFSigningViewer({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [activeFieldId, setActiveFieldId] = useState<number | null>(null);
-  const [fieldSignatures, setFieldSignatures] = useState<Record<number, string>>({});
+  const [fieldSignatures, setFieldSignatures] = useState<Record<number, string>>(existingFieldValues);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [pageRendering, setPageRendering] = useState(false);
   const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 });
+
+  // Sync fieldSignatures with existingFieldValues from parent
+  useEffect(() => {
+    console.log('🔄 Syncing existingFieldValues:', existingFieldValues);
+    setFieldSignatures(existingFieldValues);
+  }, [existingFieldValues]);
 
   // Initialize SignaturePad when canvas is active
   useEffect(() => {
@@ -310,12 +318,8 @@ export default function PDFSigningViewer({
                   style={{
                     left: `${(field.x / 100) * pdfDimensions.width}px`,
                     top: `${(field.y / 100) * pdfDimensions.height}px`,
-                    width: isActive 
-                      ? `${(field.width / 100) * pdfDimensions.width * 1.2}px` 
-                      : `${(field.width / 100) * pdfDimensions.width}px`,
-                    height: isActive 
-                      ? `${(field.height / 100) * pdfDimensions.height * 2}px` 
-                      : `${(field.height / 100) * pdfDimensions.height}px`,
+                    width: `${(field.width / 100) * pdfDimensions.width}px`,
+                    height: `${(field.height / 100) * pdfDimensions.height}px`,
                   }}
                   onClick={() => {
                     console.log('🖱️ Field clicked:', field.id, { 

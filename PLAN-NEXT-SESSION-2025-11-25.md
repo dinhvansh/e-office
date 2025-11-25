@@ -1,419 +1,160 @@
-# 📋 Plan for Next Session: 2025-11-25
+# Plan for Next Session - 2025-11-25
 
-## 🎯 Current Status Summary
+## 🎯 Goal
+Complete internal-to-external signing flow test (remaining 38% = 5/13 steps)
 
-### ✅ What's Working (100%)
-1. **Signing Flow** - Complete end-to-end
-   - Guided mode with step-by-step
-   - PDF field positioning
-   - Signature canvas (draw/upload/type)
-   - OTP verification
-   - Submit signatures ✅ FIXED!
-   
-2. **Sidebar** - Right side with full info
-   - Status badge + progress bar
-   - Document information
-   - Signers list with status
-   - Activity history timeline
+## ✅ Current Status (62% Complete - 8/13 steps)
 
-3. **Thank You Page** - Beautiful animated page
-   - Gradient header
-   - Info grid (Document + Signer)
-   - Next steps section
-   - Print + Close buttons
+**Working:**
+- ✅ Admin login
+- ✅ Document management
+- ✅ Signer configuration
+- ✅ Send sign request
+- ✅ Submit for approval
+- ✅ Approver login
+- ✅ Get pending approvals
+- ✅ Workflow instance created
 
-4. **Approval System** - Fixed routes & permissions
-   - My pending approvals working
-   - Approval detail page working
-   - Backend API all working
+**Blocked:**
+- ❌ Approve with signature (duplicate submission issue)
+- ⏸️ Get external signer token
+- ⏸️ Send OTP
+- ⏸️ External sign
+- ⏸️ Download signed PDF
 
-### ⚠️ Known Issues
-1. **PDF Download** - Placeholder only (needs implementation)
-2. **Mobile Testing** - Not fully tested yet
-3. **Email SMTP** - Authentication issues (using console log)
+## 🔧 Issues Found
 
----
+### Issue 1: Duplicate Submission
+**Problem**: Test script tries to submit document that already has workflow
+**Evidence**: 
+- Workflow instance ID 21 exists
+- Approval ID 21 exists
+- Error: "Document already has an active workflow"
 
-## 🎯 Recommended Next Steps
+**Solution Options**:
+1. **Option A**: Skip step 6 if workflow exists (check first)
+2. **Option B**: Create fresh document each test run
+3. **Option C**: Clean up workflow before re-testing
 
-### Option 1: Complete Signing Flow Polish (Recommended)
-**Duration**: 2-3 hours  
-**Priority**: HIGH  
-**Why**: Finish what we started, make it production-ready
+**Recommended**: Option A (check before submit)
 
-#### Tasks:
-1. **Implement PDF Download** (1 hour)
-   - Create backend endpoint: `GET /public/sign/:token/download-signed`
-   - Add signatures to PDF using pdf-lib
-   - Add "SIGNED" watermark
-   - Update ThankYouPage component
-   - Test download functionality
+### Issue 2: Wrong Approver
+**Problem**: Approval assigned to admin (user ID 1) instead of approver user
+**Evidence**: Approval record shows approver_user_id: 1
+**Expected**: Should be approver@acme.local user
 
-2. **Mobile Optimization** (1 hour)
-   - Test on iPhone/Android simulators
-   - Fix responsive issues
-   - Optimize touch targets (min 44px)
-   - Test print on mobile
-   - Adjust font sizes if needed
+**Solution**: Fix workflow step approver assignment
 
-3. **End-to-End Testing** (30 mins)
-   - Test complete flow with real data
-   - Test all 3 signing methods (draw/upload/type)
-   - Test guided mode vs manual mode
-   - Test on different browsers
-   - Document any bugs
+## 📝 Action Items for Next Session
 
-4. **Bug Fixes** (30 mins)
-   - Fix any issues found during testing
-   - Improve error messages
-   - Add loading states
-   - Polish animations
-
-**Deliverables**:
-- ✅ Working PDF download
-- ✅ Mobile-optimized UI
-- ✅ Tested on all browsers
-- ✅ Production-ready signing flow
-
----
-
-### Option 2: Approval System Enhancement
-**Duration**: 2-3 hours  
-**Priority**: MEDIUM  
-**Why**: Approval system is working but needs polish
-
-#### Tasks:
-1. **Approval Detail Page** (1 hour)
-   - Fix PDF viewing (404 error)
-   - Add signature modal for approvers
-   - Add comment field
-   - Test approve/reject flow
-
-2. **Approval List Improvements** (30 mins)
-   - Add filters (pending/approved/rejected)
-   - Add search functionality
-   - Add sorting options
-   - Improve UI/UX
-
-3. **Email Notifications** (30 mins)
-   - Test approval request emails
-   - Test approval action emails
-   - Fix SMTP if possible
-   - Document email setup
-
-4. **Testing** (30 mins)
-   - Test with multiple approvers
-   - Test sequential approval
-   - Test rejection flow
-   - Test request info flow
-
-**Deliverables**:
-- ✅ Complete approval flow
-- ✅ Working email notifications
-- ✅ Tested with real scenarios
-- ✅ Production-ready approval system
-
----
-
-### Option 3: Dashboard & Analytics
-**Duration**: 3-4 hours  
-**Priority**: LOW  
-**Why**: Nice to have, but not critical
-
-#### Tasks:
-1. **Dashboard Page** (2 hours)
-   - Create dashboard layout
-   - Add KPI cards (total docs, pending, completed)
-   - Add recent activity feed
-   - Add charts (documents by status, by type)
-
-2. **Reports** (1 hour)
-   - Document report (by date range)
-   - User activity report
-   - Signing statistics
-   - Export to Excel/PDF
-
-3. **Search & Filter** (1 hour)
-   - Global search
-   - Advanced filters
-   - Saved searches
-   - Quick filters
-
-**Deliverables**:
-- ✅ Dashboard with KPIs
-- ✅ Basic reports
-- ✅ Search functionality
-
----
-
-## 💡 My Recommendation
-
-**Go with Option 1: Complete Signing Flow Polish**
-
-**Reasons**:
-1. ✅ Signing flow is 95% done - just needs final touches
-2. ✅ PDF download is expected feature
-3. ✅ Mobile optimization is critical for real users
-4. ✅ Will make the system production-ready
-5. ✅ Can demo to stakeholders after this
-
-**After Option 1, then do**:
-- Option 2 (Approval System) - 1 more session
-- Option 3 (Dashboard) - 1-2 more sessions
-
----
-
-## 📝 Detailed Plan for Option 1
-
-### Task 1: Implement PDF Download (1 hour)
-
-#### Backend (30 mins)
-```typescript
-// File: backend/src/modules/public/publicSign.controller.ts
-
-/**
- * Download signed document
- * GET /public/sign/:token/download-signed
- */
-downloadSignedDocument = async (req: Request, res: Response) => {
-  const { token } = req.params;
+### Priority 1: Fix Test Script (15 mins)
+```javascript
+// Step 6: Check if workflow exists before submitting
+async function step6_SubmitForApproval() {
+  // Check if workflow instance exists
+  const existing = await checkWorkflowInstance(documentId);
   
-  // 1. Find signer by token
-  // 2. Verify signer has signed
-  // 3. Load original PDF
-  // 4. Add signatures using pdf-lib
-  // 5. Add "SIGNED" watermark
-  // 6. Stream to response
+  if (existing) {
+    console.log('⏭️  Workflow already exists, skipping submission');
+    approvalId = existing.approval_id;
+    return true;
+  }
+  
+  // Submit for approval
+  const response = await axios.post(...);
+  approvalId = response.data.data.id;
+  return true;
 }
 ```
 
-**Steps**:
-1. Install pdf-lib: `npm install pdf-lib`
-2. Create download endpoint
-3. Load original PDF from storage
-4. Add signature images to PDF
-5. Add watermark/stamp
-6. Set proper headers
-7. Stream to response
-
-#### Frontend (30 mins)
-```typescript
-// File: frontend/components/signing/ThankYouPage.tsx
-
-const handleDownload = async () => {
-  setDownloading(true);
-  try {
-    const response = await fetch(
-      `${apiBase}/public/sign/${token}/download-signed`
-    );
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${documentTitle}_Signed_${date}.pdf`;
-    a.click();
-    toast.success('Tải xuống thành công!');
-  } catch (error) {
-    toast.error('Không thể tải xuống');
-  } finally {
-    setDownloading(false);
-  }
-};
+### Priority 2: Fix Approver Assignment (30 mins)
+**Check workflow step configuration:**
+```sql
+SELECT * FROM workflow_steps WHERE workflow_id = 12;
 ```
 
-**Steps**:
-1. Add download state
-2. Implement download function
-3. Update button to call function
-4. Add loading spinner
-5. Test download
+**Expected**: 
+- approver_type: 'role' or 'user'
+- approver_id: Should point to Manager role or approver user
 
----
+**Fix if needed**: Update workflow step or create new workflow
 
-### Task 2: Mobile Optimization (1 hour)
+### Priority 3: Complete Remaining Steps (1 hour)
 
-#### Responsive Testing (30 mins)
-**Devices to test**:
-- iPhone 12 (390px)
-- iPhone SE (375px)
-- Samsung Galaxy S20 (360px)
-- iPad (768px)
+**Step 9: Approve with Signature**
+- Use approval ID from database
+- Call approve endpoint with signature data
+- Verify status changes to 'approved'
 
-**What to check**:
-- [ ] Sidebar responsive (hide on mobile?)
-- [ ] PDF viewer scales correctly
-- [ ] Buttons are tappable (min 44px)
-- [ ] Text is readable
-- [ ] No horizontal scroll
-- [ ] Signature canvas works with touch
-- [ ] Thank you page looks good
+**Step 10: Get External Signer Token**
+- Query signers table for external signer
+- Get signing_token field
+- Verify token exists
 
-#### Fixes (30 mins)
-```typescript
-// Sidebar: Hide on mobile, show as overlay
-<div className="hidden lg:block w-96 ...">
-  <SigningSidebar ... />
-</div>
+**Step 11: Send OTP**
+- Call public API to send OTP
+- Get OTP from response (dev mode)
+- Store for next step
 
-// Mobile menu button
-<button className="lg:hidden ...">
-  Show Info
-</button>
+**Step 12: External Sign**
+- Use token + OTP to sign
+- Submit signature data
+- Verify signer status = 'signed'
 
-// Buttons: Larger on mobile
-<Button className="py-6 text-lg md:py-4 md:text-base">
-  Sign
-</Button>
+**Step 13: Download Signed PDF**
+- Call download endpoint
+- Save PDF file
+- Verify file size > 0
+
+## 🧪 Testing Commands
+
+```bash
+# 1. Setup fresh test data
+cd backend
+node scripts/setup-full-test-flow.js
+
+# 2. Update test script with new document ID
+# Edit test-internal-to-external-flow.js line 61-62
+
+# 3. Run full test
+node scripts/test-internal-to-external-flow.js
+
+# 4. Debug if needed
+node scripts/debug-approval-creation.js
 ```
-
----
-
-### Task 3: End-to-End Testing (30 mins)
-
-#### Test Scenarios
-1. **Happy Path**
-   - Upload document
-   - Add fields
-   - Send to signer
-   - Signer receives email
-   - Signer signs (guided mode)
-   - Thank you page shows
-   - Download works
-
-2. **Error Scenarios**
-   - Expired OTP
-   - Invalid signature
-   - Network error
-   - Already signed
-
-3. **Edge Cases**
-   - Multiple signers
-   - Large PDF (>10MB)
-   - Many fields (>20)
-   - Mobile device
-
-#### Test Checklist
-```markdown
-- [ ] Upload document (Chrome)
-- [ ] Add 3 signature fields
-- [ ] Send to signer
-- [ ] Open signing link
-- [ ] Enter OTP
-- [ ] Start guided mode
-- [ ] Sign all fields
-- [ ] Submit signatures
-- [ ] Thank you page shows
-- [ ] Download PDF
-- [ ] Verify signatures in PDF
-- [ ] Test on Firefox
-- [ ] Test on Safari
-- [ ] Test on mobile
-```
-
----
-
-### Task 4: Bug Fixes & Polish (30 mins)
-
-#### Known Issues to Fix
-1. **Loading States**
-   - Add spinner during submit
-   - Add skeleton during PDF load
-   - Add progress during download
-
-2. **Error Messages**
-   - Better OTP error messages
-   - Network error handling
-   - Validation error messages
-
-3. **Animations**
-   - Smooth transitions
-   - Loading animations
-   - Success animations
-
-4. **Accessibility**
-   - Keyboard navigation
-   - Screen reader support
-   - Focus management
-
----
 
 ## 📊 Success Criteria
 
-### Must Have ✅
-- [ ] PDF download works
-- [ ] Mobile responsive
-- [ ] All browsers tested
-- [ ] No critical bugs
-- [ ] Thank you page perfect
+- ✅ All 13 steps pass (100%)
+- ✅ Workflow completes successfully
+- ✅ External signer signs document
+- ✅ Signed PDF downloaded
+- ✅ No errors in test output
 
-### Nice to Have 🎯
-- [ ] Keyboard navigation
-- [ ] Accessibility compliant
-- [ ] Performance optimized
-- [ ] Error recovery
+## 🎯 Estimated Time
 
----
+- Fix test script: 15 mins
+- Fix approver assignment: 30 mins
+- Complete remaining steps: 1 hour
+- Testing & verification: 15 mins
 
-## 🚀 Quick Start Commands
+**Total**: ~2 hours to 100% completion
 
-```bash
-# Start all servers
-cd backend && npm run dev
-cd frontend && npm run dev
-cd license-server && npm run dev
+## 📚 Reference Files
 
-# Get test data
-cd backend
-node scripts/quick-test-guided.js
+- Test script: `backend/scripts/test-internal-to-external-flow.js`
+- Setup script: `backend/scripts/setup-full-test-flow.js`
+- Debug script: `backend/scripts/debug-approval-creation.js`
+- Schema: `backend/prisma/schema.prisma`
+- Approvals service: `backend/src/modules/approvals/approvals.service.ts`
 
-# Test signing flow
-# Open: http://localhost:3000/sign/[token]
-# Email: [from script]
-# OTP: [from script]
-```
+## 💡 Key Insights
 
----
+1. **Workflow system working** - Instance and approval created successfully
+2. **Permission system working** - Manager role has correct permissions
+3. **Schema fixed** - `is_internal` field added and working
+4. **Test infrastructure solid** - Just needs minor fixes
 
-## 📝 Files to Work On
+## 🚀 Ready to Complete!
 
-### Backend
-- `backend/src/modules/public/publicSign.controller.ts` (download endpoint)
-- `backend/src/modules/public/publicSign.routes.ts` (add route)
-
-### Frontend
-- `frontend/components/signing/ThankYouPage.tsx` (download button)
-- `frontend/app/sign/[token]/page.tsx` (mobile responsive)
-- `frontend/components/signing/SigningSidebar.tsx` (mobile hide/show)
-
-### Testing
-- Create `test-complete-signing-flow.js`
-- Create `test-mobile-responsive.md`
-- Update `TEST-GUIDED-SIGNING-MANUAL.md`
-
----
-
-## 🎯 Expected Outcome
-
-After this session:
-- ✅ **Production-ready signing flow**
-- ✅ **PDF download working**
-- ✅ **Mobile optimized**
-- ✅ **Fully tested**
-- ✅ **Ready to demo**
-
-**Then we can move to**:
-- Approval system polish
-- Dashboard & analytics
-- Advanced features
-
----
-
-**Estimated Total Time**: 2-3 hours  
-**Priority**: 🔴 HIGH  
-**Status**: Ready to start
-
----
-
-**Created**: 2025-11-24  
-**For Session**: 2025-11-25  
-**Recommended**: Option 1 - Complete Signing Flow Polish
+All major blockers resolved. Next session should achieve 100% test completion with minimal effort.

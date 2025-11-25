@@ -102,17 +102,37 @@ export function PDFCanvasViewer({
     if (!canvasRef.current || !selectedSignerId) return;
     
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    // ✅ Convert pixel to percentage (0-100%)
+    const xPercent = (clickX / rect.width) * 100;
+    const yPercent = (clickY / rect.height) * 100;
+
+    // ✅ Convert size from pixel to percentage
+    const widthPx = selectedFieldType === 'signature' ? 200 : selectedFieldType === 'checkbox' ? 30 : 150;
+    const heightPx = selectedFieldType === 'signature' ? 80 : selectedFieldType === 'checkbox' ? 30 : 40;
+    const widthPercent = (widthPx / rect.width) * 100;
+    const heightPercent = (heightPx / rect.height) * 100;
+
+    console.log('🎯 Click position:', { 
+      pixel: { x: clickX, y: clickY }, 
+      percent: { x: xPercent.toFixed(2), y: yPercent.toFixed(2) },
+      canvasSize: { width: rect.width, height: rect.height }
+    });
+    console.log('📏 Field size:', {
+      pixel: { width: widthPx, height: heightPx },
+      percent: { width: widthPercent.toFixed(2), height: heightPercent.toFixed(2) }
+    });
 
     // Add field at clicked position with selected signer
     const signer = signers.find(s => s.id === selectedSignerId);
     onFieldAdd?.({
       type: selectedFieldType,
-      x,
-      y,
-      width: selectedFieldType === 'signature' ? 200 : selectedFieldType === 'checkbox' ? 30 : 150,
-      height: selectedFieldType === 'signature' ? 80 : selectedFieldType === 'checkbox' ? 30 : 40,
+      x: xPercent,  // ✅ Save as percentage
+      y: yPercent,  // ✅ Save as percentage
+      width: widthPercent,  // ✅ Save as percentage
+      height: heightPercent,  // ✅ Save as percentage
       page: pageNum,
       assigned_signer_id: selectedSignerId,
       signer_name: signer?.name,
@@ -202,6 +222,13 @@ export function PDFCanvasViewer({
               const colorIndex = signer ? (signer.signing_order - 1) % colors.length : 0;
               const color = colors[colorIndex];
               
+              // ✅ Convert percentage to pixel for rendering
+              const canvasRect = canvasRef.current?.getBoundingClientRect();
+              const leftPx = canvasRect ? (field.x / 100) * canvasRect.width : field.x;
+              const topPx = canvasRect ? (field.y / 100) * canvasRect.height : field.y;
+              const widthPx = canvasRect ? (field.width / 100) * canvasRect.width : field.width;
+              const heightPx = canvasRect ? (field.height / 100) * canvasRect.height : field.height;
+              
               return (
                 <div
                   key={field.id}
@@ -213,20 +240,23 @@ export function PDFCanvasViewer({
                   onDragEnd={(e) => {
                     if (!canvasRef.current) return;
                     const rect = canvasRef.current.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
+                    const dragX = e.clientX - rect.left;
+                    const dragY = e.clientY - rect.top;
                     
-                    if (x >= 0 && y >= 0 && x <= rect.width && y <= rect.height) {
-                      onFieldMove?.(field.id, x, y);
+                    if (dragX >= 0 && dragY >= 0 && dragX <= rect.width && dragY <= rect.height) {
+                      // ✅ Convert pixel to percentage when moving
+                      const xPercent = (dragX / rect.width) * 100;
+                      const yPercent = (dragY / rect.height) * 100;
+                      onFieldMove?.(field.id, xPercent, yPercent);
                     }
                     setDraggingField(null);
                   }}
                   className={`absolute border-2 ${color.border} ${color.bg} bg-opacity-30 cursor-move ${color.hover}`}
                   style={{
-                    left: field.x,
-                    top: field.y,
-                    width: field.width,
-                    height: field.height,
+                    left: `${leftPx}px`,      // ✅ Use pixel for CSS
+                    top: `${topPx}px`,        // ✅ Use pixel for CSS
+                    width: `${widthPx}px`,    // ✅ Convert % to pixel
+                    height: `${heightPx}px`,  // ✅ Convert % to pixel
                   }}
                 >
                   <div className={`text-xs ${color.text} p-1 font-semibold`}>
