@@ -256,8 +256,8 @@ export default function SignRequestEditorPage() {
                     const newField: Field = {
                       ...field,
                       type: selectedFieldType,
-                      width: selectedFieldType === 'signature' ? 200 : selectedFieldType === 'checkbox' ? 30 : 150,
-                      height: selectedFieldType === 'signature' ? 80 : selectedFieldType === 'checkbox' ? 30 : 40,
+                      // ✅ Use width/height from PDFCanvasViewer (already in percentage)
+                      // Don't override with fixed pixel values
                       required: true,
                       label: `${selectedFieldType.charAt(0).toUpperCase() + selectedFieldType.slice(1)} Field`,
                       assigned_signer_id: selectedSigner,
@@ -269,6 +269,12 @@ export default function SignRequestEditorPage() {
                     const index = parseInt(id.replace('field-', ''));
                     const newFields = [...fields];
                     newFields[index] = { ...newFields[index], x, y };
+                    setFields(newFields);
+                  }}
+                  onFieldResize={(id, width, height) => {
+                    const index = parseInt(id.replace('field-', ''));
+                    const newFields = [...fields];
+                    newFields[index] = { ...newFields[index], width, height };
                     setFields(newFields);
                   }}
                 />

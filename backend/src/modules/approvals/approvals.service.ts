@@ -144,12 +144,20 @@ class ApprovalsService {
     // Get approvers for first step
     const approverIds = await approvalsRepository.getApproversForStep(
       firstStep.id,
-      tenantId
+      tenantId,
+      documentId // Pass documentId for manager lookup
     );
 
     if (approverIds.length === 0) {
+      // Check if it's a manager step and provide specific error
+      if (firstStep.approver_type === 'manager') {
+        throw ApiError.badRequest(
+          'Bạn chưa được phân công quản lý trực tiếp. Vui lòng liên hệ admin để cập nhật thông tin.',
+          'NO_MANAGER_ASSIGNED'
+        );
+      }
       throw ApiError.badRequest(
-        'No approvers found for first step',
+        'Không tìm thấy người phê duyệt cho bước đầu tiên',
         'NO_APPROVERS_FOUND'
       );
     }
@@ -368,7 +376,8 @@ class ApprovalsService {
     // Move to next step
     const nextApproverIds = await approvalsRepository.getApproversForStep(
       nextStep.id,
-      tenantId
+      tenantId,
+      approval.document_id // Pass documentId for manager lookup
     );
 
     if (nextApproverIds.length === 0) {

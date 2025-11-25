@@ -26,8 +26,8 @@ async function testSendEmail() {
   console.log('Host:', config.host);
   console.log('Port:', config.port);
   console.log('Secure:', config.secure);
-  console.log('User:', config.auth.user);
-  console.log('Password:', '***' + config.auth.pass.slice(-4));
+  console.log('User:', config.auth?.user || 'undefined (console mode)');
+  console.log('Password:', config.auth?.pass ? '***' + config.auth.pass.slice(-4) : 'undefined (console mode)');
   console.log('════════════════════════════════════════════════════════════\n');
   
   try {

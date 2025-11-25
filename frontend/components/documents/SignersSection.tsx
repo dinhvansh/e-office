@@ -1,9 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import { Plus, Trash2, User, Building2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,25 +24,11 @@ export interface Signer {
 interface SignersSectionProps {
   signers: Signer[];
   onChange: (signers: Signer[]) => void;
+  externalOrgs: any[]; // Pass from parent to avoid multiple API calls
 }
 
-export function SignersSection({ signers, onChange }: SignersSectionProps) {
-  const { fetchJson } = useAuth();
-
-  // Fetch external organizations
-  const { data: externalOrgs, isLoading: isLoadingOrgs } = useQuery({
-    queryKey: ["external-orgs"],
-    queryFn: async () => {
-      const response = await fetchJson<any>("/external-orgs");
-      console.log("📦 External orgs RAW response:", response);
-      // fetchJson already unwraps .data, so response IS the array
-      const orgs = Array.isArray(response) ? response : [];
-      console.log("📦 External orgs PARSED:", orgs);
-      return orgs;
-    },
-  });
-
-  console.log("🏢 External orgs FINAL:", externalOrgs, "Loading:", isLoadingOrgs);
+export function SignersSection({ signers, onChange, externalOrgs }: SignersSectionProps) {
+  const isLoadingOrgs = false; // Data already loaded by parent
 
   const addSigner = (type: "manual" | "external") => {
     const newSigner: Signer = {
@@ -69,12 +52,8 @@ export function SignersSection({ signers, onChange }: SignersSectionProps) {
   };
 
   const updateSigner = (id: string, field: keyof Signer, value: any) => {
-    console.log("🔄 updateSigner called:", { id, field, value });
-    console.log("📊 Current signers:", signers);
     const updated = signers.map((s) => (s.id === id ? { ...s, [field]: value } : s));
-    console.log("✅ Updated signers:", updated);
     onChange(updated);
-    console.log("📤 onChange called with updated signers");
   };
 
   return (

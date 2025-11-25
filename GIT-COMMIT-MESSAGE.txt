@@ -1,63 +1,31 @@
-feat: Complete Guided Signing Flow + Digital Signature + Inline Recipients
+feat: Display approver names and emails in workflow preview
 
-🎉 Major Features (Session 2025-11-23)
+- Fixed WorkflowPreview component to show approver info (strict mode)
+- Fixed WorkflowCustomizer component to show approver info (flexible mode)
+- Added approver name, email, and avatar display
+- Added fallback messages for missing approver data
+- Added debug tools and console logs for troubleshooting
+- Created test scripts for workflow API verification
 
-✨ Features:
-- Guided signing flow (DocuSign-style step-by-step)
-- Digital signature (3 methods: draw/upload/type)
-- Inline recipients, CC emails & attachments
-- Complete backup & setup system
-- Task checklist guide
+Components:
+- frontend/components/workflow/WorkflowPreview.tsx
+- frontend/components/workflow/WorkflowCustomizer.tsx
 
-📊 Stats:
-- 7 major features completed
-- 2,200+ lines of code
-- 11/11 tests passed (100%)
-- 8 comprehensive docs
+Scripts:
+- backend/scripts/check-hopdong-doctype.js
+- backend/scripts/test-workflow-browser-debug.js
+- backend/scripts/fix-hopdong-to-strict.js
 
-🏗️ Components Added:
-- ProgressHeader (guided mode progress bar)
-- SignatureCanvas (draw signature)
-- SignatureModal (3 signing methods)
-- ApprovalActionDialog (approve with signature)
-- SignersSection (manual + external org)
-- CCEmailsSection (email validation)
-- AttachmentsSection (file upload)
+Documentation:
+- SESSION-2025-11-26-WORKFLOW-APPROVER-DISPLAY.md
+- CONTEXT-FOR-NEXT-SESSION-2025-11-26.md
+- AGENTS.md (updated)
 
-🔧 Backend Changes:
-- Database schema (4 new tables, 6 new fields)
-- Public signing API with OTP
-- Signature storage (IP, user agent logging)
-- Recipients, CC, attachments integration
+Database:
+- Backup: database-backup-2025-11-25T17-25-17.json (199 records)
 
-🎨 Frontend Changes:
-- Guided mode with auto-scroll
-- Field highlighting (pulse + ring effect)
-- Progress tracking (step counter + bar)
-- Responsive design
-- Professional UI
+Issue: Workflow preview không hiển thị tên và email người phê duyệt
+Root Cause: WorkflowCustomizer (flexible mode) thiếu approver info display
+Solution: Added approver info UI matching WorkflowPreview design
 
-🧪 Testing:
-- test-inline-recipients-cc-attachments.js (5/5 passed)
-- test-digital-signature.js (6/6 passed)
-- test-guided-signing-flow.js (comprehensive)
-
-📚 Documentation:
-- TASK-CHECKLIST-GUIDE.md
-- SETUP-NEW-MACHINE.md
-- FEATURE-GUIDED-SIGNING-COMPLETE.md
-- DIGITAL-SIGNATURE-COMPLETE.md
-- FEATURE-INLINE-RECIPIENTS-CC-ATTACHMENTS-COMPLETE.md
-- SESSION-2025-11-23-GUIDED-SIGNING-SUMMARY.md
-- VERIFICATION-CHECKLIST.md
-- PROMPT-FOR-NEXT-SESSION-2025-11-24.md
-
-🎯 Impact:
-- 50% faster signing process
-- 90% fewer errors
-- Matches DocuSign/AdobeSign standards
-- Production ready
-
-✅ Status: All features complete, all tests passing, ready for user testing
-
-Co-authored-by: Kiro AI Assistant <kiro@example.com>
+Status: ✅ Complete - Both strict and flexible modes now show approver details

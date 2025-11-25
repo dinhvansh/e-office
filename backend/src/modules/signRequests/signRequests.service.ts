@@ -32,6 +32,17 @@ class SignRequestsService {
   }
 
   /**
+   * Get single sign request by ID
+   */
+  async getSignRequest(id: number, tenantId: number) {
+    const signRequest = await signRequestsRepository.findById(id, tenantId);
+    if (!signRequest) {
+      throw ApiError.notFound("Sign request not found", "SIGN_REQUEST_NOT_FOUND");
+    }
+    return signRequest;
+  }
+
+  /**
    * Get sign requests created by the current user
    */
   async getMySignRequests(userId: number, tenantId: number, status?: string) {

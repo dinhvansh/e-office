@@ -91,6 +91,15 @@ export default function DocumentsPage() {
     },
   });
 
+  // Fetch external organizations once at parent level
+  const { data: externalOrgs } = useQuery({
+    queryKey: ["external-orgs"],
+    queryFn: async () => {
+      const response = await fetchJson<any>("/external-orgs");
+      return Array.isArray(response) ? response : [];
+    },
+  });
+
   const activeDocumentTypes = documentTypesData?.filter((type) => type.is_active) || [];
   const activeWorkflows = Array.isArray(workflowsData) ? workflowsData.filter((wf) => wf.is_active) : [];
 
@@ -638,8 +647,8 @@ export default function DocumentsPage() {
                   </div>
                 </div>
 
-                {/* Workflow Components - Internal Approval (MOVED UP) */}
-                {workflowMode && (
+                {/* Signers Section - External Signers (MOVED UP - FIRST!) */}
+                {selectedDocType?.require_digital_signing && (
                   <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <div className="mb-3">
                       <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -682,6 +691,7 @@ export default function DocumentsPage() {
                   <SignersSection 
                     signers={signers}
                     onChange={setSigners}
+                    externalOrgs={externalOrgs || []}
                   />
                 )}
 

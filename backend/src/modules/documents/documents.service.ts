@@ -758,8 +758,9 @@ class DocumentsService {
       filePath = document.file_path;
     } else if (document.file_path.startsWith('storage/') || document.file_path.startsWith('storage\\')) {
       // Real uploaded files (from fileStorage.ts)
-      // Backend server runs from backend/ directory, so resolve from cwd
-      filePath = path.resolve(process.cwd(), document.file_path);
+      // Storage is at project root, not in backend/ directory
+      // So we need to go up one level from backend/
+      filePath = path.resolve(process.cwd(), '..', document.file_path);
     } else if (document.file_path.startsWith('/uploads/')) {
       // Legacy seed data - files don't exist
       throw ApiError.notFound("File not found (seed data)", "FILE_NOT_FOUND");

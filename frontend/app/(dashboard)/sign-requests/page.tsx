@@ -50,6 +50,49 @@ export default function SignRequestsPage() {
   const [filter, setFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Copy signing link for external signers
+  const handleCopySigningLink = async (request: SignRequest) => {
+    try {
+      // Get external signer with token
+      const externalSigner = request.signers.find(s => !s.email.includes('@acme.local'));
+      if (!externalSigner) {
+        alert('Không tìm thấy người ký bên ngoài');
+        return;
+      }
+
+      // Fetch signer details to get token
+      const response = await fetchJson<any>(`/sign-requests/${request.id}`);
+      const signerWithToken = response.signers?.find((s: any) => s.id === externalSigner.id);
+      
+      if (!signerWithToken?.signing_token) {
+        alert('Chưa có link ký. Vui lòng gửi yêu cầu ký trước.');
+        return;
+      }
+
+      const signingUrl = `${window.location.origin}/sign/${signerWithToken.signing_token}`;
+      await navigator.clipboard.writeText(signingUrl);
+      alert('✅ Đã copy link ký vào clipboard!');
+    } catch (error: any) {
+      console.error('Copy link error:', error);
+      alert('❌ Lỗi: ' + (error.message || 'Không thể copy link'));
+    }
+  };
+
+  // Resend email to external signers
+  const handleResendEmail = async (signRequestId: number) => {
+    if (!confirm('Gửi lại email cho người ký bên ngoài?')) return;
+    
+    try {
+      await fetchJson(`/sign-requests/${signRequestId}/send`, {
+        method: 'POST',
+      });
+      alert('✅ Đã gửi lại email thành công!');
+    } catch (error: any) {
+      console.error('Resend email error:', error);
+      alert('❌ Lỗi: ' + (error.message || 'Không thể gửi email'));
+    }
+  };
+
   const { data, isLoading } = useQuery({
     queryKey: ['my-sign-requests', filter],
     queryFn: async () => {
@@ -231,15 +274,40 @@ export default function SignRequestsPage() {
                       <td className="px-4 py-3">
                         {getStatusBadge(request.progress, request.status)}
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => router.push(`/documents/${request.document.id}`)}
-                          title="Xem chi tiết"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 justify-center">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => router.push(`/sign-requests/${request.id}`)}
+                            title="Xem chi tiết"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          {/* Show copy link & resend for external signers */}
+                          {request.signers.some(s => !s.email.includes('@acme.local')) && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleCopySigningLink(request)}
+                                title="Copy link ký"
+                                className="text-blue-600 hover:text-blue-700"
+                              >
+                                📋
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleResendEmail(request.id)}
+                                title="Gửi lại email"
+                                className="text-green-600 hover:text-green-700"
+                              >
+                                📧
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))

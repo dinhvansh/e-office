@@ -141,8 +141,41 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900">{step.step_name}</p>
-                <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                  <Clock className="w-3 h-3" />
+                
+                {/* Approver Info */}
+                {step.approver_name && step.approver_email ? (
+                  <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-100">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-200 text-blue-700 flex items-center justify-center text-xs font-semibold">
+                        {step.approver_name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-blue-900 truncate">
+                          {step.approver_name}
+                        </p>
+                        <p className="text-xs text-blue-600 truncate">
+                          {step.approver_email}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                    <p className="text-xs text-gray-500">
+                      ⚠️ Chưa có thông tin người phê duyệt
+                    </p>
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                  <User className="w-3 h-3" />
+                  <span>
+                    {step.approver_type === 'user' && 'Người dùng'}
+                    {step.approver_type === 'role' && 'Vai trò'}
+                    {step.approver_type === 'department' && 'Phòng ban'}
+                    {step.approver_type === 'manager' && 'Quản lý'}
+                  </span>
+                  <Clock className="w-3 h-3 ml-2" />
                   <span>{step.due_in_days} ngày</span>
                 </div>
               </div>

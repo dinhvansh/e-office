@@ -7,13 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import SignatureModal from '@/components/signature/SignatureModal';
+import DocumentPDFViewer from '@/components/pdf/DocumentPDFViewer';
 import { toast } from 'sonner';
 import { 
   CheckCircle, 
   XCircle, 
   MessageSquare, 
-  FileText, 
-  User, 
   ArrowLeft,
   Download
 } from 'lucide-react';
@@ -183,15 +182,51 @@ export default function ApprovalDetailPage() {
             </div>
 
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="p-4 border-b">
+              <div className="p-4 border-b flex justify-between items-center">
                 <h2 className="text-lg font-semibold">Xem trước</h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const authData = localStorage.getItem('esign.auth');
+                      if (!authData) throw new Error('Not authenticated');
+                      
+                      const parsed = JSON.parse(authData);
+                      const token = parsed?.tokens?.accessToken;
+                      if (!token) throw new Error('No token');
+
+                      const response = await fetch(
+                        `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${approval.document.id}/download`,
+                        {
+                          headers: {
+                            'Authorization': `Bearer ${token}`
+                          }
+                        }
+                      );
+                      
+                      if (!response.ok) throw new Error('Download failed');
+                      
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = approval.document.original_file_name || 'document.pdf';
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                      toast.success('Tải xuống thành công');
+                    } catch (error) {
+                      toast.error('Không thể tải xuống');
+                    }
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Tải xuống
+                </Button>
               </div>
-              <div className="h-[600px]">
-                <iframe
-                  src={`${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '')}/api/v1/documents/${approval.document.id}/view?token=${localStorage.getItem('token')}`}
-                  className="w-full h-full"
-                />
-              </div>
+              <DocumentPDFViewer documentId={approval.document.id} />
             </div>
           </div>
 

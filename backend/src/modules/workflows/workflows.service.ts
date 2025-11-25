@@ -8,7 +8,7 @@ class WorkflowsService {
     return workflowsRepository.findAll(tenantId);
   }
 
-  async getWorkflow(id: number, tenantId: number) {
+  async getWorkflow(id: number, tenantId: number, userId?: number) {
     const workflow = await workflowsRepository.findById(id, tenantId);
     if (!workflow) {
       throw ApiError.notFound('Workflow not found', 'WORKFLOW_NOT_FOUND');
@@ -60,8 +60,34 @@ class WorkflowsService {
               }
             }
           } else if (step.approver_type === 'manager') {
-            approverName = 'Quản lý trực tiếp';
-            approverEmail = '(Tùy theo người tạo)';
+            // If userId provided, lookup their manager for preview
+            if (userId) {
+              const currentUser = await prisma.users.findUnique({
+                where: { id: userId },
+                select: {
+                  manager_id: true,
+                  manager: {
+                    select: {
+                      id: true,
+                      email: true,
+                      full_name: true,
+                      status: true
+                    }
+                  }
+                }
+              });
+              
+              if (currentUser?.manager_id && currentUser.manager?.status === 'active') {
+                approverName = currentUser.manager.full_name || currentUser.manager.email;
+                approverEmail = currentUser.manager.email;
+              } else {
+                approverName = 'Quản lý trực tiếp';
+                approverEmail = '⚠️ Bạn chưa có quản lý';
+              }
+            } else {
+              approverName = 'Quản lý trực tiếp';
+              approverEmail = '(Tùy theo người tạo)';
+            }
           }
           
           return {

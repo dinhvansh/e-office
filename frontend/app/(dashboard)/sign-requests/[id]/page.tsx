@@ -1,252 +1,319 @@
-"use client";
+'use client';
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
-import { useAuth } from "@/components/providers/auth-provider";
-import { SignRequestRecord } from "@/lib/types";
+import React from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/components/providers/auth-provider';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, FileText, Users, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import dayjs from 'dayjs';
+
+interface Signer {
+  id: number;
+  name: string;
+  email: string;
+  role: string | null;
+  signing_order: number | null;
+  status: string;
+  signed_at: string | null;
+  is_internal: boolean;
+}
+
+interface SignRequest {
+  id: number;
+  title: string | null;
+  message: string | null;
+  status: string;
+  workflow_type: string;
+  created_at: string;
+  deadline: string | null;
+  document: {
+    id: number;
+    title: string | null;
+    original_file_name: string;
+    document_number: string | null;
+  };
+  signers: Signer[];
+}
 
 export default function SignRequestDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { fetchJson } = useAuth();
-  const queryClient = useQueryClient();
-  const signRequestId = Number(params.id);
+  const signRequestId = parseInt(params.id as string);
+  const [pdfUrl, setPdfUrl] = React.useState<string>('');
 
   const { data: signRequest, isLoading } = useQuery({
-    queryKey: ["sign-request", signRequestId],
+    queryKey: ['sign-request', signRequestId],
     queryFn: async () => {
-      const data = await fetchJson<{ sign_request: SignRequestRecord }>(`/sign-requests/${signRequestId}`);
-      return data.sign_request;
+      const res = await fetchJson<{ sign_request: SignRequest }>(`/sign-requests/${signRequestId}`);
+      return res.sign_request;
     },
   });
 
-  const [otpInputs, setOtpInputs] = useState<Record<number, string>>({});
+  // Load PDF with authentication
+  React.useEffect(() => {
+    if (!signRequest) return;
 
-  const sendOtpMutation = useMutation({
-    mutationFn: async (signerId: number) => {
-      const data = await fetchJson<{ otp: string; message: string }>(`/signers/${signerId}/send-otp`, {
-        method: "POST",
-      });
-      return { signerId, ...data };
-    },
-    onSuccess: (data) => {
-      alert(`✅ OTP đã được gửi!\n\nOTP: ${data.otp}\n\n(Trong production, OTP sẽ được gửi qua email)`);
-      queryClient.invalidateQueries({ queryKey: ["sign-request", signRequestId] });
-    },
-    onError: (error) => {
-      alert(`❌ Lỗi: ${(error as Error).message}`);
-    },
-  });
+    const loadPDF = async () => {
+      try {
+        const token = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('esign.auth') || '{}')?.tokens?.accessToken : '';
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${signRequest.document.id}/view`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          setPdfUrl(url);
+        }
+      } catch (error) {
+        console.error('Failed to load PDF:', error);
+      }
+    };
 
-  const signMutation = useMutation({
-    mutationFn: async ({ signerId, otp }: { signerId: number; otp: string }) => {
-      await fetchJson(`/signers/${signerId}/sign`, {
-        method: "POST",
-        body: JSON.stringify({ otp }),
-      });
-    },
-    onSuccess: () => {
-      alert("✅ Ký thành công!");
-      queryClient.invalidateQueries({ queryKey: ["sign-request", signRequestId] });
-      setOtpInputs({});
-    },
-    onError: (error) => {
-      alert(`❌ Lỗi: ${(error as Error).message}`);
-    },
-  });
+    loadPDF();
+
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [signRequest]);
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'signed':
+      case 'completed':
+        return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+      case 'rejected':
+        return <XCircle className="w-5 h-5 text-red-500" />;
+      case 'pending':
+      case 'otp_sent':
+        return <Clock className="w-5 h-5 text-yellow-500" />;
+      default:
+        return <AlertCircle className="w-5 h-5 text-gray-400" />;
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'signed':
+      case 'completed':
+        return 'Đã ký';
+      case 'rejected':
+        return 'Đã từ chối';
+      case 'otp_sent':
+        return 'Đã gửi OTP';
+      case 'pending':
+        return 'Chờ ký';
+      default:
+        return status;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <Badge className="bg-green-500">Đã hoàn thành</Badge>;
+      case 'in_progress':
+      case 'pending':
+        return <Badge className="bg-yellow-500">Đang xử lý</Badge>;
+      case 'cancelled':
+        return <Badge variant="secondary">Đã hủy</Badge>;
+      default:
+        return <Badge variant="secondary">Nháp</Badge>;
+    }
+  };
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-slate-500">Đang tải...</div>
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-lg">Đang tải...</div>
       </div>
     );
   }
 
   if (!signRequest) {
     return (
-      <div className="card">
-        <p className="text-red-600">Không tìm thấy quy trình ký</p>
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-lg text-red-500">Không tìm thấy yêu cầu ký</div>
       </div>
     );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-green-100 text-green-700";
-      case "pending":
-        return "bg-yellow-100 text-yellow-700";
-      case "otp_sent":
-        return "bg-blue-100 text-blue-700";
-      case "in_progress":
-        return "bg-purple-100 text-purple-700";
-      default:
-        return "bg-slate-100 text-slate-700";
-    }
-  };
+  const signedCount = signRequest.signers.filter(s => s.status === 'signed' || s.status === 'completed').length;
+  const totalSigners = signRequest.signers.length;
+  const progress = totalSigners > 0 ? Math.round((signedCount / totalSigners) * 100) : 0;
+
+  // Sort signers by signing order
+  const sortedSigners = [...signRequest.signers].sort((a, b) => {
+    if (a.signing_order === null) return 1;
+    if (b.signing_order === null) return -1;
+    return a.signing_order - b.signing_order;
+  });
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto p-6 max-w-6xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => router.back()}
-          className="text-sm text-slate-600 hover:text-slate-900"
+      <div className="mb-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push('/sign-requests')}
+          className="mb-4"
         >
-          ← Quay lại
-        </button>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Quay lại
+        </Button>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold mb-2">
+              {signRequest.title || signRequest.document.title || signRequest.document.original_file_name}
+            </h1>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span>Mã: {signRequest.document.document_number || `#${signRequest.id}`}</span>
+              <span>•</span>
+              <span>Tạo: {dayjs(signRequest.created_at).format('DD/MM/YYYY HH:mm')}</span>
+              {signRequest.deadline && (
+                <>
+                  <span>•</span>
+                  <span>Hạn: {dayjs(signRequest.deadline).format('DD/MM/YYYY')}</span>
+                </>
+              )}
+            </div>
+          </div>
+          {getStatusBadge(signRequest.status)}
+        </div>
       </div>
 
-      {/* Sign Request Info */}
-      <section className="card">
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">{signRequest.title || "Quy trình ký"}</h1>
-            <p className="mt-1 text-sm text-slate-500">ID: #{signRequest.id}</p>
-          </div>
-          <span className={`rounded-full px-3 py-1 text-sm font-medium ${getStatusColor(signRequest.status || "")}`}>
-            {signRequest.status}
-          </span>
-        </div>
-
-        {signRequest.message && (
-          <div className="mb-4 rounded-xl bg-slate-50 p-4">
-            <p className="text-sm text-slate-700">{signRequest.message}</p>
-          </div>
-        )}
-
-        <div className="grid gap-4 text-sm md:grid-cols-3">
-          <div>
-            <p className="text-slate-500">Loại quy trình</p>
-            <p className="font-medium text-slate-900">{signRequest.workflow_type || "sequential"}</p>
-          </div>
-          <div>
-            <p className="text-slate-500">Tài liệu</p>
-            <p className="font-medium text-slate-900">#{signRequest.document_id}</p>
-          </div>
-          <div>
-            <p className="text-slate-500">Ngày tạo</p>
-            <p className="font-medium text-slate-900">
-              {new Date(signRequest.created_at).toLocaleDateString("vi-VN")}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Signers */}
-      <section className="card">
-        <h2 className="mb-4 text-xl font-semibold text-slate-900">
-          Người ký ({signRequest.signers?.length || 0})
-        </h2>
-
-        <div className="space-y-4">
-          {signRequest.signers?.map((signer) => (
-            <div
-              key={signer.id}
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-brand-600">
-                      {signer.name?.charAt(0).toUpperCase() || "?"}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-900">{signer.name}</p>
-                      <p className="text-sm text-slate-500">{signer.email}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Document Preview */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Tài liệu
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-gray-100 rounded-lg p-4 min-h-[600px]">
+                {pdfUrl ? (
+                  <iframe
+                    src={pdfUrl}
+                    className="w-full h-[600px] border-0 rounded bg-white"
+                    title="Document Preview"
+                  />
+                ) : (
+                  <div className="w-full h-[600px] bg-white rounded flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                      <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400 animate-pulse" />
+                      <p>Đang tải tài liệu...</p>
                     </div>
                   </div>
+                )}
+              </div>
 
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(signer.status || "")}`}>
-                      {signer.status}
-                    </span>
-                    {signer.signed_at && (
-                      <span className="text-xs text-slate-500">
-                        Đã ký: {new Date(signer.signed_at).toLocaleString("vi-VN")}
-                      </span>
-                    )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right: Signing Progress */}
+        <div className="space-y-6">
+          {/* Progress Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Tiến độ ký</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span>Đã ký: {signedCount}/{totalSigners}</span>
+                    <span className="font-semibold">{progress}%</span>
+                  </div>
+                  <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-green-500 transition-all"
+                      style={{ width: `${progress}%` }}
+                    />
                   </div>
                 </div>
-
-                <div className="flex flex-col gap-2">
-                  {/* Send OTP Button */}
-                  {signer.status === "pending" && (
-                    <button
-                      onClick={() => sendOtpMutation.mutate(signer.id)}
-                      disabled={sendOtpMutation.isPending}
-                      className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
-                    >
-                      {sendOtpMutation.isPending ? "Đang gửi..." : "📧 Gửi OTP"}
-                    </button>
-                  )}
-
-                  {/* Sign Form */}
-                  {(signer.status === "otp_sent" || signer.status === "pending") && (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Nhập OTP"
-                        maxLength={6}
-                        value={otpInputs[signer.id] || ""}
-                        onChange={(e) =>
-                          setOtpInputs((prev) => ({ ...prev, [signer.id]: e.target.value }))
-                        }
-                        className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
-                      />
-                      <button
-                        onClick={() => {
-                          const otp = otpInputs[signer.id];
-                          if (!otp || otp.length !== 6) {
-                            alert("Vui lòng nhập OTP 6 số");
-                            return;
-                          }
-                          signMutation.mutate({ signerId: signer.id, otp });
-                        }}
-                        disabled={signMutation.isPending || !otpInputs[signer.id]}
-                        className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500 disabled:opacity-50"
-                      >
-                        ✍️ Ký
-                      </button>
-                    </div>
-                  )}
-
-                  {signer.status === "completed" && (
-                    <div className="flex items-center gap-2 text-green-600">
-                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      <span className="text-sm font-medium">Đã ký</span>
-                    </div>
-                  )}
+                <div className="text-sm text-muted-foreground">
+                  Loại: {signRequest.workflow_type === 'sequential' ? 'Ký tuần tự' : 'Ký song song'}
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            </CardContent>
+          </Card>
 
-      {/* Document Info */}
-      {signRequest.document && (
-        <section className="card">
-          <h2 className="mb-4 text-xl font-semibold text-slate-900">Tài liệu</h2>
-          <div className="rounded-xl bg-slate-50 p-4">
-            <p className="text-sm text-slate-500">File path</p>
-            <p className="font-mono text-sm text-slate-900">{signRequest.document.file_path}</p>
-            <div className="mt-2 flex gap-4 text-xs text-slate-500">
-              <span>ID: #{signRequest.document.id}</span>
-              <span>Status: {signRequest.document.status}</span>
-              <span>Version: {signRequest.document.version}</span>
-            </div>
-          </div>
-        </section>
-      )}
+          {/* Signers List */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Users className="w-5 h-5" />
+                Người ký ({totalSigners})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {sortedSigners.map((signer, index) => (
+                  <div
+                    key={signer.id}
+                    className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex-shrink-0 mt-1">
+                      {getStatusIcon(signer.status)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        {signer.signing_order !== null && (
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold flex items-center justify-center">
+                            {signer.signing_order}
+                          </span>
+                        )}
+                        <span className="font-medium truncate">{signer.name}</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground truncate">{signer.email}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-muted-foreground">
+                          {getStatusText(signer.status)}
+                        </span>
+                        {signer.signed_at && (
+                          <>
+                            <span className="text-xs text-muted-foreground">•</span>
+                            <span className="text-xs text-muted-foreground">
+                              {dayjs(signer.signed_at).format('DD/MM HH:mm')}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Message */}
+          {signRequest.message && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Lời nhắn</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {signRequest.message}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

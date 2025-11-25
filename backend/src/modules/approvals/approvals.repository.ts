@@ -173,7 +173,11 @@ export class ApprovalsRepository {
   }
 
   // Helper: Get approvers for a step
-  async getApproversForStep(stepId: number, tenantId: number): Promise<number[]> {
+  async getApproversForStep(
+    stepId: number, 
+    tenantId: number, 
+    documentId?: number
+  ): Promise<number[]> {
     const step = await prisma.workflow_steps.findUnique({
       where: { id: stepId },
     });
@@ -221,8 +225,31 @@ export class ApprovalsRepository {
         break;
 
       case 'manager':
-        // TODO: Implement direct manager logic
-        // For now, return empty
+        // Get direct manager of document owner
+        if (documentId) {
+          const document = await prisma.documents.findUnique({
+            where: { id: documentId },
+            select: {
+              owner: {
+                select: {
+                  manager_id: true,
+                  manager: {
+                    select: {
+                      id: true,
+                      email: true,
+                      full_name: true,
+                      status: true
+                    }
+                  }
+                }
+              }
+            }
+          });
+          
+          if (document?.owner?.manager_id && document.owner.manager?.status === 'active') {
+            approverIds.push(document.owner.manager_id);
+          }
+        }
         break;
 
       case 'position':

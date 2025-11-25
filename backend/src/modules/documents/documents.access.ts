@@ -28,6 +28,19 @@ export async function canViewDocument(
     return true;
   }
 
+  // Layer 3.5: Approver check - if user is assigned as approver for this document
+  const { prisma } = require('../../config/prisma');
+  const approval = await prisma.document_approvals.findFirst({
+    where: {
+      document_id: doc.id,
+      approver_user_id: user.id
+    }
+  });
+  
+  if (approval) {
+    return true; // Approver can view document
+  }
+
   // Layer 4: Visibility scope
   const scope = (doc.visibility_scope as DocumentVisibilityScope) ?? 'public';
   

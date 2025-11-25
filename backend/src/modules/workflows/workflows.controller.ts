@@ -54,7 +54,11 @@ export class WorkflowsController {
 
   getById = async (req: Request, res: Response): Promise<void> => {
     const id = idSchema.parse(req.params.id);
-    const workflow = await workflowsService.getWorkflow(id, req.auth!.tenantId);
+    const workflow = await workflowsService.getWorkflow(
+      id, 
+      req.auth!.tenantId,
+      req.auth!.userId // Pass userId for manager preview
+    );
     res.json(ok({ workflow }));
   };
 

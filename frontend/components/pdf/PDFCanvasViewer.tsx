@@ -35,6 +35,7 @@ interface PDFCanvasViewerProps {
   selectedFieldType?: 'signature' | 'text' | 'date' | 'checkbox';
   onFieldAdd?: (field: Omit<Field, 'id'>) => void;
   onFieldMove?: (id: string, x: number, y: number) => void;
+  onFieldResize?: (id: string, width: number, height: number) => void;
 }
 
 export function PDFCanvasViewer({ 
@@ -45,7 +46,8 @@ export function PDFCanvasViewer({
   selectedSignerId, 
   selectedFieldType = 'signature',
   onFieldAdd, 
-  onFieldMove 
+  onFieldMove,
+  onFieldResize 
 }: PDFCanvasViewerProps) {
   const { blobUrl, loading, error } = usePDFUrl(fileUrl, token);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -54,7 +56,8 @@ export function PDFCanvasViewer({
   const [pageNum, setPageNum] = useState(1);
   const [numPages, setNumPages] = useState(0);
   const [scale, setScale] = useState(1.5);
-  const [draggingField, setDraggingField] = useState<string | null>(null);
+  const [resizingField, setResizingField] = useState<{ id: string; handle: string } | null>(null);
+  const [resizeStart, setResizeStart] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
   // Load PDF
   useEffect(() => {
@@ -97,6 +100,45 @@ export function PDFCanvasViewer({
     renderPage();
   }, [pdf, pageNum, scale]);
 
+  // Handle resize mouse move
+  useEffect(() => {
+    if (!resizingField || !resizeStart || !canvasRef.current) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = canvasRef.current!.getBoundingClientRect();
+      const deltaX = e.clientX - resizeStart.x;
+      const deltaY = e.clientY - resizeStart.y;
+      
+      // ✅ REDUCED SENSITIVITY: Divide by 1.5 to make resize smoother
+      const deltaXPercent = ((deltaX / rect.width) * 100) / 1.5;
+      const deltaYPercent = ((deltaY / rect.height) * 100) / 1.5;
+
+      let newWidth = resizeStart.width;
+      let newHeight = resizeStart.height;
+
+      // Only handle bottom-right corner (se)
+      if (resizingField.handle === 'se') {
+        newWidth = Math.max(5, resizeStart.width + deltaXPercent);
+        newHeight = Math.max(3, resizeStart.height + deltaYPercent);
+      }
+
+      onFieldResize?.(resizingField.id, newWidth, newHeight);
+    };
+
+    const handleMouseUp = () => {
+      setResizingField(null);
+      setResizeStart(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizingField, resizeStart, onFieldResize]);
+
   // Handle canvas click to add field
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !selectedSignerId) return;
@@ -109,9 +151,9 @@ export function PDFCanvasViewer({
     const xPercent = (clickX / rect.width) * 100;
     const yPercent = (clickY / rect.height) * 100;
 
-    // ✅ Convert size from pixel to percentage
-    const widthPx = selectedFieldType === 'signature' ? 200 : selectedFieldType === 'checkbox' ? 30 : 150;
-    const heightPx = selectedFieldType === 'signature' ? 80 : selectedFieldType === 'checkbox' ? 30 : 40;
+    // ✅ Convert size from pixel to percentage (REDUCED SIZE)
+    const widthPx = selectedFieldType === 'signature' ? 120 : selectedFieldType === 'checkbox' ? 25 : 100;
+    const heightPx = selectedFieldType === 'signature' ? 50 : selectedFieldType === 'checkbox' ? 25 : 30;
     const widthPercent = (widthPx / rect.width) * 100;
     const heightPercent = (heightPx / rect.height) * 100;
 
@@ -234,7 +276,6 @@ export function PDFCanvasViewer({
                   key={field.id}
                   draggable
                   onDragStart={(e) => {
-                    setDraggingField(field.id);
                     e.dataTransfer.effectAllowed = 'move';
                   }}
                   onDragEnd={(e) => {
@@ -249,14 +290,14 @@ export function PDFCanvasViewer({
                       const yPercent = (dragY / rect.height) * 100;
                       onFieldMove?.(field.id, xPercent, yPercent);
                     }
-                    setDraggingField(null);
                   }}
-                  className={`absolute border-2 ${color.border} ${color.bg} bg-opacity-30 cursor-move ${color.hover}`}
+                  className={`absolute border-2 ${color.border} ${color.bg} bg-opacity-30 cursor-move ${color.hover} group rounded-md transition-all duration-75`}
                   style={{
-                    left: `${leftPx}px`,      // ✅ Use pixel for CSS
-                    top: `${topPx}px`,        // ✅ Use pixel for CSS
-                    width: `${widthPx}px`,    // ✅ Convert % to pixel
-                    height: `${heightPx}px`,  // ✅ Convert % to pixel
+                    left: `${leftPx}px`,
+                    top: `${topPx}px`,
+                    width: `${widthPx}px`,
+                    height: `${heightPx}px`,
+                    willChange: 'transform',
                   }}
                 >
                   <div className={`text-xs ${color.text} p-1 font-semibold`}>
@@ -265,6 +306,22 @@ export function PDFCanvasViewer({
                       <div className="text-xs opacity-75 truncate">{field.signer_name}</div>
                     )}
                   </div>
+                  
+                  {/* Resize handle - ONLY bottom-right corner (larger & more visible) */}
+                  <div
+                    className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-600 rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 border-2 border-white shadow-lg hover:bg-blue-700 hover:scale-110 transition-all duration-200"
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setResizingField({ id: field.id, handle: 'se' });
+                      setResizeStart({
+                        x: e.clientX,
+                        y: e.clientY,
+                        width: field.width,
+                        height: field.height
+                      });
+                    }}
+                  />
                 </div>
               );
             })}
