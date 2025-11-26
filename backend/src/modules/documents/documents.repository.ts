@@ -37,30 +37,49 @@ export interface PaginatedResult<T> {
 }
 
 export class DocumentsRepository {
-  async listByTenant(tenantId: number): Promise<documents[]> {
+  async listByTenant(tenantId: number, noSigningOnly = false): Promise<documents[]> {
+    const whereClause: any = { tenant_id: tenantId };
+    
+    if (noSigningOnly) {
+      // Only documents whose document type doesn't require digital signing
+      whereClause.document_type = {
+        require_digital_signing: false
+      };
+    }
+    
     return prisma.documents.findMany({
-      where: { tenant_id: tenantId },
+      where: whereClause,
       orderBy: { created_at: "desc" },
     });
   }
 
   async listByTenantPaginated(
     tenantId: number,
-    params: PaginationParams = {}
+    params: PaginationParams = {},
+    noSigningOnly = false
   ): Promise<PaginatedResult<documents>> {
     const page = params.page || 1;
     const limit = params.limit || 10;
     const skip = (page - 1) * limit;
 
+    const whereClause: any = { tenant_id: tenantId };
+    
+    if (noSigningOnly) {
+      // Only documents whose document type doesn't require digital signing
+      whereClause.document_type = {
+        require_digital_signing: false
+      };
+    }
+
     const [data, total] = await Promise.all([
       prisma.documents.findMany({
-        where: { tenant_id: tenantId },
+        where: whereClause,
         orderBy: { created_at: "desc" },
         skip,
         take: limit,
       }),
       prisma.documents.count({
-        where: { tenant_id: tenantId },
+        where: whereClause,
       }),
     ]);
 

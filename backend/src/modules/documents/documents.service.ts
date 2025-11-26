@@ -38,8 +38,8 @@ export interface CreateDocumentInput {
 }
 
 class DocumentsService {
-  async listDocuments(tenantId: number, userId?: number): Promise<documents[]> {
-    const documents = await documentsRepository.listByTenant(tenantId);
+  async listDocuments(tenantId: number, userId?: number, noSigningOnly = false): Promise<documents[]> {
+    const documents = await documentsRepository.listByTenant(tenantId, noSigningOnly);
     
     // If no userId provided (admin context), return all documents
     if (!userId) {
@@ -63,9 +63,10 @@ class DocumentsService {
     tenantId: number,
     userId: number | undefined,
     page: number = 1,
-    limit: number = 10
+    limit: number = 10,
+    noSigningOnly = false
   ) {
-    const result = await documentsRepository.listByTenantPaginated(tenantId, { page, limit });
+    const result = await documentsRepository.listByTenantPaginated(tenantId, { page, limit }, noSigningOnly);
     
     // If no userId provided (admin context), return all documents
     if (!userId) {
@@ -315,15 +316,33 @@ class DocumentsService {
             
             // Create signer if we found user info
             if (email) {
-              await signersRepository.create({
+              // Check if this is an internal user
+              const internalUser = await prisma.users.findFirst({
+                where: {
+                  tenant_id: tenantId,
+                  email: email,
+                  status: 'active'
+                },
+                select: { id: true }
+              });
+              
+              const signerData: any = {
                 sign_request: { connect: { id: signRequest.id } },
                 email,
                 name,
                 role: 'signer',
                 signing_order: step.step_order,
                 status: 'pending',
-              });
-              console.log(`  ✓ Signer created: ${email}`);
+                is_internal: !!internalUser,
+              };
+              
+              // Add user relation if internal
+              if (internalUser) {
+                signerData.user = { connect: { id: internalUser.id } };
+              }
+              
+              await signersRepository.create(signerData);
+              console.log(`  ✓ Signer created: ${email} (internal: ${!!internalUser})`);
             } else {
               console.log(`  ✗ Skipped: no email found`);
             }
@@ -409,15 +428,38 @@ class DocumentsService {
       if (input.signers && input.signers.length > 0) {
         const { signersRepository } = await import('../signers/signers.repository');
         
+        // Check which signers are internal users
+        const signerEmails = input.signers.map(s => s.email);
+        const internalUsers = await prisma.users.findMany({
+          where: {
+            tenant_id: tenantId,
+            email: { in: signerEmails },
+            status: 'active'
+          },
+          select: { id: true, email: true }
+        });
+        const internalEmailMap = new Map(internalUsers.map(u => [u.email, u.id]));
+        
         for (const signer of input.signers) {
-          await signersRepository.create({
+          const userId = internalEmailMap.get(signer.email);
+          const isInternal = !!userId;
+          
+          const signerData: any = {
             sign_request: { connect: { id: signRequest.id } },
             email: signer.email,
             name: signer.name,
             role: 'signer',
             signing_order: signer.order,
             status: 'pending',
-          });
+            is_internal: isInternal,
+          };
+          
+          // Add user relation if internal
+          if (userId) {
+            signerData.user = { connect: { id: userId } };
+          }
+          
+          await signersRepository.create(signerData);
         }
       }
       

@@ -217,9 +217,13 @@ class SignRequestsService {
       signing_order: signerData.signing_order,
       status: 'pending',
       is_internal: !!internalUser, // ✅ Set based on user existence
-      user_id: internalUser?.id || null, // ✅ Set user_id for internal users
       position_data: signerData.position_data as Prisma.InputJsonValue,
     };
+
+    // ✅ Add user relation if internal
+    if (internalUser) {
+      signerCreateData.user = { connect: { id: internalUser.id } };
+    }
 
     const signer = await signersRepository.create(signerCreateData);
 
@@ -467,6 +471,107 @@ class SignRequestsService {
       all_signed: allSigned,
       signer_id: signer.id
     };
+  }
+
+  // ✅ Phase 2: Get Signers
+  async getSigners(signRequestId: number, tenantId: number) {
+    const signRequest = await this.getSignRequest(signRequestId, tenantId);
+    return await signersRepository.findBySignRequest(signRequestId);
+  }
+
+  // ✅ Phase 2: Remove Signer
+  async removeSignerFromRequest(signRequestId: number, signerId: number, tenantId: number) {
+    // Verify sign request belongs to tenant
+    await this.getSignRequest(signRequestId, tenantId);
+
+    // Remove fields assigned to this signer
+    await prisma.sign_request_fields.deleteMany({
+      where: { assigned_signer_id: signerId }
+    });
+
+    // Delete signer
+    await signersRepository.delete(signerId);
+
+    // Reorder remaining signers
+    const remainingSigners = await signersRepository.findBySignRequest(signRequestId);
+    const sortedSigners = remainingSigners.sort((a, b) => 
+      (a.signing_order || 0) - (b.signing_order || 0)
+    );
+
+    for (let i = 0; i < sortedSigners.length; i++) {
+      await signersRepository.update(sortedSigners[i].id, {
+        signing_order: i + 1
+      });
+    }
+
+    // Audit log (optional - may fail if audit service has issues)
+    try {
+      await auditService.record({
+        tenantId,
+        documentId: null,
+        event: 'sign_request.signer_removed',
+        metadata: { sign_request_id: signRequestId, signer_id: signerId }
+      });
+    } catch (error) {
+      console.error('⚠️ Audit log failed (non-critical):', error.message);
+    }
+  }
+
+  // ✅ Phase 2: Update Signer
+  async updateSigner(signerId: number, updates: Partial<SignerInput & { signing_order?: number }>, tenantId: number) {
+    // Get signer to verify tenant
+    const signer = await signersRepository.findById(signerId);
+    if (!signer) {
+      throw ApiError.notFound('Signer not found', 'SIGNER_NOT_FOUND');
+    }
+
+    // Verify sign request belongs to tenant
+    await this.getSignRequest(signer.sign_request_id, tenantId);
+
+    // If email changed, check if new email is internal user
+    if (updates.email && updates.email !== signer.email) {
+      const internalUser = await prisma.users.findFirst({
+        where: {
+          tenant_id: tenantId,
+          email: updates.email,
+          status: 'active'
+        },
+        select: { id: true }
+      });
+
+      // Update is_internal and user relation based on new email
+      const updateData: any = {
+        ...updates,
+        is_internal: !!internalUser,
+      };
+
+      // ✅ Use Prisma relation for user_id
+      if (internalUser) {
+        updateData.user = { connect: { id: internalUser.id } };
+      } else if (signer.user_id) {
+        // Disconnect if was internal but now external
+        updateData.user = { disconnect: true };
+      }
+
+      await signersRepository.update(signerId, updateData);
+    } else {
+      // Just update other fields
+      await signersRepository.update(signerId, updates);
+    }
+
+    // Audit log (optional - may fail if audit service has issues)
+    try {
+      await auditService.record({
+        tenantId,
+        documentId: null,
+        event: 'sign_request.signer_updated',
+        metadata: { signer_id: signerId, updates }
+      });
+    } catch (error) {
+      console.error('⚠️ Audit log failed (non-critical):', error.message);
+    }
+
+    return await signersRepository.findById(signerId);
   }
 }
 

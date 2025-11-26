@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-slate-50 text-slate-900">
         <AppProviders>{children}</AppProviders>
         <Toaster 
-          position="top-right"
+          position="bottom-right"
           toastOptions={{
             classNames: {
               error: 'bg-red-600 text-white border-red-700 text-sm sm:text-base',

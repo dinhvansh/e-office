@@ -17,6 +17,8 @@ signRequestsRouter.get("/my-requests", asyncHandler(controller.getMyRequests));
 // Specific routes MUST come before generic /:id route
 // Signers management routes
 signRequestsRouter.post("/:id/signers", asyncHandler(controller.addSigner));
+signRequestsRouter.delete("/:id/signers/:signerId", asyncHandler(controller.removeSigner)); // ✅ Phase 2
+signRequestsRouter.put("/:id/signers/:signerId", asyncHandler(controller.updateSigner)); // ✅ Phase 2
 
 // Field management routes
 signRequestsRouter.get("/:id/editor", asyncHandler(controller.getEditor));

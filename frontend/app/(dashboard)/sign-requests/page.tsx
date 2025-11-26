@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
-import { PenTool, Eye, Search, Edit } from 'lucide-react';
+import { PenTool, Eye, Search, Edit, Upload } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -183,12 +183,21 @@ export default function SignRequestsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        icon={PenTool}
-        title="Yêu cầu Ký số"
-        description="Theo dõi và quản lý các yêu cầu ký số bạn đã tạo"
-        iconColor="text-green-600"
-      />
+      <div className="flex items-center justify-between">
+        <PageHeader
+          icon={PenTool}
+          title="Yêu cầu Ký số"
+          description="Theo dõi và quản lý các yêu cầu ký số bạn đã tạo"
+          iconColor="text-green-600"
+        />
+        <Button
+          onClick={() => router.push('/sign-requests/create')}
+          className="bg-green-600 hover:bg-green-700"
+        >
+          <Upload className="w-4 h-4 mr-2" />
+          Tạo yêu cầu ký mới
+        </Button>
+      </div>
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 border-b">
@@ -313,6 +322,19 @@ export default function SignRequestsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 justify-center">
+                          {/* Edit Workflow Button - Show for draft documents */}
+                          {request.status === 'draft' && (
+                            <Button
+                              size="sm"
+                              onClick={() => router.push(`/sign-requests/${request.id}/editor`)}
+                              title="Chỉnh sửa luồng ký"
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Sửa
+                            </Button>
+                          )}
+                          
                           {/* Internal Signing Button - Show if current user is pending signer */}
                           {isCurrentUserPendingSigner(request) && isCurrentUserTurn(request) && (
                             <Button

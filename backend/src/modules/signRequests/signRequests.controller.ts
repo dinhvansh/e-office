@@ -90,6 +90,16 @@ export class SignRequestsController {
       signing_order: z.number().int().optional(),
     }).parse(req.body);
     
+    // ✅ Check if draft
+    const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId);
+    if (signRequest.status !== 'draft') {
+      res.status(400).json({
+        success: false,
+        error: 'Không thể sửa. Tài liệu đã được gửi đi.',
+      });
+      return;
+    }
+    
     const signer = await signRequestsService.addSigner(
       signRequestId,
       req.auth!.tenantId,
@@ -97,6 +107,72 @@ export class SignRequestsController {
     );
     
     res.status(201).json(ok({ signer }));
+  };
+
+  // ✅ Phase 2: Remove Signer
+  removeSigner = async (req: Request, res: Response): Promise<void> => {
+    const signRequestId = idSchema.parse(req.params.id);
+    const signerId = idSchema.parse(req.params.signerId);
+
+    // Check if draft
+    const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId);
+    if (signRequest.status !== 'draft') {
+      res.status(400).json({
+        success: false,
+        error: 'Không thể sửa. Tài liệu đã được gửi đi.',
+      });
+      return;
+    }
+
+    // Check minimum signers
+    const signers = await signRequestsService.getSigners(signRequestId, req.auth!.tenantId);
+    if (signers.length <= 1) {
+      res.status(400).json({
+        success: false,
+        error: 'Phải có ít nhất 1 người ký',
+      });
+      return;
+    }
+
+    // Remove signer and reassign fields
+    await signRequestsService.removeSignerFromRequest(
+      signRequestId,
+      signerId,
+      req.auth!.tenantId
+    );
+
+    res.json(ok({ removed: true }));
+  };
+
+  // ✅ Phase 2: Update Signer
+  updateSigner = async (req: Request, res: Response): Promise<void> => {
+    const signRequestId = idSchema.parse(req.params.id);
+    const signerId = idSchema.parse(req.params.signerId);
+    const updates = z.object({
+      email: z.string().email().optional(),
+      name: z.string().min(1).optional(),
+      role: z.string().optional(),
+      signing_order: z.number().optional(),
+    }).partial().parse(req.body);
+
+    // Check if draft
+    const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId);
+    if (signRequest.status !== 'draft') {
+      res.status(400).json({
+        success: false,
+        error: 'Không thể sửa. Tài liệu đã được gửi đi.',
+      });
+      return;
+    }
+
+    // Update signer
+    const signer = await signRequestsService.updateSigner(
+      signerId,
+      updates,
+      req.auth!.tenantId
+    );
+
+    res.json(ok({ signer }));
   };
 
   // Field Management Endpoints
@@ -113,6 +189,17 @@ export class SignRequestsController {
 
   saveFields = async (req: Request, res: Response): Promise<void> => {
     const id = idSchema.parse(req.params.id);
+    
+    // ✅ Check if sign request is in draft status
+    const signRequest = await signRequestsService.getSignRequest(id, req.auth!.tenantId);
+    if (signRequest.status !== 'draft') {
+      res.status(400).json({
+        success: false,
+        error: 'Không thể chỉnh sửa. Tài liệu đã được gửi đi.',
+      });
+      return;
+    }
+    
     const fieldsSchema = z.array(
       z.object({
         id: z.number().optional(),

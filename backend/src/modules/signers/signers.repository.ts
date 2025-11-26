@@ -41,6 +41,13 @@ export class SignersRepository {
       where: { sign_request_id: signRequestId },
     });
   }
+
+  // ✅ Phase 2: Delete signer
+  delete(id: number) {
+    return prisma.signers.delete({
+      where: { id },
+    });
+  }
 }
 
 export const signersRepository = new SignersRepository();

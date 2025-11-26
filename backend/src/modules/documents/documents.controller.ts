@@ -61,6 +61,7 @@ export class DocumentsController {
     // Check if pagination params exist
     const page = req.query.page ? parseInt(req.query.page as string) : undefined;
     const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+    const noSigningOnly = req.query.no_signing_only === 'true';
 
     if (page || limit) {
       // Use paginated endpoint
@@ -68,7 +69,8 @@ export class DocumentsController {
         req.auth!.tenantId,
         req.auth!.userId,
         page || 1,
-        limit || 10
+        limit || 10,
+        noSigningOnly
       );
       res.json(ok({
         documents: toDocumentDTOs(result.data),
@@ -76,7 +78,7 @@ export class DocumentsController {
       }));
     } else {
       // Use original non-paginated endpoint (backward compatibility)
-      const documents = await documentsService.listDocuments(req.auth!.tenantId, req.auth!.userId);
+      const documents = await documentsService.listDocuments(req.auth!.tenantId, req.auth!.userId, noSigningOnly);
       res.json(ok({ documents: toDocumentDTOs(documents) }));
     }
   };

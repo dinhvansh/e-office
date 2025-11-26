@@ -66,7 +66,7 @@ export default function DocumentsPage() {
           total: number;
           totalPages: number;
         };
-      }>(`/documents?page=${page}&limit=${limit}`);
+      }>(`/documents?page=${page}&limit=${limit}&no_signing_only=true`); // Only documents without signing requirement
       return data;
     },
   });
@@ -100,7 +100,10 @@ export default function DocumentsPage() {
     },
   });
 
-  const activeDocumentTypes = documentTypesData?.filter((type) => type.is_active) || [];
+  // Only show document types that DON'T require digital signing
+  const activeDocumentTypes = documentTypesData?.filter((type) => 
+    type.is_active && !type.require_digital_signing
+  ) || [];
   const activeWorkflows = Array.isArray(workflowsData) ? workflowsData.filter((wf) => wf.is_active) : [];
 
   // Detect workflow mode when document type changes
@@ -759,6 +762,8 @@ export default function DocumentsPage() {
                     <tr>
                       <th className="px-4 py-3 text-left font-medium">ID</th>
                       <th className="px-4 py-3 text-left font-medium">Tên file</th>
+                      <th className="px-4 py-3 text-left font-medium">Loại</th>
+                      <th className="px-4 py-3 text-left font-medium">Người tạo</th>
                       <th className="px-4 py-3 text-left font-medium">Số văn bản</th>
                       <th className="px-4 py-3 text-left font-medium">Trạng thái</th>
                       <th className="px-4 py-3 text-left font-medium">Ngày tạo</th>
@@ -770,6 +775,8 @@ export default function DocumentsPage() {
                       <tr key={i} className="border-b">
                         <td className="px-4 py-3"><Skeleton className="h-5 w-12" /></td>
                         <td className="px-4 py-3"><Skeleton className="h-5 w-48" /></td>
+                        <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
+                        <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
                         <td className="px-4 py-3"><Skeleton className="h-5 w-24" /></td>
                         <td className="px-4 py-3"><Skeleton className="h-6 w-20" /></td>
                         <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
