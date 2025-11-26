@@ -41,12 +41,14 @@ export default function LoginPage() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.15),transparent_60%)]" />
       <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-gradient-to-br from-blue-500/40 to-slate-900/60 blur-3xl md:block" />
       <form onSubmit={handleSubmit} className="relative w-full max-w-lg rounded-[32px] border border-white/60 bg-white/80 p-10 shadow-[0_25px_70px_rgba(15,23,42,0.15)] backdrop-blur">
-        <div className="mb-8 space-y-2">
-          <p className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
-            WP Sign
-          </p>
-          <h1 className="text-3xl font-semibold text-slate-900">Đăng nhập Workspace</h1>
-          <p className="text-sm text-slate-500">Quản lý tài liệu, luồng ký và license trong một màn hình.</p>
+        <div className="mb-8 space-y-4">
+          <div className="flex justify-center">
+            <img src="/logo.png" alt="Logo" className="h-16 w-auto object-contain" />
+          </div>
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-semibold text-slate-900">Đăng nhập Workspace</h1>
+            <p className="text-sm text-slate-500">Quản lý tài liệu, luồng ký và license trong một màn hình.</p>
+          </div>
         </div>
         {error && (
           <div className="mb-4 rounded-2xl bg-red-50 px-4 py-3 shadow-inner shadow-red-100 border border-red-100">

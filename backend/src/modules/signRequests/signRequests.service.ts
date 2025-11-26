@@ -135,6 +135,18 @@ class SignRequestsService {
     const signRequest = await signRequestsRepository.create(signRequestData);
 
     if (input.signers?.length) {
+      // Check which signers are internal users
+      const signerEmails = input.signers.map(s => s.email);
+      const internalUsers = await prisma.users.findMany({
+        where: {
+          tenant_id: tenantId,
+          email: { in: signerEmails },
+          status: 'active'
+        },
+        select: { id: true, email: true } // ✅ Get user ID
+      });
+      const internalUserMap = new Map(internalUsers.map(u => [u.email, u.id]));
+
       await signersRepository.createMany(
         input.signers.map((signer) => ({
           sign_request_id: signRequest.id,
@@ -142,6 +154,8 @@ class SignRequestsService {
           name: signer.name,
           role: signer.role,
           status: "pending",
+          is_internal: internalUserMap.has(signer.email), // ✅ Set based on user existence
+          user_id: internalUserMap.get(signer.email) || null, // ✅ Set user_id for internal users
           position_data: signer.position_data ? (signer.position_data as Prisma.InputJsonValue) : undefined,
         })),
       );
@@ -184,6 +198,16 @@ class SignRequestsService {
       throw ApiError.badRequest('Cannot add signers after sign request is sent');
     }
 
+    // Check if signer is internal user
+    const internalUser = await prisma.users.findFirst({
+      where: {
+        tenant_id: tenantId,
+        email: signerData.email,
+        status: 'active'
+      },
+      select: { id: true } // ✅ Get user ID
+    });
+
     // Create signer with Prisma relation
     const signerCreateData: Prisma.signersCreateInput = {
       sign_request: { connect: { id: signRequestId } },
@@ -192,6 +216,8 @@ class SignRequestsService {
       role: signerData.role,
       signing_order: signerData.signing_order,
       status: 'pending',
+      is_internal: !!internalUser, // ✅ Set based on user existence
+      user_id: internalUser?.id || null, // ✅ Set user_id for internal users
       position_data: signerData.position_data as Prisma.InputJsonValue,
     };
 
@@ -331,6 +357,116 @@ class SignRequestsService {
     });
 
     return this.getSignRequest(id, tenantId);
+  }
+
+  /**
+   * Internal user signs document (no OTP required)
+   */
+  async signInternal(
+    signRequestId: number,
+    userId: number,
+    tenantId: number,
+    signatureData: string,
+    signatureType: string,
+    ipAddress: string,
+    userAgent: string
+  ) {
+    // Get sign request
+    const signRequest = await this.getSignRequest(signRequestId, tenantId);
+
+    // Find signer for this user
+    const signer = await prisma.signers.findFirst({
+      where: {
+        sign_request_id: signRequestId,
+        is_internal: true,
+        email: {
+          in: await prisma.users.findUnique({
+            where: { id: userId },
+            select: { email: true }
+          }).then(u => u?.email ? [u.email] : [])
+        }
+      }
+    });
+
+    if (!signer) {
+      throw ApiError.notFound(
+        'Bạn không phải là người ký của tài liệu này',
+        'SIGNER_NOT_FOUND'
+      );
+    }
+
+    // Check if already signed
+    if (signer.status === 'signed' || signer.status === 'completed') {
+      throw ApiError.badRequest(
+        'Bạn đã ký tài liệu này rồi',
+        'ALREADY_SIGNED'
+      );
+    }
+
+    // Check signing order (sequential workflow)
+    if (signRequest.workflow_type === 'sequential' && signer.signing_order) {
+      const allSigners = await signersRepository.findBySignRequest(signRequestId);
+      const previousSigners = allSigners.filter(s => 
+        s.signing_order && s.signing_order < signer.signing_order
+      );
+      
+      const allPreviousSigned = previousSigners.every(s => 
+        s.status === 'signed' || s.status === 'completed'
+      );
+
+      if (!allPreviousSigned) {
+        const pendingSigners = previousSigners.filter(s => 
+          s.status !== 'signed' && s.status !== 'completed'
+        );
+        throw ApiError.badRequest(
+          `Vui lòng đợi người ký trước hoàn thành. Đang chờ: ${pendingSigners.map(s => s.name).join(', ')}`,
+          'SIGNING_ORDER_VIOLATION'
+        );
+      }
+    }
+
+    // Update signer with signature
+    await signersRepository.update(signer.id, {
+      status: 'signed',
+      signed_at: new Date(),
+      signature_data: signatureData,
+      signature_type: signatureType,
+      ip_address: ipAddress,
+      user_agent: userAgent
+    });
+
+    // Check if all signers have signed
+    const allSigners = await signersRepository.findBySignRequest(signRequestId);
+    const allSigned = allSigners.every(s => 
+      s.status === 'signed' || s.status === 'completed'
+    );
+
+    // Update sign request and document status
+    if (allSigned) {
+      await signRequestsRepository.updateStatus(signRequestId, tenantId, 'completed');
+      if (signRequest.document_id) {
+        await documentsRepository.update(signRequest.document_id, {
+          status: 'completed'
+        });
+      }
+    } else {
+      await signRequestsRepository.updateStatus(signRequestId, tenantId, 'in_progress');
+    }
+
+    // Audit log
+    await auditService.record({
+      tenantId,
+      documentId: signRequest.document_id,
+      event: 'sign.internal_signed',
+      userId
+    });
+
+    return {
+      success: true,
+      message: allSigned ? 'Tất cả đã ký xong!' : 'Ký thành công!',
+      all_signed: allSigned,
+      signer_id: signer.id
+    };
   }
 }
 

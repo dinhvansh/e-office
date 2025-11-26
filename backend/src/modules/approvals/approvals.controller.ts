@@ -91,13 +91,32 @@ export class ApprovalsController {
     res.json(ok(result));
   };
 
-  // Get my pending approvals
+  // Get my pending approvals with filters, pagination, search, sort
   getMyPending = async (req: Request, res: Response): Promise<void> => {
-    const approvals = await approvalsService.getMyPendingApprovals(
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const search = req.query.search as string;
+    const status = req.query.status as string; // pending, approved, rejected, info_requested
+    const documentTypeId = req.query.document_type_id ? parseInt(req.query.document_type_id as string) : undefined;
+    const creatorSearch = req.query.creator_search as string; // Search by creator name or email
+    const sortBy = req.query.sort_by as string || 'created_at'; // created_at, document_number
+    const sortOrder = req.query.sort_order as string || 'desc'; // asc, desc
+
+    const result = await approvalsService.getMyPendingApprovals(
       req.auth!.userId,
-      req.auth!.tenantId
+      req.auth!.tenantId,
+      {
+        page,
+        limit,
+        search,
+        status,
+        documentTypeId,
+        creatorSearch,
+        sortBy,
+        sortOrder: sortOrder as 'asc' | 'desc'
+      }
     );
-    res.json(ok(approvals));
+    res.json(ok(result));
   };
 
   // Get document approvals (history)
@@ -118,6 +137,34 @@ export class ApprovalsController {
       req.auth!.tenantId
     );
     res.json(ok({ instance }));
+  };
+
+  // Get my combined tasks (approvals + signing)
+  getMyCombinedTasks = async (req: Request, res: Response): Promise<void> => {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const search = req.query.search as string;
+    const taskType = req.query.task_type as string; // 'approval' | 'signing' | undefined (all)
+    const status = req.query.status as string;
+    const documentTypeId = req.query.document_type_id ? parseInt(req.query.document_type_id as string) : undefined;
+    const sortBy = req.query.sort_by as string || 'created_at';
+    const sortOrder = req.query.sort_order as string || 'desc';
+
+    const result = await approvalsService.getMyCombinedTasks(
+      req.auth!.userId,
+      req.auth!.tenantId,
+      {
+        page,
+        limit,
+        search,
+        taskType,
+        status,
+        documentTypeId,
+        sortBy,
+        sortOrder: sortOrder as 'asc' | 'desc'
+      }
+    );
+    res.json(ok(result));
   };
 }
 

@@ -51,6 +51,7 @@ model users {
   user_roles    user_roles[]
   managed_departments departments[] @relation("department_manager")
   approvals     document_approvals[]
+  signers       signers[]     @relation("signer_user") // ✅ Relation to signers
 }
 
 model documents {
@@ -117,6 +118,7 @@ model sign_requests {
 model signers {
   id             Int           @id @default(autoincrement())
   sign_request_id Int
+  user_id        Int?          // ✅ Link to internal user (if is_internal = true)
   email          String?
   name           String?
   role           String?
@@ -133,6 +135,7 @@ model signers {
   ip_address     String?       // IP address khi ký
   user_agent     String?       // Browser/device info
   sign_request   sign_requests @relation(fields: [sign_request_id], references: [id])
+  user           users?        @relation("signer_user", fields: [user_id], references: [id]) // ✅ Relation to user
   assigned_fields sign_request_fields[]
   field_values   sign_request_field_values[]
 }

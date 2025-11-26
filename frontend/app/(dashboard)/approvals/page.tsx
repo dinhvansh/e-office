@@ -1,43 +1,80 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { CheckSquare, FileText, Clock, User, ArrowRight, History, Filter } from 'lucide-react';
-import { useAuth } from '@/components/providers/auth-provider';
-import { PageHeader } from '@/components/ui/page-header';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { EmptyState } from '@/components/ui/empty-state';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import dayjs from 'dayjs';
-import Link from 'next/link';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/providers/auth-provider';
+import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { MetricCard } from '@/components/ui/metric-card';
+import { PageHeader } from '@/components/ui/page-header';
+import { 
+  CheckCircle2, 
+  XCircle, 
+  Clock,
+  FileText,
+  User,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ClipboardList,
+} from 'lucide-react';
+import dayjs from 'dayjs';
 
-interface ApprovalItem {
+interface Approval {
   id: number;
-  document_id: number;
-  due_date: string;
+  action: string;
   created_at: string;
+  document_id: number;
   document: {
     id: number;
-    title: string | null;
-    document_number: string | null;
-    original_file_name?: string | null;
+    title: string;
+    document_number: string;
+    original_file_name: string;
+    owner: {
+      id: number;
+      email: string;
+      full_name: string;
+    };
     document_type: {
+      id: number;
       name: string;
       code: string;
     };
-    owner: {
-      full_name: string | null;
-      email: string;
-    } | null;
-  };
-  workflow: {
-    name: string;
   };
   workflow_step: {
+    id: number;
     step_name: string;
+  };
+}
+
+interface Statistics {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  info_requested: number;
+}
+
+interface ApiResponse {
+  approvals: Approval[];
+  statistics: Statistics;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
   };
 }
 
@@ -45,156 +82,415 @@ export default function ApprovalsPage() {
   const { fetchJson } = useAuth();
   const router = useRouter();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['my-pending-approvals'],
+  // State
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [documentTypeId, setDocumentTypeId] = useState('');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [creatorSearch, setCreatorSearch] = useState('');
+
+  // Fetch approvals
+  const { data, isLoading, refetch } = useQuery<ApiResponse>({
+    queryKey: ['approvals', page, limit, search, status, documentTypeId, sortBy, sortOrder, creatorSearch],
     queryFn: async () => {
-      const res = await fetchJson<ApprovalItem[]>('/approvals/my-pending');
-      return res;
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+      if (search) params.append('search', search);
+      if (status) params.append('status', status);
+      if (documentTypeId) params.append('document_type_id', documentTypeId);
+      if (sortBy) params.append('sort_by', sortBy);
+      if (sortOrder) params.append('sort_order', sortOrder);
+      if (creatorSearch) params.append('creator_search', creatorSearch);
+
+      const response = await fetchJson<ApiResponse>(`/approvals/my-pending?${params.toString()}`);
+      return response;
     },
   });
 
-  const getDueDateColor = (date: string) => {
-    const now = dayjs();
-    const due = dayjs(date);
-    const diff = due.diff(now, 'day');
+  // Fetch document types for filter
+  const { data: documentTypes } = useQuery({
+    queryKey: ['document-types'],
+    queryFn: async () => {
+      const response = await fetchJson<any>('/document-types');
+      return Array.isArray(response) ? response : [];
+    },
+  });
 
-    if (diff < 0) return 'text-red-600 bg-red-50 border-red-200'; // Overdue
-    if (diff <= 1) return 'text-orange-600 bg-orange-50 border-orange-200'; // Due soon
-    return 'text-green-600 bg-green-50 border-green-200';
+  const statistics = data?.statistics || {
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    info_requested: 0,
+  };
+
+  const approvals = data?.approvals || [];
+  const pagination = data?.pagination || {
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={CheckSquare}
         title="Phê duyệt của tôi"
-        description="Quản lý các văn bản cần bạn phê duyệt"
-        iconColor="text-amber-600"
-        actions={
-          <Badge variant="secondary" className="text-sm">
-            {data?.length ?? 0} chờ xử lý
-          </Badge>
-        }
+        description="Quản lý các yêu cầu phê duyệt"
+        icon={ClipboardList}
       />
 
-      <Tabs defaultValue="pending" className="w-full">
-        <TabsList className="grid w-full max-w-[400px] grid-cols-2">
-          <TabsTrigger value="pending">Đang chờ duyệt</TabsTrigger>
-          <TabsTrigger value="history">Lịch sử phê duyệt</TabsTrigger>
-        </TabsList>
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <MetricCard
+          title="Tổng số"
+          value={statistics.total}
+          icon={FileText}
+          iconColor="text-blue-600"
+          iconBgColor="bg-blue-100"
+        />
+        <MetricCard
+          title="Chờ duyệt"
+          value={statistics.pending}
+          icon={Clock}
+          iconColor="text-orange-600"
+          iconBgColor="bg-orange-100"
+        />
+        <MetricCard
+          title="Đã duyệt"
+          value={statistics.approved}
+          icon={CheckCircle2}
+          iconColor="text-green-600"
+          iconBgColor="bg-green-100"
+        />
+        <MetricCard
+          title="Từ chối"
+          value={statistics.rejected}
+          icon={XCircle}
+          iconColor="text-red-600"
+          iconBgColor="bg-red-100"
+        />
+      </div>
 
-        <TabsContent value="pending" className="mt-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Danh sách chờ duyệt</CardTitle>
-                  <CardDescription>
-                    Các văn bản đang chờ bạn xử lý
-                  </CardDescription>
-                </div>
-                <Button variant="outline" size="sm">
-                  <Filter className="w-4 h-4 mr-2" />
-                  Lọc
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">
-                      <Skeleton className="h-12 w-12 rounded-full" />
-                      <div className="space-y-2 flex-1">
-                        <Skeleton className="h-4 w-1/3" />
-                        <Skeleton className="h-4 w-1/2" />
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+        <h3 className="text-sm font-semibold text-gray-700 mb-4">Bộ lọc</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Search */}
+          <div className="space-y-2">
+            <Label htmlFor="search">Tìm kiếm</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                id="search"
+                placeholder="Mã, tên tài liệu..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                className="pl-10"
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+
+          {/* Status Filter */}
+          <div className="space-y-2">
+            <Label htmlFor="status">Trạng thái</Label>
+            <Select
+              value={status || "all"}
+              onValueChange={(value) => {
+                setStatus(value === "all" ? "" : value);
+                setPage(1);
+              }}
+              disabled={isLoading}
+            >
+              <SelectTrigger id="status">
+                <SelectValue placeholder="Tất cả trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                <SelectItem value="pending">Chờ duyệt</SelectItem>
+                <SelectItem value="approved">Đã duyệt</SelectItem>
+                <SelectItem value="rejected">Từ chối</SelectItem>
+                <SelectItem value="info_requested">Yêu cầu bổ sung</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Document Type Filter */}
+          <div className="space-y-2">
+            <Label htmlFor="docType">Loại văn bản</Label>
+            <Select
+              value={documentTypeId || "all"}
+              onValueChange={(value) => {
+                setDocumentTypeId(value === "all" ? "" : value);
+                setPage(1);
+              }}
+              disabled={isLoading}
+            >
+              <SelectTrigger id="docType">
+                <SelectValue placeholder="Tất cả loại" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả loại</SelectItem>
+                {documentTypes?.map((type: any) => (
+                  <SelectItem key={type.id} value={type.id.toString()}>
+                    {type.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Creator Filter */}
+          <div className="space-y-2">
+            <Label htmlFor="creator">Người tạo</Label>
+            <Input
+              id="creator"
+              placeholder="Tên hoặc email..."
+              value={creatorSearch}
+              onChange={(e) => {
+                setCreatorSearch(e.target.value);
+                setPage(1);
+              }}
+              disabled={isLoading}
+            />
+          </div>
+        </div>
+
+        {/* Sort */}
+        <div className="flex items-center gap-4">
+          <div className="space-y-2 flex-1">
+            <Label htmlFor="sort">Sắp xếp theo</Label>
+            <Select
+              value={`${sortBy}-${sortOrder}`}
+              onValueChange={(value) => {
+                const [newSortBy, newSortOrder] = value.split('-');
+                setSortBy(newSortBy);
+                setSortOrder(newSortOrder);
+                setPage(1);
+              }}
+              disabled={isLoading}
+            >
+              <SelectTrigger id="sort">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_at-desc">Mới nhất</SelectItem>
+                <SelectItem value="created_at-asc">Cũ nhất</SelectItem>
+                <SelectItem value="document_number-asc">Mã văn bản A-Z</SelectItem>
+                <SelectItem value="document_number-desc">Mã văn bản Z-A</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* Approvals List */}
+      <div className="bg-white rounded-lg shadow-sm">
+        {isLoading ? (
+          <div className="divide-y">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="p-4 animate-pulse">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 bg-gray-200 rounded"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-5 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/4"></div>
                       </div>
                     </div>
-                  ))}
+                    <div className="flex gap-4">
+                      <div className="h-4 bg-gray-200 rounded w-24"></div>
+                      <div className="h-4 bg-gray-200 rounded w-32"></div>
+                      <div className="h-4 bg-gray-200 rounded w-28"></div>
+                    </div>
+                  </div>
+                  <div className="ml-4">
+                    <div className="h-6 bg-gray-200 rounded-full w-24"></div>
+                  </div>
                 </div>
-              ) : data && data.length > 0 ? (
-                <div className="space-y-4">
-                  {data.map((item) => (
-                    <div
-                      key={item.id}
-                      className="group flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors gap-4"
-                    >
-                      <div className="flex items-start gap-4 flex-1">
-                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mt-1">
-                          <FileText className="w-6 h-6" />
+              </div>
+            ))}
+          </div>
+        ) : approvals.length === 0 ? (
+          <div className="p-12 text-center">
+            <ClipboardList className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Không có yêu cầu phê duyệt
+            </h3>
+            <p className="text-gray-500">
+              {search || status || documentTypeId || creatorSearch
+                ? 'Không tìm thấy kết quả phù hợp với bộ lọc'
+                : 'Bạn chưa có yêu cầu phê duyệt nào'}
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Mã yêu cầu
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tên tài liệu
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Người tạo
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ngày tạo
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Trạng thái
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Hành động
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {approvals.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-blue-600" />
+                          <span className="text-sm font-medium text-gray-900">
+                            {item.document.document_number || `#${item.document_id}`}
+                          </span>
                         </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold text-base hover:underline cursor-pointer" onClick={() => router.push(`/documents/${item.document_id}`)}>
-                              {item.document.original_file_name || item.document.title || `Document #${item.document_id}`}
-                            </h3>
-                            {item.document.document_number && (
-                              <Badge variant="outline" className="font-mono text-xs">
-                                {item.document.document_number}
-                              </Badge>
-                            )}
-                            <Badge variant="secondary" className="text-xs">
-                              {item.document.document_type.name}
-                            </Badge>
-                          </div>
-                          
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                            <div className="flex items-center gap-1">
-                              <User className="w-3.5 h-3.5" />
-                              <span>{item.document.owner?.full_name || item.document.owner?.email}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="font-medium text-foreground">Bước:</span>
-                              <span>{item.workflow_step.step_name}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="font-medium text-foreground">Quy trình:</span>
-                              <span>{item.workflow.name}</span>
-                            </div>
-                          </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-col gap-1">
+                          <span 
+                            className="text-sm font-medium text-gray-900 hover:underline cursor-pointer" 
+                            onClick={() => router.push(`/approvals/${item.id}`)}
+                          >
+                            {item.document.original_file_name || item.document.title || `Document #${item.document_id}`}
+                          </span>
+                          <Badge variant="secondary" className="text-xs w-fit">
+                            {item.document.document_type.name}
+                          </Badge>
                         </div>
-                      </div>
-
-                      <div className="flex flex-col sm:items-end gap-2 min-w-[150px]">
-                        <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getDueDateColor(item.due_date)}`}>
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>Hạn: {dayjs(item.due_date).format('DD/MM/YYYY')}</span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm text-gray-900">
+                            {item.document.owner?.full_name || item.document.owner?.email}
+                          </span>
                         </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1 text-sm text-gray-500">
+                          <Clock className="w-4 h-4" />
+                          <span>{dayjs(item.created_at).format('DD/MM/YYYY')}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <Badge 
+                          variant={
+                            item.action === 'approved' ? 'default' :
+                            item.action === 'rejected' ? 'destructive' :
+                            'secondary'
+                          }
+                          className="text-xs"
+                        >
+                          {item.workflow_step.step_name}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <Button 
                           size="sm" 
-                          className="w-full sm:w-auto"
+                          variant="outline"
                           onClick={() => router.push(`/approvals/${item.id}`)}
                         >
-                          Xử lý
-                          <ArrowRight className="w-4 h-4 ml-2" />
+                          Xem
                         </Button>
-                      </div>
-                    </div>
+                      </td>
+                    </tr>
                   ))}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={CheckSquare}
-                  title="Không có văn bản chờ duyệt"
-                  description="Tuyệt vời! Bạn đã hoàn thành tất cả các yêu cầu phê duyệt."
-                />
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                </tbody>
+              </table>
+            </div>
 
-        <TabsContent value="history" className="mt-6">
-          <Card>
-            <CardContent className="p-6">
-              <EmptyState
-                icon={History}
-                title="Lịch sử phê duyệt"
-                description="Tính năng đang được phát triển"
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            {/* Pagination */}
+            <div className="px-4 py-4 border-t flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700">
+                  Hiển thị {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} trong tổng số {pagination.total}
+                </span>
+                <Select
+                  value={limit.toString()}
+                  onValueChange={(value) => {
+                    setLimit(parseInt(value));
+                    setPage(1);
+                  }}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="30">30</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(1)}
+                  disabled={page === 1 || isLoading}
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1 || isLoading}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-sm text-gray-700 px-2">
+                  Trang {pagination.page} / {pagination.totalPages || 1}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(page + 1)}
+                  disabled={page >= pagination.totalPages || isLoading}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(pagination.totalPages)}
+                  disabled={page >= pagination.totalPages || isLoading}
+                >
+                  <ChevronsRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { SIDEBAR_STRUCTURE } from "@/constants/sidebarItems";
 import { filterSidebarByPermissions } from "@/lib/permissions";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { LoadingBar } from "@/components/ui/loading-bar";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { tokens, user, tenant, logout, isLoading } = useAuth();
@@ -34,6 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
+      <LoadingBar />
       <div className={cn(
         "grid gap-0 transition-all duration-300",
         isCollapsed ? "md:grid-cols-[100px_1fr]" : "md:grid-cols-[280px_1fr]"
@@ -56,14 +58,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             isCollapsed && "flex justify-center"
           )}>
             {isCollapsed ? (
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-bold text-lg">
-                {(tenant?.name ?? "WP")[0]}
-              </div>
+              <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain" />
             ) : (
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-bold text-lg">
-                  {(tenant?.name ?? "WP")[0]}
-                </div>
+                <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain" />
                 <div>
                   <p className="text-lg font-bold text-slate-900">{tenant?.name ?? "WP Sign"}</p>
                   <p className="text-xs text-slate-500">{tenant?.plan ?? "Enterprise"}</p>

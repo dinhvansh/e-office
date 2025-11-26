@@ -57,10 +57,10 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         color: "text-purple-600"
       },
       { 
-        label: "Phê duyệt của tôi", 
-        href: "/approvals", 
+        label: "Công việc của tôi", 
+        href: "/my-tasks", 
         icon: CheckSquare,
-        caption: "Chờ phê duyệt",
+        caption: "Phê duyệt & Ký số",
         color: "text-amber-600"
       },
     ]

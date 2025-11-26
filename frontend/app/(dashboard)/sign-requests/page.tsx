@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
-import { PenTool, Eye, Search } from 'lucide-react';
+import { PenTool, Eye, Search, Edit } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
+import { toast } from 'sonner';
 
 interface SignRequest {
   id: number;
@@ -34,6 +35,8 @@ interface SignRequest {
     status: string;
     signed_at: string | null;
     signing_order: number | null;
+    is_internal: boolean; // ✅ Added
+    user_id: number | null; // ✅ Added
   }>;
   progress: {
     total: number;
@@ -45,7 +48,7 @@ interface SignRequest {
 }
 
 export default function SignRequestsPage() {
-  const { fetchJson } = useAuth();
+  const { fetchJson, user } = useAuth();
   const router = useRouter();
   const [filter, setFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -86,11 +89,45 @@ export default function SignRequestsPage() {
       await fetchJson(`/sign-requests/${signRequestId}/send`, {
         method: 'POST',
       });
-      alert('✅ Đã gửi lại email thành công!');
+      toast.success('Đã gửi lại email thành công!');
     } catch (error: any) {
       console.error('Resend email error:', error);
-      alert('❌ Lỗi: ' + (error.message || 'Không thể gửi email'));
+      toast.error('Lỗi: ' + (error.message || 'Không thể gửi email'));
     }
+  };
+
+  // Check if current user is a pending internal signer
+  const isCurrentUserPendingSigner = (request: SignRequest) => {
+    if (!user?.id) return false;
+    return request.signers.some(
+      s => s.is_internal && 
+           s.user_id === user.id && 
+           (s.status === 'pending' || s.status === 'otp_sent')
+    );
+  };
+
+  // Check if it's current user's turn to sign (for sequential)
+  const isCurrentUserTurn = (request: SignRequest) => {
+    if (!user?.id) return false;
+    
+    const currentUserSigner = request.signers.find(
+      s => s.is_internal && s.user_id === user.id
+    );
+    
+    if (!currentUserSigner || currentUserSigner.status === 'signed') {
+      return false;
+    }
+
+    // For sequential signing, check if all previous signers have signed
+    const previousSigners = request.signers.filter(
+      s => (s.signing_order || 0) < (currentUserSigner.signing_order || 0)
+    );
+    
+    if (previousSigners.length === 0) {
+      return true; // First signer
+    }
+
+    return previousSigners.every(s => s.status === 'signed' || s.status === 'completed');
   };
 
   const { data, isLoading } = useQuery({
@@ -276,6 +313,20 @@ export default function SignRequestsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 justify-center">
+                          {/* Internal Signing Button - Show if current user is pending signer */}
+                          {isCurrentUserPendingSigner(request) && isCurrentUserTurn(request) && (
+                            <Button
+                              size="sm"
+                              onClick={() => router.push(`/sign-requests/${request.id}/sign`)}
+                              title="Ký ngay"
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Ký ngay
+                            </Button>
+                          )}
+                          
+                          {/* View Details Button */}
                           <Button
                             size="sm"
                             variant="ghost"
@@ -284,14 +335,15 @@ export default function SignRequestsPage() {
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
-                          {/* Show copy link & resend for external signers */}
-                          {request.signers.some(s => !s.email.includes('@acme.local')) && (
+                          
+                          {/* External Signer Actions - Only show if has external signers */}
+                          {request.signers.some(s => !s.is_internal) && (
                             <>
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => handleCopySigningLink(request)}
-                                title="Copy link ký"
+                                title="Copy link ký (bên ngoài)"
                                 className="text-blue-600 hover:text-blue-700"
                               >
                                 📋
@@ -300,7 +352,7 @@ export default function SignRequestsPage() {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => handleResendEmail(request.id)}
-                                title="Gửi lại email"
+                                title="Gửi lại email (bên ngoài)"
                                 className="text-green-600 hover:text-green-700"
                               >
                                 📧

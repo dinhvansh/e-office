@@ -39,7 +39,7 @@ export class SignRequestsController {
     // Calculate progress for each request
     const requestsWithProgress = signRequests.map(sr => {
       const totalSigners = sr.signers.length;
-      const signedCount = sr.signers.filter(s => s.status === 'signed').length;
+      const signedCount = sr.signers.filter(s => s.status === 'signed' || s.status === 'completed').length;
       const rejectedCount = sr.signers.filter(s => s.status === 'rejected').length;
       
       return {
@@ -157,5 +157,27 @@ export class SignRequestsController {
       reason
     );
     res.json(ok({ sign_request: signRequest }));
+  };
+
+  // Internal Signing (no OTP required)
+  signInternal = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id);
+    const signatureSchema = z.object({
+      signature_data: z.string().min(1),
+      signature_type: z.enum(['drawn', 'uploaded', 'typed']),
+    });
+    const body = signatureSchema.parse(req.body);
+    
+    const result = await signRequestsService.signInternal(
+      id,
+      req.auth!.userId,
+      req.auth!.tenantId,
+      body.signature_data,
+      body.signature_type,
+      req.ip || 'unknown',
+      req.get('user-agent') || 'unknown'
+    );
+    
+    res.json(ok(result));
   };
 }

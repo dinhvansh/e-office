@@ -628,10 +628,132 @@ class ApprovalsService {
   }
 
   /**
-   * Get my pending approvals
+   * Get my pending approvals with filters, pagination, search, sort
    */
-  async getMyPendingApprovals(userId: number, tenantId: number) {
-    return approvalsRepository.findPendingApprovals(userId, tenantId);
+  async getMyPendingApprovals(
+    userId: number,
+    tenantId: number,
+    options?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      status?: string;
+      documentTypeId?: number;
+      creatorSearch?: string;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
+    }
+  ) {
+    const page = options?.page || 1;
+    const limit = options?.limit || 10;
+    const skip = (page - 1) * limit;
+
+    // Build where clause - simplified to avoid nested complexity
+    const where: any = {
+      approver_user_id: userId
+    };
+
+    // Filter by status
+    if (options?.status) {
+      where.action = options.status;
+    }
+
+    // For complex filters, we'll filter in memory after fetching
+    // This is simpler and avoids Prisma nested where issues
+
+    // Get all approvals for this user (we'll filter in memory)
+    let allApprovals = await prisma.document_approvals.findMany({
+      where,
+      include: {
+        document: {
+          include: {
+            owner: { select: { id: true, email: true, full_name: true } },
+            document_type: { select: { id: true, name: true, code: true } }
+          }
+        },
+        workflow: { select: { id: true, name: true } },
+        workflow_step: { select: { id: true, step_order: true, step_name: true } },
+        approver: { select: { id: true, email: true, full_name: true } }
+      }
+    });
+
+    // Filter by tenant
+    allApprovals = allApprovals.filter(a => a.document.tenant_id === tenantId);
+
+    // Filter by document type
+    if (options?.documentTypeId) {
+      allApprovals = allApprovals.filter(a => 
+        a.document.document_type_id === options.documentTypeId
+      );
+    }
+
+    // Filter by creator (search by name or email)
+    if (options?.creatorSearch) {
+      const creatorLower = options.creatorSearch.toLowerCase();
+      allApprovals = allApprovals.filter(a => {
+        const owner = a.document.owner;
+        return (
+          owner.full_name?.toLowerCase().includes(creatorLower) ||
+          owner.email?.toLowerCase().includes(creatorLower)
+        );
+      });
+    }
+
+    // Search filter (document title, number)
+    if (options?.search) {
+      const searchLower = options.search.toLowerCase();
+      allApprovals = allApprovals.filter(a => {
+        const doc = a.document;
+        return (
+          doc.title?.toLowerCase().includes(searchLower) ||
+          doc.document_number?.toLowerCase().includes(searchLower)
+        );
+      });
+    }
+
+    // Sort
+    allApprovals.sort((a, b) => {
+      if (options?.sortBy === 'document_number') {
+        const aNum = a.document.document_number || '';
+        const bNum = b.document.document_number || '';
+        return options.sortOrder === 'asc' ? aNum.localeCompare(bNum) : bNum.localeCompare(aNum);
+      } else {
+        const aDate = new Date(a.created_at).getTime();
+        const bDate = new Date(b.created_at).getTime();
+        return options?.sortOrder === 'asc' ? aDate - bDate : bDate - aDate;
+      }
+    });
+
+    // Pagination
+    const total = allApprovals.length;
+    const approvals = allApprovals.slice(skip, skip + limit);
+
+    // Calculate statistics from filtered approvals
+    const allApprovalsForUser = await prisma.document_approvals.findMany({
+      where: { approver_user_id: userId },
+      include: { document: { select: { tenant_id: true } } }
+    });
+    
+    const tenantApprovals = allApprovalsForUser.filter(a => a.document.tenant_id === tenantId);
+    
+    const statistics = {
+      total: tenantApprovals.length,
+      pending: tenantApprovals.filter(a => a.action === 'pending').length,
+      approved: tenantApprovals.filter(a => a.action === 'approved').length,
+      rejected: tenantApprovals.filter(a => a.action === 'rejected').length,
+      info_requested: tenantApprovals.filter(a => a.action === 'info_requested').length
+    };
+
+    return {
+      approvals,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      },
+      statistics
+    };
   }
 
   /**
@@ -664,6 +786,165 @@ class ApprovalsService {
     }
 
     return approvalsRepository.findWorkflowInstance(documentId);
+  }
+
+  /**
+   * Get my combined tasks (approvals + signing)
+   */
+  async getMyCombinedTasks(
+    userId: number,
+    tenantId: number,
+    options?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      taskType?: string; // 'approval' | 'signing' | undefined (all)
+      status?: string;
+      documentTypeId?: number;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
+    }
+  ) {
+    const page = options?.page || 1;
+    const limit = options?.limit || 10;
+    const skip = (page - 1) * limit;
+
+    let allTasks: any[] = [];
+
+    // Get approvals if taskType is 'approval' or undefined (all)
+    if (!options?.taskType || options.taskType === 'approval') {
+      const approvals = await prisma.document_approvals.findMany({
+        where: { approver_user_id: userId },
+        include: {
+          document: {
+            include: {
+              owner: { select: { id: true, email: true, full_name: true } },
+              document_type: { select: { id: true, name: true, code: true } }
+            }
+          },
+          workflow_step: { select: { step_name: true, step_order: true } }
+        }
+      });
+
+      // Filter by tenant
+      const tenantApprovals = approvals.filter(a => a.document.tenant_id === tenantId);
+
+      // Map to unified task format
+      tenantApprovals.forEach(approval => {
+        allTasks.push({
+          task_type: 'approval',
+          task_id: approval.id,
+          document_id: approval.document_id,
+          document_number: approval.document.document_number,
+          document_title: approval.document.title,
+          document_type: approval.document.document_type,
+          owner: approval.document.owner,
+          status: approval.action, // pending, approved, rejected, info_requested
+          workflow_step: approval.workflow_step?.step_name,
+          created_at: approval.created_at,
+          due_date: approval.due_date,
+        });
+      });
+    }
+
+    // Get signing tasks if taskType is 'signing' or undefined (all)
+    if (!options?.taskType || options.taskType === 'signing') {
+      // Get all sign requests with signers
+      const signRequests: any = await prisma.sign_requests.findMany({
+        include: {
+          signers: {
+            where: {
+              user_id: userId,
+              is_internal: true,
+            }
+          },
+          document: {
+            include: {
+              owner: { select: { id: true, email: true, full_name: true } },
+              document_type: { select: { id: true, name: true, code: true } }
+            }
+          }
+        }
+      });
+
+      // Filter by tenant and map to tasks
+      signRequests.forEach((signRequest: any) => {
+        if (signRequest.document.tenant_id === tenantId && signRequest.signers.length > 0) {
+          signRequest.signers.forEach((signer: any) => {
+            allTasks.push({
+              task_type: 'signing',
+              task_id: signer.id,
+              sign_request_id: signRequest.id,
+              document_id: signRequest.document_id,
+              document_number: signRequest.document.document_number,
+              document_title: signRequest.document.title,
+              document_type: signRequest.document.document_type,
+              owner: signRequest.document.owner,
+              status: signer.status, // pending, otp_sent, signed, rejected
+              signing_order: signer.signing_order,
+              created_at: signRequest.created_at,
+              due_date: null, // Signers don't have due dates
+            });
+          });
+        }
+      });
+    }
+
+    // Apply filters
+    if (options?.documentTypeId) {
+      allTasks = allTasks.filter(t => t.document_type?.id === options.documentTypeId);
+    }
+
+    if (options?.status) {
+      allTasks = allTasks.filter(t => t.status === options.status);
+    }
+
+    if (options?.search) {
+      const searchLower = options.search.toLowerCase();
+      allTasks = allTasks.filter(t =>
+        t.document_title?.toLowerCase().includes(searchLower) ||
+        t.document_number?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Sort
+    allTasks.sort((a, b) => {
+      if (options?.sortBy === 'document_number') {
+        const aNum = a.document_number || '';
+        const bNum = b.document_number || '';
+        return options.sortOrder === 'asc' ? aNum.localeCompare(bNum) : bNum.localeCompare(aNum);
+      } else {
+        const aDate = new Date(a.created_at).getTime();
+        const bDate = new Date(b.created_at).getTime();
+        return options?.sortOrder === 'asc' ? aDate - bDate : bDate - aDate;
+      }
+    });
+
+    // Pagination
+    const total = allTasks.length;
+    const tasks = allTasks.slice(skip, skip + limit);
+
+    // Calculate statistics
+    const statistics = {
+      total: allTasks.length,
+      approval_pending: allTasks.filter(t => t.task_type === 'approval' && t.status === 'pending').length,
+      signing_pending: allTasks.filter(t => t.task_type === 'signing' && (t.status === 'pending' || t.status === 'otp_sent')).length,
+      completed: allTasks.filter(t => 
+        (t.task_type === 'approval' && t.status === 'approved') ||
+        (t.task_type === 'signing' && t.status === 'signed')
+      ).length,
+    };
+
+    return {
+      tasks,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      },
+      statistics
+    };
   }
 
   /**

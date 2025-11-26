@@ -78,7 +78,7 @@ export default function ApprovalDetailPage() {
       setApproval(data);
     } catch (error: any) {
       toast.error(error.message || 'Không thể tải thông tin phê duyệt');
-      router.push('/approvals');
+      router.push('/my-tasks');
     } finally {
       setLoading(false);
     }
@@ -129,7 +129,7 @@ export default function ApprovalDetailPage() {
       });
 
       toast.success('Thành công!');
-      router.push('/approvals');
+      router.push('/my-tasks');
     } catch (error: any) {
       toast.error(error.message || 'Lỗi');
     } finally {
@@ -158,7 +158,7 @@ export default function ApprovalDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
-        <Button variant="ghost" onClick={() => router.push('/approvals')} className="mb-4">
+        <Button variant="ghost" onClick={() => router.push('/my-tasks')} className="mb-4">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Quay lại
         </Button>

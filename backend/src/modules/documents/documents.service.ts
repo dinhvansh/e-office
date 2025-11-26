@@ -556,12 +556,28 @@ class DocumentsService {
   async deleteDocument(documentId: number, tenantId: number, userId?: number): Promise<void> {
     const document = await this.getDocument(documentId, tenantId);
     
-    // ✅ Status check: Cannot delete document in pending_approval or approved status
-    if (document.status === 'pending_approval' || document.status === 'approved') {
+    // ✅ Status check: Only allow delete for 'draft' or 'cancelled' status
+    const allowedStatuses = ['draft', 'cancelled'];
+    if (!allowedStatuses.includes(document.status)) {
       throw ApiError.badRequest(
-        "Cannot delete document that is pending approval or approved. Please cancel the approval workflow first.",
+        `Không thể xóa tài liệu đang ở trạng thái "${document.status}". Chỉ có thể xóa tài liệu ở trạng thái "Nháp" hoặc "Đã hủy". Vui lòng hủy luồng ký/phê duyệt trước khi xóa.`,
         "DOCUMENT_DELETE_DENIED_STATUS"
       );
+    }
+    
+    // ✅ Check sign request status if exists
+    if (document.sign_request_id) {
+      const signRequest = await prisma.sign_requests.findUnique({
+        where: { id: document.sign_request_id },
+        include: { signers: true }
+      });
+      
+      if (signRequest && signRequest.status === 'pending') {
+        throw ApiError.badRequest(
+          "Tài liệu đang có luồng ký đang chờ xử lý. Vui lòng hủy luồng ký trước khi xóa tài liệu.",
+          "DOCUMENT_HAS_PENDING_SIGNATURES"
+        );
+      }
     }
     
     // Ownership check: Only owner or admin can delete
@@ -594,12 +610,54 @@ class DocumentsService {
       }
     }
     
-    // Delete audit logs first to avoid foreign key constraint
+    // Delete related data first to avoid foreign key constraints
+    
+    // 1. Delete audit logs
     await prisma.audit_logs.deleteMany({
       where: { document_id: document.id },
     });
     
-    // Then delete the document
+    // 2. Delete sign request and related data if exists
+    if (document.sign_request_id) {
+      // Delete field values first
+      await prisma.sign_request_field_values.deleteMany({
+        where: {
+          field: {
+            sign_request_id: document.sign_request_id
+          }
+        }
+      });
+      
+      // Delete fields
+      await prisma.sign_request_fields.deleteMany({
+        where: { sign_request_id: document.sign_request_id }
+      });
+      
+      // Delete signers
+      await prisma.signers.deleteMany({
+        where: { sign_request_id: document.sign_request_id }
+      });
+      
+      // Delete sign request
+      await prisma.sign_requests.delete({
+        where: { id: document.sign_request_id }
+      });
+    }
+    
+    // 3. Delete workflow instance and approvals if exists
+    if (document.workflow_instance_id) {
+      // Delete approvals first
+      await prisma.document_approvals.deleteMany({
+        where: { workflow_instance_id: document.workflow_instance_id }
+      });
+      
+      // Delete workflow instance
+      await prisma.workflow_instances.delete({
+        where: { id: document.workflow_instance_id }
+      });
+    }
+    
+    // 4. Finally delete the document
     await documentsRepository.delete(document.id);
     
     // Note: Cannot record audit log after deletion since document_id is required
@@ -758,9 +816,9 @@ class DocumentsService {
       filePath = document.file_path;
     } else if (document.file_path.startsWith('storage/') || document.file_path.startsWith('storage\\')) {
       // Real uploaded files (from fileStorage.ts)
-      // Storage is at project root, not in backend/ directory
-      // So we need to go up one level from backend/
-      filePath = path.resolve(process.cwd(), '..', document.file_path);
+      // Storage is in backend/storage/ directory
+      // process.cwd() is already backend/, so just resolve from there
+      filePath = path.resolve(process.cwd(), document.file_path);
     } else if (document.file_path.startsWith('/uploads/')) {
       // Legacy seed data - files don't exist
       throw ApiError.notFound("File not found (seed data)", "FILE_NOT_FOUND");

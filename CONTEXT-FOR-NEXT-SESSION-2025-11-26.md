@@ -1,350 +1,260 @@
 # 🔄 Context for Next Session - 2025-11-26
 
-**Previous Session**: Workflow Approver Display Fix  
-**Status**: ✅ Complete  
-**Next Session Focus**: End-to-End Testing & Production Cleanup
+## 📋 Current Status
+
+### ✅ Completed Today (70%)
+
+**Internal vs External Signing Implementation**:
+1. ✅ Backend logic fix - Auto-detect internal users
+2. ✅ Backend API - `/sign-requests/:id/sign-internal` endpoint
+3. ✅ Frontend page - Internal signing page created
+4. ✅ Testing - Backend API 100% working
+5. ✅ Document 001/2025 fixed - Signers marked as internal
+
+### ⏳ Pending (30%)
+
+**Phase 3: UI Integration** (1 hour)
+- [ ] Update Sign Requests list page
+- [ ] Add "Ký ngay" button for internal signers
+- [ ] Hide OTP/link buttons for internal signers
+- [ ] Show different actions based on signer type
+
+**Phase 4: Approval Integration** (1 hour)
+- [ ] When approve, check if user is also signer
+- [ ] Add checkbox: "Ký luôn khi approve"
+- [ ] Auto-sign if checked
+- [ ] Pass signature from approval to signer
+
+**Phase 5: Complete Testing** (30 mins)
+- [ ] Test complete internal signing flow
+- [ ] Test mixed internal + external signers
+- [ ] Test sequential signing order
+- [ ] Verify progress updates correctly
 
 ---
 
-## 📋 What Was Done (Last Session)
+## 🎯 Quick Start for Next Session
 
-### ✅ Completed
-1. **Fixed Workflow Preview** - Shows approver names and emails
-2. **Fixed WorkflowCustomizer** - Shows approver info in flexible mode
-3. **Added Debug Tools** - Console logs + debug UI
-4. **Created Test Scripts** - Backend API testing
-5. **Database Backup** - 199 records backed up
+### Test Current Implementation
 
-### 🎯 Achievement
-- Workflow preview now displays approver names and emails correctly
-- Works for both strict and flexible modes
-- Debug tools available for troubleshooting
+```bash
+# 1. Backend test (should pass)
+cd backend
+node scripts/test-internal-signing.js
 
----
-
-## 🗂️ Current System State
-
-### Database
-- **Backup**: `database-backup-2025-11-25T17-25-17.json` (43.13 KB)
-- **Records**: 199 total
-- **Users**: 9 (admin, creator, approver, etc.)
-- **Workflows**: 1 (HOPDONG with 2 steps)
-- **Documents**: 8
-- **Sign Requests**: 3
-
-### Test Accounts
+# Expected: ✅ Admin signed, progress 1/2 (50%)
 ```
-Admin: admin@acme.local / Admin@123
-Creator: creator@acme.local / password123
+
+### Continue Implementation
+
+**Step 1: Update Sign Requests List** (30 mins)
+- File: `frontend/app/(dashboard)/sign-requests/page.tsx`
+- Add logic to detect if current user is internal signer
+- Show "Ký ngay" button → Navigate to `/sign-requests/:id/sign`
+- Hide OTP/link buttons for internal signers
+
+**Step 2: Test Frontend** (15 mins)
+- Login as approver@acme.local
+- Go to Sign Requests page
+- Should see "Ký ngay" button for document 001/2025
+- Click → Open internal signing page
+- Sign → Progress should update to 2/2 (100%)
+
+**Step 3: Approval Integration** (1 hour)
+- File: `frontend/app/(dashboard)/approvals/[id]/page.tsx`
+- Add checkbox: "Tôi cũng là người ký, ký luôn khi approve"
+- If checked, require signature
+- Submit both approval + signature
+- Backend: Auto-sign for approver if they are also signer
+
+---
+
+## 📊 Test Data
+
+### Document 001/2025 (ID: 101)
+- **Sign Request ID**: 53
+- **Status**: pending (in_progress after admin signed)
+- **Workflow**: Completed (2/2 approved)
+- **Signers**:
+  - Admin (ID: 64): ✅ Signed (1/2)
+  - Approver (ID: 65): ⏳ Pending (need to sign)
+
+### Test Credentials
+```
+Admin: admin@acme.local / password123
 Approver: approver@acme.local / password123
 ```
 
-### Workflows
-- **HOPDONG** (ID: 8)
-  - Step 1: CẤP 1 (manager type)
-  - Step 2: HR (user type, approver_id: 17)
-  - Both steps show approver names and emails ✅
-
-### Document Types
-- **HỢP ĐỒNG** (ID: 10)
-  - `require_approval: true`
-  - `default_workflow_id: 8`
-  - `allow_workflow_override: true`
-  - Mode: flexible (WorkflowCustomizer renders)
-
----
-
-## 🔧 Recent Changes
-
-### Files Modified (Last Session)
-1. `frontend/components/workflow/WorkflowPreview.tsx`
-   - Force fresh data (no cache)
-   - Debug logs and UI
-   - Fallback messages
-
-2. `frontend/components/workflow/WorkflowCustomizer.tsx`
-   - Added approver info display
-   - Same UI as WorkflowPreview
-   - Approver type labels
-
-### Scripts Created
-- `backend/scripts/check-hopdong-doctype.js`
-- `backend/scripts/test-workflow-browser-debug.js`
-- `backend/scripts/fix-hopdong-to-strict.js`
-
----
-
-## 🐛 Known Issues
-
-### None Currently
-All major issues resolved in last session.
-
-### Minor Items
-- Debug logs and yellow boxes still in code (need cleanup for production)
-- React Query cache may need hard refresh (`Ctrl + Shift + R`)
-
----
-
-## 🎯 Next Session Priorities
-
-### Priority 1: Production Cleanup (30 mins)
-**Goal**: Remove debug code before production
-
-**Tasks**:
-1. Remove debug console.logs from WorkflowPreview
-2. Remove yellow debug boxes from UI
-3. Remove debug logs from WorkflowCustomizer
-4. Test that approver info still displays correctly
-5. Verify no console errors
-
-**Files to Clean**:
-- `frontend/components/workflow/WorkflowPreview.tsx`
-- `frontend/components/workflow/WorkflowCustomizer.tsx`
-
-### Priority 2: End-to-End Testing (1 hour)
-**Goal**: Test complete approval workflow
-
-**Test Flow**:
+### Test URLs
 ```
-1. Login as creator@acme.local
-2. Upload document (HỢP ĐỒNG)
-3. Verify workflow preview shows approver names ✅
-4. Add signers (if digital signing)
-5. Submit for approval
-6. Login as approver@acme.local
-7. View pending approval
-8. Approve with signature
-9. Verify document status updated
-10. Verify next step triggered (if any)
+Sign Requests List: http://localhost:3000/sign-requests
+Internal Signing: http://localhost:3000/sign-requests/53/sign
+Approvals: http://localhost:3000/approvals
 ```
 
-**Test Script**: Use `backend/scripts/test-manager-approval-flow.js`
+---
 
-### Priority 3: Manager Approver Testing (30 mins)
-**Goal**: Verify manager lookup works correctly
+## 🔧 Key Implementation Details
 
-**Test Cases**:
-1. Creator has manager assigned ✅
-2. Submit document with manager step
-3. Verify manager receives approval
-4. Manager approves
-5. Document moves to next step
+### Backend API
 
-**Test Script**: Use `backend/scripts/test-manager-lookup-simple.js`
+**Endpoint**: `POST /api/v1/sign-requests/:id/sign-internal`
 
-### Priority 4: Mobile Testing (30 mins)
-**Goal**: Verify responsive design
+**Request**:
+```json
+{
+  "signature_data": "data:image/png;base64,...",
+  "signature_type": "drawn"
+}
+```
 
-**Test**:
-1. Open on mobile browser (or DevTools mobile view)
-2. Test workflow preview display
-3. Test approver info readability
-4. Test approval actions
-5. Test signature canvas
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Ký thành công!",
+  "all_signed": false,
+  "signer_id": 64
+}
+```
+
+**Logic**:
+1. Find signer for current user (is_internal: true)
+2. Check signing order (sequential)
+3. Update signer status → 'signed'
+4. Check if all signed → Update sign request status
+5. Return success message
+
+### Frontend Page
+
+**Location**: `frontend/app/(dashboard)/sign-requests/[id]/sign/page.tsx`
+
+**Features**:
+- Document info display
+- Signature canvas (react-signature-canvas)
+- Save & preview signature
+- Submit button
+- Success redirect to `/sign-requests`
+
+**Flow**:
+```
+1. User opens /sign-requests/53/sign
+2. See document info
+3. Draw signature on canvas
+4. Click "Lưu chữ ký"
+5. Preview signature
+6. Click "Hoàn tất ký"
+7. API call → Success
+8. Redirect to /sign-requests
+9. Progress updated: 1/2 → 2/2
+```
 
 ---
 
-## 📚 Important Files
+## 📝 Important Notes
 
-### Frontend Components
-- `frontend/components/workflow/WorkflowPreview.tsx` - Strict mode preview
-- `frontend/components/workflow/WorkflowCustomizer.tsx` - Flexible mode preview
-- `frontend/app/(dashboard)/documents/page.tsx` - Upload page
-- `frontend/app/(dashboard)/approvals/[id]/page.tsx` - Approval detail page
+### Signer Detection Logic
 
-### Backend Services
-- `backend/src/modules/workflows/workflows.service.ts` - Workflow logic
-- `backend/src/modules/approvals/approvals.service.ts` - Approval logic
-- `backend/src/modules/approvals/approvals.repository.ts` - Manager lookup
-
-### Test Scripts
-- `backend/scripts/test-workflow-endpoint.js` - Test workflow API
-- `backend/scripts/test-manager-approval-flow.js` - Test manager flow
-- `backend/scripts/check-hopdong-doctype.js` - Check document type config
-
----
-
-## 🔑 Key Concepts
-
-### Workflow Modes
-1. **no_approval**: No workflow needed
-2. **strict**: Must use default workflow (WorkflowPreview)
-3. **flexible**: Can customize workflow (WorkflowCustomizer)
-4. **adhoc**: Create from scratch (AdhocWorkflowBuilder)
-
-### Approver Types
-1. **user**: Specific user (approver_id required)
-2. **role**: Any user with role
-3. **department**: Any user in department
-4. **manager**: Document owner's manager (dynamic lookup)
-
-### Manager Lookup Logic
+**Backend** (`signRequests.service.ts`):
 ```typescript
-// In approvals.repository.ts
-case 'manager':
-  if (documentId) {
-    const document = await prisma.documents.findUnique({
-      where: { id: documentId },
-      select: {
-        owner: {
-          select: {
-            manager_id: true,
-            manager: { ... }
-          }
-        }
-      }
-    });
-    
-    if (document?.owner?.manager_id) {
-      approverIds.push(document.owner.manager_id);
-    }
+// Check if email exists in users table
+const internalUsers = await prisma.users.findMany({
+  where: {
+    tenant_id: tenantId,
+    email: { in: signerEmails },
+    status: 'active'
   }
-  break;
+});
+
+// Set is_internal flag
+is_internal: internalEmails.has(signer.email)
 ```
+
+**Frontend** (TODO):
+```typescript
+// Check if current user is internal signer
+const currentUserEmail = user.email;
+const isInternalSigner = request.signers.some(s => 
+  s.email === currentUserEmail && s.is_internal
+);
+
+// Show appropriate button
+{isInternalSigner && s.status !== 'signed' && (
+  <Button onClick={() => router.push(`/sign-requests/${request.id}/sign`)}>
+    ✍️ Ký ngay
+  </Button>
+)}
+```
+
+### Progress Calculation
+
+**Fixed in controller**:
+```typescript
+const signedCount = sr.signers.filter(s => 
+  s.status === 'signed' || s.status === 'completed'
+).length;
+```
+
+Now correctly counts both 'signed' and 'completed' statuses.
 
 ---
 
-## 🚀 Quick Start Commands
+## 🚀 Next Steps Priority
 
-### Start Servers
-```bash
-# Backend
-cd backend
-npm run dev
-
-# Frontend
-cd frontend
-npm run dev
-
-# License Server
-cd license-server
-npm run dev
-```
-
-### Test Backend API
-```bash
-node backend/scripts/test-workflow-endpoint.js
-node backend/scripts/test-manager-lookup-simple.js
-node backend/scripts/test-manager-approval-flow.js
-```
-
-### Database Backup
-```bash
-node backend/scripts/backup-database.js
-```
-
-### Database Restore
-```bash
-node backend/scripts/restore-database-smart.js database-backup-2025-11-25T17-25-17.json
-```
+1. **High**: UI Integration (Sign Requests list)
+2. **Medium**: Approval Integration (Sign when approve)
+3. **Low**: Additional features (batch signing, etc.)
 
 ---
 
-## 📖 Documentation References
+## 📚 Reference Files
 
-### Session Reports
-- `SESSION-2025-11-26-WORKFLOW-APPROVER-DISPLAY.md` - Last session
-- `MANAGER-APPROVER-COMPLETE.md` - Manager approver implementation
-- `AGENTS.md` - Full session history
+**Backend**:
+- `backend/src/modules/signRequests/signRequests.service.ts` - Main logic
+- `backend/src/modules/signRequests/signRequests.controller.ts` - API endpoint
+- `backend/scripts/test-internal-signing.js` - Test script
 
-### Feature Docs
-- `docs/dev/FEATURE-WORKFLOW-PREVIEW.md` - Workflow preview feature
-- `docs/dev/FEATURE-MANAGER-APPROVER.md` - Manager approver logic
+**Frontend**:
+- `frontend/app/(dashboard)/sign-requests/[id]/sign/page.tsx` - Signing page
+- `frontend/app/(dashboard)/sign-requests/page.tsx` - List page (TODO)
+- `frontend/app/(dashboard)/approvals/[id]/page.tsx` - Approval page (TODO)
 
-### Setup Guides
-- `START-HERE-SETUP.md` - Quick setup guide
-- `docs/setup-and-backup/README.md` - Full setup documentation
-
----
-
-## 💡 Tips for Next Developer
-
-### 1. Hard Refresh Browser
-If workflow preview doesn't show data:
-```
-Ctrl + Shift + R (Windows)
-Cmd + Shift + R (Mac)
-```
-
-### 2. Check Console Logs
-Open DevTools (F12) → Console tab
-Look for:
-- `🔍 WorkflowPreview - Raw API Response`
-- `🎨 Rendering Step`
-- `🐛 Debug: name=..., email=...`
-
-### 3. Test Backend First
-Always test backend API before debugging frontend:
-```bash
-node backend/scripts/test-workflow-endpoint.js
-```
-
-### 4. Check Document Type Config
-Verify workflow mode:
-```bash
-node backend/scripts/check-hopdong-doctype.js
-```
-
-### 5. Manager Assignment
-Ensure creator has manager assigned:
-```bash
-node backend/scripts/assign-manager-to-creator.js
-```
+**Documentation**:
+- `SPEC-INTERNAL-EXTERNAL-SIGNING.md` - Full specification
+- `PLAN-INTERNAL-EXTERNAL-SIGNING-FIX.md` - Implementation plan
+- `agents.md` - Session logs
 
 ---
 
-## 🎯 Success Criteria for Next Session
+## ⚠️ Known Issues
 
-### Must Have
-- [ ] Debug code removed from production
-- [ ] End-to-end approval flow tested
-- [ ] Manager approver tested
-- [ ] No console errors
-- [ ] Approver info displays correctly
-
-### Nice to Have
-- [ ] Mobile responsive tested
-- [ ] Performance optimized
-- [ ] Additional test cases
-- [ ] User documentation updated
+None currently. Backend working 100%, frontend page created but not integrated yet.
 
 ---
 
-## 📞 Support
+## 🎯 Success Criteria
 
-### If Issues Occur
+**Phase 3 Complete When**:
+- ✅ Internal signers see "Ký ngay" button
+- ✅ External signers see "Copy link" + "Gửi email" buttons
+- ✅ Clicking "Ký ngay" opens internal signing page
+- ✅ After signing, progress updates correctly
 
-1. **Check Backend Logs**
-   ```bash
-   # Backend terminal
-   # Look for errors or warnings
-   ```
+**Phase 4 Complete When**:
+- ✅ Approvers can sign when approving
+- ✅ Checkbox "Ký luôn khi approve" works
+- ✅ Signature saved to both approval + signer
+- ✅ Progress updates after approval+sign
 
-2. **Check Frontend Console**
-   ```
-   F12 → Console tab
-   Look for red errors
-   ```
-
-3. **Test Backend API**
-   ```bash
-   node backend/scripts/test-workflow-endpoint.js
-   ```
-
-4. **Check Database**
-   ```bash
-   node backend/scripts/check-hopdong-doctype.js
-   ```
-
-5. **Restore Backup if Needed**
-   ```bash
-   node backend/scripts/restore-database-smart.js database-backup-2025-11-25T17-25-17.json
-   ```
+**Full Feature Complete When**:
+- ✅ All phases done
+- ✅ End-to-end testing passed
+- ✅ Mixed internal+external tested
+- ✅ Sequential signing verified
+- ✅ Document 001/2025 fully signed (2/2)
 
 ---
 
-**Context Created**: 2025-11-26  
-**Status**: ✅ Ready for Next Session  
-**Estimated Time**: 2-3 hours for all priorities
-
-**Good luck! 🚀**
+**Estimated Time Remaining**: 2.5 hours  
+**Current Progress**: 70% complete  
+**Status**: ✅ Backend working, Frontend pending integration
