@@ -209,7 +209,9 @@ export default function SignRequestEditorPage() {
   }
 
   const signRequest = editorData?.signRequest;
-  const signers: Signer[] = signRequest?.signers || [];
+  // ✅ Only show signers with role='signer' (not 'approver')
+  const allSigners: Signer[] = signRequest?.signers || [];
+  const signers: Signer[] = allSigners.filter(s => s.role === 'signer' || !s.role); // Include signers without role for backward compatibility
 
   return (
     <div className="h-screen flex flex-col">
@@ -541,6 +543,8 @@ export default function SignRequestEditorPage() {
         onUpdate={() => {
           queryClient.invalidateQueries({ queryKey: ['sign-request-editor', signRequestId] });
         }}
+        fetchJson={fetchJson}
+        allowReorder={isDraft}
       />
     </div>
   );

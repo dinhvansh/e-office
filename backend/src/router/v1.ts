@@ -15,6 +15,7 @@ import numberingRouter from "../modules/numbering/numbering.routes";
 import { externalOrgsRouter } from "../modules/external-orgs/external-orgs.routes";
 import workflowsRouter from "../modules/workflows/workflows.routes";
 import approvalsRouter from "../modules/approvals/approvals.routes";
+import documentFlowRouter from "../modules/documentFlow/documentFlow.routes";
 
 export const v1Router = Router();
 
@@ -30,6 +31,8 @@ v1Router.use("/external-orgs", externalOrgsRouter);
 v1Router.use("/workflows", workflowsRouter);
 v1Router.use("/approvals", approvalsRouter);
 v1Router.use("/documents", documentsRouter);
+// Document flow must be registered AFTER /documents to avoid route conflicts
+v1Router.use("/documents", documentFlowRouter);
 v1Router.use("/sign-requests", signRequestsRouter);
 v1Router.use("/signers", signersRouter);
 v1Router.use("/audit", auditRouter);

@@ -175,6 +175,32 @@ export class SignRequestsController {
     res.json(ok({ signer }));
   };
 
+  // ✅ Reorder Signers (Drag & Drop)
+  reorderSigners = async (req: Request, res: Response): Promise<void> => {
+    const signRequestId = idSchema.parse(req.params.id);
+    const { signers } = z.object({
+      signers: z.array(z.object({
+        id: z.number(),
+        signing_order: z.number(),
+      })),
+    }).parse(req.body);
+
+    // Check if draft
+    const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId);
+    if (signRequest.status !== 'draft') {
+      res.status(400).json({
+        success: false,
+        error: 'Không thể sắp xếp lại. Tài liệu đã được gửi đi.',
+      });
+      return;
+    }
+
+    // Update signing_order for all signers
+    await signRequestsService.reorderSigners(signRequestId, req.auth!.tenantId, signers);
+
+    res.json(ok({ message: 'Đã cập nhật thứ tự ký' }));
+  };
+
   // Field Management Endpoints
 
   getEditor = async (req: Request, res: Response): Promise<void> => {

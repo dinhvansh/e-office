@@ -104,6 +104,7 @@ export class DocumentsController {
         priorityLevel: body.priority_level,
         confidentialLevel: body.confidential_level,
         visibilityScope: body.visibility_scope,
+        workflowId: body.workflow_id, // ✅ Pass workflow_id to service
         adhocSteps: body.adhoc_steps,
         customizedSteps: body.customized_steps,
         signers: body.signers,

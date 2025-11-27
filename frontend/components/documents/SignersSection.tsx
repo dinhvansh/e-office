@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus, Trash2, User, Building2 } from "lucide-react";
+import { useState } from "react";
+import { Plus, Trash2, User, Building2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,7 @@ export interface Signer {
   email: string;
   name: string;
   order: number;
+  role?: string; // ✅ Added: 'signer' or 'approver'
   externalOrgId?: number;
 }
 
@@ -29,6 +31,7 @@ interface SignersSectionProps {
 
 export function SignersSection({ signers, onChange, externalOrgs }: SignersSectionProps) {
   const isLoadingOrgs = false; // Data already loaded by parent
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const addSigner = (type: "manual" | "external") => {
     const newSigner: Signer = {
@@ -37,6 +40,7 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
       email: "",
       name: "",
       order: signers.length + 1,
+      role: "signer", // ✅ Default role
     };
     onChange([...signers, newSigner]);
   };
@@ -56,6 +60,34 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
     onChange(updated);
   };
 
+  // ✅ Drag & Drop handlers
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newSigners = [...signers];
+    const draggedItem = newSigners[draggedIndex];
+    newSigners.splice(draggedIndex, 1);
+    newSigners.splice(index, 0, draggedItem);
+
+    // Update order numbers
+    const reorderedSigners = newSigners.map((s, idx) => ({
+      ...s,
+      order: idx + 1,
+    }));
+
+    onChange(reorderedSigners);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
   return (
     <div className="space-y-4 p-4 bg-purple-50/50 rounded-lg border border-purple-200">
       <div className="flex items-center justify-between">
@@ -67,6 +99,11 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
           <p className="text-xs text-muted-foreground mt-1">
             Đối tác, khách hàng - Ký qua email, không cần đăng nhập (như DocuSign)
           </p>
+          {signers.length > 1 && (
+            <p className="text-xs text-purple-600 mt-1">
+              🔄 Kéo thả để sắp xếp lại thứ tự
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <Button
@@ -95,17 +132,33 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
         {signers.map((signer, index) => (
           <div
             key={signer.id}
-            className="border rounded-lg p-3 space-y-3 bg-white"
+            draggable={true}
+            onDragStart={() => handleDragStart(index)}
+            onDragOver={(e) => handleDragOver(e, index)}
+            onDragEnd={handleDragEnd}
+            className={`border rounded-lg p-3 space-y-3 bg-white cursor-move hover:bg-purple-50 hover:border-purple-300 transition-all ${
+              draggedIndex === index ? 'opacity-50 scale-95' : ''
+            }`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
+                {/* ✅ Drag Handle */}
+                <div className="flex-shrink-0 text-gray-400 hover:text-gray-600">
+                  <GripVertical className="w-5 h-5" />
+                </div>
+                
+                {/* Order Badge */}
+                <div className="flex-shrink-0 w-7 h-7 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-semibold text-sm">
+                  {signer.order}
+                </div>
+                
                 {signer.type === "manual" ? (
                   <User className="h-4 w-4 text-purple-600" />
                 ) : (
                   <Building2 className="h-4 w-4 text-purple-600" />
                 )}
                 <span className="text-sm font-medium text-purple-600">
-                  {signer.type === "manual" ? "Người ký" : "Tổ chức"} #{signer.order}
+                  {signer.type === "manual" ? "Người ký" : "Tổ chức"}
                 </span>
                 <span className="text-xs text-muted-foreground">
                   (Ký qua email, không cần đăng nhập)
@@ -155,6 +208,23 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
                     />
                   </div>
                 </div>
+                
+                {/* ✅ Role Selector */}
+                <div>
+                  <Label htmlFor={`signer-role-${signer.id}`} className="text-xs">
+                    Vai trò *
+                  </Label>
+                  <select
+                    id={`signer-role-${signer.id}`}
+                    value={signer.role || 'signer'}
+                    onChange={(e) => updateSigner(signer.id, "role", e.target.value)}
+                    className="w-full h-9 border rounded-md px-3 text-sm bg-white hover:border-gray-400 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
+                  >
+                    <option value="signer">👤 Người ký</option>
+                    <option value="approver">✅ Người phê duyệt</option>
+                  </select>
+                </div>
+                
                 <div>
                   <Label htmlFor={`signer-order-${signer.id}`} className="text-xs font-semibold text-purple-700">
                     🔢 Thứ tự ký *
@@ -243,6 +313,23 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
                     </div>
                   )}
                 </div>
+                
+                {/* ✅ Role Selector */}
+                <div>
+                  <Label htmlFor={`signer-role-${signer.id}`} className="text-xs">
+                    Vai trò *
+                  </Label>
+                  <select
+                    id={`signer-role-${signer.id}`}
+                    value={signer.role || 'signer'}
+                    onChange={(e) => updateSigner(signer.id, "role", e.target.value)}
+                    className="w-full h-9 border rounded-md px-3 text-sm bg-white hover:border-gray-400 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
+                  >
+                    <option value="signer">👤 Người ký</option>
+                    <option value="approver">✅ Người phê duyệt</option>
+                  </select>
+                </div>
+                
                 <div>
                   <Label htmlFor={`signer-order-${signer.id}`} className="text-xs font-semibold text-purple-700">
                     🔢 Thứ tự ký *

@@ -26,6 +26,7 @@ interface WorkflowStep {
   approver_user_id: number | null;
   approver_role_id: number | null;
   approver_department_id: number | null;
+  participant_role: 'approver' | 'signer';
 }
 
 interface WorkflowData {
@@ -42,6 +43,7 @@ interface StepFormData {
   approver_user_id: string;
   approver_role_id: string;
   approver_department_id: string;
+  participant_role: 'approver' | 'signer';
 }
 
 export default function WorkflowsPage() {
@@ -63,6 +65,7 @@ export default function WorkflowsPage() {
     approver_user_id: '',
     approver_role_id: '',
     approver_department_id: '',
+    participant_role: 'approver',
   });
 
   // Confirm dialogs
@@ -173,6 +176,7 @@ export default function WorkflowsPage() {
       const payload: any = {
         step_name: stepFormData.step_name,
         approver_type: stepFormData.approver_type,
+        participant_role: stepFormData.participant_role,
       };
 
       // Add approver ID based on type
@@ -198,6 +202,7 @@ export default function WorkflowsPage() {
         approver_user_id: '',
         approver_role_id: '',
         approver_department_id: '',
+        participant_role: 'approver',
       });
       
       // Refetch and update managingWorkflow
@@ -305,6 +310,7 @@ export default function WorkflowsPage() {
       approver_user_id: '',
       approver_role_id: '',
       approver_department_id: '',
+      participant_role: 'approver',
     });
     setIsStepDialogOpen(true);
   };
@@ -619,7 +625,15 @@ export default function WorkflowsPage() {
                         {index + 1}.
                       </span>
                       <div className="flex-1">
-                        <div className="font-medium">{step.step_name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{step.step_name}</span>
+                          <Badge 
+                            variant={step.participant_role === 'signer' ? 'default' : 'secondary'}
+                            className={step.participant_role === 'signer' ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'}
+                          >
+                            {step.participant_role === 'signer' ? '✍️ Người ký' : '✅ Người phê duyệt'}
+                          </Badge>
+                        </div>
                         <div className="text-sm text-muted-foreground flex items-center gap-1">
                           {getApproverIcon(step.approver_type)}
                           <span>{getApproverLabel(step.approver_type)}</span>
@@ -687,9 +701,27 @@ export default function WorkflowsPage() {
                 placeholder="VD: Phê duyệt cấp trưởng phòng"
               />
             </div>
+
+            <div className="space-y-2">
+              <Label>Vai trò *</Label>
+              <select
+                value={stepFormData.participant_role}
+                onChange={(e) => setStepFormData({ 
+                  ...stepFormData, 
+                  participant_role: e.target.value as 'approver' | 'signer',
+                })}
+                className="w-full px-3 py-2 border rounded-md bg-purple-50 border-purple-300 focus:border-purple-500"
+              >
+                <option value="approver">✅ Người phê duyệt</option>
+                <option value="signer">✍️ Người ký</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                💡 Người phê duyệt: Chỉ approve trong hệ thống. Người ký: Ký trực tiếp lên văn bản.
+              </p>
+            </div>
             
             <div className="space-y-2">
-              <Label>Loại người phê duyệt *</Label>
+              <Label>Loại người {stepFormData.participant_role === 'approver' ? 'phê duyệt' : 'ký'} *</Label>
               <select
                 value={stepFormData.approver_type}
                 onChange={(e) => setStepFormData({ 

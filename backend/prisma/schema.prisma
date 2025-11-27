@@ -366,21 +366,22 @@ model workflows {
 }
 
 model workflow_steps {
-  id              Int       @id @default(autoincrement())
-  workflow_id     Int
-  step_order      Int
-  step_name       String
-  approver_type   String    // 'user', 'role', 'department', 'manager'
-  approver_id     Int?
-  due_in_days     Int       @default(3)
-  is_required     Boolean   @default(true)
-  is_parallel     Boolean   @default(false) // true = gửi cùng lúc với bước trước, false = chờ bước trước xong
-  conditions      Json?
-  created_at      DateTime  @default(now())
+  id                Int       @id @default(autoincrement())
+  workflow_id       Int
+  step_order        Int
+  step_name         String
+  approver_type     String    // 'user', 'role', 'department', 'manager'
+  approver_id       Int?
+  participant_role  String?   // 'approver' | 'signer' - Vai trò của người tham gia
+  due_in_days       Int       @default(3)
+  is_required       Boolean   @default(true)
+  is_parallel       Boolean   @default(false) // true = gửi cùng lúc với bước trước, false = chờ bước trước xong
+  conditions        Json?
+  created_at        DateTime  @default(now())
   
-  workflow        workflows @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
-  approvals       document_approvals[]
-  instances       workflow_instances[] @relation("current_step")
+  workflow          workflows @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+  approvals         document_approvals[]
+  instances         workflow_instances[] @relation("current_step")
   
   @@unique([workflow_id, step_order])
 }

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Check, ChevronDown, Search } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Check, ChevronDown, Search, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Option {
@@ -26,6 +27,7 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -34,6 +36,40 @@ export function SearchableSelect({
   const filteredOptions = options.filter((opt) =>
     opt.label.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Update dropdown position when opening
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const dropdownMaxHeight = 320;
+      const gap = 4;
+      
+      // Check if there's enough space below
+      const spaceBelow = window.innerHeight - rect.bottom - gap;
+      const spaceAbove = rect.top - gap;
+      
+      // Decide whether to show dropdown above or below
+      const showAbove = spaceBelow < dropdownMaxHeight && spaceAbove > spaceBelow;
+      
+      const style: React.CSSProperties = {
+        position: 'fixed',
+        left: `${rect.left}px`,
+        width: `${rect.width}px`,
+        zIndex: 9999,
+        maxHeight: `${Math.min(dropdownMaxHeight, showAbove ? spaceAbove : spaceBelow)}px`,
+      };
+      
+      if (showAbove) {
+        // Show above button
+        style.bottom = `${window.innerHeight - rect.top + gap}px`;
+      } else {
+        // Show below button
+        style.top = `${rect.bottom + gap}px`;
+      }
+      
+      setDropdownStyle(style);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -70,8 +106,11 @@ export function SearchableSelect({
         <ChevronDown className={cn('w-4 h-4 text-gray-400 flex-shrink-0 transition-transform', isOpen && 'rotate-180')} />
       </button>
 
-      {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+      {isOpen && typeof window !== 'undefined' && createPortal(
+        <div 
+          style={dropdownStyle}
+          className="bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-y-auto"
+        >
           {/* Search input */}
           <div className="p-2 border-b border-gray-200">
             <div className="relative">
@@ -94,30 +133,66 @@ export function SearchableSelect({
                 Không tìm thấy kết quả
               </div>
             ) : (
-              filteredOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(option.value);
-                    setIsOpen(false);
-                    setSearch('');
-                  }}
-                  className={cn(
-                    'w-full px-3 py-2 text-sm text-left hover:bg-gray-100',
-                    'flex items-center justify-between gap-2',
-                    option.value === value && 'bg-blue-50 text-blue-600'
-                  )}
-                >
-                  <span className="truncate">{option.label}</span>
-                  {option.value === value && (
-                    <Check className="w-4 h-4 flex-shrink-0" />
-                  )}
-                </button>
-              ))
+              filteredOptions.map((option) => {
+                // Parse name and department from label (format: "Name (Department)")
+                const labelParts = option.label.match(/^(.+?)\s*\((.+?)\)\s*$/);
+                const name = labelParts ? labelParts[1].trim() : option.label;
+                const department = labelParts ? labelParts[2].trim() : null;
+                
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onChange(option.value);
+                      setIsOpen(false);
+                      setSearch('');
+                    }}
+                    className={cn(
+                      'w-full px-3 py-2.5 text-left hover:bg-gray-50 transition-colors cursor-pointer',
+                      'flex items-center gap-3',
+                      option.value === value && 'bg-blue-50 border-l-2 border-blue-500'
+                    )}
+                  >
+                    {/* Icon */}
+                    <div className={cn(
+                      'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
+                      option.value === value ? 'bg-blue-100' : 'bg-gray-100'
+                    )}>
+                      <User className={cn(
+                        'w-4 h-4',
+                        option.value === value ? 'text-blue-600' : 'text-gray-600'
+                      )} />
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      {/* Name (bold) */}
+                      <div className="font-semibold text-sm text-gray-900 truncate">
+                        {name}
+                      </div>
+                      
+                      {/* Department (if exists) */}
+                      {department && (
+                        <div className="text-xs text-gray-500 truncate mt-0.5">
+                          {department}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Checkmark */}
+                    {option.value === value && (
+                      <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                    )}
+                  </button>
+                );
+              })
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

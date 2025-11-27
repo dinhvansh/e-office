@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
-import { PenTool, Eye, Search, Edit, Upload } from 'lucide-react';
+import { PenTool, Eye, Search, Edit, Upload, GitBranch } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -347,6 +347,17 @@ export default function SignRequestsPage() {
                               Ký ngay
                             </Button>
                           )}
+
+                          {/* View Flow Button - Show for all documents */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => router.push(`/documents/${request.document.id}/flow`)}
+                            title="Xem luồng ký"
+                          >
+                            <GitBranch className="w-4 h-4 mr-1" />
+                            Xem luồng
+                          </Button>
                           
                           {/* View Details Button */}
                           <Button

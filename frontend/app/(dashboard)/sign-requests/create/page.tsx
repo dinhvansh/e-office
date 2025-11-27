@@ -24,6 +24,15 @@ import { AdhocWorkflowBuilder } from '@/components/workflow/AdhocWorkflowBuilder
 import { SignersSection, Signer } from '@/components/documents/SignersSection';
 import { CCEmailsSection } from '@/components/documents/CCEmailsSection';
 import { AttachmentsSection } from '@/components/documents/AttachmentsSection';
+import { InternalSignersSelector } from '@/components/documents/InternalSignersSelector';
+
+interface InternalSigner {
+  user_id: number;
+  name: string;
+  email: string;
+  signing_order: number;
+  role: 'signer' | 'approver';
+}
 
 interface DocumentType {
   id: number;
@@ -49,7 +58,8 @@ export default function CreateSignRequestPage() {
   const [adhocSteps, setAdhocSteps] = useState<any[] | null>(null);
   
   // Signers, CC, Attachments state
-  const [signers, setSigners] = useState<Signer[]>([]);
+  const [signers, setSigners] = useState<Signer[]>([]); // External signers
+  const [internalSigners, setInternalSigners] = useState<InternalSigner[]>([]); // ✅ Internal signers
   const [ccEmails, setCcEmails] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
 
@@ -70,6 +80,38 @@ export default function CreateSignRequestPage() {
       return Array.isArray(data) ? data : (data?.workflows || []);
     },
   });
+
+  // ✅ Fetch internal signers from selected workflow
+  const { data: workflowDetails } = useQuery({
+    queryKey: ['workflow-details', selectedWorkflowId],
+    queryFn: async () => {
+      if (!selectedWorkflowId) return null;
+      const data: any = await fetchJson(`/workflows/${selectedWorkflowId}`);
+      return data;
+    },
+    enabled: !!selectedWorkflowId,
+  });
+
+  // ✅ Extract internal signers from workflow steps
+  useEffect(() => {
+    if (workflowDetails && workflowDetails.steps) {
+      const signerSteps = workflowDetails.steps.filter(
+        (step: any) => step.participant_role === 'signer' && step.approver_type === 'user'
+      );
+      
+      const internalSignersList: InternalSigner[] = signerSteps.map((step: any, index: number) => ({
+        id: step.id,
+        name: step.approver_name || step.approver_email || 'Unknown',
+        email: step.approver_email || '',
+        signing_order: index + 1,
+        role: step.step_name || 'Người ký',
+      }));
+      
+      setInternalSigners(internalSignersList);
+    } else {
+      setInternalSigners([]);
+    }
+  }, [workflowDetails]);
 
   // Fetch external organizations
   const { data: externalOrgs } = useQuery({
@@ -131,12 +173,21 @@ export default function CreateSignRequestPage() {
       
       // Only validate signers if document type requires digital signing
       if (selectedDocType?.require_digital_signing) {
-        if (signers.length === 0) throw new Error('Vui lòng thêm ít nhất 1 người ký');
+        if (signers.length === 0 && internalSigners.length === 0) {
+          throw new Error('Vui lòng thêm ít nhất 1 người ký (nội bộ hoặc bên ngoài)');
+        }
         
-        // Validate signers
+        // Validate external signers
         for (const signer of signers) {
           if (!signer.email || !signer.name) {
-            throw new Error('Vui lòng điền đầy đủ thông tin người ký');
+            throw new Error('Vui lòng điền đầy đủ thông tin người ký bên ngoài');
+          }
+        }
+        
+        // Validate internal signers
+        for (const signer of internalSigners) {
+          if (!signer.email || !signer.name) {
+            throw new Error('Vui lòng điền đầy đủ thông tin người ký nội bộ');
           }
         }
       }
@@ -181,15 +232,30 @@ export default function CreateSignRequestPage() {
         payload.adhoc_steps = adhocSteps;
       }
 
-      // Add signers if provided
-      if (signers.length > 0) {
-        payload.signers = signers.map(s => ({
+      // ✅ Combine internal and external signers
+      const allSigners = [
+        // Internal signers (from workflow)
+        ...internalSigners.map(s => ({
           email: s.email,
           name: s.name,
-          order: s.order, // Use 'order' not 'signing_order'
+          signing_order: s.signing_order,
+          role: 'signer', // Internal signers are always 'signer' role
+          type: 'manual', // Internal are manual type
+        })),
+        // External signers (manual add)
+        ...signers.map((s, index) => ({
+          email: s.email,
+          name: s.name,
+          signing_order: internalSigners.length + index + 1, // ✅ Offset by internal count
+          role: s.role || 'signer', // ✅ Default to 'signer'
           type: s.type,
           external_org_id: s.externalOrgId,
-        }));
+        }))
+      ];
+
+      // Add all signers if provided
+      if (allSigners.length > 0) {
+        payload.signers = allSigners;
       }
 
       // Add CC emails if provided
@@ -341,11 +407,13 @@ export default function CreateSignRequestPage() {
           </CardContent>
         </Card>
 
-        {/* Step 1.5: Workflow Selection (if approval required) */}
+        {/* Step 2: Workflow Selection (if approval required) */}
         {selectedDocType && selectedDocType.require_approval && workflowMode && (
           <Card className="mb-6">
             <CardContent className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Quy trình phê duyệt</h3>
+              <h3 className="text-lg font-semibold mb-4">
+                Bước 2: Quy trình phê duyệt
+              </h3>
               
               {workflowMode === 'strict' && selectedDocType.default_workflow_id && (
                 <div>
@@ -358,7 +426,7 @@ export default function CreateSignRequestPage() {
 
               {workflowMode === 'flexible' && (
                 <div>
-                  <div className="mb-3 space-y-2">
+                  <div className="mb-4 space-y-2">
                     <Label>Chọn quy trình</Label>
                     <Select
                       value={selectedWorkflowId?.toString() || ''}
@@ -378,10 +446,15 @@ export default function CreateSignRequestPage() {
                   </div>
                   
                   {selectedWorkflowId && (
-                    <WorkflowCustomizer
-                      defaultWorkflowId={selectedWorkflowId}
-                      onCustomize={setCustomizedSteps}
-                    />
+                    <div className="border-t pt-4">
+                      <h4 className="text-sm font-medium mb-3 text-gray-700">
+                        👥 Danh sách người phê duyệt
+                      </h4>
+                      <WorkflowCustomizer
+                        defaultWorkflowId={selectedWorkflowId}
+                        onCustomize={setCustomizedSteps}
+                      />
+                    </div>
                   )}
                 </div>
               )}
@@ -398,19 +471,35 @@ export default function CreateSignRequestPage() {
           </Card>
         )}
 
-        {/* Step 2/3: Signers, CC, Attachments */}
+        {/* Step 2.5: Internal Signers (always show if digital signing required) */}
+        {selectedDocType?.require_digital_signing && (
+          <Card className="mb-6">
+            <CardContent className="p-6">
+              <InternalSignersSelector
+                signers={internalSigners}
+                onChange={setInternalSigners}
+                allowEdit={true}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 3: External Signers, CC, Attachments */}
         <Card className="mb-6">
           <CardContent className="p-6 space-y-6">
             <h3 className="text-lg font-semibold">
-              {selectedDocType?.require_approval ? 'Bước 3: Người ký & Thông tin bổ sung' : 'Bước 2: Người ký & Thông tin bổ sung'}
+              {selectedDocType?.require_approval ? 'Bước 3: Người ký bên ngoài & Thông tin bổ sung' : 'Bước 2: Người ký bên ngoài & Thông tin bổ sung'}
             </h3>
 
-            {/* Signers Section - Only show if digital signing is required */}
+            {/* External Signers Section */}
             {selectedDocType?.require_digital_signing && (
               <div>
-                {signers.length === 0 && (
+                <h4 className="text-sm font-medium mb-3 text-gray-700">
+                  ✍️ Người ký bên ngoài (External Signers)
+                </h4>
+                {signers.length === 0 && internalSigners.length === 0 && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                    ⚠️ <strong>Bắt buộc:</strong> Vui lòng thêm ít nhất 1 người ký để tiếp tục
+                    ⚠️ <strong>Bắt buộc:</strong> Vui lòng thêm ít nhất 1 người ký (nội bộ hoặc bên ngoài) để tiếp tục
                   </div>
                 )}
                 <SignersSection 
@@ -422,16 +511,20 @@ export default function CreateSignRequestPage() {
             )}
 
             {/* CC Emails Section */}
-            <CCEmailsSection 
-              emails={ccEmails}
-              onChange={setCcEmails}
-            />
+            <div className="border-t pt-6">
+              <CCEmailsSection 
+                emails={ccEmails}
+                onChange={setCcEmails}
+              />
+            </div>
 
             {/* Attachments Section */}
-            <AttachmentsSection 
-              files={attachments}
-              onChange={setAttachments}
-            />
+            <div className="border-t pt-6">
+              <AttachmentsSection 
+                files={attachments}
+                onChange={setAttachments}
+              />
+            </div>
           </CardContent>
         </Card>
 

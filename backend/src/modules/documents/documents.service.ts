@@ -252,9 +252,12 @@ class DocumentsService {
         if (workflow?.steps) {
           const { signersRepository } = await import('../signers/signers.repository');
           
-          console.log(`[Workflow Signers] Creating signers for ${workflow.steps.length} steps`);
+          // ✅ Only create signers for steps with participant_role = 'signer'
+          const signerSteps = workflow.steps.filter(s => s.participant_role === 'signer');
           
-          for (const step of workflow.steps) {
+          console.log(`[Workflow Signers] Creating signers for ${signerSteps.length} signer steps (out of ${workflow.steps.length} total steps)`);
+          
+          for (const step of signerSteps) {
             // Get approver info based on type
             let email = '';
             let name = '';

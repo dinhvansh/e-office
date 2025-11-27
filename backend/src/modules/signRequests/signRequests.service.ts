@@ -152,7 +152,7 @@ class SignRequestsService {
           sign_request_id: signRequest.id,
           email: signer.email,
           name: signer.name,
-          role: signer.role,
+          role: signer.role || 'signer', // ✅ Default to 'signer' if not specified
           status: "pending",
           is_internal: internalUserMap.has(signer.email), // ✅ Set based on user existence
           user_id: internalUserMap.get(signer.email) || null, // ✅ Set user_id for internal users
@@ -183,7 +183,98 @@ class SignRequestsService {
     return signRequest;
   }
 
+  /**
+   * Auto-create internal signers from workflow template
+   * Only creates signers for steps with participant_role = 'signer'
+   */
+  async createInternalSignersFromWorkflow(
+    signRequestId: number,
+    workflowId: number,
+    tenantId: number
+  ): Promise<void> {
+    // Get workflow steps with participant_role = 'signer'
+    const workflowSteps = await prisma.workflow_steps.findMany({
+      where: {
+        workflow_id: workflowId,
+        participant_role: 'signer' // ✅ Only signer steps
+      },
+      orderBy: {
+        step_order: 'asc'
+      }
+    });
 
+    if (workflowSteps.length === 0) {
+      return; // No internal signers in workflow
+    }
+
+    // Create signers for each step
+    for (const step of workflowSteps) {
+      let userId: number | null = null;
+      let email = '';
+      let name = '';
+
+      // Determine user based on approver_type
+      if (step.approver_type === 'user' && step.approver_id) {
+        const user = await prisma.users.findUnique({
+          where: { id: step.approver_id },
+          select: { id: true, email: true, full_name: true, status: true }
+        });
+        if (user && user.status === 'active') {
+          userId = user.id;
+          email = user.email;
+          name = user.full_name || user.email;
+        }
+      } else if (step.approver_type === 'role' && step.approver_id) {
+        // Get first active user with this role
+        const userRole = await prisma.user_roles.findFirst({
+          where: { role_id: step.approver_id },
+          include: { 
+            user: { 
+              select: { id: true, email: true, full_name: true, status: true } 
+            } 
+          }
+        });
+        if (userRole?.user && userRole.user.status === 'active') {
+          userId = userRole.user.id;
+          email = userRole.user.email;
+          name = userRole.user.full_name || userRole.user.email;
+        }
+      } else if (step.approver_type === 'department' && step.approver_id) {
+        // Get department manager
+        const dept = await prisma.departments.findUnique({
+          where: { id: step.approver_id },
+          include: { 
+            manager: { 
+              select: { id: true, email: true, full_name: true, status: true } 
+            } 
+          }
+        });
+        if (dept?.manager && dept.manager.status === 'active') {
+          userId = dept.manager.id;
+          email = dept.manager.email;
+          name = dept.manager.full_name || dept.manager.email;
+        }
+      }
+      // Note: 'manager' type cannot be determined at workflow config time
+      // It requires document owner context, so skip for now
+
+      // Create signer if user found
+      if (userId && email) {
+        const signerData: Prisma.signersCreateInput = {
+          sign_request: { connect: { id: signRequestId } },
+          email,
+          name,
+          role: 'signer',
+          signing_order: step.step_order,
+          status: 'pending',
+          is_internal: true,
+          user: { connect: { id: userId } }
+        };
+
+        await signersRepository.create(signerData);
+      }
+    }
+  }
 
   async addSigner(
     signRequestId: number,
@@ -572,6 +663,37 @@ class SignRequestsService {
     }
 
     return await signersRepository.findById(signerId);
+  }
+
+  // ✅ Reorder Signers (Drag & Drop)
+  async reorderSigners(
+    signRequestId: number,
+    tenantId: number,
+    signers: Array<{ id: number; signing_order: number }>
+  ) {
+    // Verify sign request belongs to tenant
+    await this.getSignRequest(signRequestId, tenantId);
+
+    // Update signing_order for each signer
+    for (const signer of signers) {
+      await signersRepository.update(signer.id, {
+        signing_order: signer.signing_order,
+      });
+    }
+
+    // Audit log (optional)
+    try {
+      await auditService.record({
+        tenantId,
+        documentId: null,
+        event: 'sign_request.signers_reordered',
+        metadata: { sign_request_id: signRequestId, signers }
+      });
+    } catch (error) {
+      console.error('⚠️ Audit log failed (non-critical):', error.message);
+    }
+
+    return { success: true };
   }
 }
 
