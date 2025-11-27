@@ -147,9 +147,16 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
                   <GripVertical className="w-5 h-5" />
                 </div>
                 
-                {/* Order Badge */}
-                <div className="flex-shrink-0 w-7 h-7 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-semibold text-sm">
-                  {signer.order}
+                {/* Order Input */}
+                <div className="flex-shrink-0">
+                  <input
+                    type="number"
+                    min="1"
+                    value={signer.order}
+                    onChange={(e) => updateSigner(signer.id, "order", parseInt(e.target.value) || 1)}
+                    className="w-12 h-7 text-center border-2 border-purple-300 rounded-md font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-purple-50"
+                    title="Thứ tự ký"
+                  />
                 </div>
                 
                 {signer.type === "manual" ? (

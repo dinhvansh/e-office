@@ -321,6 +321,25 @@ export default function SignRequestEditorPage() {
             )}
           </div>
           
+          {signers.length === 0 && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+              <p className="font-medium text-amber-900 mb-2">⚠️ Chưa có người ký</p>
+              <p className="text-amber-700 mb-3">
+                Vui lòng thêm người ký trước khi thêm fields chữ ký.
+              </p>
+              {isDraft && (
+                <Button
+                  size="sm"
+                  onClick={() => setShowManageSigners(true)}
+                  className="w-full bg-amber-600 hover:bg-amber-700"
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Thêm người ký ngay
+                </Button>
+              )}
+            </div>
+          )}
+          
           <div className="space-y-2">
             {signers.map((signer, index) => (
               <div

@@ -949,16 +949,33 @@ class ApprovalsService {
 
   /**
    * Auto-send sign request after approval completes
+   * ✅ Activates signers (waiting_approval → pending) and sends emails
    */
   private async autoSendSignRequest(document: any, tenantId: number) {
     const { signRequestsService } = await import('../signRequests/signRequests.service');
+    const { signersRepository } = await import('../signers/signers.repository');
     
     try {
-      // Send sign request (generates tokens & sends emails)
+      console.log(`[Auto-Send] Activating signers for sign request ${document.sign_request_id}`);
+      
+      // ✅ STEP 1: Activate signers (update status from 'waiting_approval' to 'pending')
+      const signers = await signersRepository.findBySignRequest(document.sign_request_id);
+      const waitingSigners = signers.filter(s => s.status === 'waiting_approval');
+      
+      console.log(`[Auto-Send] Found ${waitingSigners.length} signers waiting for approval`);
+      
+      for (const signer of waitingSigners) {
+        await signersRepository.update(signer.id, {
+          status: 'pending'
+        });
+        console.log(`[Auto-Send] Activated signer: ${signer.email}`);
+      }
+      
+      // ✅ STEP 2: Send sign request (generates tokens & sends emails)
       await signRequestsService.sendSignRequest(
         document.sign_request_id,
         tenantId,
-        0 // System auto-send
+        document.owner_id || 0 // Use document owner as sender
       );
       
       // Update document status
@@ -967,9 +984,9 @@ class ApprovalsService {
         data: { status: 'pending_signature' },
       });
       
-      console.log(`Auto-sent sign request ${document.sign_request_id} for document ${document.id}`);
+      console.log(`[Auto-Send] ✓ Sign request ${document.sign_request_id} sent for document ${document.id}`);
     } catch (error) {
-      console.error('Failed to auto-send sign request:', error);
+      console.error('[Auto-Send] ✗ Failed to auto-send sign request:', error);
       // Don't fail the approval, just log the error
       // Document stays in 'approved' status
       await prisma.documents.update({

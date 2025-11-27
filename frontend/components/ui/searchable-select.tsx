@@ -85,7 +85,10 @@ export function SearchableSelect({
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
-      inputRef.current.focus();
+      // Use setTimeout to prevent scroll jump
+      setTimeout(() => {
+        inputRef.current?.focus({ preventScroll: true });
+      }, 0);
     }
   }, [isOpen]);
 
@@ -93,7 +96,11 @@ export function SearchableSelect({
     <div ref={containerRef} className={cn('relative', className)}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
         className={cn(
           'w-full px-3 py-2 text-sm text-left bg-white border border-gray-300 rounded-md',
           'hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500',
@@ -110,6 +117,10 @@ export function SearchableSelect({
         <div 
           style={dropdownStyle}
           className="bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-y-auto"
+          onMouseDown={(e) => {
+            // Prevent default to avoid focus issues
+            e.preventDefault();
+          }}
         >
           {/* Search input */}
           <div className="p-2 border-b border-gray-200">

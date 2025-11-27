@@ -1,0 +1,114 @@
+### Test Approvals API - Phase 2 Day 5
+### Approval Flow Testing
+
+@baseUrl = http://localhost:3001/api/v1
+@token = YOUR_TOKEN_HERE
+@documentId = 1
+@workflowId = 1
+@approvalId = 1
+
+### 1. Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@acme.local",
+  "password": "secret123"
+}
+
+### 2. Submit document for approval
+POST {{baseUrl}}/approvals/submit
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "document_id": {{documentId}},
+  "workflow_id": {{workflowId}}
+}
+
+### 3. Get my pending approvals
+GET {{baseUrl}}/approvals/my-pending
+Authorization: Bearer {{token}}
+
+### 4. Get document approval history
+GET {{baseUrl}}/approvals/document/{{documentId}}
+Authorization: Bearer {{token}}
+
+### 5. Get workflow instance for document
+GET {{baseUrl}}/approvals/document/{{documentId}}/workflow
+Authorization: Bearer {{token}}
+
+### 6. Approve document
+POST {{baseUrl}}/approvals/{{approvalId}}/approve
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "comment": "Approved. Looks good!"
+}
+
+### 7. Reject document
+POST {{baseUrl}}/approvals/{{approvalId}}/reject
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "comment": "Rejected. Please revise the document."
+}
+
+### 8. Request more information
+POST {{baseUrl}}/approvals/{{approvalId}}/request-info
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "comment": "Please provide more details about section 3."
+}
+
+### ===== FULL WORKFLOW TEST =====
+
+### Step 1: Create a test document
+POST {{baseUrl}}/documents
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "file_name": "test-approval-doc.pdf",
+  "file_base64": "JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKPD4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFCb3ggWzAgMCA2MTIgNzkyXQovUmVzb3VyY2VzIDw8Ci9Gb250IDw8Ci9GMSA0IDAgUgo+Pgo+PgovQ29udGVudHMgNSAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL1R5cGUgL0ZvbnQKL1N1YnR5cGUgL1R5cGUxCi9CYXNlRm9udCAvSGVsdmV0aWNhCj4+CmVuZG9iago1IDAgb2JqCjw8Ci9MZW5ndGggNDQKPj4Kc3RyZWFtCkJUCi9GMSA4IFRmCjEwMCA3MDAgVGQKKFRlc3QgUERGKSBUagpFVApzdHJlYW0KZW5kb2JqCnhyZWYKMCA2CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKMDAwMDAwMDI0NSAwMDAwMCBuIAowMDAwMDAwMzI0IDAwMDAwIG4gCnRyYWlsZXIKPDwKL1NpemUgNgovUm9vdCAxIDAgUgo+PgpzdGFydHhyZWYKNDE4CiUlRU9G",
+  "document_type_id": 1
+}
+
+### Step 2: Submit for approval (use document ID from step 1)
+POST {{baseUrl}}/approvals/submit
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "document_id": 10,
+  "workflow_id": 1
+}
+
+### Step 3: Check my pending approvals
+GET {{baseUrl}}/approvals/my-pending
+Authorization: Bearer {{token}}
+
+### Step 4: Approve (use approval ID from step 3)
+POST {{baseUrl}}/approvals/1/approve
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "comment": "Approved!"
+}
+
+### Step 5: Check workflow status
+GET {{baseUrl}}/approvals/document/10/workflow
+Authorization: Bearer {{token}}
+
+### Summary:
+# ✅ Submit for approval
+# ✅ Get pending approvals
+# ✅ Approve/Reject/Request Info
+# ✅ Get approval history
+# ✅ Get workflow instance
+# ✅ Full workflow test

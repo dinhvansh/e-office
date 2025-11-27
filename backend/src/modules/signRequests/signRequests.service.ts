@@ -360,7 +360,18 @@ class SignRequestsService {
       select: { full_name: true, email: true }
     });
     
-    // Generate OTP and send email to each external signer
+    // ✅ Check if there are signers waiting for approval
+    const waitingForApproval = signersWithTokens.some(s => s.status === 'waiting_approval');
+    
+    if (waitingForApproval) {
+      console.log(`⏳ Sign request ${id} has signers waiting for approval. Emails will be sent after approvals complete.`);
+      // Don't send emails yet - they will be sent by autoSendSignRequest after approvals
+      return this.getSignRequest(id, tenantId);
+    }
+    
+    // Generate OTP and send email to each external signer (only if no approvals pending)
+    console.log(`📧 Sending emails to ${signersWithTokens.length} signers...`);
+    
     for (const signer of signersWithTokens) {
       if (!signer.is_internal && signer.signing_token) {
         const signUrl = `${frontendUrl}/sign/${signer.signing_token}`;

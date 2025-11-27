@@ -100,11 +100,11 @@ export default function CreateSignRequestPage() {
       );
       
       const internalSignersList: InternalSigner[] = signerSteps.map((step: any, index: number) => ({
-        id: step.id,
+        user_id: step.approver_id || 0,
         name: step.approver_name || step.approver_email || 'Unknown',
         email: step.approver_email || '',
         signing_order: index + 1,
-        role: step.step_name || 'Người ký',
+        role: (step.participant_role === 'approver' ? 'approver' : 'signer') as 'signer' | 'approver',
       }));
       
       setInternalSigners(internalSignersList);
@@ -134,22 +134,30 @@ export default function CreateSignRequestPage() {
       
       if (!docType) {
         setWorkflowMode(null);
+        setSelectedWorkflowId(null);
         return;
       }
 
       if (!docType.require_approval) {
         setWorkflowMode('no_approval');
+        setSelectedWorkflowId(null);
       } else if (!docType.default_workflow_id) {
         setWorkflowMode('adhoc');
+        setSelectedWorkflowId(null);
       } else if (!docType.allow_workflow_override) {
         setWorkflowMode('strict');
+        setSelectedWorkflowId(docType.default_workflow_id);
       } else {
         setWorkflowMode('flexible');
-        setSelectedWorkflowId(docType.default_workflow_id);
+        // ✅ Only set default if no workflow selected yet
+        if (!selectedWorkflowId) {
+          setSelectedWorkflowId(docType.default_workflow_id);
+        }
       }
     } else {
       setWorkflowMode(null);
       setSelectedDocType(null);
+      setSelectedWorkflowId(null);
     }
   }, [documentTypeId, activeDocumentTypes]);
 
@@ -184,10 +192,10 @@ export default function CreateSignRequestPage() {
           }
         }
         
-        // Validate internal signers
+        // Validate internal signers - only check user_id
         for (const signer of internalSigners) {
-          if (!signer.email || !signer.name) {
-            throw new Error('Vui lòng điền đầy đủ thông tin người ký nội bộ');
+          if (!signer.user_id || signer.user_id === 0) {
+            throw new Error('Vui lòng chọn người ký nội bộ');
           }
         }
       }
@@ -218,13 +226,15 @@ export default function CreateSignRequestPage() {
         file_name: file.name,
         file_base64: base64,
         document_type_id: documentTypeId,
+        title: file.name.replace(/\.[^/.]+$/, ''), // ✅ Use filename without extension as title
       };
 
       // Add workflow data based on mode
       if (workflowMode === 'strict' && selectedDocType?.default_workflow_id) {
         payload.workflow_id = selectedDocType.default_workflow_id;
-      } else if (workflowMode === 'flexible' && selectedDocType?.default_workflow_id) {
-        payload.workflow_id = selectedDocType.default_workflow_id;
+      } else if (workflowMode === 'flexible' && selectedWorkflowId) {
+        // ✅ Use selectedWorkflowId (user's choice), not default_workflow_id
+        payload.workflow_id = selectedWorkflowId;
         if (customizedSteps && customizedSteps.length > 0) {
           payload.customized_steps = customizedSteps;
         }
@@ -233,21 +243,24 @@ export default function CreateSignRequestPage() {
       }
 
       // ✅ Combine internal and external signers
+      console.log('🔍 Debug internalSigners before mapping:', internalSigners);
+      
       const allSigners = [
         // Internal signers (from workflow)
-        ...internalSigners.map(s => ({
-          email: s.email,
-          name: s.name,
-          signing_order: s.signing_order,
-          role: 'signer', // Internal signers are always 'signer' role
-          type: 'manual', // Internal are manual type
-        })),
+        ...internalSigners.map(s => {
+          console.log('🔍 Mapping internal signer:', s);
+          return {
+            email: s.email,
+            name: s.name,
+            order: s.signing_order, // ✅ Backend expects "order" not "signing_order"
+            type: 'manual', // Internal are manual type
+          };
+        }),
         // External signers (manual add)
         ...signers.map((s, index) => ({
           email: s.email,
           name: s.name,
-          signing_order: internalSigners.length + index + 1, // ✅ Offset by internal count
-          role: s.role || 'signer', // ✅ Default to 'signer'
+          order: internalSigners.length + index + 1, // ✅ Backend expects "order"
           type: s.type,
           external_org_id: s.externalOrgId,
         }))
@@ -477,8 +490,11 @@ export default function CreateSignRequestPage() {
             <CardContent className="p-6">
               <InternalSignersSelector
                 signers={internalSigners}
-                onChange={setInternalSigners}
-                allowEdit={true}
+                onChange={(newSigners) => {
+                  console.log('📝 InternalSigners onChange:', newSigners);
+                  setInternalSigners(newSigners);
+                }}
+                allowEdit={workflowMode === 'flexible' || workflowMode === 'adhoc'}
               />
             </CardContent>
           </Card>

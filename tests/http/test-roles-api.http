@@ -1,0 +1,40 @@
+### Test Roles API
+
+# 1. Login first to get token
+POST http://localhost:4000/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@acme.com",
+  "password": "admin123"
+}
+
+###
+
+# 2. Get all roles (replace TOKEN with actual token from login)
+GET http://localhost:4000/api/v1/roles
+Authorization: Bearer YOUR_TOKEN_HERE
+
+###
+
+# 3. Create a new role (replace TOKEN)
+POST http://localhost:4000/api/v1/roles
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "name": "Test Role",
+  "description": "Test description"
+}
+
+###
+
+# 4. Get all permissions
+GET http://localhost:4000/api/v1/roles/permissions
+Authorization: Bearer YOUR_TOKEN_HERE
+
+###
+
+# 5. Get my permissions
+GET http://localhost:4000/api/v1/roles/my-permissions
+Authorization: Bearer YOUR_TOKEN_HERE

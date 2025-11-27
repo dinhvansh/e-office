@@ -1,94 +1,186 @@
+/**
+ * Check latest document with workflow and signers
+ */
+
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-async function checkLatestDocument() {
-  console.log('\n🔍 CHECK LATEST DOCUMENT');
-  console.log('='.repeat(60));
+async function main() {
+  console.log('🔍 Checking Latest Document\n');
   
-  try {
-    // Get latest document with sign request
-    const latestDoc = await prisma.documents.findFirst({
-      where: {
-        sign_request_id: { not: null }
-      },
-      orderBy: { id: 'desc' },
-      include: {
-        sign_request: {
-          include: {
-            signers: true,
-            fields: true
+  // Get latest document
+  const document = await prisma.documents.findFirst({
+    orderBy: { created_at: 'desc' },
+    include: {
+      document_type: true,
+      sign_request: {
+        include: {
+          signers: {
+            orderBy: { signing_order: 'asc' }
           }
         }
       }
-    });
-
-    if (!latestDoc) {
-      console.log('❌ No documents with sign requests found');
-      return;
     }
-
-    console.log('\n📄 Document Info:');
-    console.log(`   ID: ${latestDoc.id}`);
-    console.log(`   Title: ${latestDoc.title}`);
-    console.log(`   Status: ${latestDoc.status}`);
-
-    const signRequest = latestDoc.sign_requests;
-    console.log('\n📝 Sign Request Info:');
-    console.log(`   ID: ${signRequest.id}`);
-    console.log(`   Status: ${signRequest.status}`);
-
-    console.log('\n👥 Signers:');
-    for (const signer of signRequest.signers) {
-      console.log(`\n   Signer #${signer.id}:`);
-      console.log(`   - Email: ${signer.email}`);
-      console.log(`   - Name: ${signer.name}`);
-      console.log(`   - Status: ${signer.status}`);
-      console.log(`   - Has Token: ${signer.signing_token ? 'Yes' : 'No'}`);
-      
-      if (signer.signing_token) {
-        console.log(`   - URL: http://localhost:3000/sign/${signer.signing_token}`);
+  });
+  
+  if (!document) {
+    console.log('❌ No documents found');
+    return;
+  }
+  
+  console.log('📄 Document Info:');
+  console.log(`  ID: ${document.id}`);
+  console.log(`  Title: ${document.title || 'Untitled'}`);
+  console.log(`  Status: ${document.status}`);
+  console.log(`  Created: ${document.created_at.toISOString()}`);
+  console.log(`  Document Type: ${document.document_type?.name || 'N/A'}`);
+  console.log(`  Requires Approval: ${document.document_type?.require_approval || false}`);
+  console.log(`  Requires Signing: ${document.document_type?.require_digital_signing || false}`);
+  console.log('');
+  
+  // Check workflow instance
+  const workflowInstance = await prisma.workflow_instances.findFirst({
+    where: { document_id: document.id },
+    include: {
+      workflow: {
+        include: {
+          steps: {
+            orderBy: { step_order: 'asc' }
+          }
+        }
       }
     }
-
-    console.log('\n📋 Fields:');
-    if (signRequest.fields.length === 0) {
-      console.log('   ⚠️  NO FIELDS FOUND!');
-      console.log('   This is why signer cannot see fields.');
-      console.log('\n💡 Solution:');
-      console.log('   1. Go to editor page');
-      console.log('   2. Add signature fields');
-      console.log('   3. Click "Lưu" to save');
-    } else {
-      for (const field of signRequest.fields) {
-        console.log(`\n   Field #${field.id}:`);
-        console.log(`   - Type: ${field.type}`);
-        console.log(`   - Position: ${field.x}%, ${field.y}%`);
-        console.log(`   - Size: ${field.width}x${field.height}`);
-        console.log(`   - Assigned to signer: ${field.assigned_signer_id || 'None'}`);
-        console.log(`   - Required: ${field.required}`);
-      }
-    }
-
-    console.log('\n' + '='.repeat(60));
-    console.log('💡 Next Steps:');
-    console.log('='.repeat(60));
+  });
+  
+  if (workflowInstance) {
+    console.log('🔄 Workflow Instance:');
+    console.log(`  ID: ${workflowInstance.id}`);
+    console.log(`  Workflow: ${workflowInstance.workflow.name}`);
+    console.log(`  Is Template: ${workflowInstance.workflow.is_template}`);
+    console.log(`  Created For Doc: ${workflowInstance.workflow.created_for_doc}`);
+    console.log(`  Status: ${workflowInstance.status}`);
+    console.log(`  Steps: ${workflowInstance.workflow.steps.length}`);
+    console.log('');
     
-    if (signRequest.fields.length === 0) {
-      console.log('\n⚠️  Add fields first!');
-      console.log(`   1. Go to: http://localhost:3000/sign-requests/${signRequest.id}/editor`);
-      console.log('   2. Click on PDF to add signature fields');
-      console.log('   3. Click "Lưu" to save');
-      console.log('   4. Then send sign request');
+    // Show steps
+    console.log('📋 Workflow Steps:');
+    workflowInstance.workflow.steps.forEach((step, i) => {
+      console.log(`  ${i + 1}. ${step.step_name || `Step ${step.step_order}`}`);
+      console.log(`     Type: ${step.approver_type}`);
+      console.log(`     Approver ID: ${step.approver_id}`);
+      console.log(`     Participant Role: ${step.participant_role || 'N/A'}`);
+    });
+    console.log('');
+    
+    // Check approvals
+    const approvals = await prisma.document_approvals.findMany({
+      where: { document_id: document.id },
+      include: {
+        approver: {
+          select: { id: true, full_name: true, email: true }
+        },
+        workflow_step: {
+          select: { step_order: true, step_name: true }
+        }
+      },
+      orderBy: { created_at: 'asc' }
+    });
+    
+    console.log(`✅ Approvals (${approvals.length}):` );
+    approvals.forEach((approval, i) => {
+      console.log(`  ${i + 1}. Step ${approval.workflow_step?.step_order}: ${approval.workflow_step?.step_name}`);
+      console.log(`     Approver: ${approval.approver?.full_name || 'N/A'} (${approval.approver?.email || 'N/A'})`);
+      console.log(`     Status: ${approval.action}`);
+      console.log(`     Created: ${approval.created_at.toISOString()}`);
+    });
+    console.log('');
+  } else {
+    console.log('⚠️  No workflow instance found');
+    console.log('');
+  }
+  
+  // Check sign request
+  if (document.sign_request) {
+    console.log('📝 Sign Request:');
+    console.log(`  ID: ${document.sign_request.id}`);
+    console.log(`  Status: ${document.sign_request.status}`);
+    console.log(`  Signers: ${document.sign_request.signers.length}`);
+    console.log('');
+    
+    if (document.sign_request.signers.length > 0) {
+      console.log('👥 Signers:');
+      document.sign_request.signers.forEach((signer, i) => {
+        console.log(`  ${i + 1}. ${signer.name} (${signer.email})`);
+        console.log(`     Role: ${signer.role || 'N/A'}`);
+        console.log(`     Status: ${signer.status}`);
+        console.log(`     Signing Order: ${signer.signing_order || 'N/A'}`);
+        console.log(`     Is Internal: ${signer.is_internal}`);
+        console.log(`     User ID: ${signer.user_id || 'N/A'}`);
+      });
     } else {
-      console.log('\n✅ Fields exist!');
-      console.log('   Check if they are assigned to correct signer');
+      console.log('  ⚠️  No signers found!');
+      console.log('  This is the problem - signers should have been created.');
     }
-
-  } catch (error) {
-    console.error('\n❌ ERROR:', error.message);
-  } finally {
-    await prisma.$disconnect();
+    console.log('');
+  } else {
+    console.log('⚠️  No sign request found');
+    console.log('');
+  }
+  
+  // Summary
+  console.log('📊 Summary:');
+  console.log(`  Document: ${document.id} - ${document.status}`);
+  console.log(`  Workflow: ${workflowInstance ? '✅ Yes' : '❌ No'}`);
+  console.log(`  Approvals: ${workflowInstance ? (await prisma.document_approvals.count({ where: { document_id: document.id } })) : 0}`);
+  console.log(`  Sign Request: ${document.sign_request ? '✅ Yes' : '❌ No'}`);
+  console.log(`  Signers: ${document.sign_request?.signers.length || 0}`);
+  
+  // Check if this is the refactor issue
+  if (workflowInstance && workflowInstance.workflow.created_for_doc === document.id) {
+    console.log('\n✅ This is a CUSTOMIZED workflow (created for this document)');
+    
+    // Check if workflow was created before approvals
+    const approvals = await prisma.document_approvals.findMany({
+      where: { document_id: document.id },
+      orderBy: { created_at: 'asc' }
+    });
+    
+    if (approvals.length > 0) {
+      const workflowCreated = workflowInstance.workflow.created_at;
+      const firstApprovalCreated = approvals[0].created_at;
+      
+      if (workflowCreated <= firstApprovalCreated) {
+        console.log('✅ Workflow created BEFORE approvals (correct order!)');
+      } else {
+        console.log('❌ Workflow created AFTER approvals (wrong order!)');
+      }
+    }
+    
+    // Check signer status
+    if (document.sign_request?.signers.length > 0) {
+      const waitingSigners = document.sign_request.signers.filter(s => s.status === 'waiting_approval');
+      const pendingSigners = document.sign_request.signers.filter(s => s.status === 'pending');
+      
+      console.log(`\nSigner Status:`);
+      console.log(`  waiting_approval: ${waitingSigners.length}`);
+      console.log(`  pending: ${pendingSigners.length}`);
+      
+      const pendingApprovals = approvals.filter(a => a.action === 'pending');
+      
+      if (pendingApprovals.length > 0 && waitingSigners.length > 0) {
+        console.log('✅ Signers waiting for approvals (correct!)');
+      } else if (pendingApprovals.length === 0 && pendingSigners.length > 0) {
+        console.log('✅ All approvals done, signers are pending (correct!)');
+      } else if (waitingSigners.length === 0 && pendingSigners.length === 0) {
+        console.log('⚠️  No signers with waiting_approval or pending status');
+      }
+    } else {
+      console.log('\n❌ NO SIGNERS CREATED - This is the problem!');
+      console.log('Expected: Signers should be created from workflow steps');
+    }
   }
 }
 
-checkLatestDocument();
+main()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());

@@ -91,7 +91,9 @@ export default function PublicSigningPage() {
       const result = await res.json();
 
       if (!res.ok) {
-        throw new Error(result.message || 'Failed to load signing data');
+        // Backend returns error in format: { success: false, error: { message: "...", code: "..." } }
+        const errorMsg = result.error?.message || result.message || 'Failed to load signing data';
+        throw new Error(errorMsg);
       }
 
       setData(result.data);
@@ -123,10 +125,12 @@ export default function PublicSigningPage() {
       const result = await res.json();
 
       if (!res.ok) {
-        let errorMessage = result.message || 'Không thể gửi OTP';
+        // Backend returns error in format: { success: false, error: { message: "...", code: "..." } }
+        const errorMsg = result.error?.message || result.message || 'Không thể gửi OTP';
+        let errorMessage = errorMsg;
         
         if (res.status === 400) {
-          if (result.message?.includes('Email does not match')) {
+          if (errorMsg.includes('Email does not match')) {
             errorMessage = '📧 Email không khớp với người ký. Vui lòng kiểm tra lại email.';
           }
         } else if (res.status === 404) {
@@ -425,18 +429,20 @@ export default function PublicSigningPage() {
         });
         
         // Handle specific error cases
-        let errorMessage = result.message || 'Không thể ký tài liệu';
+        // Backend returns error in format: { success: false, error: { message: "...", code: "..." } }
+        const errorMsg = result.error?.message || result.message || 'Không thể ký tài liệu';
+        let errorMessage = errorMsg;
         
         if (res.status === 400) {
-          if (result.message?.includes('Invalid OTP')) {
+          if (errorMsg.includes('Invalid OTP')) {
             errorMessage = '❌ Mã OTP không đúng. Vui lòng kiểm tra lại mã OTP trong email.';
-          } else if (result.message?.includes('OTP expired')) {
+          } else if (errorMsg.includes('OTP expired')) {
             errorMessage = '⏰ Mã OTP đã hết hạn. Vui lòng click "Gửi mã OTP" để nhận mã mới.';
-          } else if (result.message?.includes('OTP not issued')) {
+          } else if (errorMsg.includes('OTP not issued')) {
             errorMessage = '📧 Chưa có mã OTP. Vui lòng click "Gửi mã OTP" trước.';
-          } else if (result.message?.includes('required fields')) {
+          } else if (errorMsg.includes('required fields')) {
             errorMessage = '📝 Vui lòng điền đầy đủ tất cả các trường bắt buộc.';
-          } else if (result.message?.includes('already signed') || result.message?.includes('You have already signed')) {
+          } else if (errorMsg.includes('already signed') || errorMsg.includes('You have already signed')) {
             errorMessage = '✅ Bạn đã ký tài liệu này rồi. Trang sẽ tự động tải lại để hiển thị kết quả.';
             // Auto reload to show thank you page
             setTimeout(() => {
@@ -506,7 +512,9 @@ export default function PublicSigningPage() {
             const res = await fetch(`${apiBase}/public/sign/${token}/download-signed`);
             if (!res.ok) {
               const result = await res.json();
-              throw new Error(result.message || 'Không thể tải xuống PDF');
+              // Backend returns error in format: { success: false, error: { message: "...", code: "..." } }
+              const errorMsg = result.error?.message || result.message || 'Không thể tải xuống PDF';
+              throw new Error(errorMsg);
             }
             const contentDisposition = res.headers.get('Content-Disposition');
             let filename = 'document_signed.pdf';

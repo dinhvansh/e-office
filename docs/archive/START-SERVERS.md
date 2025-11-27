@@ -1,290 +1,233 @@
-# 🚀 Khởi động Backend & Frontend
+# 🚀 Hướng Dẫn Bật Phần Mềm
 
-## ⚠️ PowerShell Execution Policy Issue
+**Project**: WP Sign / E-Office System  
+**Last Updated**: 2025-11-20
 
-Nếu bạn gặp lỗi:
+---
+
+## 📋 Yêu Cầu
+
+- ✅ Node.js đã cài (v18+)
+- ✅ Docker Desktop đang chạy
+- ✅ Git đã clone project
+
+---
+
+## 🔧 Bước 1: Khởi Động Database (Docker)
+
+### Cách 1: Dùng Docker Desktop
+1. Mở **Docker Desktop**
+2. Vào tab **Containers**
+3. Tìm containers:
+   - `projectwpsign-postgres-1`
+   - `projectwpsign-redis-1`
+4. Click nút **▶️ Start** nếu chưa chạy
+
+### Cách 2: Dùng Command Line
+```bash
+# Vào thư mục project
+cd "E:\2.CODE\PROJECT WP SIGN"
+
+# Khởi động database
+docker-compose up -d postgres redis
 ```
-npm : File C:\Program Files\nodejs\npm.ps1 cannot be loaded because running scripts is disabled
+
+### Kiểm Tra Database Đã Chạy
+```bash
+docker ps
 ```
 
-Có 2 cách giải quyết:
+Kết quả phải có:
+```
+CONTAINER ID   IMAGE            STATUS          PORTS
+...            postgres:16      Up X seconds    0.0.0.0:5432->5432/tcp
+...            redis:7-alpine   Up X seconds    0.0.0.0:6379->6379/tcp
+```
 
-### Cách 1: Dùng CMD thay vì PowerShell (Khuyến nghị)
+---
 
-#### Terminal 1: Backend
-```cmd
+## 🖥️ Bước 2: Khởi Động Backend
+
+### Mở Terminal 1
+```bash
+# Vào thư mục backend
 cd backend
+
+# Chạy backend
 npm run dev
 ```
 
-#### Terminal 2: Frontend
-```cmd
+### Kết Quả Thành Công
+```
+Backend listening on port 4000
+```
+
+**Backend URL**: http://localhost:4000
+
+---
+
+## 🌐 Bước 3: Khởi Động Frontend
+
+### Mở Terminal 2 (Terminal mới)
+```bash
+# Vào thư mục frontend
 cd frontend
+
+# Chạy frontend
 npm run dev
 ```
 
-### Cách 2: Thay đổi Execution Policy (Cần Admin)
-
-Mở PowerShell **as Administrator** và chạy:
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+### Kết Quả Thành Công
+```
+▲ Next.js 14.1.0
+- Local:        http://localhost:3000
+✓ Ready in 5.5s
 ```
 
-Sau đó chạy lại:
-```powershell
+**Frontend URL**: http://localhost:3000
+
+---
+
+## ✅ Bước 4: Kiểm Tra & Đăng Nhập
+
+### 1. Mở Trình Duyệt
+```
+http://localhost:3000
+```
+
+### 2. Đăng Nhập
+- **Email**: `admin@acme.local`
+- **Password**: `admin123`
+
+### 3. Test Các Trang
+- ✅ Dashboard: `/`
+- ✅ Documents: `/documents`
+- ✅ Workflows: `/workflows`
+- ✅ Approvals: `/approvals`
+- ✅ Users: `/users`
+- ✅ Roles: `/roles`
+- ✅ Departments: `/departments`
+- ✅ External Orgs: `/external-orgs`
+- ✅ Document Types: `/document-types`
+
+---
+
+## 🐛 Xử Lý Lỗi
+
+### Lỗi 1: Backend Không Kết Nối Database
+```
+Can't reach database server at `localhost:5432`
+```
+
+**Giải pháp**:
+1. Kiểm tra Docker Desktop đang chạy
+2. Khởi động lại containers:
+   ```bash
+   docker-compose restart postgres redis
+   ```
+3. Restart backend (Ctrl+C rồi `npm run dev` lại)
+
+### Lỗi 2: Port 3000 Đã Được Sử Dụng
+```
+Port 3000 is already in use
+```
+
+**Giải pháp**:
+1. Tắt process đang dùng port 3000
+2. Hoặc đổi port trong `frontend/package.json`:
+   ```json
+   "dev": "next dev -p 3001"
+   ```
+
+### Lỗi 3: Port 4000 Đã Được Sử Dụng
+```
+Port 4000 is already in use
+```
+
+**Giải pháp**:
+1. Tắt process đang dùng port 4000
+2. Hoặc đổi port trong `backend/src/server.ts`:
+   ```typescript
+   const PORT = process.env.PORT || 4001;
+   ```
+
+### Lỗi 4: Module Not Found
+```
+Cannot find module 'xxx'
+```
+
+**Giải pháp**:
+```bash
+# Backend
 cd backend
-npm run dev
-```
+npm install
 
----
-
-## 📝 Hướng dẫn chi tiết
-
-### Bước 1: Mở 2 Terminal
-
-**Terminal 1 (Backend):**
-1. Mở Command Prompt (CMD) hoặc PowerShell
-2. Navigate đến thư mục backend
-3. Chạy `npm run dev`
-
-**Terminal 2 (Frontend):**
-1. Mở Command Prompt (CMD) hoặc PowerShell mới
-2. Navigate đến thư mục frontend
-3. Chạy `npm run dev`
-
-### Bước 2: Kiểm tra
-
-**Backend:**
-- URL: http://localhost:4000
-- Check: http://localhost:4000/api/v1/tenants/me (sẽ trả về 401 nếu không có token)
-
-**Frontend:**
-- URL: http://localhost:3000
-- Login page sẽ hiển thị
-
-### Bước 3: Login
-
-Truy cập http://localhost:3000 và login với:
-- **Email**: `admin@tenant1.com`
-- **Password**: `password123`
-
----
-
-## 🎯 Test Flow trên UI
-
-### 1. Login
-- Vào http://localhost:3000
-- Nhập email/password
-- Click "Login"
-
-### 2. Upload Document
-- Click "Documents" trong sidebar
-- Click "Upload Document"
-- Chọn file PDF
-- Click "Upload"
-
-### 3. Create Sign Request
-- Click "Sign Requests" trong sidebar
-- Click "Create Sign Request"
-- Chọn document
-- Thêm signers (email + name)
-- Click "Create"
-
-### 4. Send OTP
-- Vào sign request detail
-- Click "Send OTP" cho signer
-- **Dev mode**: Xem OTP trong console log của backend
-- **Prod mode**: Check email inbox
-
-### 5. Sign Document
-- Nhập OTP
-- Click "Sign"
-- Document status sẽ chuyển thành "completed"
-
-### 6. View Audit Logs
-- Click "Audit" trong sidebar
-- Chọn document
-- Xem timeline của tất cả actions
-
----
-
-## 🐛 Troubleshooting
-
-### Backend không khởi động
-
-**Lỗi: "Port 4000 already in use"**
-```cmd
-# Windows: Kill process trên port 4000
-netstat -ano | findstr :4000
-taskkill /PID <PID> /F
-```
-
-**Lỗi: "Cannot connect to database"**
-- Kiểm tra PostgreSQL đang chạy
-- Check DATABASE_URL trong .env
-- Chạy: `npx prisma generate`
-
-### Frontend không khởi động
-
-**Lỗi: "Port 3000 already in use"**
-```cmd
-# Windows: Kill process trên port 3000
-netstat -ano | findstr :3000
-taskkill /PID <PID> /F
-```
-
-**Lỗi: "Module not found"**
-```cmd
+# Frontend
 cd frontend
 npm install
 ```
 
-### Email không gửi
-
-**Dev mode:**
-- Xem console log của backend terminal
-- Tìm dòng: `📧 [EMAIL] Would send email:`
-
-**Prod mode:**
-- Check SMTP config trong `backend/.env`
-- Test với Gmail App Password
-
-### OTP không hoạt động
-
-- OTP có hiệu lực 10 phút
-- Gửi OTP mới nếu hết hạn
-- Check console log để xem OTP
-
 ---
 
-## 📊 Ports
+## 🔄 Tắt Phần Mềm
 
-| Service | Port | URL |
-|---------|------|-----|
-| Backend | 4000 | http://localhost:4000 |
-| Frontend | 3000 | http://localhost:3000 |
-| PostgreSQL | 5432 | localhost:5432 |
-| Redis | 6379 | localhost:6379 |
-| Prisma Studio | 5555 | http://localhost:5555 |
+### Tắt Backend & Frontend
+- Nhấn **Ctrl + C** trong mỗi terminal
 
----
-
-## 🔧 Useful Commands
-
-### Backend
-```cmd
-cd backend
-
-# Start dev server
-npm run dev
-
-# View database
-npx prisma studio
-
-# Run migrations
-npx prisma migrate dev
-
-# Seed database
-npx prisma db seed
-
-# Run tests
-npx ts-node scripts/test-basic-flow.ts
+### Tắt Database (Tùy Chọn)
+```bash
+docker-compose stop
 ```
 
-### Frontend
-```cmd
-cd frontend
+**Lưu ý**: Không cần tắt database nếu muốn giữ data
 
-# Start dev server
-npm run dev
+---
 
-# Build for production
-npm run build
+## 📝 Quick Commands
 
-# Run E2E tests
-npm run test:e2e
+### Khởi Động Tất Cả (3 Terminals)
+```bash
+# Terminal 1: Database
+docker-compose up -d postgres redis
+
+# Terminal 2: Backend
+cd backend && npm run dev
+
+# Terminal 3: Frontend
+cd frontend && npm run dev
+```
+
+### Kiểm Tra Status
+```bash
+# Database
+docker ps
+
+# Backend
+curl http://localhost:4000/health
+
+# Frontend
+curl http://localhost:3000
 ```
 
 ---
 
-## 🎨 UI Features
+## 🎯 Tóm Tắt Nhanh
 
-### Dashboard
-- Overview statistics
-- Recent documents
-- Recent sign requests
-
-### Documents
-- List all documents
-- Upload new document
-- View document detail
-- Delete document
-
-### Sign Requests
-- List all sign requests
-- Create new sign request
-- View sign request detail
-- Send OTP to signers
-- Sign document with OTP
-- Cancel sign request
-
-### Audit Logs
-- View document history
-- Filter by event type
-- Timeline view
-
-### Settings
-- Tenant information
-- User profile
-- Webhook configuration
+1. **Bật Docker Desktop** → Start containers
+2. **Terminal 1**: `cd backend && npm run dev`
+3. **Terminal 2**: `cd frontend && npm run dev`
+4. **Mở trình duyệt**: http://localhost:3000
+5. **Đăng nhập**: admin@acme.local / admin123
 
 ---
 
-## 📧 Email trong Console
+## 📞 Cần Giúp?
 
-Khi gửi OTP trong dev mode, bạn sẽ thấy trong backend console:
-
-```
-📧 [EMAIL] Would send email: {
-  from: 'WP Sign <noreply@wpsign.local>',
-  to: 'signer@example.com',
-  subject: 'Mã OTP ký tài liệu - Hợp đồng thuê nhà',
-  html: '<!DOCTYPE html>...'
-}
-```
-
-Copy OTP từ HTML content và paste vào UI để sign.
+- **Documentation**: Xem `README.md`
+- **Testing**: Xem `README-TESTING.md`
+- **API Tests**: Xem `test-api.http`
+- **Issues**: Check `LESSONS-LEARNED.md`
 
 ---
 
-## ✅ Checklist
-
-- [ ] Backend chạy thành công (port 4000)
-- [ ] Frontend chạy thành công (port 3000)
-- [ ] Login được vào UI
-- [ ] Upload document được
-- [ ] Create sign request được
-- [ ] Send OTP (xem console log)
-- [ ] Sign document với OTP
-- [ ] View audit logs
-
----
-
-## 🎉 Xong!
-
-Bây giờ bạn có thể:
-- Test toàn bộ flow trên UI
-- Upload và ký documents
-- Xem audit logs
-- Configure webhooks
-- Test email OTP
-
-**Happy testing!** 🚀
-
----
-
-**Tips:**
-- Dùng CMD thay vì PowerShell để tránh execution policy issues
-- Mở 2 terminal riêng cho backend và frontend
-- Xem console log của backend để debug
-- Check Network tab trong browser DevTools nếu có lỗi API
+**Chúc bạn code vui vẻ! 🚀**

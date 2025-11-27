@@ -1,0 +1,118 @@
+### Test Document Visibility & Confidential Level
+### Phase 1 - Minimal RBAC Implementation
+
+@baseUrl = http://localhost:3001/api/v1
+@adminToken = YOUR_ADMIN_TOKEN_HERE
+@userToken = YOUR_USER_TOKEN_HERE
+
+### 1. Login as admin@acme.local (Admin)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@acme.local",
+  "password": "secret123"
+}
+
+### 2. Create normal public document (Admin)
+# Expected: Success - anyone can see this
+POST {{baseUrl}}/documents
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "file_name": "public-normal-doc.pdf",
+  "file_base64": "JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKPD4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFCb3ggWzAgMCA2MTIgNzkyXQovUmVzb3VyY2VzIDw8Ci9Gb250IDw8Ci9GMSA0IDAgUgo+Pgo+PgovQ29udGVudHMgNSAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL1R5cGUgL0ZvbnQKL1N1YnR5cGUgL1R5cGUxCi9CYXNlRm9udCAvSGVsdmV0aWNhCj4+CmVuZG9iago1IDAgb2JqCjw8Ci9MZW5ndGggNDQKPj4Kc3RyZWFtCkJUCi9GMSA4IFRmCjEwMCA3MDAgVGQKKFRlc3QgUERGKSBUagpFVApzdHJlYW0KZW5kb2JqCnhyZWYKMCA2CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKMDAwMDAwMDI0NSAwMDAwMCBuIAowMDAwMDAwMzI0IDAwMDAwIG4gCnRyYWlsZXIKPDwKL1NpemUgNgovUm9vdCAxIDAgUgo+PgpzdGFydHhyZWYKNDE4CiUlRU9G",
+  "document_type_id": 1,
+  "confidential_level": "normal",
+  "visibility_scope": "public"
+}
+
+### 3. Create confidential public document (Admin)
+# Expected: Success - visible to all but marked confidential
+POST {{baseUrl}}/documents
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "file_name": "confidential-public-doc.pdf",
+  "file_base64": "JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKPD4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFCb3ggWzAgMCA2MTIgNzkyXQovUmVzb3VyY2VzIDw8Ci9Gb250IDw8Ci9GMSA0IDAgUgo+Pgo+PgovQ29udGVudHMgNSAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL1R5cGUgL0ZvbnQKL1N1YnR5cGUgL1R5cGUxCi9CYXNlRm9udCAvSGVsdmV0aWNhCj4+CmVuZG9iago1IDAgb2JqCjw8Ci9MZW5ndGggNDQKPj4Kc3RyZWFtCkJUCi9GMSA4IFRmCjEwMCA3MDAgVGQKKENvbmZpZGVudGlhbCkgVGoKRVQKc3RyZWFtCmVuZG9iago=",
+  "document_type_id": 1,
+  "confidential_level": "confidential",
+  "visibility_scope": "public"
+}
+
+### 4. Create secret private document (Admin)
+# Expected: Success - only owner + admin can see
+POST {{baseUrl}}/documents
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "file_name": "secret-private-doc.pdf",
+  "file_base64": "JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKPD4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFCb3ggWzAgMCA2MTIgNzkyXQovUmVzb3VyY2VzIDw8Ci9Gb250IDw8Ci9GMSA0IDAgUgo+Pgo+PgovQ29udGVudHMgNSAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL1R5cGUgL0ZvbnQKL1N1YnR5cGUgL1R5cGUxCi9CYXNlRm9udCAvSGVsdmV0aWNhCj4+CmVuZG9iago1IDAgb2JqCjw8Ci9MZW5ndGggNDQKPj4Kc3RyZWFtCkJUCi9GMSA4IFRmCjEwMCA3MDAgVGQKKFNlY3JldCBQREYpIFRqCkVUCnN0cmVhbQplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAowMDAwMDAwMjQ1IDAwMDAwIG4gCjAwMDAwMDAzMjQgMDAwMDAgbiAKdHJhaWxlcgo8PAovU2l6ZSA2Ci9Sb290IDEgMCBSCj4+CnN0YXJ0eHJlZgo0MjAKJSVFT0Y=",
+  "document_type_id": 1,
+  "confidential_level": "secret",
+  "visibility_scope": "private"
+}
+
+### 5. Create secret public document (Admin)
+# Expected: Success - but only owner + admin can see (secret overrides public)
+POST {{baseUrl}}/documents
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "file_name": "secret-public-doc.pdf",
+  "file_base64": "JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKPD4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFCb3ggWzAgMCA2MTIgNzkyXQovUmVzb3VyY2VzIDw8Ci9Gb250IDw8Ci9GMSA0IDAgUgo+Pgo+PgovQ29udGVudHMgNSAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL1R5cGUgL0ZvbnQKL1N1YnR5cGUgL1R5cGUxCi9CYXNlRm9udCAvSGVsdmV0aWNhCj4+CmVuZG9iago1IDAgb2JqCjw8Ci9MZW5ndGggNDQKPj4Kc3RyZWFtCkJUCi9GMSA4IFRmCjEwMCA3MDAgVGQKKFNlY3JldCBQdWJsaWMpIFRqCkVUCnN0cmVhbQplbmRvYmoK",
+  "document_type_id": 1,
+  "confidential_level": "secret",
+  "visibility_scope": "public"
+}
+
+### 6. List documents as Admin
+# Expected: See all documents (4 documents)
+GET {{baseUrl}}/documents
+Authorization: Bearer {{adminToken}}
+
+### 7. Login as regular user
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@acme.local",
+  "password": "secret123"
+}
+
+### 8. List documents as regular user
+# Expected: Only see public/normal and public/confidential documents (2 documents)
+# Should NOT see: secret documents (private or public)
+GET {{baseUrl}}/documents
+Authorization: Bearer {{userToken}}
+
+### 9. Try to access secret document as regular user
+# Expected: 403 DOCUMENT_ACCESS_DENIED
+GET {{baseUrl}}/documents/3
+Authorization: Bearer {{userToken}}
+
+### 10. Access public normal document as regular user
+# Expected: Success (200)
+GET {{baseUrl}}/documents/1
+Authorization: Bearer {{userToken}}
+
+### 11. Access public confidential document as regular user
+# Expected: Success (200) - confidential is just a label, public scope allows access
+GET {{baseUrl}}/documents/2
+Authorization: Bearer {{userToken}}
+
+### 12. Try to access secret public document as regular user
+# Expected: 403 DOCUMENT_ACCESS_DENIED - secret level overrides public scope
+GET {{baseUrl}}/documents/4
+Authorization: Bearer {{userToken}}
+
+### Test Summary:
+# ✅ Admin sees all documents (4)
+# ✅ Regular user sees only public/normal + public/confidential (2)
+# ✅ Regular user gets 403 on secret documents (regardless of scope)
+# ✅ Regular user gets 403 on private documents
+# ✅ Owner always sees their own documents

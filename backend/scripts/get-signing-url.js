@@ -1,39 +1,74 @@
+/**
+ * Get signing URL for external signer
+ */
+
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL || 'postgresql://esign:esignpass@localhost:5432/esign',
-    },
-  },
-});
+const prisma = new PrismaClient();
 
-async function getSigningUrl() {
-  const signRequestId = parseInt(process.argv[2]) || 40;
+async function main() {
+  const email = 'info@abc.com.vn';
   
+  console.log(`🔍 Getting Signing URL for ${email}\n`);
+  
+  // Find signer
   const signers = await prisma.signers.findMany({
-    where: { sign_request_id: signRequestId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      signing_token: true,
-      status: true,
+    where: {
+      email: email,
+      is_internal: false
     },
+    include: {
+      sign_request: {
+        include: {
+          document: {
+            select: {
+              id: true,
+              title: true,
+              document_number: true,
+              original_file_name: true
+            }
+          }
+        }
+      }
+    },
+    orderBy: {
+      id: 'desc'
+    }
   });
-
-  console.log(`\n📧 Signing URLs for Sign Request #${signRequestId}:\n`);
-  console.log('═'.repeat(80));
   
-  signers.forEach((signer, index) => {
-    console.log(`\n${index + 1}. ${signer.name} (${signer.email})`);
+  if (signers.length === 0) {
+    console.error('❌ No signers found for this email');
+    return;
+  }
+  
+  console.log(`Found ${signers.length} signing requests:\n`);
+  
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  
+  signers.forEach((signer, i) => {
+    console.log(`${i + 1}. Sign Request #${signer.sign_request_id}`);
+    console.log(`   Document: ${signer.sign_request.document?.title || signer.sign_request.document?.original_file_name || 'Untitled'}`);
+    console.log(`   Document Number: ${signer.sign_request.document?.document_number || 'N/A'}`);
     console.log(`   Status: ${signer.status}`);
-    console.log(`   URL: http://localhost:3000/sign/${signer.signing_token}`);
+    console.log(`   Signing Order: ${signer.signing_order || 'N/A'}`);
+    
+    if (signer.signing_token) {
+      const signUrl = `${frontendUrl}/sign/${signer.signing_token}`;
+      console.log(`   ✅ Signing URL: ${signUrl}`);
+    } else {
+      console.log(`   ⚠️  No signing token yet (document not sent)`);
+    }
+    
+    console.log('');
   });
   
-  console.log('\n' + '═'.repeat(80));
-  console.log(`\n✅ Total: ${signers.length} signers\n`);
-  
-  await prisma.$disconnect();
+  // Show most recent one prominently
+  if (signers[0].signing_token) {
+    const latestUrl = `${frontendUrl}/sign/${signers[0].signing_token}`;
+    console.log('📋 LATEST SIGNING URL (copy this):');
+    console.log(`\n${latestUrl}\n`);
+  }
 }
 
-getSigningUrl().catch(console.error);
+main()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());

@@ -210,8 +210,8 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
                         value: user.id,
                         label: `${user.full_name || user.email}${user.full_name ? ` (${user.email})` : ''}`,
                       }))}
-                      value={step.approver_id}
-                      onChange={(value) => handleUpdateStep(index, 'approver_id', value)}
+                      value={step.approver_id || ''}
+                      onChange={(value) => handleUpdateStep(index, 'approver_id', typeof value === 'string' ? parseInt(value) : value)}
                       placeholder="-- Chọn người phê duyệt --"
                     />
                   </div>

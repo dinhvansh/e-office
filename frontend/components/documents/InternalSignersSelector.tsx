@@ -7,6 +7,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 interface InternalSigner {
   user_id: number;
@@ -57,27 +58,30 @@ export function InternalSignersSelector({ signers, onChange, allowEdit = false }
   };
 
   const handleUpdateSigner = (index: number, field: keyof InternalSigner, value: any) => {
-    console.log('🔧 handleUpdateSigner called:', { index, field, value, currentSigners: signers });
-    
     const newSigners = [...signers];
     
-    // Convert string to number for user_id
-    const finalValue = field === 'user_id' ? parseInt(value) : value;
-    console.log('🔧 finalValue after conversion:', finalValue, typeof finalValue);
-    
-    newSigners[index] = { ...newSigners[index], [field]: finalValue };
-    
-    // If user_id changed, update name and email
-    if (field === 'user_id' && value) {
-      const user = users?.find((u: any) => u.id === parseInt(value));
-      console.log('🔧 Found user:', user);
+    if (field === 'user_id') {
+      // Convert string to number for user_id
+      const userId = parseInt(value);
+      newSigners[index] = { 
+        ...newSigners[index], 
+        user_id: userId 
+      };
+      
+      // Update name and email from selected user
+      const user = users?.find((u: any) => u.id === userId);
       if (user) {
         newSigners[index].name = user.full_name || user.email;
         newSigners[index].email = user.email;
       }
+    } else {
+      // For other fields, just update directly
+      newSigners[index] = { 
+        ...newSigners[index], 
+        [field]: value 
+      };
     }
     
-    console.log('🔧 Calling onChange with:', newSigners);
     onChange(newSigners);
   };
 
@@ -166,33 +170,39 @@ export function InternalSignersSelector({ signers, onChange, allowEdit = false }
                 <GripVertical className="w-4 h-4 text-gray-400" />
               )}
 
-              {/* Order Badge */}
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-semibold text-sm">
-                {signer.signing_order}
-              </div>
+              {/* Order Badge or Input */}
+              {allowEdit ? (
+                <div className="flex-shrink-0">
+                  <input
+                    type="number"
+                    min="1"
+                    value={signer.signing_order}
+                    onChange={(e) => {
+                      const newOrder = parseInt(e.target.value) || 1;
+                      handleUpdateSigner(index, 'signing_order', newOrder);
+                    }}
+                    className="w-12 h-8 text-center border-2 border-blue-300 rounded-md font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              ) : (
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-semibold text-sm">
+                  {signer.signing_order}
+                </div>
+              )}
 
               {/* User Selector or Display */}
               <div className="flex-1 space-y-2">
                 {allowEdit ? (
                   <>
-                    <Select
-                      value={signer.user_id ? signer.user_id.toString() : ''}
-                      onValueChange={(value) => {
-                        console.log('Selected user value:', value);
-                        handleUpdateSigner(index, 'user_id', value);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="-- Chọn người ký --" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users?.map((user: any) => (
-                          <SelectItem key={user.id} value={user.id.toString()}>
-                            {user.full_name || user.email} ({user.email})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={users?.map((user: any) => ({
+                        value: user.id,
+                        label: `${user.full_name || user.email} (${user.email})`,
+                      })) || []}
+                      value={signer.user_id && signer.user_id > 0 ? signer.user_id : ''}
+                      onChange={(value) => handleUpdateSigner(index, 'user_id', typeof value === 'string' ? value : value.toString())}
+                      placeholder="-- Chọn người ký --"
+                    />
 
                     {/* Role Selector */}
                     <Select

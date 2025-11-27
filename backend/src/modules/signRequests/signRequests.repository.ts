@@ -25,7 +25,12 @@ export class SignRequestsRepository {
   findById(id: number, tenantId: number) {
     return prisma.sign_requests.findFirst({
       where: { id, tenant_id: tenantId },
-      include: { signers: true, document: true },
+      include: { 
+        signers: {
+          orderBy: { signing_order: 'asc' }
+        }, 
+        document: true
+      },
     });
   }
 

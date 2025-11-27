@@ -1,0 +1,17 @@
+### Test Login & Get Fresh Token
+
+@baseUrl = http://localhost:4000/api/v1
+
+### 1. Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@acme.local",
+  "password": "admin123"
+}
+
+### 2. Test workflows with token from step 1
+# Copy accessToken from response above and paste below
+GET {{baseUrl}}/workflows
+Authorization: Bearer YOUR_TOKEN_HERE
