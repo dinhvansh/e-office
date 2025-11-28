@@ -324,8 +324,12 @@ class SignRequestsService {
   async sendSignRequest(id: number, tenantId: number, userId: number) {
     const signRequest = await this.getSignRequest(id, tenantId);
 
-    if (signRequest.status !== "draft") {
-      throw ApiError.badRequest("Sign request already sent", "SIGN_REQUEST_ALREADY_SENT");
+    // ✅ Allow resend: Only block if completed or cancelled
+    if (signRequest.status === "completed" || signRequest.status === "cancelled") {
+      throw ApiError.badRequest(
+        `Cannot send sign request with status: ${signRequest.status}`, 
+        "SIGN_REQUEST_INVALID_STATUS"
+      );
     }
 
     // Validate fields (if any exist)
@@ -337,15 +341,22 @@ class SignRequestsService {
       }
     }
 
-    // Generate signing tokens for all signers
+    // ✅ Generate/regenerate signing tokens for all signers (including those without tokens)
     const signers = await signersRepository.findBySignRequest(id);
     for (const signer of signers) {
-      const token = crypto.randomBytes(32).toString("hex");
-      await signersRepository.update(signer.id, { signing_token: token });
+      // Generate new token if missing or regenerate for resend
+      if (!signer.signing_token || signRequest.status !== "draft") {
+        const token = crypto.randomBytes(32).toString("hex");
+        await signersRepository.update(signer.id, { 
+          signing_token: token
+        });
+      }
     }
 
-    // Update status to pending
-    await signRequestsRepository.updateStatus(id, tenantId, "pending");
+    // Update status to pending (or keep current if already sent)
+    if (signRequest.status === "draft") {
+      await signRequestsRepository.updateStatus(id, tenantId, "pending");
+    }
 
     // Reload signers with updated tokens
     const signersWithTokens = await signersRepository.findBySignRequest(id);
@@ -369,10 +380,14 @@ class SignRequestsService {
       return this.getSignRequest(id, tenantId);
     }
     
-    // Generate OTP and send email to each external signer (only if no approvals pending)
-    console.log(`📧 Sending emails to ${signersWithTokens.length} signers...`);
+    // ⭐ SEQUENTIAL SIGNING: Only send emails to signers with status 'pending'
+    // Signers with 'waiting_signing' will receive emails after previous signer completes
+    const pendingSigners = signersWithTokens.filter(s => s.status === 'pending');
+    const waitingSigners = signersWithTokens.filter(s => s.status === 'waiting_signing');
     
-    for (const signer of signersWithTokens) {
+    console.log(`📧 Sending emails to ${pendingSigners.length} pending signers (${waitingSigners.length} waiting)...`);
+    
+    for (const signer of pendingSigners) {
       if (!signer.is_internal && signer.signing_token) {
         const signUrl = `${frontendUrl}/sign/${signer.signing_token}`;
         
@@ -395,17 +410,22 @@ class SignRequestsService {
             recipientEmail: signer.email,
             recipientName: signer.name,
             documentTitle: signRequest.title || signRequest.document?.title || 'Document',
+            documentNumber: signRequest.document?.document_number, // ✅ Add document number
             senderName: sender?.full_name || sender?.email || 'System',
             message: signRequest.message,
             signUrl: signUrl,
             otp: otp,
             expiryMinutes: 10
           });
-          console.log(`📧 Sign request email (with OTP) sent to: ${signer.email}`);
+          console.log(`📧 Sign request email (with OTP) sent to: ${signer.email} (order: ${signer.signing_order})`);
         } catch (error) {
           console.error(`❌ Failed to send email to ${signer.email}:`, error.message);
         }
       }
+    }
+    
+    if (waitingSigners.length > 0) {
+      console.log(`⏳ ${waitingSigners.length} signers waiting for previous signers to complete`);
     }
 
     await auditService.record({
@@ -705,6 +725,109 @@ class SignRequestsService {
     }
 
     return { success: true };
+  }
+
+  /**
+   * Delete sign request (draft only)
+   */
+  async deleteSignRequest(id: number, tenantId: number, userId: number) {
+    const signRequest = await this.getSignRequest(id, tenantId);
+
+    // Only allow deleting draft sign requests
+    if (signRequest.status !== 'draft') {
+      throw ApiError.badRequest(
+        'Chỉ có thể xóa văn bản ở trạng thái nháp',
+        'SIGN_REQUEST_DELETE_DENIED'
+      );
+    }
+
+    // Delete all related data
+    // 1. Delete fields
+    await prisma.sign_request_fields.deleteMany({
+      where: { sign_request_id: id }
+    });
+
+    // 2. Delete signers
+    await prisma.signers.deleteMany({
+      where: { sign_request_id: id }
+    });
+
+    // 3. Delete sign request
+    await prisma.sign_requests.delete({
+      where: { id }
+    });
+
+    // Audit log
+    await auditService.record({
+      tenantId,
+      documentId: signRequest.document_id,
+      event: 'sign.deleted',
+      userId,
+    });
+
+    return { deleted: true };
+  }
+
+  /**
+   * Revoke completed internal document
+   * Reset to draft status for re-signing
+   */
+  async revokeSignRequest(id: number, tenantId: number, userId: number) {
+    const signRequest = await this.getSignRequest(id, tenantId);
+
+    // Only allow revoking completed sign requests
+    if (signRequest.status !== 'completed') {
+      throw ApiError.badRequest(
+        'Chỉ có thể thu hồi văn bản đã hoàn thành',
+        'SIGN_REQUEST_REVOKE_DENIED'
+      );
+    }
+
+    // Check if all signers are internal
+    const signers = await signersRepository.findBySignRequest(id);
+    const hasExternalSigners = signers.some(s => !s.is_internal);
+    
+    if (hasExternalSigners) {
+      throw ApiError.badRequest(
+        'Không thể thu hồi văn bản có người ký bên ngoài',
+        'SIGN_REQUEST_REVOKE_EXTERNAL_DENIED'
+      );
+    }
+
+    // Reset all signers to pending status
+    for (const signer of signers) {
+      await signersRepository.update(signer.id, {
+        status: 'pending',
+        signed_at: null,
+        signature_data: null,
+        signature_type: null,
+        ip_address: null,
+        user_agent: null,
+        otp: null,
+        otp_expire: null,
+        signing_token: null
+      });
+    }
+
+    // Update sign request status back to draft
+    await signRequestsRepository.updateStatus(id, tenantId, 'draft');
+
+    // Update document status back to draft
+    if (signRequest.document_id) {
+      await documentsRepository.update(signRequest.document_id, {
+        status: 'draft',
+      });
+    }
+
+    // Audit log
+    await auditService.record({
+      tenantId,
+      documentId: signRequest.document_id,
+      event: 'sign.revoked',
+      userId,
+    });
+
+    return this.getSignRequest(id, tenantId);
   }
 }
 

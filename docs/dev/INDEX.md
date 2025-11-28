@@ -1,241 +1,267 @@
 # 📚 Development Documentation Index
 
-**Last Updated**: 2025-11-20  
-**Purpose**: Quick navigation to all development documentation
+> **Quick navigation** cho tất cả development docs
 
 ---
 
-## 🚀 Start Here
+## 🎯 Start Here
 
-### For New Developers / AI Assistants
-1. **[HANDOFF-TO-DEV2.md](HANDOFF-TO-DEV2.md)** ⭐ START HERE!
-   - Quick summary of current status
-   - How to get started
-   - What to read next
-   - Testing checklist
-
-2. **[../../START-HERE-FOR-AI.md](../../START-HERE-FOR-AI.md)**
-   - Onboarding guide for AI assistants
-   - Critical patterns and rules
-   - Common pitfalls to avoid
-
-3. **[../../LESSONS-LEARNED.md](../../LESSONS-LEARNED.md)**
-   - Critical lessons from development
-   - Common mistakes and solutions
-   - Best practices
-
----
-
-## 📋 Session Reports
-
-### Phase 1 Sessions
-1. **[SESSION-2025-11-18-PHASE1-SESSION1.md](SESSION-2025-11-18-PHASE1-SESSION1.md)**
-   - Date: 2025-11-18
-   - Duration: 1 hour
-   - Focus: Document types & numbering backend
-   - Status: Complete ✅
-
-2. **[SESSION-2025-11-19-PHASE1-SESSION2.md](SESSION-2025-11-19-PHASE1-SESSION2.md)**
-   - Date: 2025-11-19
-   - Duration: 1 hour
-   - Focus: Integration & external orgs
-   - Status: Complete ✅
-
-3. **Session 2025-11-19 Night** (documented in AGENTS.md)
-   - Duration: 3 hours
-   - Focus: UI/UX improvements & RBAC
-   - Status: Complete ✅
-
-4. **[SESSION-2025-11-20-CRUD-COMPLETE.md](SESSION-2025-11-20-CRUD-COMPLETE.md)**
-   - Date: 2025-11-20
-   - Duration: 30 minutes
-   - Focus: Complete missing CRUD operations
-   - Status: Complete ✅
-
-### Phase 1 Summary
-- **[PHASE-1-FINAL-STATUS.md](PHASE-1-FINAL-STATUS.md)** ⭐ IMPORTANT!
-  - Complete overview of Phase 1
-  - All features and statistics
-  - Success metrics
-  - Next steps
-
----
-
-## 🗺️ Architecture & Planning
-
-### Architecture
-- **[../../CODE-MAP.md](../../CODE-MAP.md)** ⭐ ESSENTIAL!
-  - Complete code structure guide
-  - Module patterns
-  - UI patterns
-  - Quick reference
-
-### Planning
-- **[../../PHASE-1-PLAN.md](../../PHASE-1-PLAN.md)** - Phase 1 plan (COMPLETE ✅)
-- **[../../PHASE-2-PLAN.md](../../PHASE-2-PLAN.md)** - Phase 2 plan (NEXT)
-- **[../../ROADMAP-E-OFFICE.md](../../ROADMAP-E-OFFICE.md)** - 7-phase roadmap
-
-### Requirements
-- **[../../ERD.md](../../ERD.md)** - Database schema
-- **[../../FUNCTIONAL_SPEC.md](../../FUNCTIONAL_SPEC.md)** - Functional requirements
-- **[../../SYSTEM-COMPARISON.md](../../SYSTEM-COMPARISON.md)** - Current vs target
-
----
-
-## 🧪 Testing
-
-### Testing Guides
-- **[../../TEST-CRUD-COMPLETE.md](../../TEST-CRUD-COMPLETE.md)** - CRUD testing checklist
-- **[../testing-guide.md](../testing-guide.md)** - General testing guide
-- **[../../test-api.http](../../test-api.http)** - REST Client test cases
-
-### Test Scripts
-- **[../../backend/scripts/test-basic-flow.ts](../../backend/scripts/test-basic-flow.ts)** - Automated test script
-
----
-
-## 📝 Development Logs
-
-### Main Log
-- **[../../AGENTS.md](../../AGENTS.md)** ⭐ COMPLETE HISTORY!
-  - Full development history
-  - All sessions logged
-  - Current status
-  - Next steps
+### New Developers
+1. **[DEVELOPMENT-RULES.md](DEVELOPMENT-RULES.md)** - ⭐ ĐỌC ĐẦU TIÊN - Quy tắc bắt buộc
+2. **[LESSONS-LEARNED.md](LESSONS-LEARNED.md)** - ⭐ Học từ lỗi đã fix
+3. **[ERROR-HANDLING-GUIDE.md](ERROR-HANDLING-GUIDE.md)** - Error handling patterns
+4. **[UI-TESTING-GUIDE.md](UI-TESTING-GUIDE.md)** - UI testing strategies
 
 ### Quick References
-- **[../../TODO-URGENT.md](../../TODO-URGENT.md)** - Urgent tasks (COMPLETE ✅)
-- **[../../README.md](../../README.md)** - Project overview
+- **[WORKFLOW-MODES-QUICK-REF.md](WORKFLOW-MODES-QUICK-REF.md)** - 4 workflow modes
+- **[DOCUMENT-VISIBILITY-QUICK-REF.md](DOCUMENT-VISIBILITY-QUICK-REF.md)** - Access control
+- **[NUMBERING-RULES-EXPLAINED.md](NUMBERING-RULES-EXPLAINED.md)** - Auto-numbering system
 
 ---
 
-## 🎨 UI/UX Documentation
+## 📁 Documentation Structure
 
-### UI Refactoring
-- **[UI_Refactor_Request.MD](UI_Refactor_Request.MD)** - UI refactoring notes
-
-### Component Library
-- **shadcn/ui components** in `frontend/components/ui/`
-  - Button, Dialog, Card, Badge, Input, Label, Textarea, Alert
-
----
-
-## 📊 Quick Stats
-
-### Phase 1 (COMPLETE ✅)
-- **Duration**: ~5.5 hours (4 sessions)
-- **Backend files**: 18 files
-- **Frontend pages**: 5 pages (full CRUD)
-- **Database tables**: 6 new tables
-- **API endpoints**: 30+ endpoints
-- **Lines of code**: ~2,500 lines
-- **Status**: 100% Complete
-
-### Modules Completed
-1. ✅ Departments (full CRUD)
-2. ✅ Roles (full CRUD)
-3. ✅ Users (full CRUD)
-4. ✅ External Organizations (full CRUD)
-5. ✅ Document Types (full CRUD)
-6. ✅ Numbering Rules (API only)
-
----
-
-## 🔜 What's Next?
-
-### Phase 2: Workflow Engine
-- **Duration**: 2 weeks (20 hours)
-- **Features**: 
-  - Workflow templates
-  - Multi-step approval
-  - Deadline tracking
-  - Workflow builder UI
-- **Plan**: [PHASE-2-PLAN.md](../../PHASE-2-PLAN.md)
+```
+docs/dev/
+├── 🎯 Core Rules (READ FIRST)
+│   ├── DEVELOPMENT-RULES.md          ⭐ Quy tắc bắt buộc
+│   ├── LESSONS-LEARNED.md            ⭐ Bài học từ bugs
+│   └── INDEX.md                      📚 File này
+│
+├── 📖 Guides
+│   ├── ERROR-HANDLING-GUIDE.md
+│   ├── UI-TESTING-GUIDE.md
+│   ├── QUICK-START-*.md
+│   └── *-GUIDE.md
+│
+├── 🎨 Features
+│   ├── FEATURE-*.md                  Feature specs
+│   ├── WORKFLOW-*.md                 Workflow related
+│   └── TASK-*.md                     Task specs
+│
+├── 📝 Sessions
+│   ├── SESSION-2025-11-*.md          Session logs
+│   └── SESSION-2025-12-*.md
+│
+├── 🐛 Issues & Solutions
+│   ├── ISSUE-*.md                    Issue analysis
+│   ├── SOLUTION-*.md                 Solutions
+│   └── FIX-*.md                      Bug fixes
+│
+├── 📊 Reports
+│   ├── PHASE-*-COMPLETE-REPORT.md    Phase reports
+│   ├── *-SUMMARY.md                  Summaries
+│   └── REFACTOR-*.md                 Refactor reports
+│
+└── 🗄️ Archive
+    └── [old/deprecated docs]
+```
 
 ---
 
-## 📖 Reading Order for New Developers
+## 📖 By Category
 
-### Day 1: Understanding (2 hours)
-1. [HANDOFF-TO-DEV2.md](HANDOFF-TO-DEV2.md) - 15 min
-2. [../../AGENTS.md](../../AGENTS.md) - 30 min
-3. [../../CODE-MAP.md](../../CODE-MAP.md) - 30 min
-4. [../../LESSONS-LEARNED.md](../../LESSONS-LEARNED.md) - 15 min
-5. [PHASE-1-FINAL-STATUS.md](PHASE-1-FINAL-STATUS.md) - 30 min
+### 🎯 Core Documentation
 
-### Day 1: Testing (1 hour)
-1. Start services (backend, frontend, database)
-2. Test all CRUD operations using [TEST-CRUD-COMPLETE.md](../../TEST-CRUD-COMPLETE.md)
-3. Try REST Client tests in [test-api.http](../../test-api.http)
+**Must Read**:
+- [DEVELOPMENT-RULES.md](DEVELOPMENT-RULES.md) - Development rules (MANDATORY)
+- [LESSONS-LEARNED.md](LESSONS-LEARNED.md) - Lessons from bugs (MANDATORY)
 
-### Day 2: Planning (1 hour)
-1. [../../PHASE-2-PLAN.md](../../PHASE-2-PLAN.md) - 30 min
-2. [../../ERD.md](../../ERD.md) - 20 min
-3. [../../FUNCTIONAL_SPEC.md](../../FUNCTIONAL_SPEC.md) - 10 min
+**Architecture**:
+- [WORKFLOW-SYSTEM-COMPLETE-DESIGN.md](WORKFLOW-SYSTEM-COMPLETE-DESIGN.md)
+- [PHASE-2-BACKEND-IMPLEMENTATION-GUIDE.md](PHASE-2-BACKEND-IMPLEMENTATION-GUIDE.md)
 
-### Day 2: Start Coding
-1. Follow patterns from Phase 1
-2. Create new modules using same structure
-3. Document as you go
+**Quick References**:
+- [WORKFLOW-MODES-QUICK-REF.md](WORKFLOW-MODES-QUICK-REF.md)
+- [DOCUMENT-VISIBILITY-QUICK-REF.md](DOCUMENT-VISIBILITY-QUICK-REF.md)
+- [NUMBERING-RULES-EXPLAINED.md](NUMBERING-RULES-EXPLAINED.md)
 
 ---
 
-## 💡 Tips
+### 📖 Guides & How-Tos
 
-### For AI Assistants
-1. **Always read AGENTS.md first** - It has the complete history
-2. **Follow established patterns** - Don't reinvent the wheel
-3. **Use fetchJson** - Don't handle tokens manually
-4. **Use toast** - Not alert()
-5. **Document everything** - Update AGENTS.md with progress
+**Testing**:
+- [UI-TESTING-GUIDE.md](UI-TESTING-GUIDE.md)
+- [PHASE-1-UI-TEST-CHECKLIST.md](PHASE-1-UI-TEST-CHECKLIST.md)
 
-### For Human Developers
-1. **Read the handoff doc first** - [HANDOFF-TO-DEV2.md](HANDOFF-TO-DEV2.md)
-2. **Test before coding** - Understand what's already there
-3. **Follow the patterns** - Look at existing code
-4. **Ask questions** - Check LESSONS-LEARNED.md first
-5. **Keep docs updated** - Future you will thank you
+**Error Handling**:
+- [ERROR-HANDLING-GUIDE.md](ERROR-HANDLING-GUIDE.md)
+
+**Quick Starts**:
+- [QUICK-START-WORKFLOW-FRONTEND.md](QUICK-START-WORKFLOW-FRONTEND.md)
 
 ---
 
-## 🔍 Quick Search
+### 🎨 Feature Specifications
 
-### Find a Module
-- Backend: `backend/src/modules/{module-name}/`
-- Frontend: `frontend/app/(dashboard)/{page-name}/page.tsx`
+**Workflow System**:
+- [FEATURE-FLEXIBLE-WORKFLOW-FINAL.md](FEATURE-FLEXIBLE-WORKFLOW-FINAL.md)
+- [FEATURE-ADHOC-WORKFLOW.md](FEATURE-ADHOC-WORKFLOW.md)
+- [FEATURE-PARALLEL-APPROVAL-PLAN.md](FEATURE-PARALLEL-APPROVAL-PLAN.md)
 
-### Find Documentation
-- Session reports: `docs/dev/SESSION-*.md`
-- Planning: `PHASE-*.md` in root
-- Architecture: `CODE-MAP.md`, `ERD.md`
-- Testing: `TEST-*.md`, `test-api.http`
+**Document Management**:
+- [FEATURE-DOCUMENT-MANAGEMENT-ENHANCEMENT.md](FEATURE-DOCUMENT-MANAGEMENT-ENHANCEMENT.md)
+- [TASK-DOCUMENT-VISIBILITY-COMPLETE.md](TASK-DOCUMENT-VISIBILITY-COMPLETE.md)
+- [TASK-DOCUMENT-FILE-PATH-HARDENING-COMPLETE.md](TASK-DOCUMENT-FILE-PATH-HARDENING-COMPLETE.md)
 
-### Find Examples
-- CRUD pattern: `frontend/app/(dashboard)/users/page.tsx`
-- Backend module: `backend/src/modules/users/`
-- API routes: `backend/src/router/v1.ts`
+**User Management**:
+- [FEATURE-POSITIONS-COMPLETE.md](FEATURE-POSITIONS-COMPLETE.md)
+- [FEATURE-USER-POSITION-MANAGER-COMPLETE.md](FEATURE-USER-POSITION-MANAGER-COMPLETE.md)
+- [FEATURE-POSITIONS-PLAN.md](FEATURE-POSITIONS-PLAN.md)
+- [FEATURE-MANAGER-FIELD.md](FEATURE-MANAGER-FIELD.md)
+
+**UI Features**:
+- [FEATURE-SUBMIT-FOR-APPROVAL-UI.md](FEATURE-SUBMIT-FOR-APPROVAL-UI.md)
+- [FEATURE-ASSIGN-PERMISSIONS-TO-ROLE.md](FEATURE-ASSIGN-PERMISSIONS-TO-ROLE.md)
+- [FEATURE-REMOVE-PERMISSION-FROM-ROLE.md](FEATURE-REMOVE-PERMISSION-FROM-ROLE.md)
+- [FEATURE-LOGIN-ERROR-HANDLING.md](FEATURE-LOGIN-ERROR-HANDLING.md)
+- [FEATURE-MENU-PERMISSIONS.md](FEATURE-MENU-PERMISSIONS.md)
+- [FIX-DIALOG-RESPONSIVE.md](FIX-DIALOG-RESPONSIVE.md)
+
+---
+
+### 📝 Session Logs
+
+**November 2025**:
+- [SESSION-2025-11-21-WORKFLOW-SYSTEM-IMPLEMENTATION.md](SESSION-2025-11-21-WORKFLOW-SYSTEM-IMPLEMENTATION.md)
+- [SESSION-2025-11-21-WORKFLOW-BACKEND-COMPLETE.md](SESSION-2025-11-21-WORKFLOW-BACKEND-COMPLETE.md)
+- [SESSION-2025-11-21-WORKFLOW-FRONTEND-COMPLETE.md](SESSION-2025-11-21-WORKFLOW-FRONTEND-COMPLETE.md)
+- [SESSION-2025-11-21-POSITIONS-MANAGER-TESTING.md](SESSION-2025-11-21-POSITIONS-MANAGER-TESTING.md)
+- [SESSION-2025-11-21-FINAL-SUMMARY.md](SESSION-2025-11-21-FINAL-SUMMARY.md)
+- [SESSION-2025-11-20-PHASE-2-START.md](SESSION-2025-11-20-PHASE-2-START.md)
+- [SESSION-2025-11-20-PHASE-2-DAY5-COMPLETE.md](SESSION-2025-11-20-PHASE-2-DAY5-COMPLETE.md)
+- [SESSION-2025-11-20-PHASE-2-DAY6-START.md](SESSION-2025-11-20-PHASE-2-DAY6-START.md)
+- [SESSION-2025-11-20-DOCUMENT-VISIBILITY.md](SESSION-2025-11-20-DOCUMENT-VISIBILITY.md)
+- [SESSION-2025-11-20-UI-REFACTOR-START.md](SESSION-2025-11-20-UI-REFACTOR-START.md)
+- [SESSION-2025-11-20-UI-REFACTOR-COMPLETE.md](SESSION-2025-11-20-UI-REFACTOR-COMPLETE.md)
+- [SESSION-2025-11-20-UI-POLISH.md](SESSION-2025-11-20-UI-POLISH.md)
+- [SESSION-2025-11-20-FINAL-SUMMARY.md](SESSION-2025-11-20-FINAL-SUMMARY.md)
+- [SESSION-2025-11-19-FIX-INVALID-TOKEN.md](SESSION-2025-11-19-FIX-INVALID-TOKEN.md)
+- [SESSION-FIX-INVALID-TOKEN.md](SESSION-FIX-INVALID-TOKEN.md)
+
+---
+
+### 🐛 Issues & Solutions
+
+**Workflow Issues**:
+- [ISSUE-CUSTOMIZED-WORKFLOW-ORDER.md](ISSUE-CUSTOMIZED-WORKFLOW-ORDER.md)
+- [ISSUE-NO-SIGNERS-IN-EDITOR.md](ISSUE-NO-SIGNERS-IN-EDITOR.md)
+- [SOLUTION-WORKFLOW-PARTICIPANT-ROLE.md](SOLUTION-WORKFLOW-PARTICIPANT-ROLE.md)
+
+**Signing Issues**:
+- [FIX-OTP-EXPIRY-ERROR-HANDLING.md](FIX-OTP-EXPIRY-ERROR-HANDLING.md)
+- [FIX-PREMATURE-EMAIL-SENDING.md](FIX-PREMATURE-EMAIL-SENDING.md)
+
+---
+
+### 📊 Reports & Summaries
+
+**Phase Reports**:
+- [PHASE-1-COMPLETE-REPORT.md](PHASE-1-COMPLETE-REPORT.md)
+- [PHASE-1-VERIFICATION-COMPLETE.md](PHASE-1-VERIFICATION-COMPLETE.md)
+- [PHASE-1-FINAL-CHECKLIST.md](PHASE-1-FINAL-CHECKLIST.md)
+
+**Summaries**:
+- [WORKFLOW-SYSTEM-SUMMARY.md](WORKFLOW-SYSTEM-SUMMARY.md)
+- [REFACTOR-SUMMARY.md](REFACTOR-SUMMARY.md)
+- [SUMMARY-FOR-GPT-REVIEW.md](SUMMARY-FOR-GPT-REVIEW.md)
+
+**Analysis**:
+- [APPROVAL-SIGNING-FLOW-REVIEW.md](APPROVAL-SIGNING-FLOW-REVIEW.md)
+- [DB-NAMING-REVIEW.md](DB-NAMING-REVIEW.md)
+- [WORKFLOW-ORDER-DIAGRAM.md](WORKFLOW-ORDER-DIAGRAM.md)
+
+**Integration Reports**:
+- [REPORT-EXTERNAL-ORGS-MODULE.md](REPORT-EXTERNAL-ORGS-MODULE.md)
+- [REPORT-INTEGRATE-DOCUMENT-TYPES-NUMBERING-kiro.md](REPORT-INTEGRATE-DOCUMENT-TYPES-NUMBERING-kiro.md)
+- [TASK-INTEGRATE-DOCUMENT-TYPES-NUMBERING-COMPLETE.md](TASK-INTEGRATE-DOCUMENT-TYPES-NUMBERING-COMPLETE.md)
+
+---
+
+## 🔍 By Topic
+
+### Workflow System
+- [WORKFLOW-SYSTEM-COMPLETE-DESIGN.md](WORKFLOW-SYSTEM-COMPLETE-DESIGN.md)
+- [WORKFLOW-SYSTEM-SUMMARY.md](WORKFLOW-SYSTEM-SUMMARY.md)
+- [WORKFLOW-MODES-QUICK-REF.md](WORKFLOW-MODES-QUICK-REF.md)
+- [WORKFLOW-ORDER-DIAGRAM.md](WORKFLOW-ORDER-DIAGRAM.md)
+- [FEATURE-FLEXIBLE-WORKFLOW-FINAL.md](FEATURE-FLEXIBLE-WORKFLOW-FINAL.md)
+- [FEATURE-ADHOC-WORKFLOW.md](FEATURE-ADHOC-WORKFLOW.md)
+- [FEATURE-PARALLEL-APPROVAL-PLAN.md](FEATURE-PARALLEL-APPROVAL-PLAN.md)
+
+### Document Management
+- [FEATURE-DOCUMENT-MANAGEMENT-ENHANCEMENT.md](FEATURE-DOCUMENT-MANAGEMENT-ENHANCEMENT.md)
+- [TASK-DOCUMENT-VISIBILITY-COMPLETE.md](TASK-DOCUMENT-VISIBILITY-COMPLETE.md)
+- [DOCUMENT-VISIBILITY-QUICK-REF.md](DOCUMENT-VISIBILITY-QUICK-REF.md)
+- [TASK-DOCUMENT-FILE-PATH-HARDENING-COMPLETE.md](TASK-DOCUMENT-FILE-PATH-HARDENING-COMPLETE.md)
+- [NUMBERING-RULES-EXPLAINED.md](NUMBERING-RULES-EXPLAINED.md)
+
+### User & Permissions
+- [FEATURE-POSITIONS-COMPLETE.md](FEATURE-POSITIONS-COMPLETE.md)
+- [FEATURE-USER-POSITION-MANAGER-COMPLETE.md](FEATURE-USER-POSITION-MANAGER-COMPLETE.md)
+- [FEATURE-MENU-PERMISSIONS.md](FEATURE-MENU-PERMISSIONS.md)
+- [FEATURE-ASSIGN-PERMISSIONS-TO-ROLE.md](FEATURE-ASSIGN-PERMISSIONS-TO-ROLE.md)
+- [FEATURE-REMOVE-PERMISSION-FROM-ROLE.md](FEATURE-REMOVE-PERMISSION-FROM-ROLE.md)
+
+### UI/UX
+- [UI-TESTING-GUIDE.md](UI-TESTING-GUIDE.md)
+- [UI_Refactor_Request.MD](UI_Refactor_Request.MD)
+- [FEATURE-LOGIN-ERROR-HANDLING.md](FEATURE-LOGIN-ERROR-HANDLING.md)
+- [FIX-DIALOG-RESPONSIVE.md](FIX-DIALOG-RESPONSIVE.md)
+
+### Testing
+- [UI-TESTING-GUIDE.md](UI-TESTING-GUIDE.md)
+- [PHASE-1-UI-TEST-CHECKLIST.md](PHASE-1-UI-TEST-CHECKLIST.md)
+- [WORKFLOW-REFACTOR-TEST-CHECKLIST.md](WORKFLOW-REFACTOR-TEST-CHECKLIST.md)
+
+---
+
+## 📅 Recent Updates
+
+**2025-11-28**:
+- ✅ Created DEVELOPMENT-RULES.md
+- ✅ Created LESSONS-LEARNED.md
+- ✅ Created INDEX.md (this file)
+- ✅ Organized documentation structure
+
+**2025-11-27**:
+- ✅ Workflow order refactor complete
+- ✅ Added participant_role field
+- ✅ Fixed signing order conflicts
+
+**2025-11-21**:
+- ✅ Workflow system implementation complete
+- ✅ Frontend workflow pages complete
+- ✅ Positions & manager features complete
+
+**2025-11-20**:
+- ✅ Phase 2 backend complete
+- ✅ UI refactor complete
+- ✅ Document visibility complete
+
+---
+
+## 🎯 TODO
+
+### Documentation Tasks
+- [ ] Migrate old session logs to `sessions/` folder
+- [ ] Create feature category folders
+- [ ] Add more examples to LESSONS-LEARNED.md
+- [ ] Create video tutorials for complex features
+
+### Code Tasks
+- [ ] See `docs/dev/TODO-*.md` files
 
 ---
 
 ## 📞 Need Help?
 
-### Documentation Issues
-- Check [../../LESSONS-LEARNED.md](../../LESSONS-LEARNED.md) for common issues
-- Look at existing code for examples
-- Read session reports for context
-
-### Code Issues
-- Check [../../CODE-MAP.md](../../CODE-MAP.md) for patterns
-- Look at similar modules
-- Test with [test-api.http](../../test-api.http)
-
-### Planning Questions
-- Read [../../PHASE-2-PLAN.md](../../PHASE-2-PLAN.md)
-- Check [../../FUNCTIONAL_SPEC.md](../../FUNCTIONAL_SPEC.md)
-- Review [../../ERD.md](../../ERD.md)
+1. **Search this index** for relevant docs
+2. **Check LESSONS-LEARNED.md** for similar issues
+3. **Read DEVELOPMENT-RULES.md** for guidelines
+4. **Ask in team chat** if still stuck
 
 ---
 
-**Last Updated**: 2025-11-20  
-**Status**: Phase 1 Complete ✅  
-**Next**: Phase 2 - Workflow Engine
+**Last Updated**: 2025-11-28  
+**Maintained By**: Development Team

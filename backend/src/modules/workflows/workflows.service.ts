@@ -216,6 +216,10 @@ class WorkflowsService {
       step_name: string;
       approver_type: string;
       approver_id?: number;
+      approver_user_id?: number;
+      approver_role_id?: number;
+      approver_department_id?: number;
+      participant_role?: 'approver' | 'signer';
       due_in_days?: number;
       is_required?: boolean;
       conditions?: any;
@@ -231,6 +235,16 @@ class WorkflowsService {
       throw ApiError.badRequest('Invalid approver type', 'INVALID_APPROVER_TYPE');
     }
 
+    // Map specific approver IDs to generic approver_id
+    let approverId = data.approver_id;
+    if (data.approver_type === 'user' && data.approver_user_id) {
+      approverId = data.approver_user_id;
+    } else if (data.approver_type === 'role' && data.approver_role_id) {
+      approverId = data.approver_role_id;
+    } else if (data.approver_type === 'department' && data.approver_department_id) {
+      approverId = data.approver_department_id;
+    }
+
     // Get next step order
     const existingSteps = await workflowsRepository.findSteps(workflowId);
     const nextOrder = existingSteps.length > 0
@@ -240,7 +254,13 @@ class WorkflowsService {
     return workflowsRepository.createStep({
       workflow_id: workflowId,
       step_order: nextOrder,
-      ...data,
+      step_name: data.step_name,
+      approver_type: data.approver_type,
+      approver_id: approverId,
+      participant_role: data.participant_role || 'approver',
+      due_in_days: data.due_in_days,
+      is_required: data.is_required,
+      conditions: data.conditions,
     });
   }
 
@@ -250,6 +270,10 @@ class WorkflowsService {
       step_name?: string;
       approver_type?: string;
       approver_id?: number;
+      approver_user_id?: number;
+      approver_role_id?: number;
+      approver_department_id?: number;
+      participant_role?: 'approver' | 'signer';
       due_in_days?: number;
       is_required?: boolean;
       conditions?: any;
@@ -272,7 +296,25 @@ class WorkflowsService {
       }
     }
 
-    return workflowsRepository.updateStep(stepId, data);
+    // Map specific approver IDs to generic approver_id
+    let approverId = data.approver_id;
+    if (data.approver_type === 'user' && data.approver_user_id) {
+      approverId = data.approver_user_id;
+    } else if (data.approver_type === 'role' && data.approver_role_id) {
+      approverId = data.approver_role_id;
+    } else if (data.approver_type === 'department' && data.approver_department_id) {
+      approverId = data.approver_department_id;
+    }
+
+    return workflowsRepository.updateStep(stepId, {
+      step_name: data.step_name,
+      approver_type: data.approver_type,
+      approver_id: approverId,
+      participant_role: data.participant_role,
+      due_in_days: data.due_in_days,
+      is_required: data.is_required,
+      conditions: data.conditions,
+    });
   }
 
   async deleteWorkflowStep(stepId: number, tenantId: number) {

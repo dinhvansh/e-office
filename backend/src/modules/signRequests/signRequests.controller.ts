@@ -37,10 +37,10 @@ export class SignRequestsController {
     );
     
     // Calculate progress for each request
-    const requestsWithProgress = signRequests.map(sr => {
-      const totalSigners = sr.signers.length;
-      const signedCount = sr.signers.filter(s => s.status === 'signed' || s.status === 'completed').length;
-      const rejectedCount = sr.signers.filter(s => s.status === 'rejected').length;
+    const requestsWithProgress = signRequests.map((sr: any) => {
+      const totalSigners = sr.signers?.length || 0;
+      const signedCount = sr.signers?.filter((s: any) => s.status === 'signed' || s.status === 'completed').length || 0;
+      const rejectedCount = sr.signers?.filter((s: any) => s.status === 'rejected').length || 0;
       
       return {
         ...sr,
@@ -74,12 +74,6 @@ export class SignRequestsController {
     const id = idSchema.parse(req.params.id);
     const signRequest = await signRequestsService.getSignRequest(id, req.auth!.tenantId);
     res.json(ok({ sign_request: signRequest }));
-  };
-
-  cancel = async (req: Request, res: Response): Promise<void> => {
-    const id = idSchema.parse(req.params.id);
-    await signRequestsService.cancelSignRequest(id, req.auth!.tenantId, req.auth!.userId);
-    res.json(ok({ cancelled: true }));
   };
 
   // Signers Management
@@ -270,6 +264,32 @@ export class SignRequestsController {
       reason
     );
     res.json(ok({ sign_request: signRequest }));
+  };
+
+  // Delete sign request (draft only)
+  delete = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id);
+    
+    // Check if draft
+    const signRequest = await signRequestsService.getSignRequest(id, req.auth!.tenantId);
+    if (signRequest.status !== 'draft') {
+      res.status(400).json({
+        success: false,
+        error: 'Chỉ có thể xóa văn bản ở trạng thái nháp',
+      });
+      return;
+    }
+    
+    await signRequestsService.deleteSignRequest(id, req.auth!.tenantId, req.auth!.userId);
+    res.json(ok({ deleted: true }));
+  };
+
+  // Revoke completed internal document
+  revoke = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id);
+    
+    await signRequestsService.revokeSignRequest(id, req.auth!.tenantId, req.auth!.userId);
+    res.json(ok({ revoked: true }));
   };
 
   // Internal Signing (no OTP required)

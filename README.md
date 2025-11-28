@@ -248,7 +248,11 @@ cd frontend && npm run build
 
 ## 🤝 Contributing
 
-See [docs/dev/AGENTS.md](docs/dev/AGENTS.md) for development guidelines.
+### Development Guidelines
+- **[docs/dev/DEVELOPMENT-RULES.md](docs/dev/DEVELOPMENT-RULES.md)** - ⭐ Quy tắc bắt buộc (MANDATORY)
+- **[docs/dev/LESSONS-LEARNED.md](docs/dev/LESSONS-LEARNED.md)** - ⭐ Học từ lỗi đã fix
+- **[docs/dev/INDEX.md](docs/dev/INDEX.md)** - 📚 Documentation index
+- **[docs/archive/agents.md](docs/archive/agents.md)** - AI development log (archived)
 
 ## 📞 Support
 

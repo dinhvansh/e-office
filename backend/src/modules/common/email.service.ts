@@ -25,12 +25,17 @@ class EmailService {
     recipientEmail: string;
     recipientName: string;
     documentTitle: string;
+    documentNumber?: string; // ✅ Add document number
     senderName: string;
     message?: string;
     signUrl: string;
     otp: string;
     expiryMinutes: number;
   }): Promise<void> {
+    const docInfo = data.documentNumber 
+      ? `${data.documentTitle} (${data.documentNumber})`
+      : data.documentTitle;
+    
     const html = `
       <!DOCTYPE html>
       <html>
@@ -41,6 +46,7 @@ class EmailService {
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
           .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
           .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+          .doc-info { background: white; padding: 15px; border-left: 4px solid #667eea; margin: 15px 0; border-radius: 4px; }
           .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
           .otp-box { background: white; border: 2px dashed #667eea; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; }
           .otp-code { font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 8px; }
@@ -56,8 +62,11 @@ class EmailService {
           <div class="content">
             <p>Xin chào <strong>${data.recipientName}</strong>,</p>
             <p><strong>${data.senderName}</strong> đã gửi cho bạn yêu cầu ký tài liệu:</p>
-            <p><strong>Tài liệu:</strong> ${data.documentTitle}</p>
-            ${data.message ? `<p><strong>Lời nhắn:</strong> ${data.message}</p>` : ""}
+            <div class="doc-info">
+              <p style="margin: 0;"><strong>📄 Tài liệu:</strong> ${data.documentTitle}</p>
+              ${data.documentNumber ? `<p style="margin: 5px 0 0 0; color: #666;"><strong>🔢 Mã số:</strong> ${data.documentNumber}</p>` : ''}
+            </div>
+            ${data.message ? `<p><strong>💬 Lời nhắn:</strong> ${data.message}</p>` : ""}
             
             <p>Vui lòng nhấn vào nút bên dưới để xem và ký tài liệu:</p>
             <a href="${data.signUrl}" class="button">Xem và ký tài liệu</a>
@@ -87,9 +96,9 @@ class EmailService {
 
     await sendEmail({
       to: data.recipientEmail,
-      subject: `Yêu cầu ký tài liệu: ${data.documentTitle}`,
+      subject: `Yêu cầu ký tài liệu: ${docInfo}`,
       html,
-      text: `Xin chào ${data.recipientName},\n\n${data.senderName} đã gửi cho bạn yêu cầu ký tài liệu: ${data.documentTitle}\n\nVui lòng truy cập: ${data.signUrl}\n\nMã OTP: ${data.otp}\n(Có hiệu lực trong ${data.expiryMinutes} phút)`,
+      text: `Xin chào ${data.recipientName},\n\n${data.senderName} đã gửi cho bạn yêu cầu ký tài liệu: ${docInfo}\n\nVui lòng truy cập: ${data.signUrl}\n\nMã OTP: ${data.otp}\n(Có hiệu lực trong ${data.expiryMinutes} phút)`,
     });
   }
 
@@ -97,10 +106,15 @@ class EmailService {
     recipientEmail: string;
     recipientName: string;
     documentTitle: string;
+    documentNumber?: string; // ✅ Add document number
     senderName: string;
     message?: string;
     signUrl: string;
   }): Promise<void> {
+    const docInfo = data.documentNumber 
+      ? `${data.documentTitle} (${data.documentNumber})`
+      : data.documentTitle;
+    
     const html = `
       <!DOCTYPE html>
       <html>
@@ -111,6 +125,7 @@ class EmailService {
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
           .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
           .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+          .doc-info { background: white; padding: 15px; border-left: 4px solid #667eea; margin: 15px 0; border-radius: 4px; }
           .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
           .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
         </style>
@@ -123,8 +138,11 @@ class EmailService {
           <div class="content">
             <p>Xin chào <strong>${data.recipientName}</strong>,</p>
             <p><strong>${data.senderName}</strong> đã gửi cho bạn yêu cầu ký tài liệu:</p>
-            <p><strong>Tài liệu:</strong> ${data.documentTitle}</p>
-            ${data.message ? `<p><strong>Lời nhắn:</strong> ${data.message}</p>` : ""}
+            <div class="doc-info">
+              <p style="margin: 0;"><strong>📄 Tài liệu:</strong> ${data.documentTitle}</p>
+              ${data.documentNumber ? `<p style="margin: 5px 0 0 0; color: #666;"><strong>🔢 Mã số:</strong> ${data.documentNumber}</p>` : ''}
+            </div>
+            ${data.message ? `<p><strong>💬 Lời nhắn:</strong> ${data.message}</p>` : ""}
             <p>Vui lòng nhấn vào nút bên dưới để xem và ký tài liệu:</p>
             <a href="${data.signUrl}" class="button">Xem và ký tài liệu</a>
             <p style="color: #666; font-size: 14px;">Hoặc copy link sau vào trình duyệt:<br>${data.signUrl}</p>
@@ -139,9 +157,9 @@ class EmailService {
 
     await sendEmail({
       to: data.recipientEmail,
-      subject: `Yêu cầu ký tài liệu: ${data.documentTitle}`,
+      subject: `Yêu cầu ký tài liệu: ${docInfo}`,
       html,
-      text: `Xin chào ${data.recipientName},\n\n${data.senderName} đã gửi cho bạn yêu cầu ký tài liệu: ${data.documentTitle}\n\nVui lòng truy cập: ${data.signUrl}`,
+      text: `Xin chào ${data.recipientName},\n\n${data.senderName} đã gửi cho bạn yêu cầu ký tài liệu: ${docInfo}\n\nVui lòng truy cập: ${data.signUrl}`,
     });
   }
 

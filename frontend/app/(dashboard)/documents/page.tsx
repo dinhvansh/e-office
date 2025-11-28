@@ -690,13 +690,24 @@ export default function DocumentsPage() {
                 )}
 
                 {/* Signers Section - Only show if digital signing is required (MOVED DOWN) */}
-                {selectedDocType?.require_digital_signing && (
-                  <SignersSection 
-                    signers={signers}
-                    onChange={setSigners}
-                    externalOrgs={externalOrgs || []}
-                  />
-                )}
+                {selectedDocType?.require_digital_signing && (() => {
+                  // ⭐ Count internal signers from workflow steps
+                  let internalSignersCount = 0;
+                  if (customizedSteps && customizedSteps.length > 0) {
+                    internalSignersCount = customizedSteps.filter(
+                      (step: any) => step.participant_role === 'signer'
+                    ).length;
+                  }
+                  
+                  return (
+                    <SignersSection 
+                      signers={signers}
+                      onChange={setSigners}
+                      externalOrgs={externalOrgs || []}
+                      internalSignersCount={internalSignersCount}
+                    />
+                  );
+                })()}
 
                 {/* CC Emails Section */}
                 <CCEmailsSection 

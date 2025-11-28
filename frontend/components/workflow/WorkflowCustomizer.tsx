@@ -49,7 +49,9 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
         step_name: `Bước ${customSteps.length + 1}`,
         approver_type: 'user',
         approver_id: users[0]?.id || '',
+        participant_role: 'approver', // ✅ Default to approver
         due_in_days: 3,
+        order: customSteps.length + 1, // ✅ Add order field
       },
     ]);
   };
@@ -113,11 +115,13 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
               if (customSteps.length === 0) {
                 // Initialize with default steps
                 setCustomSteps(
-                  defaultSteps.map((step: any) => ({
+                  defaultSteps.map((step: any, idx: number) => ({
                     step_name: step.step_name,
                     approver_type: step.approver_type,
                     approver_id: step.approver_id,
+                    participant_role: step.participant_role || 'approver', // ✅ Include role
                     due_in_days: step.due_in_days,
+                    order: idx + 1, // ✅ Add order field
                   }))
                 );
               }
@@ -168,6 +172,14 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
                 )}
                 
                 <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                  {/* ✅ Show participant role */}
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                    step.participant_role === 'signer' 
+                      ? 'bg-green-100 text-green-700' 
+                      : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {step.participant_role === 'signer' ? '✍️ Người ký' : '👤 Người phê duyệt'}
+                  </span>
                   <User className="w-3 h-3" />
                   <span>
                     {step.approver_type === 'user' && 'Người dùng'}
@@ -187,13 +199,26 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
       {/* Custom steps editor */}
       {!useDefault && (
         <div className="space-y-2">
+          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <p className="text-xs text-blue-700">
+              💡 <strong>Mẹo:</strong> Bạn có thể tùy chỉnh số thứ tự của mỗi bước bằng cách nhập vào ô số bên trái
+            </p>
+          </div>
           {customSteps.map((step, index) => (
             <div
               key={index}
               className="flex items-start gap-2 p-3 bg-white rounded-lg border border-gray-200"
             >
-              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-semibold">
-                {index + 1}
+              {/* ✅ Order input instead of fixed number */}
+              <div className="flex-shrink-0">
+                <input
+                  type="number"
+                  value={step.order || index + 1}
+                  onChange={(e) => handleUpdateStep(index, 'order', parseInt(e.target.value) || 1)}
+                  min="1"
+                  className="w-12 h-8 px-2 text-sm text-center border border-gray-300 rounded font-semibold text-blue-600"
+                  title="Số thứ tự"
+                />
               </div>
               <div className="flex-1 space-y-2">
                 <input
@@ -203,6 +228,19 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
                   placeholder="Tên bước"
                   className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                 />
+                
+                {/* ✅ NEW: Role selector */}
+                <div className="flex gap-2">
+                  <select
+                    value={step.participant_role || 'approver'}
+                    onChange={(e) => handleUpdateStep(index, 'participant_role', e.target.value)}
+                    className="px-2 py-1 text-sm border border-gray-300 rounded bg-white"
+                  >
+                    <option value="approver">👤 Người phê duyệt</option>
+                    <option value="signer">✍️ Người ký</option>
+                  </select>
+                </div>
+                
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <SearchableSelect
@@ -212,7 +250,7 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
                       }))}
                       value={step.approver_id || ''}
                       onChange={(value) => handleUpdateStep(index, 'approver_id', typeof value === 'string' ? parseInt(value) : value)}
-                      placeholder="-- Chọn người phê duyệt --"
+                      placeholder={step.participant_role === 'signer' ? '-- Chọn người ký --' : '-- Chọn người phê duyệt --'}
                     />
                   </div>
                   <input

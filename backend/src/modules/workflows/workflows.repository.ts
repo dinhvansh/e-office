@@ -105,6 +105,7 @@ export class WorkflowsRepository {
     step_name: string;
     approver_type: string;
     approver_id?: number;
+    participant_role?: string;
     due_in_days?: number;
     is_required?: boolean;
     conditions?: any;
@@ -119,6 +120,7 @@ export class WorkflowsRepository {
     step_name?: string;
     approver_type?: string;
     approver_id?: number;
+    participant_role?: string;
     due_in_days?: number;
     is_required?: boolean;
     conditions?: any;

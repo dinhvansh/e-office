@@ -9,4 +9,5 @@ publicSignRouter.get('/:token', asyncHandler(publicSignController.getSigningPage
 publicSignRouter.get('/:token/document', asyncHandler(publicSignController.getDocument));
 publicSignRouter.get('/:token/download-signed', asyncHandler(publicSignController.downloadSignedPdf));
 publicSignRouter.post('/:token/send-otp', asyncHandler(publicSignController.sendOtp));
+publicSignRouter.post('/:token/verify-otp', asyncHandler(publicSignController.verifyOtp));
 publicSignRouter.post('/:token/sign', asyncHandler(publicSignController.submitSignature));

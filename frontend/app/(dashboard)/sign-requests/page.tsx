@@ -1,14 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
-import { PenTool, Eye, Search, Edit, Upload, GitBranch } from 'lucide-react';
+import { PenTool, Eye, Search, Edit, Upload, GitBranch, MoreVertical, Trash2, XCircle, RotateCcw } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import ConfirmationDialog from '@/components/ui/confirmation-dialog';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
@@ -50,8 +58,23 @@ interface SignRequest {
 export default function SignRequestsPage() {
   const { fetchJson, user } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   // Copy signing link for external signers
   const handleCopySigningLink = async (request: SignRequest) => {
@@ -94,6 +117,82 @@ export default function SignRequestsPage() {
       console.error('Resend email error:', error);
       toast.error('Lỗi: ' + (error.message || 'Không thể gửi email'));
     }
+  };
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async ({ signRequestId, documentId }: { signRequestId: number; documentId: number }) => {
+      await fetchJson(`/sign-requests/${signRequestId}`, { method: 'DELETE' });
+      await fetchJson(`/documents/${documentId}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      toast.success('Đã xóa văn bản thành công!');
+      queryClient.invalidateQueries({ queryKey: ['my-sign-requests'] });
+    },
+    onError: (error: any) => {
+      toast.error('Lỗi: ' + (error.message || 'Không thể xóa văn bản'));
+    },
+  });
+
+  // Cancel mutation
+  const cancelMutation = useMutation({
+    mutationFn: async (signRequestId: number) => {
+      await fetchJson(`/sign-requests/${signRequestId}/cancel`, { method: 'POST' });
+    },
+    onSuccess: () => {
+      toast.success('Đã hủy luồng ký thành công!');
+      queryClient.invalidateQueries({ queryKey: ['my-sign-requests'] });
+    },
+    onError: (error: any) => {
+      toast.error('Lỗi: ' + (error.message || 'Không thể hủy luồng ký'));
+    },
+  });
+
+  // Revoke mutation
+  const revokeMutation = useMutation({
+    mutationFn: async (signRequestId: number) => {
+      await fetchJson(`/sign-requests/${signRequestId}/revoke`, { method: 'POST' });
+    },
+    onSuccess: () => {
+      toast.success('Đã thu hồi văn bản thành công!');
+      queryClient.invalidateQueries({ queryKey: ['my-sign-requests'] });
+    },
+    onError: (error: any) => {
+      toast.error('Lỗi: ' + (error.message || 'Không thể thu hồi văn bản'));
+    },
+  });
+
+  // Delete handler
+  const handleDelete = (signRequestId: number, documentId: number) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Xóa văn bản',
+      message: 'Bạn có chắc muốn xóa yêu cầu ký này?\n\nHành động này không thể hoàn tác!',
+      confirmText: 'Xóa',
+      onConfirm: () => deleteMutation.mutate({ signRequestId, documentId }),
+    });
+  };
+
+  // Cancel handler
+  const handleCancel = (signRequestId: number) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Hủy luồng ký',
+      message: 'Bạn có chắc muốn hủy luồng ký này?\n\nTất cả người ký sẽ không thể ký nữa!',
+      confirmText: 'Hủy luồng',
+      onConfirm: () => cancelMutation.mutate(signRequestId),
+    });
+  };
+
+  // Revoke handler
+  const handleRevoke = (signRequestId: number) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Thu hồi văn bản',
+      message: 'Bạn có chắc muốn thu hồi văn bản đã thanh lý?\n\nVăn bản sẽ chuyển về trạng thái nháp và cần ký lại!',
+      confirmText: 'Thu hồi',
+      onConfirm: () => revokeMutation.mutate(signRequestId),
+    });
   };
 
   // Check if current user is a pending internal signer
@@ -321,7 +420,7 @@ export default function SignRequestsPage() {
                         {getStatusBadge(request.progress, request.status)}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2 justify-center">
+                        <div className="flex items-center gap-1 justify-center">
                           {/* Edit Workflow Button - Show for draft documents */}
                           {request.status === 'draft' && (
                             <Button
@@ -330,8 +429,7 @@ export default function SignRequestsPage() {
                               title="Chỉnh sửa luồng ký"
                               className="bg-blue-600 hover:bg-blue-700 text-white"
                             >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Sửa
+                              <Edit className="w-4 h-4" />
                             </Button>
                           )}
                           
@@ -343,55 +441,105 @@ export default function SignRequestsPage() {
                               title="Ký ngay"
                               className="bg-green-600 hover:bg-green-700 text-white"
                             >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Ký ngay
+                              <PenTool className="w-4 h-4" />
                             </Button>
                           )}
 
-                          {/* View Flow Button - Show for all documents */}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => router.push(`/documents/${request.document.id}/flow`)}
-                            title="Xem luồng ký"
-                          >
-                            <GitBranch className="w-4 h-4 mr-1" />
-                            Xem luồng
-                          </Button>
-                          
                           {/* View Details Button */}
                           <Button
                             size="sm"
-                            variant="ghost"
+                            variant="outline"
                             onClick={() => router.push(`/sign-requests/${request.id}`)}
-                            title="Xem chi tiết"
+                            title="Xem luồng"
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
                           
-                          {/* External Signer Actions - Only show if has external signers */}
-                          {request.signers.some(s => !s.is_internal) && (
-                            <>
+                          {/* More Actions Dropdown */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleCopySigningLink(request)}
-                                title="Copy link ký (bên ngoài)"
-                                className="text-blue-600 hover:text-blue-700"
+                                className="h-8 w-8 p-0"
+                                disabled={deleteMutation.isPending || cancelMutation.isPending || revokeMutation.isPending}
                               >
-                                📋
+                                <MoreVertical className="w-4 h-4" />
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleResendEmail(request.id)}
-                                title="Gửi lại email (bên ngoài)"
-                                className="text-green-600 hover:text-green-700"
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              {/* Delete - Draft only */}
+                              {request.status === 'draft' && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => handleDelete(request.id, request.document.id)}
+                                    disabled={deleteMutation.isPending}
+                                    className="text-red-600 focus:text-red-600"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    {deleteMutation.isPending ? 'Đang xóa...' : 'Xóa văn bản'}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                </>
+                              )}
+
+                              {/* Cancel - Pending/In Progress only */}
+                              {(request.status === 'pending' || request.status === 'in_progress') && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => handleCancel(request.id)}
+                                    disabled={cancelMutation.isPending}
+                                    className="text-orange-600 focus:text-orange-600"
+                                  >
+                                    <XCircle className="w-4 h-4 mr-2" />
+                                    {cancelMutation.isPending ? 'Đang hủy...' : 'Hủy luồng ký'}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                </>
+                              )}
+
+                              {/* Revoke - Completed internal documents only */}
+                              {(request.status === 'completed' || request.progress.percentage === 100) && 
+                               request.signers.every(s => s.is_internal) && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => handleRevoke(request.id)}
+                                    disabled={revokeMutation.isPending}
+                                    className="text-purple-600 focus:text-purple-600"
+                                  >
+                                    <RotateCcw className="w-4 h-4 mr-2" />
+                                    {revokeMutation.isPending ? 'Đang thu hồi...' : 'Thu hồi văn bản'}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                </>
+                              )}
+
+                              {/* External Signer Actions */}
+                              {request.signers.some(s => !s.is_internal) && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => handleCopySigningLink(request)}
+                                  >
+                                    📋 Copy link ký
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleResendEmail(request.id)}
+                                  >
+                                    📧 Gửi lại email
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                </>
+                              )}
+
+                              {/* View Flow */}
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/documents/${request.document.id}/flow`)}
                               >
-                                📧
-                              </Button>
-                            </>
-                          )}
+                                <GitBranch className="w-4 h-4 mr-2" />
+                                Xem luồng chi tiết
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </td>
                     </tr>
@@ -408,6 +556,17 @@ export default function SignRequestsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        cancelText="Hủy"
+      />
     </div>
   );
 }

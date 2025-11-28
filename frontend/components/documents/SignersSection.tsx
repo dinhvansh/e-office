@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, User, Building2, GripVertical } from "lucide-react";
+import { Trash2, User, Building2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,12 +34,14 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const addSigner = (type: "manual" | "external") => {
+    const nextOrder = signers.length + 1;
+    
     const newSigner: Signer = {
       id: Date.now().toString(),
       type,
       email: "",
       name: "",
-      order: signers.length + 1,
+      order: nextOrder,
       role: "signer", // ✅ Default role
     };
     onChange([...signers, newSigner]);
@@ -215,46 +217,6 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
                     />
                   </div>
                 </div>
-                
-                {/* ✅ Role Selector */}
-                <div>
-                  <Label htmlFor={`signer-role-${signer.id}`} className="text-xs">
-                    Vai trò *
-                  </Label>
-                  <select
-                    id={`signer-role-${signer.id}`}
-                    value={signer.role || 'signer'}
-                    onChange={(e) => updateSigner(signer.id, "role", e.target.value)}
-                    className="w-full h-9 border rounded-md px-3 text-sm bg-white hover:border-gray-400 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
-                  >
-                    <option value="signer">👤 Người ký</option>
-                    <option value="approver">✅ Người phê duyệt</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <Label htmlFor={`signer-order-${signer.id}`} className="text-xs font-semibold text-purple-700">
-                    🔢 Thứ tự ký *
-                  </Label>
-                  <Input
-                    id={`signer-order-${signer.id}`}
-                    type="number"
-                    min="1"
-                    value={signer.order}
-                    onChange={(e) =>
-                      updateSigner(
-                        signer.id,
-                        "order",
-                        parseInt(e.target.value) || 1
-                      )
-                    }
-                    className="h-9 border-purple-300 focus:border-purple-500"
-                    placeholder="1, 2, 3..."
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    💡 Số nhỏ ký trước. Cùng số = ký song song
-                  </p>
-                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -319,46 +281,6 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
                       <div>📧 {signer.email}</div>
                     </div>
                   )}
-                </div>
-                
-                {/* ✅ Role Selector */}
-                <div>
-                  <Label htmlFor={`signer-role-${signer.id}`} className="text-xs">
-                    Vai trò *
-                  </Label>
-                  <select
-                    id={`signer-role-${signer.id}`}
-                    value={signer.role || 'signer'}
-                    onChange={(e) => updateSigner(signer.id, "role", e.target.value)}
-                    className="w-full h-9 border rounded-md px-3 text-sm bg-white hover:border-gray-400 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
-                  >
-                    <option value="signer">👤 Người ký</option>
-                    <option value="approver">✅ Người phê duyệt</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <Label htmlFor={`signer-order-${signer.id}`} className="text-xs font-semibold text-purple-700">
-                    🔢 Thứ tự ký *
-                  </Label>
-                  <Input
-                    id={`signer-order-${signer.id}`}
-                    type="number"
-                    min="1"
-                    value={signer.order}
-                    onChange={(e) =>
-                      updateSigner(
-                        signer.id,
-                        "order",
-                        parseInt(e.target.value) || 1
-                      )
-                    }
-                    className="h-9 border-purple-300 focus:border-purple-500"
-                    placeholder="1, 2, 3..."
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    💡 Số nhỏ ký trước. Cùng số = ký song song
-                  </p>
                 </div>
               </div>
             )}

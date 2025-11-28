@@ -5,10 +5,128 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, PenTool, Check, FileText } from 'lucide-react';
+import { ArrowLeft, PenTool, Check, FileText, Download } from 'lucide-react';
 import SignatureCanvas from 'react-signature-canvas';
 import InternalSigningSidebar from '@/components/signing/InternalSigningSidebar';
 import { toast } from 'sonner';
+
+// Simple PDF Viewer Component
+function PDFViewer({ documentId }: { documentId: number }) {
+  const { fetchJson } = useAuth();
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadPDF();
+  }, [documentId]);
+
+  const loadPDF = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Fetch PDF as blob with authentication
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/documents/${documentId}/view`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Không thể tải PDF');
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      setPdfUrl(url);
+    } catch (err: any) {
+      console.error('PDF load error:', err);
+      setError(err.message || 'Không thể tải PDF');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/documents/${documentId}/download`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+
+      if (!response.ok) throw new Error('Không thể tải xuống');
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `document-${documentId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Đã tải xuống PDF');
+    } catch (err: any) {
+      toast.error(err.message || 'Không thể tải xuống');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[600px] bg-gray-100 rounded-lg">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Đang tải PDF...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[600px] bg-red-50 rounded-lg border border-red-200">
+        <FileText className="w-16 h-16 text-red-400 mb-4" />
+        <p className="text-red-600 font-medium mb-2">Không thể tải PDF</p>
+        <p className="text-red-500 text-sm mb-4">{error}</p>
+        <Button onClick={loadPDF} variant="outline">
+          Thử lại
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="border rounded-lg overflow-hidden bg-gray-100">
+        <iframe
+          src={pdfUrl || ''}
+          className="w-full h-[600px]"
+          title="Document Preview"
+          style={{ border: 'none' }}
+        />
+      </div>
+      <div className="flex justify-center">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleDownload}
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Tải xuống PDF
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 interface SigningData {
   sign_request: {
@@ -87,19 +205,17 @@ export default function InternalSigningPage() {
     setSignatureData('');
   };
 
-  const handleSaveSignature = () => {
+  const handleSubmit = async () => {
+    // Check if canvas is empty
     if (sigCanvasRef.current?.isEmpty()) {
-      toast.error('Vui lòng vẽ chữ ký');
+      toast.error('Vui lòng vẽ chữ ký trước khi gửi');
       return;
     }
-    const data = sigCanvasRef.current?.toDataURL('image/png');
-    setSignatureData(data || '');
-    toast.success('Đã lưu chữ ký');
-  };
 
-  const handleSubmit = async () => {
-    if (!signatureData) {
-      toast.error('Vui lòng ký trước khi gửi');
+    // Get signature data from canvas
+    const currentSignature = sigCanvasRef.current?.toDataURL('image/png');
+    if (!currentSignature) {
+      toast.error('Không thể lấy chữ ký');
       return;
     }
 
@@ -109,7 +225,7 @@ export default function InternalSigningPage() {
       const result = await fetchJson(`/sign-requests/${signRequestId}/sign-internal`, {
         method: 'POST',
         body: JSON.stringify({
-          signature_data: signatureData,
+          signature_data: currentSignature,
           signature_type: 'drawn'
         })
       });
@@ -148,26 +264,53 @@ export default function InternalSigningPage() {
   const alreadySigned = mySigner.status === 'signed' || mySigner.status === 'completed';
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4">
-        {/* Header */}
-        <div className="mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => router.back()}
-            className="mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Quay lại
-          </Button>
-          <h1 className="text-3xl font-bold text-gray-900">Ký tài liệu</h1>
-          <p className="text-gray-600 mt-2">
-            {data.sign_request.document.title || data.sign_request.document.original_file_name}
-          </p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.back()}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Quay lại
+              </Button>
+              <div>
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-gray-400" />
+                  <h1 className="text-xl font-semibold">
+                    {data.sign_request.document.title || data.sign_request.document.original_file_name}
+                  </h1>
+                </div>
+                <p className="text-sm text-gray-500 mt-1">
+                  {data.sign_request.document.document_number}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {alreadySigned ? (
+                <div className="flex items-center gap-2 text-green-600 bg-green-50 px-4 py-2 rounded-lg">
+                  <Check className="w-4 h-4" />
+                  <span className="text-sm font-medium">Đã ký</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-4 py-2 rounded-lg">
+                  <PenTool className="w-4 h-4" />
+                  <span className="text-sm font-medium">Chờ ký</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
+      </div>
 
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Sidebar */}
+          {/* Left: Sidebar */}
           <div className="lg:col-span-1">
             <InternalSigningSidebar
               signers={data.sign_request.signers}
@@ -177,149 +320,105 @@ export default function InternalSigningPage() {
             />
           </div>
 
-          {/* Right Column - PDF & Signature */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* PDF Viewer */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
+          {/* Center: PDF Viewer */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg shadow-sm border">
+              <div className="p-4 border-b">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-gray-600" />
                   Xem tài liệu
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="border rounded-lg overflow-hidden bg-gray-100">
-                  <div className="relative w-full h-[600px]">
-                    <iframe
-                      src={`${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${data.sign_request.document.id}/view`}
-                      className="w-full h-full"
-                      title="Document Preview"
-                      style={{ border: 'none' }}
+                </h2>
+              </div>
+              <div className="p-4">
+                <PDFViewer documentId={data.sign_request.document.id} />
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Signature Panel */}
+          <div className="lg:col-span-1">
+            {!alreadySigned ? (
+              <div className="bg-white rounded-lg shadow-sm border">
+                <div className="p-4 border-b">
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <PenTool className="w-5 h-5 text-gray-600" />
+                    Chữ ký của bạn
+                  </h2>
+                </div>
+                <div className="p-4 space-y-4">
+                  {/* Canvas */}
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg bg-white">
+                    <SignatureCanvas
+                      ref={sigCanvasRef}
+                      canvasProps={{
+                        className: 'w-full h-48 cursor-crosshair',
+                        style: { background: 'white' }
+                      }}
                     />
                   </div>
-                  <div className="p-2 bg-gray-50 border-t flex justify-center gap-2">
+                  <p className="text-xs text-gray-500 text-center">
+                    Vẽ chữ ký của bạn ở trên, sau đó bấm "Hoàn tất ký"
+                  </p>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
                     <Button
                       variant="outline"
+                      onClick={handleClear}
+                      disabled={submitting}
+                      className="w-full"
                       size="sm"
-                      onClick={() => {
-                        window.open(
-                          `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${data.sign_request.document.id}/download`,
-                          '_blank'
-                        );
-                      }}
                     >
-                      Tải xuống PDF
+                      Xóa và vẽ lại
+                    </Button>
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="flex flex-col gap-2 pt-4 border-t">
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={submitting}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                    >
+                      {submitting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Đang ký...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4 mr-2" />
+                          Hoàn tất ký
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => router.back()}
+                      disabled={submitting}
+                      className="w-full"
+                      size="sm"
+                    >
+                      Hủy
                     </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Signature Canvas */}
-            {!alreadySigned && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <PenTool className="w-5 h-5" />
-                    Chữ ký của bạn
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Canvas */}
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg bg-white">
-                      <SignatureCanvas
-                        ref={sigCanvasRef}
-                        canvasProps={{
-                          className: 'w-full h-48 cursor-crosshair',
-                          style: { background: 'white' }
-                        }}
-                      />
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={handleClear}
-                        disabled={submitting}
-                        className="flex-1"
-                      >
-                        Xóa
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={handleSaveSignature}
-                        disabled={submitting}
-                        className="flex-1"
-                      >
-                        Lưu chữ ký
-                      </Button>
-                    </div>
-
-                    {/* Preview */}
-                    {signatureData && (
-                      <div className="mt-4">
-                        <p className="text-sm text-gray-600 mb-2">Xem trước:</p>
-                        <div className="border rounded-lg p-4 bg-gray-50">
-                          <img
-                            src={signatureData}
-                            alt="Signature preview"
-                            className="max-h-24 mx-auto"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Submit Button */}
-                    <div className="flex flex-col gap-2 pt-4 border-t">
-                      <Button
-                        onClick={handleSubmit}
-                        disabled={!signatureData || submitting}
-                        className="w-full bg-green-600 hover:bg-green-700"
-                      >
-                        {submitting ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                            Đang ký...
-                          </>
-                        ) : (
-                          <>
-                            <Check className="w-4 h-4 mr-2" />
-                            Hoàn tất ký
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => router.back()}
-                        disabled={submitting}
-                        className="w-full"
-                      >
-                        Hủy
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Already Signed Message */}
-            {alreadySigned && (
-              <Card className="bg-green-50 border-green-200">
-                <CardContent className="p-6 text-center">
+              </div>
+            ) : (
+              <div className="bg-green-50 border border-green-200 rounded-lg shadow-sm">
+                <div className="p-6 text-center">
                   <Check className="w-12 h-12 text-green-600 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-green-900 mb-2">
                     Đã ký thành công
                   </h3>
-                  <p className="text-green-700 mb-4">
+                  <p className="text-green-700 mb-4 text-sm">
                     Bạn đã ký tài liệu này vào {new Date(mySigner.signed_at).toLocaleString('vi-VN')}
                   </p>
-                  <Button onClick={() => router.push('/sign-requests')}>
+                  <Button onClick={() => router.push('/sign-requests')} size="sm">
                     Quay về danh sách
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )}
           </div>
         </div>

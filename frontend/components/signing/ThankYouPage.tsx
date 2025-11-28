@@ -8,6 +8,7 @@ interface ThankYouPageProps {
   signerEmail?: string;
   signerRole?: string;
   documentTitle?: string;
+  documentNumber?: string; // ✅ Add document number
   originalFileName?: string;
   signedAt?: string;
   signRequestTitle?: string;
@@ -19,6 +20,7 @@ export default function ThankYouPage({
   signerEmail,
   signerRole,
   documentTitle,
+  documentNumber, // ✅ Add document number
   originalFileName,
   signedAt,
   signRequestTitle,
@@ -91,6 +93,14 @@ export default function ThankYouPage({
                       {signRequestTitle || documentTitle || 'Tài liệu ký số'}
                     </span>
                   </div>
+                  {documentNumber && (
+                    <div>
+                      <span className="text-gray-600 block mb-1">🔢 Mã văn bản</span>
+                      <span className="font-mono text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded block">
+                        {documentNumber}
+                      </span>
+                    </div>
+                  )}
                   {originalFileName && (
                     <div>
                       <span className="text-gray-600 block mb-1">File gốc</span>

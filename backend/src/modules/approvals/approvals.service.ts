@@ -138,8 +138,17 @@ class ApprovalsService {
       throw ApiError.badRequest('Workflow has no steps', 'WORKFLOW_NO_STEPS');
     }
 
-    // Get first step
-    const firstStep = workflow.steps[0];
+    // ✅ Filter only approver steps (not signer steps)
+    const approverSteps = workflow.steps.filter(
+      step => step.participant_role === 'approver' || !step.participant_role // backward compatibility
+    );
+
+    if (approverSteps.length === 0) {
+      throw ApiError.badRequest('Workflow has no approver steps', 'WORKFLOW_NO_APPROVER_STEPS');
+    }
+
+    // Get first approver step
+    const firstStep = approverSteps[0];
 
     // Get approvers for first step
     const approverIds = await approvalsRepository.getApproversForStep(
@@ -280,32 +289,124 @@ class ApprovalsService {
       approval.workflow_step_id
     );
 
-    const allApproved = stepApprovals.every(
+    const allStepApproved = stepApprovals.every(
       a => a.id === approvalId || a.action === 'approved'
     );
 
-    if (!allApproved) {
+    if (!allStepApproved) {
       // Still waiting for other approvers in this step
       return {
-        message: 'Approval recorded. Waiting for other approvers.',
+        message: 'Approval recorded. Waiting for other approvers in this step.',
         status: 'waiting',
       };
     }
 
-    // All approvals for this step are done, move to next step
+    // ⭐ SEQUENTIAL APPROVAL: Current step is complete, activate next step
+    console.log(`[Sequential Approval] Step ${approval.workflow_step_id} completed`);
+    
+    // Get workflow instance to find next step
     const instance = await approvalsRepository.findWorkflowInstance(approval.document_id);
-
+    
     if (!instance) {
       throw ApiError.notFound('Workflow instance not found', 'INSTANCE_NOT_FOUND');
     }
-
-    const currentStepOrder = instance.current_step?.step_order || 0;
-    const nextStep = instance.workflow.steps.find(
-      s => s.step_order === currentStepOrder + 1
+    
+    // Get all approver steps (not signer steps)
+    const approverSteps = instance.workflow.steps.filter(
+      s => s.participant_role !== 'signer'
     );
+    
+    // Find current step index
+    const currentStepIndex = approverSteps.findIndex(
+      s => s.id === approval.workflow_step_id
+    );
+    
+    // Check if there's a next step
+    const nextStep = approverSteps[currentStepIndex + 1];
+    
+    if (nextStep) {
+      // ⭐ Activate next step: change 'waiting' → 'pending'
+      console.log(`[Sequential Approval] Activating next step: ${nextStep.step_name} (ID: ${nextStep.id})`);
+      
+      const activatedCount = await prisma.document_approvals.updateMany({
+        where: {
+          document_id: approval.document_id,
+          workflow_step_id: nextStep.id,
+          action: 'waiting'
+        },
+        data: {
+          action: 'pending'
+        }
+      });
+      
+      console.log(`[Sequential Approval] Activated ${activatedCount.count} approvals for next step`);
+      
+      // Update workflow instance current step
+      await approvalsRepository.updateWorkflowInstance(approval.document_id, {
+        current_step_id: nextStep.id
+      });
+      
+      // Send email notifications to next approvers
+      const nextApprovals = await prisma.document_approvals.findMany({
+        where: {
+          document_id: approval.document_id,
+          workflow_step_id: nextStep.id,
+          action: 'pending'
+        },
+        include: {
+          approver: {
+            select: { id: true, email: true, full_name: true }
+          },
+          document: {
+            select: { 
+              title: true, 
+              document_number: true,
+              owner: {
+                select: { full_name: true, email: true }
+              }
+            }
+          }
+        }
+      });
+      
+      const approvalUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/approvals`;
+      
+      // Send emails in parallel
+      Promise.all(
+        nextApprovals.map(na =>
+          emailService.sendApprovalRequestNotification({
+            recipientEmail: na.approver.email,
+            recipientName: na.approver.full_name || na.approver.email,
+            documentTitle: na.document.title || 'Untitled',
+            documentNumber: na.document.document_number || '',
+            submitterName: na.document.owner?.full_name || na.document.owner?.email || 'Unknown',
+            workflowName: instance.workflow.name,
+            stepName: nextStep.step_name || `Bước ${nextStep.step_order}`,
+            dueDate: na.due_date || new Date(),
+            approvalUrl,
+          }).catch(err => console.error(`Failed to send email to ${na.approver.email}:`, err))
+        )
+      ).catch(err => console.error('Email notification errors:', err));
+      
+      return {
+        message: `Step approved! Moved to next step: ${nextStep.step_name}`,
+        status: 'next_step',
+        nextStep: {
+          id: nextStep.id,
+          name: nextStep.step_name,
+          order: nextStep.step_order
+        }
+      };
+    }
+    
+    // ✅ No more steps - all approvals complete!
 
-    if (!nextStep) {
-      // No more steps, workflow complete
+    // ✅ ALL approvals are done! Move to signing phase
+    console.log(`[Sequential Approval] All approval steps completed!`);
+    
+    // Mark workflow as completed
+    if (true) {
+      // No more APPROVER steps, check if there are SIGNER steps
       await approvalsRepository.updateWorkflowInstance(approval.document_id, {
         status: 'completed',
         completed_at: new Date(),
@@ -322,9 +423,64 @@ class ApprovalsService {
         },
       });
 
-      // Check if document requires digital signing
-      if (document?.document_type?.require_digital_signing && document.sign_request_id) {
-        // Auto-send sign request
+      // ✅ Check if there are signers waiting for approval
+      if (document?.sign_request_id) {
+        const { signersRepository } = await import('../signers/signers.repository');
+        const waitingSigners = await prisma.signers.findMany({
+          where: {
+            sign_request_id: document.sign_request_id,
+            status: 'waiting_approval'
+          }
+        });
+
+        if (waitingSigners.length > 0) {
+          // ⭐ SEQUENTIAL SIGNING: Only activate first signer, others stay 'waiting_signing'
+          console.log(`[Approval Complete] Found ${waitingSigners.length} signers waiting for approval`);
+          
+          // Sort by signing_order
+          const sortedSigners = waitingSigners.sort((a, b) => 
+            (a.signing_order || 0) - (b.signing_order || 0)
+          );
+          
+          // Activate first signer: 'waiting_approval' → 'pending'
+          const firstSigner = sortedSigners[0];
+          await signersRepository.update(firstSigner.id, {
+            status: 'pending'
+          });
+          console.log(`[Approval Complete] Activated first signer: ${firstSigner.email} (order: ${firstSigner.signing_order})`);
+          
+          // Change remaining signers: 'waiting_approval' → 'waiting_signing'
+          for (let i = 1; i < sortedSigners.length; i++) {
+            await signersRepository.update(sortedSigners[i].id, {
+              status: 'waiting_signing'
+            });
+            console.log(`[Approval Complete] Set to waiting_signing: ${sortedSigners[i].email} (order: ${sortedSigners[i].signing_order})`);
+          }
+          
+          // Send sign request (this will generate tokens and send emails only to pending signers)
+          const { signRequestsService } = await import('../signRequests/signRequests.service');
+          await signRequestsService.sendSignRequest(
+            document.sign_request_id,
+            tenantId,
+            document.owner_id || userId
+          );
+          
+          // Update document status to pending_signature
+          await prisma.documents.update({
+            where: { id: approval.document_id },
+            data: { status: 'pending_signature' },
+          });
+          
+          console.log(`[Approval Complete] ✓ Sign request sent to first signer (${sortedSigners.length - 1} waiting)`);
+        } else {
+          // No signers waiting, mark as completed
+          await prisma.documents.update({
+            where: { id: approval.document_id },
+            data: { status: 'completed' },
+          });
+        }
+      } else if (document?.document_type?.require_digital_signing && document.sign_request_id) {
+        // Check if document requires digital signing (external signers already added)
         await this.autoSendSignRequest(document, tenantId);
       } else {
         // No signing required, mark as completed
@@ -372,95 +528,6 @@ class ApprovalsService {
         status: 'completed',
       };
     }
-
-    // Move to next step
-    const nextApproverIds = await approvalsRepository.getApproversForStep(
-      nextStep.id,
-      tenantId,
-      approval.document_id // Pass documentId for manager lookup
-    );
-
-    if (nextApproverIds.length === 0) {
-      throw ApiError.badRequest(
-        'No approvers found for next step',
-        'NO_APPROVERS_FOUND'
-      );
-    }
-
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + nextStep.due_in_days);
-
-    // Create approvals for next step
-    const nextApprovals = nextApproverIds.map(approverId => ({
-      document_id: approval.document_id,
-      workflow_id: approval.workflow_id,
-      workflow_step_id: nextStep.id,
-      approver_user_id: approverId,
-      due_date: dueDate,
-    }));
-
-    await approvalsRepository.createApprovals(nextApprovals);
-
-    // Update workflow instance
-    await approvalsRepository.updateWorkflowInstance(approval.document_id, {
-      current_step_id: nextStep.id,
-    });
-
-    // Send notifications to next approvers
-    const document = await prisma.documents.findUnique({
-      where: { id: approval.document_id },
-      include: { owner: true },
-    });
-
-    const approver = await prisma.users.findUnique({
-      where: { id: userId },
-      select: { full_name: true, email: true },
-    });
-
-    const nextApprovers = await prisma.users.findMany({
-      where: { id: { in: nextApproverIds } },
-      select: { id: true, email: true, full_name: true },
-    });
-
-    const approvalUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/approvals`;
-    const documentUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/documents/${approval.document_id}`;
-
-    // Notify next approvers
-    Promise.all(
-      nextApprovers.map(nextApprover =>
-        emailService.sendApprovalRequestNotification({
-          recipientEmail: nextApprover.email,
-          recipientName: nextApprover.full_name || nextApprover.email,
-          documentTitle: document?.title || 'Document',
-          documentNumber: document?.document_number || '',
-          submitterName: document?.owner?.full_name || document?.owner?.email || 'Unknown',
-          workflowName: instance.workflow.name,
-          stepName: nextStep.step_name || `Bước ${nextStep.step_order}`,
-          dueDate,
-          approvalUrl,
-        }).catch(err => console.error(`Failed to send email to ${nextApprover.email}:`, err))
-      )
-    ).catch(err => console.error('Email notification errors:', err));
-
-    // Notify document owner about progress
-    if (document?.owner && approver) {
-      emailService.sendApprovalActionNotification({
-        recipientEmail: document.owner.email,
-        recipientName: document.owner.full_name || document.owner.email,
-        documentTitle: document.title || 'Untitled',
-        documentNumber: document.document_number || '',
-        approverName: approver.full_name || approver.email,
-        action: 'approved',
-        comment,
-        documentUrl,
-      }).catch(err => console.error('Failed to send progress email:', err));
-    }
-
-    return {
-      message: `Approved! Moved to next step: ${nextStep.step_name}`,
-      status: 'next_step',
-      next_step: nextStep.step_name,
-    };
   }
 
   /**

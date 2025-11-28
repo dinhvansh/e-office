@@ -29,7 +29,9 @@ const createSchema = z
       step_name: z.string().optional(),
       approver_type: z.enum(['user', 'role', 'department', 'manager']),
       approver_id: z.number(),
+      participant_role: z.enum(['approver', 'signer']).optional(), // ✅ Add participant_role
       due_in_days: z.number().min(1).max(365),
+      order: z.number().int().positive().optional(), // ✅ Add order field
     })).optional(),
     
     // Inline recipients, CC, and attachments

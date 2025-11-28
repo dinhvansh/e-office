@@ -21,6 +21,7 @@ interface SigningData {
     email: string;
     role: string;
     status: string;
+    signed_at?: string;
   };
   sign_request: {
     id: number;
@@ -33,6 +34,7 @@ interface SigningData {
     id: number;
     title: string;
     original_file_name: string;
+    document_number?: string;
     created_at: string;
   };
   fields: any[];
@@ -143,7 +145,6 @@ export default function PublicSigningPage() {
       }
 
       setOtpSent(true);
-      setOtpVerified(false); // Reset verified state
       toast.success('📧 Mã OTP đã được gửi đến email của bạn');
       
       // Show debug OTP if available (dev mode)
@@ -157,23 +158,49 @@ export default function PublicSigningPage() {
     }
   };
 
+
+
   const handleVerifyOtp = async () => {
     if (!otp || otp.length !== 6) {
       toast.error('Vui lòng nhập đầy đủ mã OTP (6 số)');
       return;
     }
 
+    if (!/^\d{6}$/.test(otp)) {
+      toast.error('Mã OTP phải là 6 chữ số');
+      return;
+    }
+
     setVerifying(true);
     try {
-      // Just validate format - actual verification happens on submit
-      if (!/^\d{6}$/.test(otp)) {
-        throw new Error('Mã OTP phải là 6 chữ số');
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:4000';
+      const res = await fetch(`${apiBase}/public/sign/${token}/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ otp }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        const errorMsg = result.error?.message || result.message || 'Mã OTP không hợp lệ';
+        let errorMessage = errorMsg;
+        
+        if (result.error?.code === 'OTP_EXPIRED') {
+          errorMessage = '⏰ Mã OTP đã hết hạn. Vui lòng click "Gửi lại OTP" để nhận mã mới.';
+        } else if (result.error?.code === 'INVALID_OTP') {
+          errorMessage = '❌ Mã OTP không đúng. Vui lòng kiểm tra lại mã OTP trong email.';
+        } else if (result.error?.code === 'OTP_NOT_ISSUED') {
+          errorMessage = '📧 Chưa có mã OTP. Vui lòng click "Gửi lại OTP" trước.';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       setOtpVerified(true);
-      toast.success('✅ Mã OTP hợp lệ! Bạn có thể bắt đầu ký tài liệu.');
+      toast.success('✅ Xác thực thành công! Bạn có thể bắt đầu ký tài liệu.');
     } catch (error: any) {
-      toast.error(error.message || 'Mã OTP không hợp lệ');
+      toast.error(error.message || 'Không thể xác thực OTP');
       setOtpVerified(false);
     } finally {
       setVerifying(false);
@@ -181,18 +208,8 @@ export default function PublicSigningPage() {
   };
 
   const handleOpenSignatureModal = () => {
-    if (!otpSent) {
-      toast.error('📧 Vui lòng gửi mã OTP trước');
-      return;
-    }
-    
-    if (!otp || otp.length !== 6) {
-      toast.error('🔢 Vui lòng nhập đầy đủ mã OTP (6 số)');
-      return;
-    }
-    
-    if (!/^\d{6}$/.test(otp)) {
-      toast.error('🔢 Mã OTP phải là 6 chữ số');
+    if (!otpVerified) {
+      toast.error('🔐 Vui lòng xác thực OTP trước');
       return;
     }
     
@@ -243,22 +260,11 @@ export default function PublicSigningPage() {
 
   const handleStartGuided = () => {
     console.log('🚀 handleStartGuided called');
-    console.log('📧 otpSent:', otpSent);
-    console.log('🔢 otp:', otp);
+    console.log('🔐 otpVerified:', otpVerified);
     console.log('📋 myFields:', myFields.map(f => ({ id: f.id, label: f.label, page: f.page, x: f.x, y: f.y })));
     
-    if (!otpSent) {
-      toast.error('📧 Vui lòng gửi mã OTP trước');
-      return;
-    }
-    
-    if (!otp || otp.length !== 6) {
-      toast.error('🔢 Vui lòng nhập đầy đủ mã OTP (6 số)');
-      return;
-    }
-    
-    if (!/^\d{6}$/.test(otp)) {
-      toast.error('🔢 Mã OTP phải là 6 chữ số');
+    if (!otpVerified) {
+      toast.error('🔐 Vui lòng xác thực OTP trước');
       return;
     }
     
@@ -502,6 +508,7 @@ export default function PublicSigningPage() {
         signerEmail={data.signer?.email}
         signerRole={data.signer?.role}
         documentTitle={data.document?.title}
+        documentNumber={data.document?.document_number} // ✅ Add document number
         originalFileName={data.document?.original_file_name}
         signedAt={data.signed_at || data.signer?.signed_at}
         signRequestTitle={data.sign_request?.title}
@@ -613,7 +620,7 @@ export default function PublicSigningPage() {
               </p>
             </div>
 
-            {/* Always show OTP input */}
+            {/* OTP input */}
             <div>
               <Label htmlFor="otp">Mã OTP (6 số)</Label>
               <Input
@@ -624,14 +631,22 @@ export default function PublicSigningPage() {
                   setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
                   setOtpVerified(false); // Reset verified when OTP changes
                 }}
-                placeholder="000000"
+                placeholder="Nhập mã OTP từ email"
                 maxLength={6}
                 className="mt-1"
                 disabled={otpVerified}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                💡 Mã OTP đã được gửi trong email yêu cầu ký. Nếu không tìm thấy hoặc hết hạn, nhấn "Gửi lại OTP" bên dưới.
-              </p>
+              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-900 font-medium mb-1">
+                  📧 Mã OTP đã được gửi trong email yêu cầu ký
+                </p>
+                <p className="text-xs text-blue-700">
+                  1️⃣ Nhập mã OTP từ email<br/>
+                  2️⃣ Click "Xác thực OTP" để xác nhận<br/>
+                  3️⃣ Bắt đầu ký tài liệu<br/>
+                  🔄 Nếu không tìm thấy hoặc hết hạn, nhấn "Gửi lại OTP"
+                </p>
+              </div>
             </div>
 
             {/* Verify and Resend buttons */}
@@ -651,6 +666,14 @@ export default function PublicSigningPage() {
                 {otpSent ? '🔄 Gửi lại OTP' : '📧 Gửi lại OTP'}
               </Button>
             </div>
+            
+            {otpVerified && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-900 font-medium">
+                  ✅ Xác thực thành công! Bạn có thể bắt đầu ký tài liệu.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -779,7 +802,7 @@ export default function PublicSigningPage() {
         </div>
 
         {/* Signature Section - Hidden in guided mode or when using field signatures */}
-        {otpSent && !guidedMode && Object.keys(fieldSignatures).length === 0 && (
+        {otpVerified && !guidedMode && Object.keys(fieldSignatures).length === 0 && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             <h2 className="text-lg font-semibold mb-4">Chữ ký</h2>
             

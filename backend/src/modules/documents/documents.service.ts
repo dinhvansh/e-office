@@ -126,7 +126,9 @@ class DocumentsService {
       step_name?: string;
       approver_type: string;
       approver_id: number;
+      participant_role?: string; // ✅ Add participant_role
       due_in_days: number;
+      order?: number; // ✅ Add order field
     }>;
   }, tenantId: number, ownerId: number, requesterIp?: string, userAgent?: string) {
     if (!input.base64 && !input.storagePath) {
@@ -290,10 +292,14 @@ class DocumentsService {
         
         console.log(`[Workflow Instance] Created instance ID: ${instance.id}`);
         
-        // ✅ Create approvals for ALL steps (not just first step)
+        // ✅ Create approvals for ALL approver steps (not signer steps)
+        // ⭐ SEQUENTIAL APPROVAL: Only first step gets 'pending', others get 'waiting'
         let hasValidApprovals = false;
         
-        for (const step of workflow.steps) {
+        // Filter approver steps only
+        const approverSteps = workflow.steps.filter(s => s.participant_role !== 'signer');
+        
+        for (const step of approverSteps) {
           // Get approver user ID based on step type
           let approverUserId: number | null = null;
           
@@ -305,12 +311,9 @@ class DocumentsService {
             });
             approverUserId = userRole?.user_id || null;
           } else if (step.approver_type === 'department') {
-            // ✅ If approver_id is provided, use that department
-            // ✅ If not, use document owner's department
             let deptId = step.approver_id;
             
             if (!deptId) {
-              // Get owner's department
               const owner = await prisma.users.findUnique({
                 where: { id: ownerId },
                 select: { department_id: true }
@@ -337,18 +340,22 @@ class DocumentsService {
             const dueDate = new Date();
             dueDate.setDate(dueDate.getDate() + (step.due_in_days || 7));
             
+            // ⭐ SEQUENTIAL: First approver step = 'pending', others = 'waiting'
+            const isFirstStep = step.step_order === approverSteps[0].step_order;
+            const approvalStatus = isFirstStep ? 'pending' : 'waiting';
+            
             await prisma.document_approvals.create({
               data: {
                 document_id: document.id,
                 workflow_id: workflow.id,
                 workflow_step_id: step.id,
                 approver_user_id: approverUserId,
-                action: 'pending',
+                action: approvalStatus,
                 due_date: dueDate
               }
             });
             
-            console.log(`[Workflow Step ${step.step_order}] Created approval for user ${approverUserId}`);
+            console.log(`[Workflow Step ${step.step_order}] Created approval for user ${approverUserId} with status: ${approvalStatus}`);
             hasValidApprovals = true;
           } else {
             console.warn(`[Workflow Step ${step.step_order}] Could not determine approver for step: ${step.step_name}`);
@@ -367,10 +374,13 @@ class DocumentsService {
         }
       }
       
-      // ✅ STEP 3: CREATE SIGNERS (with appropriate status based on approvals)
-      // Determine signer status: 'waiting_approval' if has approvals, 'pending' otherwise
-      const signerStatus = hasApprovals ? 'waiting_approval' : 'pending';
-      console.log(`[Signers] Signer status will be: ${signerStatus} (hasApprovals: ${hasApprovals})`);
+      // ✅ STEP 3: CREATE SIGNERS (with appropriate status based on approvals and signing order)
+      // Determine signer status:
+      // - 'waiting_approval' if has approvals
+      // - 'pending' for first signer (if no approvals)
+      // - 'waiting_signing' for subsequent signers (sequential signing)
+      const baseSignerStatus = hasApprovals ? 'waiting_approval' : 'pending';
+      console.log(`[Signers] Base signer status: ${baseSignerStatus} (hasApprovals: ${hasApprovals})`);
       
       if (workflow?.steps) {
         const { signersRepository } = await import('../signers/signers.repository');
@@ -385,7 +395,16 @@ class DocumentsService {
           console.log(`[Workflow Signers] ⚠️ No signer steps found in workflow. Signers must be added manually.`);
         }
         
-        for (const step of signerSteps) {
+        for (let i = 0; i < signerSteps.length; i++) {
+          const step = signerSteps[i];
+          const isFirstSigner = i === 0;
+          
+          // ⭐ SEQUENTIAL SIGNING: First signer gets base status, others get 'waiting_signing'
+          let signerStatus = baseSignerStatus;
+          if (!isFirstSigner && baseSignerStatus === 'pending') {
+            signerStatus = 'waiting_signing'; // Wait for previous signer
+          }
+          
           // Get approver info based on type
           let email = '';
           let name = '';
@@ -463,7 +482,7 @@ class DocumentsService {
               name,
               role: 'signer',
               signing_order: step.step_order,
-              status: signerStatus, // ✅ Use determined status
+              status: signerStatus, // ⭐ Sequential status
               is_internal: !!internalUser,
             };
             
@@ -473,7 +492,7 @@ class DocumentsService {
             }
             
             await signersRepository.create(signerData);
-            console.log(`  ✓ Signer created: ${email} (internal: ${!!internalUser}, status: ${signerStatus})`);
+            console.log(`  ✓ Signer created: ${email} (internal: ${!!internalUser}, status: ${signerStatus}, order: ${step.step_order})`);
           } else {
             console.log(`  ✗ Skipped: no email found`);
           }
@@ -501,9 +520,20 @@ class DocumentsService {
         });
         const internalEmailMap = new Map(internalUsers.map(u => [u.email, u.id]));
         
-        for (const signer of input.signers) {
+        // Sort signers by order to determine first signer
+        const sortedSigners = [...input.signers].sort((a, b) => a.order - b.order);
+        
+        for (let i = 0; i < sortedSigners.length; i++) {
+          const signer = sortedSigners[i];
+          const isFirstSigner = i === 0;
           const userId = internalEmailMap.get(signer.email);
           const isInternal = !!userId;
+          
+          // ⭐ SEQUENTIAL SIGNING: First signer gets base status, others get 'waiting_signing'
+          let signerStatus = baseSignerStatus;
+          if (!isFirstSigner && baseSignerStatus === 'pending') {
+            signerStatus = 'waiting_signing'; // Wait for previous signer
+          }
           
           const signerData: any = {
             sign_request: { connect: { id: signRequest.id } },
@@ -511,7 +541,7 @@ class DocumentsService {
             name: signer.name,
             role: 'signer',
             signing_order: signer.order,
-            status: signerStatus, // ✅ Use determined status (waiting_approval or pending)
+            status: signerStatus, // ⭐ Sequential status
             is_internal: isInternal,
           };
           
@@ -521,7 +551,7 @@ class DocumentsService {
           }
           
           await signersRepository.create(signerData);
-          console.log(`  ✓ Manual signer created: ${signer.email} (status: ${signerStatus})`);
+          console.log(`  ✓ Manual signer created: ${signer.email} (status: ${signerStatus}, order: ${signer.order})`);
         }
       }
       
@@ -844,7 +874,9 @@ class DocumentsService {
       step_name?: string;
       approver_type: string;
       approver_id: number;
+      participant_role?: string; // ✅ Add participant_role
       due_in_days: number;
+      order?: number; // ✅ Add order field
     }>,
     documentId: number,
     tenantId: number,
@@ -887,10 +919,11 @@ class DocumentsService {
       await prisma.workflow_steps.create({
         data: {
           workflow_id: workflow.id,
-          step_order: i + 1,
+          step_order: customSteps[i].order || (i + 1), // ✅ Use custom order if provided
           step_name: customSteps[i].step_name || `Bước ${i + 1}`,
           approver_type: customSteps[i].approver_type,
           approver_id: customSteps[i].approver_id,
+          participant_role: customSteps[i].participant_role || 'approver', // ✅ Add participant_role
           due_in_days: customSteps[i].due_in_days,
           is_required: true,
         },

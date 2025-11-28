@@ -236,6 +236,48 @@ export class PublicSignController {
   };
 
   /**
+   * Verify OTP before signing
+   * POST /public/sign/:token/verify-otp
+   */
+  verifyOtp = async (req: Request, res: Response): Promise<void> => {
+    const { token } = req.params;
+    const { otp } = z.object({ otp: z.string().length(6) }).parse(req.body);
+
+    // Find signer by token
+    const signer = await prisma.signers.findUnique({
+      where: { signing_token: token },
+    });
+
+    if (!signer) {
+      throw ApiError.notFound('Invalid signing link', 'INVALID_TOKEN');
+    }
+
+    // Check if OTP exists
+    if (!signer.otp) {
+      throw ApiError.badRequest('OTP not issued. Please request OTP first.', 'OTP_NOT_ISSUED');
+    }
+
+    // Check if OTP expired
+    if (signer.otp_expire && new Date() > signer.otp_expire) {
+      throw ApiError.badRequest('OTP expired. Please request a new OTP.', 'OTP_EXPIRED');
+    }
+
+    // Verify OTP
+    const bcrypt = require('bcrypt');
+    const isValid = await bcrypt.compare(otp, signer.otp);
+
+    if (!isValid) {
+      throw ApiError.badRequest('Invalid OTP. Please check your email.', 'INVALID_OTP');
+    }
+
+    // OTP is valid
+    res.json(ok({ 
+      verified: true,
+      message: 'OTP verified successfully'
+    }));
+  };
+
+  /**
    * Download signed PDF with all signatures
    * GET /public/sign/:token/download-signed
    */
@@ -448,11 +490,52 @@ export class PublicSignController {
         data: { status: 'completed' },
       });
 
-      // Update document status
-      await prisma.documents.update({
-        where: { id: signer.sign_request.document_id },
-        data: { status: 'completed' },
-      });
+      // ⭐ Generate signed PDF with all signatures
+      console.log('📄 Generating signed PDF with all signatures...');
+      try {
+        const signedPdfBuffer = await pdfSigningService.generateSignedPdf(signer.sign_request_id);
+        
+        // Save signed PDF to storage
+        const signedFileName = `signed_${Date.now()}_${signer.sign_request.document_id}.pdf`;
+        const document = await prisma.documents.findUnique({
+          where: { id: signer.sign_request.document_id }
+        });
+        
+        if (document) {
+          // Get tenant_id from document's file_path
+          const tenantId = document.file_path.split('/')[1] || document.file_path.split('\\')[1];
+          const signedFilePath = path.join('storage', tenantId, signedFileName);
+          
+          // Ensure directory exists
+          const signedDir = path.dirname(signedFilePath);
+          if (!fs.existsSync(signedDir)) {
+            fs.mkdirSync(signedDir, { recursive: true });
+          }
+          
+          // Write signed PDF
+          fs.writeFileSync(signedFilePath, signedPdfBuffer);
+          console.log('✅ Signed PDF saved:', signedFilePath);
+          
+          // Update document with signed_file_path
+          await prisma.documents.update({
+            where: { id: signer.sign_request.document_id },
+            data: { 
+              status: 'completed',
+              signed_file_path: signedFilePath
+            },
+          });
+          console.log('✅ Document updated with signed_file_path');
+        }
+      } catch (error) {
+        console.error('❌ Failed to generate signed PDF:', error);
+        // Don't fail the signing process, just log the error
+        // Update document status anyway
+        await prisma.documents.update({
+          where: { id: signer.sign_request.document_id },
+          data: { status: 'completed' },
+        });
+      }
+      
       console.log('✅ Sign request and document marked as completed');
     } else {
       console.log('⏳ Not all signed yet, updating to in_progress...');
@@ -463,15 +546,61 @@ export class PublicSignController {
       });
       console.log('✅ Sign request marked as in_progress');
       
-      // TODO: Send email to next signer in sequential workflow
-      if (signer.sign_request.workflow_type === 'sequential') {
-        const nextSigner = allSigners.find(s => 
-          (s.status === 'pending' || s.status === 'otp_sent') && 
-          s.signing_order > (signer.signing_order || 0)
-        );
-        if (nextSigner) {
-          console.log(`📧 TODO: Send email to next signer: ${nextSigner.name} (${nextSigner.email})`);
-          // Email notification will be implemented later
+      // ⭐ SEQUENTIAL SIGNING: Activate next signer
+      // Find signers with 'waiting_signing' status
+      const waitingSigners = allSigners.filter(s => s.status === 'waiting_signing');
+      
+      if (waitingSigners.length > 0) {
+        // Sort by signing_order and get the first one
+        const nextSigner = waitingSigners.sort((a, b) => 
+          (a.signing_order || 0) - (b.signing_order || 0)
+        )[0];
+        
+        console.log(`⭐ Activating next signer: ${nextSigner.name} (order: ${nextSigner.signing_order})`);
+        
+        // Activate next signer: 'waiting_signing' → 'pending'
+        await prisma.signers.update({
+          where: { id: nextSigner.id },
+          data: { status: 'pending' }
+        });
+        
+        // Send email notification to next signer
+        if (!nextSigner.is_internal && nextSigner.signing_token) {
+          const { emailService } = await import('../../modules/common/email.service');
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+          const signUrl = `${frontendUrl}/sign/${nextSigner.signing_token}`;
+          
+          // Generate OTP
+          const otp = Math.floor(100000 + Math.random() * 900000).toString();
+          const bcrypt = require('bcrypt');
+          const otpHash = await bcrypt.hash(otp, 10);
+          const otpExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+          
+          // Save OTP
+          await prisma.signers.update({
+            where: { id: nextSigner.id },
+            data: {
+              otp: otpHash,
+              otp_expire: otpExpire,
+              status: 'otp_sent'
+            }
+          });
+          
+          try {
+            await emailService.sendSignRequestWithOTP({
+              recipientEmail: nextSigner.email,
+              recipientName: nextSigner.name,
+              documentTitle: signer.sign_request.title || 'Document',
+              senderName: 'System',
+              message: `It's now your turn to sign. Previous signer has completed.`,
+              signUrl: signUrl,
+              otp: otp,
+              expiryMinutes: 10
+            });
+            console.log(`📧 Email sent to next signer: ${nextSigner.email}`);
+          } catch (error) {
+            console.error(`❌ Failed to send email to ${nextSigner.email}:`, error);
+          }
         }
       }
     }

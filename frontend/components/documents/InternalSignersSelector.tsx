@@ -170,7 +170,7 @@ export function InternalSignersSelector({ signers, onChange, allowEdit = false }
                 <GripVertical className="w-4 h-4 text-gray-400" />
               )}
 
-              {/* Order Badge or Input */}
+              {/* Order Badge or Input - Only editable in Flexible mode */}
               {allowEdit ? (
                 <div className="flex-shrink-0">
                   <input
@@ -181,7 +181,8 @@ export function InternalSignersSelector({ signers, onChange, allowEdit = false }
                       const newOrder = parseInt(e.target.value) || 1;
                       handleUpdateSigner(index, 'signing_order', newOrder);
                     }}
-                    className="w-12 h-8 text-center border-2 border-blue-300 rounded-md font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-12 h-8 text-center border-2 border-blue-300 rounded-md font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    title="Thứ tự ký"
                   />
                 </div>
               ) : (

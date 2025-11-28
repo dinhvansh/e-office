@@ -87,10 +87,12 @@ export class ApprovalsRepository {
   }
 
   async findPendingApprovals(userId: number, tenantId: number) {
+    // ⭐ SEQUENTIAL APPROVAL: Only return 'pending', not 'waiting'
+    // 'waiting' approvals are not visible until previous step completes
     return prisma.document_approvals.findMany({
       where: {
         approver_user_id: userId,
-        action: 'pending',
+        action: 'pending', // Only pending, not waiting
         document: {
           tenant_id: tenantId,
         },

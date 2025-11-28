@@ -27,7 +27,9 @@ signRequestsRouter.post("/:id/fields", asyncHandler(controller.saveFields));
 signRequestsRouter.delete("/:id/fields/:fieldId", asyncHandler(controller.deleteField));
 signRequestsRouter.post("/:id/send", asyncHandler(controller.send));
 signRequestsRouter.post("/:id/cancel", asyncHandler(controller.cancel));
+signRequestsRouter.post("/:id/revoke", asyncHandler(controller.revoke)); // ✅ Revoke completed internal document
 signRequestsRouter.post("/:id/sign-internal", asyncHandler(controller.signInternal)); // ✅ Internal signing
 
 // Generic routes MUST come last - use regex to match only numeric IDs
 signRequestsRouter.get("/:id(\\d+)", asyncHandler(controller.getById));
+signRequestsRouter.delete("/:id(\\d+)", asyncHandler(controller.delete)); // ✅ Delete draft
