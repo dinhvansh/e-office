@@ -23,4 +23,31 @@ export class TenantsController {
     const stats = await tenantsService.getTenantStats(req.auth!.tenantId);
     res.json(ok({ stats }));
   };
+
+  /**
+   * Create new tenant with admin user (Public endpoint for SaaS onboarding)
+   * POST /api/v1/tenants/create-with-admin
+   */
+  createWithAdmin = async (req: Request, res: Response): Promise<void> => {
+    const { tenant_name, tenant_domain, admin_email, admin_password, admin_full_name } = req.body;
+
+    // Validate required fields
+    if (!tenant_name || !admin_email || !admin_password || !admin_full_name) {
+      res.status(400).json({
+        error: 'Missing required fields',
+        required: ['tenant_name', 'admin_email', 'admin_password', 'admin_full_name']
+      });
+      return;
+    }
+
+    const result = await tenantsService.createTenantWithAdmin({
+      tenant_name,
+      tenant_domain,
+      admin_email,
+      admin_password,
+      admin_full_name
+    });
+
+    res.status(201).json(ok(result));
+  };
 }
