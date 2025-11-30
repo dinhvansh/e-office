@@ -5,6 +5,14 @@ export const positionsService = {
     return positionsRepository.findByTenant(tenantId, filters);
   },
 
+  async getPositionsPaginated(tenantId: number, options: {
+    page: number;
+    limit: number;
+    is_active?: boolean;
+  }) {
+    return positionsRepository.findByTenantPaginated(tenantId, options);
+  },
+
   async getPositionById(id: number, tenantId: number) {
     const position = await positionsRepository.findById(id, tenantId);
     if (!position) {

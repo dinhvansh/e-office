@@ -1,30 +1,23 @@
 import { request } from "undici";
-
-export interface WebhookEndpoint {
-  url: string;
-  events: string[];
-  secret?: string;
-}
+import { webhooksRepository } from "./webhooks.repository";
 
 class WebhookService {
-  private registry = new Map<number, WebhookEndpoint[]>();
-
-  register(tenantId: number, endpoint: WebhookEndpoint): void {
-    const existing = this.registry.get(tenantId) ?? [];
-    const filteredEvents = endpoint.events.length === 0 ? ["*"] : endpoint.events;
-    existing.push({ ...endpoint, events: filteredEvents });
-    this.registry.set(tenantId, existing);
-  }
-
   async emit(tenantId: number, event: string, payload: unknown): Promise<void> {
-    const endpoints = this.registry.get(tenantId) ?? [];
+    const webhooks = await webhooksRepository.findActiveByTenantId(tenantId);
+    
     await Promise.all(
-      endpoints.map(async (endpoint) => {
-        if (!endpoint.events.includes("*") && !endpoint.events.includes(event)) {
+      webhooks.map(async (webhook) => {
+        // Check if webhook is subscribed to this event
+        if (!webhook.events.includes("*") && !webhook.events.includes(event)) {
           return;
         }
+
+        let statusCode: number | undefined;
+        let response: string | undefined;
+        let error: string | undefined;
+
         try {
-          await request(endpoint.url, {
+          const res = await request(webhook.url, {
             method: "POST",
             body: JSON.stringify({
               event,
@@ -34,13 +27,27 @@ class WebhookService {
             headers: {
               "Content-Type": "application/json",
               "X-Esign-Event": event,
-              ...(endpoint.secret ? { "X-Esign-Signature": endpoint.secret } : {}),
+              ...(webhook.secret ? { "X-Esign-Signature": webhook.secret } : {}),
             },
           });
+
+          statusCode = res.statusCode;
+          response = await res.body.text();
         } catch (err) {
           // eslint-disable-next-line no-console
-          console.error("Failed to deliver webhook", endpoint.url, err);
+          console.error("Failed to deliver webhook", webhook.url, err);
+          error = err instanceof Error ? err.message : String(err);
         }
+
+        // Log the webhook delivery
+        await webhooksRepository.createLog(
+          webhook.id,
+          event,
+          payload,
+          statusCode,
+          response,
+          error
+        );
       }),
     );
   }

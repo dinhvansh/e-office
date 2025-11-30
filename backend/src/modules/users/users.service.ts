@@ -6,6 +6,11 @@ export const usersService = {
     return usersRepository.findByTenant(tenantId, filters);
   },
 
+  // ✅ NEW: Get only active users
+  async getActiveUsers(tenantId: number) {
+    return usersRepository.findByTenant(tenantId, { status: 'active' });
+  },
+
   async getUserById(id: number, tenantId: number) {
     const user = await usersRepository.findById(id, tenantId);
     if (!user) {

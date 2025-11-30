@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit, Trash2, Shield, Users as UsersIcon } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Shield, Users as UsersIcon, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import { StatusTag } from '@/components/ui/status-tag';
 import { PageHeader } from '@/components/ui/page-header';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
+import { ApproveRejectDialog } from '@/components/users/ApproveRejectDialog';
 
 interface User {
   id: number;
@@ -42,6 +43,11 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [approveRejectDialog, setApproveRejectDialog] = useState<{
+    open: boolean;
+    user: User | null;
+    action: 'approve' | 'reject';
+  }>({ open: false, user: null, action: 'approve' });
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -133,6 +139,42 @@ export default function UsersPage() {
     },
   });
 
+  const approveUserMutation = useMutation({
+    mutationFn: (userId: number) => fetchJson(`/users/${userId}/approve`, { method: 'POST' }),
+    onSuccess: () => {
+      toast.success('Phê duyệt người dùng thành công!');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error: any) => {
+      const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
+      toast.error(`Lỗi: ${message}`);
+    },
+  });
+
+  const rejectUserMutation = useMutation({
+    mutationFn: ({ userId, reason }: { userId: number; reason: string }) => 
+      fetchJson(`/users/${userId}/reject`, { 
+        method: 'POST',
+        body: JSON.stringify({ reason })
+      }),
+    onSuccess: () => {
+      toast.success('Từ chối người dùng thành công!');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error: any) => {
+      const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
+      toast.error(`Lỗi: ${message}`);
+    },
+  });
+
+  const handleApproveReject = async (userId: number, reason?: string) => {
+    if (approveRejectDialog.action === 'approve') {
+      await approveUserMutation.mutateAsync(userId);
+    } else {
+      await rejectUserMutation.mutateAsync({ userId, reason: reason || '' });
+    }
+  };
+
   const users: User[] = ((usersData as any) || []).sort((a: User, b: User) => b.id - a.id);
   const departments: Department[] = (departmentsData as any) || [];
   const roles: Role[] = (rolesData as any) || [];
@@ -174,6 +216,8 @@ export default function UsersPage() {
             <option value="">Tất cả trạng thái</option>
             <option value="active">Hoạt động</option>
             <option value="inactive">Không hoạt động</option>
+            <option value="pending">Chờ duyệt</option>
+            <option value="rejected">Đã từ chối</option>
           </select>
         </div>
       </Card>
@@ -269,48 +313,81 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <StatusTag 
-                        status={user.status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
-                      />
+                      {user.status === 'pending' ? (
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+                          Chờ duyệt
+                        </Badge>
+                      ) : user.status === 'rejected' ? (
+                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">
+                          Đã từ chối
+                        </Badge>
+                      ) : (
+                        <StatusTag 
+                          status={user.status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
+                        />
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">
                       {new Date(user.created_at).toLocaleDateString('vi-VN')}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          className="hover:bg-primary/10 hover:text-primary transition-colors"
-                          onClick={() => {
-                            setEditingUser(user);
-                            setFormData({
-                              email: user.email,
-                              password: '',
-                              full_name: user.full_name || '',
-                              phone: user.phone || '',
-                              department_id: user.department?.id?.toString() || '',
-                              position_id: (user as any).position_id?.toString() || '',
-                              manager_id: (user as any).manager_id?.toString() || '',
-                              role_ids: user.user_roles.map(ur => ur.role.id),
-                            });
-                            setShowCreateModal(true);
-                          }}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="hover:bg-destructive/10 hover:text-destructive transition-colors"
-                          onClick={() => {
-                            if (confirm('Bạn có chắc muốn xóa người dùng này?')) {
-                              deleteUserMutation.mutate(user.id);
-                            }
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
+                        {user.status === 'pending' ? (
+                          <>
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700"
+                              onClick={() => setApproveRejectDialog({ open: true, user, action: 'approve' })}
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Phê duyệt
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => setApproveRejectDialog({ open: true, user, action: 'reject' })}
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Từ chối
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="hover:bg-primary/10 hover:text-primary transition-colors"
+                              onClick={() => {
+                                setEditingUser(user);
+                                setFormData({
+                                  email: user.email,
+                                  password: '',
+                                  full_name: user.full_name || '',
+                                  phone: user.phone || '',
+                                  department_id: user.department?.id?.toString() || '',
+                                  position_id: (user as any).position_id?.toString() || '',
+                                  manager_id: (user as any).manager_id?.toString() || '',
+                                  role_ids: user.user_roles.map(ur => ur.role.id),
+                                });
+                                setShowCreateModal(true);
+                              }}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="hover:bg-destructive/10 hover:text-destructive transition-colors"
+                              onClick={() => {
+                                if (confirm('Bạn có chắc muốn xóa người dùng này?')) {
+                                  deleteUserMutation.mutate(user.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -504,6 +581,15 @@ export default function UsersPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Approve/Reject Dialog */}
+      <ApproveRejectDialog
+        open={approveRejectDialog.open}
+        onClose={() => setApproveRejectDialog({ open: false, user: null, action: 'approve' })}
+        user={approveRejectDialog.user}
+        action={approveRejectDialog.action}
+        onConfirm={handleApproveReject}
+      />
     </div>
   );
 }

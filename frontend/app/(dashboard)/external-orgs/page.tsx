@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Plus, Edit, Trash2, Phone, Mail, User } from 'lucide-react';
+import { Building2, Plus, Edit, Trash2, Phone, Mail, User, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search } from 'lucide-react';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui/page-header';
@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MetricCard } from '@/components/ui/metric-card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type ExternalOrg = {
   id: number;
@@ -40,13 +41,57 @@ const CATEGORIES = [
 export default function ExternalOrgsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingOrg, setEditingOrg] = useState<ExternalOrg | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [filter, setFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const queryClient = useQueryClient();
   const { fetchJson } = useAuth();
 
-  const { data: orgs = [], isLoading } = useQuery({
-    queryKey: ['external-orgs'],
-    queryFn: () => fetchJson<ExternalOrg[]>('/external-orgs'),
+  const { data: response, isLoading } = useQuery({
+    queryKey: ['external-orgs', currentPage, itemsPerPage, filter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.append('page', currentPage.toString());
+      params.append('limit', itemsPerPage.toString());
+      if (filter !== 'all') {
+        params.append('category', filter);
+      }
+      
+      return await fetchJson<{
+        orgs: ExternalOrg[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+          hasNext: boolean;
+          hasPrev: boolean;
+        };
+      }>(`/external-orgs?${params.toString()}`);
+    },
   });
+
+  const orgs = response?.orgs || [];
+  const pagination = response?.pagination;
+
+  // Client-side search filter
+  const filteredOrgs = orgs.filter(org => {
+    if (!searchQuery) return true;
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      org.name.toLowerCase().includes(searchLower) ||
+      org.code?.toLowerCase().includes(searchLower) ||
+      org.email?.toLowerCase().includes(searchLower) ||
+      org.contact_person?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Reset to page 1 when filter changes
+  const handleFilterChange = (newFilter: string) => {
+    setFilter(newFilter);
+    setCurrentPage(1);
+  };
 
   const createMutation = useMutation({
     mutationFn: (data: Partial<ExternalOrg>) => {
@@ -57,6 +102,7 @@ export default function ExternalOrgsPage() {
       console.log('External org created successfully');
       setShowModal(false);
       toast.success('Tạo tổ chức thành công!');
+      setCurrentPage(1); // Reset to first page
       // Small delay to ensure backend has saved
       setTimeout(async () => {
         await queryClient.refetchQueries({ queryKey: ['external-orgs'] });
@@ -133,28 +179,42 @@ export default function ExternalOrgsPage() {
         }
       />
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {isLoading ? (
-          <>
-            <Skeleton className="h-24" />
-            <Skeleton className="h-24" />
-            <Skeleton className="h-24" />
-            <Skeleton className="h-24" />
-          </>
-        ) : (
-          CATEGORIES.map((cat) => {
-            const count = orgs.filter((o) => o.category === cat.value).length;
-            return (
-              <MetricCard
-                key={cat.value}
-                title={cat.label}
-                value={count.toString()}
-                icon={Building2}
-              />
-            );
-          })
-        )}
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2 border-b">
+        <button
+          onClick={() => handleFilterChange('all')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            filter === 'all'
+              ? 'border-cyan-600 text-cyan-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Tất cả {pagination && `(${pagination.total})`}
+        </button>
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat.value}
+            onClick={() => handleFilterChange(cat.value)}
+            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+              filter === cat.value
+                ? 'border-cyan-600 text-cyan-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Input
+          placeholder="Tìm theo tên, mã, email, người liên hệ..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
       </div>
 
       {/* Organizations List */}
@@ -170,15 +230,15 @@ export default function ExternalOrgsPage() {
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
             </div>
-          ) : orgs.length === 0 ? (
+          ) : filteredOrgs.length === 0 ? (
             <EmptyState
               icon={Building2}
-              title="Chưa có tổ chức"
-              description="Thêm tổ chức bên ngoài đầu tiên để bắt đầu quản lý"
-              action={{
+              title={searchQuery ? "Không tìm thấy tổ chức" : "Chưa có tổ chức"}
+              description={searchQuery ? "Thử tìm kiếm với từ khóa khác" : "Thêm tổ chức bên ngoài đầu tiên để bắt đầu quản lý"}
+              action={!searchQuery ? {
                 label: "Thêm tổ chức",
                 onClick: () => { setEditingOrg(null); setShowModal(true); }
-              }}
+              } : undefined}
             />
           ) : (
             <div className="rounded-lg border">
@@ -193,7 +253,7 @@ export default function ExternalOrgsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {orgs.map((org) => (
+                    {filteredOrgs.map((org) => (
                       <tr key={org.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                         <td className="px-4 py-4">
                           <div>
@@ -256,6 +316,71 @@ export default function ExternalOrgsPage() {
             </div>
           )}
         </CardContent>
+        {/* Pagination */}
+        {!isLoading && filteredOrgs.length > 0 && pagination && (
+          <CardFooter className="flex items-center justify-between px-6 py-4 border-t">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Hiển thị {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, pagination.total)} trong tổng số {pagination.total}
+              </span>
+              <Select 
+                value={itemsPerPage.toString()} 
+                onValueChange={(value) => { 
+                  setItemsPerPage(parseInt(value)); 
+                  setCurrentPage(1); 
+                }}
+              >
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="30">30</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronsLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm">
+                Trang {currentPage} / {pagination.totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage >= pagination.totalPages}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(pagination.totalPages)}
+                disabled={currentPage >= pagination.totalPages}
+              >
+                <ChevronsRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </CardFooter>
+        )}
       </Card>
 
       {/* Create/Edit Modal */}

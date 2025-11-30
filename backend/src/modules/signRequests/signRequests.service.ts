@@ -9,6 +9,8 @@ import { signersRepository } from "../signers/signers.repository";
 import { webhookService } from "../webhooks/webhooks.service";
 import { signRequestsRepository } from "./signRequests.repository";
 import { signRequestFieldsService } from "./signRequestFields.service";
+import { notificationsService } from "../notifications/notifications.service";
+import { NotificationType } from "../notifications/notifications.types";
 
 export interface SignerInput {
   email: string;
@@ -43,9 +45,15 @@ class SignRequestsService {
   }
 
   /**
-   * Get sign requests created by the current user
+   * Get sign requests created by the current user with pagination
    */
-  async getMySignRequests(userId: number, tenantId: number, status?: string) {
+  async getMySignRequests(
+    userId: number, 
+    tenantId: number, 
+    status?: string,
+    page: number = 1,
+    limit: number = 10
+  ) {
     const where: Prisma.sign_requestsWhereInput = {
       tenant_id: tenantId,
       document: {
@@ -57,6 +65,14 @@ class SignRequestsService {
       where.status = status;
     }
 
+    // Get total count
+    const total = await prisma.sign_requests.count({ where });
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+    const totalPages = Math.ceil(total / limit);
+
+    // Get paginated data
     const signRequests = await signRequestsRepository.findMany({
       where,
       include: {
@@ -82,17 +98,31 @@ class SignRequestsService {
             email: true,
             status: true,
             signed_at: true,
-            signing_order: true
+            signing_order: true,
+            is_internal: true,
+            user_id: true
           },
           orderBy: {
             signing_order: 'asc'
           }
         }
       },
-      orderBy: { created_at: 'desc' }
+      orderBy: { created_at: 'desc' },
+      skip,
+      take: limit
     });
 
-    return signRequests;
+    return {
+      data: signRequests,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
+      }
+    };
   }
 
   /**
@@ -173,14 +203,6 @@ class SignRequestsService {
     });
 
     return this.getSignRequest(signRequest.id, tenantId);
-  }
-
-  async getSignRequest(id: number, tenantId: number) {
-    const signRequest = await signRequestsRepository.findById(id, tenantId);
-    if (!signRequest) {
-      throw ApiError.notFound("Sign request not found", "SIGN_REQUEST_NOT_FOUND");
-    }
-    return signRequest;
   }
 
   /**
@@ -418,6 +440,18 @@ class SignRequestsService {
             expiryMinutes: 10
           });
           console.log(`📧 Sign request email (with OTP) sent to: ${signer.email} (order: ${signer.signing_order})`);
+
+          // Create in-app notification for internal signers
+          if (signer.is_internal && signer.user_id) {
+            await notificationsService.createNotification({
+              tenantId,
+              userId: signer.user_id,
+              type: NotificationType.SIGN_REQUEST,
+              title: 'Yêu cầu ký mới',
+              message: `Bạn có yêu cầu ký cho tài liệu "${signRequest.title || signRequest.document?.title || 'Document'}"`,
+              link: `/sign-requests/${signRequest.id}/internal-sign`,
+            }).catch(err => console.error(`Failed to create notification for user ${signer.user_id}:`, err));
+          }
         } catch (error) {
           console.error(`❌ Failed to send email to ${signer.email}:`, error.message);
         }
@@ -461,8 +495,16 @@ class SignRequestsService {
     // Get all signers to notify
     const signers = await signersRepository.findBySignRequest(id);
 
-    // Update sign request status
-    await signRequestsRepository.updateStatus(id, tenantId, "cancelled");
+    // Update sign request status with cancellation info
+    await prisma.sign_requests.update({
+      where: { id, tenant_id: tenantId },
+      data: {
+        status: "cancelled",
+        cancellation_reason: reason || "Không có lý do",
+        cancelled_at: new Date(),
+        cancelled_by: userId,
+      },
+    });
 
     // Update document status back to draft
     if (signRequest.document_id) {
@@ -492,7 +534,7 @@ class SignRequestsService {
     signRequestId: number,
     userId: number,
     tenantId: number,
-    signatureData: string,
+    signatureData: string | Record<string, string>,  // Support both formats
     signatureType: string,
     ipAddress: string,
     userAgent: string
@@ -551,15 +593,70 @@ class SignRequestsService {
       }
     }
 
+    // Handle signature data - convert to string if it's an object
+    let finalSignatureData: string;
+    if (typeof signatureData === 'string') {
+      // Old format: single signature
+      finalSignatureData = signatureData;
+    } else {
+      // New format: field_signatures object
+      // For now, just take the first signature (backward compatibility)
+      // TODO: Store all field signatures properly
+      const firstSignature = Object.values(signatureData)[0];
+      finalSignatureData = firstSignature || '';
+      
+      // Store field signatures in position_data for future use
+      await signersRepository.update(signer.id, {
+        position_data: signatureData as any
+      });
+    }
+
     // Update signer with signature
     await signersRepository.update(signer.id, {
       status: 'signed',
       signed_at: new Date(),
-      signature_data: signatureData,
+      signature_data: finalSignatureData,
       signature_type: signatureType,
       ip_address: ipAddress,
       user_agent: userAgent
     });
+
+    // ✅ SEQUENTIAL WORKFLOW: Activate next signer
+    if (signRequest.workflow_type === 'sequential' && signer.signing_order) {
+      const allSigners = await signersRepository.findBySignRequest(signRequestId);
+      
+      // Find next signer in order
+      const nextSigner = allSigners.find(s => 
+        s.signing_order === (signer.signing_order! + 1) &&
+        s.status === 'waiting_signing'
+      );
+
+      if (nextSigner) {
+        console.log(`[Sequential Signing] Activating next signer: ${nextSigner.name} (order ${nextSigner.signing_order})`);
+        await signersRepository.update(nextSigner.id, {
+          status: 'pending'
+        });
+
+        // Send notification to next signer
+        if (nextSigner.is_internal && nextSigner.user_id) {
+          try {
+            await notificationsService.create({
+              tenantId,
+              userId: nextSigner.user_id,
+              type: NotificationType.SIGN_REQUEST_RECEIVED,
+              title: 'Đến lượt bạn ký tài liệu',
+              message: `Tài liệu "${signRequest.title}" đang chờ bạn ký`,
+              metadata: {
+                sign_request_id: signRequestId,
+                document_id: signRequest.document_id
+              }
+            });
+          } catch (error) {
+            console.error('Failed to send notification to next signer:', error);
+          }
+        }
+      }
+    }
 
     // Check if all signers have signed
     const allSigners = await signersRepository.findBySignRequest(signRequestId);
@@ -567,14 +664,34 @@ class SignRequestsService {
       s.status === 'signed' || s.status === 'completed'
     );
 
-    // Update sign request and document status
+    // ✅ PROGRESSIVE PDF: Generate PDF after each signature
+    try {
+      console.log(`[Internal Signing] Generating progressive PDF for sign request ${signRequestId}`);
+      const { pdfGenerationService } = await import('./pdfGeneration.service');
+      
+      const signedPdfPath = await pdfGenerationService.generateProgressivePdf(
+        signRequestId,
+        {
+          includeAuditTrail: allSigned,  // Only add audit trail when completed
+          addWatermark: !allSigned        // Add watermark if not completed
+        }
+      );
+      
+      // Update document with signed PDF path
+      await documentsRepository.update(signRequest.document_id, {
+        signed_file_path: signedPdfPath,
+        status: allSigned ? 'completed' : 'in_progress'
+      });
+      
+      console.log(`[Internal Signing] Progressive PDF generated: ${signedPdfPath}`);
+    } catch (error: any) {
+      console.error(`[Internal Signing] Failed to generate progressive PDF: ${error.message}`);
+      // Don't fail the signing process if PDF generation fails
+    }
+
+    // Update sign request status
     if (allSigned) {
       await signRequestsRepository.updateStatus(signRequestId, tenantId, 'completed');
-      if (signRequest.document_id) {
-        await documentsRepository.update(signRequest.document_id, {
-          status: 'completed'
-        });
-      }
     } else {
       await signRequestsRepository.updateStatus(signRequestId, tenantId, 'in_progress');
     }

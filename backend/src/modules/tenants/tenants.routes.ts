@@ -8,3 +8,4 @@ const controller = new TenantsController();
 export const tenantsRouter = Router();
 
 tenantsRouter.get("/me", authGuard, asyncHandler(controller.me));
+tenantsRouter.get("/me/stats", authGuard, asyncHandler(controller.stats));

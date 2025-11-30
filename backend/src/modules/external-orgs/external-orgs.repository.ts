@@ -10,6 +10,45 @@ export class ExternalOrgsRepository {
     });
   }
 
+  async findAllPaginated(
+    tenantId: number,
+    options: {
+      page: number;
+      limit: number;
+      category?: string;
+    }
+  ) {
+    const { page, limit, category } = options;
+    const skip = (page - 1) * limit;
+
+    const where: any = { tenant_id: tenantId };
+    if (category) {
+      where.category = category;
+    }
+
+    const [orgs, total] = await Promise.all([
+      prisma.external_organizations.findMany({
+        where,
+        orderBy: { created_at: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.external_organizations.count({ where }),
+    ]);
+
+    return {
+      orgs,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+    };
+  }
+
   async findById(id: number, tenantId: number) {
     return prisma.external_organizations.findFirst({
       where: { id, tenant_id: tenantId },

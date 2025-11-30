@@ -30,14 +30,19 @@ export class SignRequestsController {
 
   getMyRequests = async (req: Request, res: Response): Promise<void> => {
     const status = req.query.status as string | undefined;
-    const signRequests = await signRequestsService.getMySignRequests(
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    
+    const result = await signRequestsService.getMySignRequests(
       req.auth!.userId,
       req.auth!.tenantId,
-      status
+      status,
+      page,
+      limit
     );
     
     // Calculate progress for each request
-    const requestsWithProgress = signRequests.map((sr: any) => {
+    const requestsWithProgress = result.data.map((sr: any) => {
       const totalSigners = sr.signers?.length || 0;
       const signedCount = sr.signers?.filter((s: any) => s.status === 'signed' || s.status === 'completed').length || 0;
       const rejectedCount = sr.signers?.filter((s: any) => s.status === 'rejected').length || 0;
@@ -54,7 +59,10 @@ export class SignRequestsController {
       };
     });
     
-    res.json(ok({ sign_requests: requestsWithProgress }));
+    res.json(ok({ 
+      sign_requests: requestsWithProgress,
+      pagination: result.pagination
+    }));
   };
 
   create = async (req: Request, res: Response): Promise<void> => {
@@ -295,17 +303,23 @@ export class SignRequestsController {
   // Internal Signing (no OTP required)
   signInternal = async (req: Request, res: Response): Promise<void> => {
     const id = idSchema.parse(req.params.id);
+    
+    // Support both old format (signature_data) and new format (field_signatures)
     const signatureSchema = z.object({
-      signature_data: z.string().min(1),
+      signature_data: z.string().min(1).optional(),
+      field_signatures: z.record(z.string()).optional(),
       signature_type: z.enum(['drawn', 'uploaded', 'typed']),
+    }).refine(data => data.signature_data || data.field_signatures, {
+      message: "Either signature_data or field_signatures must be provided"
     });
+    
     const body = signatureSchema.parse(req.body);
     
     const result = await signRequestsService.signInternal(
       id,
       req.auth!.userId,
       req.auth!.tenantId,
-      body.signature_data,
+      body.signature_data || body.field_signatures!,
       body.signature_type,
       req.ip || 'unknown',
       req.get('user-agent') || 'unknown'

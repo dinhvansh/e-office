@@ -3,6 +3,8 @@ import { approvalsRepository } from './approvals.repository';
 import { prisma } from '../../config/prisma';
 import { emailService } from '../common/email.service';
 import { signRequestsService } from '../signRequests/signRequests.service';
+import { notificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/notifications.types';
 
 class ApprovalsService {
   /**
@@ -213,9 +215,10 @@ class ApprovalsService {
 
     const approvalUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/approvals`;
 
-    // Send emails in parallel (don't wait)
+    // Send emails and in-app notifications in parallel (don't wait)
     Promise.all(
-      approvers.map(approver =>
+      approvers.map(async approver => {
+        // Send email
         emailService.sendApprovalRequestNotification({
           recipientEmail: approver.email,
           recipientName: approver.full_name || approver.email,
@@ -226,9 +229,19 @@ class ApprovalsService {
           stepName: firstStep.step_name || `Bước ${firstStep.step_order}`,
           dueDate,
           approvalUrl,
-        }).catch(err => console.error(`Failed to send email to ${approver.email}:`, err))
-      )
-    ).catch(err => console.error('Email notification errors:', err));
+        }).catch(err => console.error(`Failed to send email to ${approver.email}:`, err));
+
+        // Create in-app notification
+        notificationsService.createNotification({
+          tenantId,
+          userId: approver.id,
+          type: NotificationType.APPROVAL_REQUEST,
+          title: 'Yêu cầu phê duyệt mới',
+          message: `Tài liệu "${document.title || 'Untitled'}" cần phê duyệt của bạn`,
+          link: `/approvals?filter=pending`,
+        }).catch(err => console.error(`Failed to create notification for user ${approver.id}:`, err));
+      })
+    ).catch(err => console.error('Notification errors:', err));
 
     return {
       instance,
@@ -499,6 +512,7 @@ class ApprovalsService {
       if (document?.owner) {
         const documentUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/documents/${document.id}`;
         
+        // Send email notification
         emailService.sendWorkflowCompletedNotification({
           recipientEmail: document.owner.email,
           recipientName: document.owner.full_name || document.owner.email,
@@ -507,6 +521,16 @@ class ApprovalsService {
           workflowName: instance.workflow.name,
           documentUrl,
         }).catch(err => console.error('Failed to send completion email:', err));
+
+        // Create in-app notification
+        notificationsService.createNotification({
+          tenantId,
+          userId: document.owner.id,
+          type: NotificationType.WORKFLOW_COMPLETED,
+          title: 'Quy trình phê duyệt hoàn tất',
+          message: `Tài liệu "${document.title || 'Untitled'}" đã được phê duyệt hoàn tất`,
+          link: `/documents/${document.id}`,
+        }).catch(err => console.error('Failed to create notification:', err));
 
         // Also notify approver
         if (approver) {
@@ -598,6 +622,7 @@ class ApprovalsService {
     if (document?.owner && approver) {
       const documentUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/documents/${document.id}`;
       
+      // Send email notification
       emailService.sendApprovalActionNotification({
         recipientEmail: document.owner.email,
         recipientName: document.owner.full_name || document.owner.email,
@@ -608,6 +633,16 @@ class ApprovalsService {
         comment,
         documentUrl,
       }).catch(err => console.error('Failed to send rejection email:', err));
+
+      // Create in-app notification
+      notificationsService.createNotification({
+        tenantId,
+        userId: document.owner.id,
+        type: NotificationType.APPROVAL_REJECTED,
+        title: 'Tài liệu bị từ chối',
+        message: `Tài liệu "${document.title || 'Untitled'}" đã bị từ chối bởi ${approver.full_name || approver.email}`,
+        link: `/documents/${document.id}/flow`,
+      }).catch(err => console.error('Failed to create notification:', err));
     }
 
     return {
@@ -676,6 +711,7 @@ class ApprovalsService {
     if (document?.owner && approver) {
       const documentUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/documents/${document.id}`;
       
+      // Send email notification
       emailService.sendApprovalActionNotification({
         recipientEmail: document.owner.email,
         recipientName: document.owner.full_name || document.owner.email,
@@ -686,6 +722,16 @@ class ApprovalsService {
         comment,
         documentUrl,
       }).catch(err => console.error('Failed to send request info email:', err));
+
+      // Create in-app notification
+      notificationsService.createNotification({
+        tenantId,
+        userId: document.owner.id,
+        type: NotificationType.APPROVAL_INFO_REQUESTED,
+        title: 'Yêu cầu bổ sung thông tin',
+        message: `${approver.full_name || approver.email} yêu cầu bổ sung thông tin cho tài liệu "${document.title || 'Untitled'}"`,
+        link: `/documents/${document.id}/flow`,
+      }).catch(err => console.error('Failed to create notification:', err));
     }
 
     return {
@@ -917,12 +963,17 @@ class ApprovalsService {
     // Get signing tasks if taskType is 'signing' or undefined (all)
     if (!options?.taskType || options.taskType === 'signing') {
       // Get all sign requests with signers
+      // ✅ Only get signers that are ready to sign (pending, otp_sent)
+      // ❌ Exclude waiting_signing (waiting for their turn)
       const signRequests: any = await prisma.sign_requests.findMany({
         include: {
           signers: {
             where: {
               user_id: userId,
               is_internal: true,
+              status: {
+                in: ['pending', 'otp_sent', 'signed', 'rejected'] // Exclude waiting_signing, waiting_approval
+              }
             }
           },
           document: {

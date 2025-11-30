@@ -60,7 +60,13 @@ export default function SignRequestDetailPage() {
     const loadPDF = async () => {
       try {
         const token = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('esign.auth') || '{}')?.tokens?.accessToken : '';
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${signRequest.document.id}/view`, {
+        
+        // Use signed version if sign request is completed
+        const endpoint = signRequest.status === 'completed' 
+          ? `/documents/${signRequest.document.id}/view-signed`
+          : `/documents/${signRequest.document.id}/view`;
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}${endpoint}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

@@ -16,6 +16,8 @@ import { externalOrgsRouter } from "../modules/external-orgs/external-orgs.route
 import workflowsRouter from "../modules/workflows/workflows.routes";
 import approvalsRouter from "../modules/approvals/approvals.routes";
 import documentFlowRouter from "../modules/documentFlow/documentFlow.routes";
+import notificationsRouter from "../modules/notifications/notifications.routes";
+import settingsRouter from "../modules/settings/settings.routes";
 
 export const v1Router = Router();
 
@@ -37,3 +39,5 @@ v1Router.use("/sign-requests", signRequestsRouter);
 v1Router.use("/signers", signersRouter);
 v1Router.use("/audit", auditRouter);
 v1Router.use("/webhooks", webhooksRouter);
+v1Router.use("/notifications", notificationsRouter);
+v1Router.use("/settings", settingsRouter);

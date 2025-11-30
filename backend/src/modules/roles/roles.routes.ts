@@ -9,6 +9,7 @@ router.use(authGuard);
 router.get('/', rolesController.getRoles);
 router.get('/permissions', rolesController.getAllPermissions);
 router.get('/my-permissions', rolesController.getUserPermissions);
+router.get('/:id/users', rolesController.getRoleUsers);
 router.get('/:id', rolesController.getRoleById);
 router.post('/', rolesController.createRole);
 router.put('/:id', rolesController.updateRole);

@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
-import { PenTool, Eye, Search, Edit, Upload, GitBranch, MoreVertical, Trash2, XCircle, RotateCcw } from 'lucide-react';
+import { PenTool, Eye, Search, Edit, Upload, GitBranch, MoreVertical, Trash2, XCircle, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +31,7 @@ interface SignRequest {
     title: string | null;
     original_file_name: string;
     document_number: string | null;
+    document_type?: string | null;
     owner: {
       id: number;
       full_name: string | null;
@@ -61,6 +63,8 @@ export default function SignRequestsPage() {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -76,19 +80,27 @@ export default function SignRequestsPage() {
     onConfirm: () => {},
   });
 
-  // Copy signing link for external signers
+  // Cancel dialog with reason
+  const [cancelDialog, setCancelDialog] = useState<{ 
+    open: boolean; 
+    signRequestId: number | null; 
+    reason: string 
+  }>({
+    open: false,
+    signRequestId: null,
+    reason: '',
+  });
+
+  // Copy signing link for signers
   const handleCopySigningLink = async (request: SignRequest) => {
     try {
-      // Get external signer with token
-      const externalSigner = request.signers.find(s => !s.email.includes('@acme.local'));
-      if (!externalSigner) {
-        alert('Không tìm thấy người ký bên ngoài');
-        return;
-      }
-
-      // Fetch signer details to get token
+      // Fetch full sign request details to get tokens
       const response = await fetchJson<any>(`/sign-requests/${request.id}`);
-      const signerWithToken = response.signers?.find((s: any) => s.id === externalSigner.id);
+      
+      // Find first signer with token (prefer external, then internal)
+      const externalSigner = response.signers?.find((s: any) => !s.is_internal && s.signing_token);
+      const internalSigner = response.signers?.find((s: any) => s.is_internal && s.signing_token);
+      const signerWithToken = externalSigner || internalSigner;
       
       if (!signerWithToken?.signing_token) {
         alert('Chưa có link ký. Vui lòng gửi yêu cầu ký trước.');
@@ -97,7 +109,7 @@ export default function SignRequestsPage() {
 
       const signingUrl = `${window.location.origin}/sign/${signerWithToken.signing_token}`;
       await navigator.clipboard.writeText(signingUrl);
-      alert('✅ Đã copy link ký vào clipboard!');
+      alert(`✅ Đã copy link ký cho ${signerWithToken.name || signerWithToken.email}!`);
     } catch (error: any) {
       console.error('Copy link error:', error);
       alert('❌ Lỗi: ' + (error.message || 'Không thể copy link'));
@@ -134,13 +146,17 @@ export default function SignRequestsPage() {
     },
   });
 
-  // Cancel mutation
+  // Cancel mutation with reason
   const cancelMutation = useMutation({
-    mutationFn: async (signRequestId: number) => {
-      await fetchJson(`/sign-requests/${signRequestId}/cancel`, { method: 'POST' });
+    mutationFn: async ({ signRequestId, reason }: { signRequestId: number; reason: string }) => {
+      await fetchJson(`/sign-requests/${signRequestId}/cancel`, { 
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
     },
     onSuccess: () => {
-      toast.success('Đã hủy luồng ký thành công!');
+      toast.success('Đã hủy luồng ký! Email thông báo đã được gửi đến tất cả người ký.');
+      setCancelDialog({ open: false, signRequestId: null, reason: '' });
       queryClient.invalidateQueries({ queryKey: ['my-sign-requests'] });
     },
     onError: (error: any) => {
@@ -173,15 +189,19 @@ export default function SignRequestsPage() {
     });
   };
 
-  // Cancel handler
+  // Cancel handler - open dialog with reason input
   const handleCancel = (signRequestId: number) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Hủy luồng ký',
-      message: 'Bạn có chắc muốn hủy luồng ký này?\n\nTất cả người ký sẽ không thể ký nữa!',
-      confirmText: 'Hủy luồng',
-      onConfirm: () => cancelMutation.mutate(signRequestId),
-    });
+    setCancelDialog({ open: true, signRequestId, reason: '' });
+  };
+
+  // Confirm cancel with reason
+  const confirmCancel = () => {
+    if (cancelDialog.signRequestId) {
+      cancelMutation.mutate({
+        signRequestId: cancelDialog.signRequestId,
+        reason: cancelDialog.reason || 'Không có lý do',
+      });
+    }
   };
 
   // Revoke handler
@@ -229,16 +249,33 @@ export default function SignRequestsPage() {
     return previousSigners.every(s => s.status === 'signed' || s.status === 'completed');
   };
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['my-sign-requests', filter],
+  const { data: response, isLoading } = useQuery({
+    queryKey: ['my-sign-requests', filter, currentPage, itemsPerPage],
     queryFn: async () => {
-      const params = filter !== 'all' ? `?status=${filter}` : '';
-      const res = await fetchJson<{ sign_requests: SignRequest[] }>(
-        `/sign-requests/my-requests${params}`
+      const params = new URLSearchParams();
+      if (filter !== 'all') params.append('status', filter);
+      params.append('page', currentPage.toString());
+      params.append('limit', itemsPerPage.toString());
+      
+      const res = await fetchJson<{ 
+        sign_requests: SignRequest[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+          hasNext: boolean;
+          hasPrev: boolean;
+        }
+      }>(
+        `/sign-requests/my-requests?${params.toString()}`
       );
-      return res.sign_requests;
+      return res;
     },
   });
+
+  const data = response?.sign_requests;
+  const pagination = response?.pagination;
 
   const getStatusBadge = (progress: SignRequest['progress'], status: string) => {
     if (status === 'cancelled') {
@@ -273,6 +310,12 @@ export default function SignRequestsPage() {
            docNumber.toLowerCase().includes(searchLower);
   });
 
+  // Reset to page 1 when filter changes
+  const handleFilterChange = (newFilter: string) => {
+    setFilter(newFilter);
+    setCurrentPage(1);
+  };
+
   const stats = {
     all: data?.length || 0,
     pending: data?.filter(r => r.status === 'pending' || r.status === 'in_progress').length || 0,
@@ -301,44 +344,44 @@ export default function SignRequestsPage() {
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 border-b">
         <button
-          onClick={() => setFilter('all')}
+          onClick={() => handleFilterChange('all')}
           className={`px-4 py-2 font-medium border-b-2 transition-colors ${
             filter === 'all'
               ? 'border-green-600 text-green-600'
               : 'border-transparent text-gray-600 hover:text-gray-900'
           }`}
         >
-          Tất cả ({stats.all})
+          Tất cả {pagination && `(${pagination.total})`}
         </button>
         <button
-          onClick={() => setFilter('pending')}
+          onClick={() => handleFilterChange('pending')}
           className={`px-4 py-2 font-medium border-b-2 transition-colors ${
             filter === 'pending'
               ? 'border-yellow-600 text-yellow-600'
               : 'border-transparent text-gray-600 hover:text-gray-900'
           }`}
         >
-          Chờ ký ({stats.pending})
+          Chờ ký
         </button>
         <button
-          onClick={() => setFilter('completed')}
+          onClick={() => handleFilterChange('completed')}
           className={`px-4 py-2 font-medium border-b-2 transition-colors ${
             filter === 'completed'
               ? 'border-green-600 text-green-600'
               : 'border-transparent text-gray-600 hover:text-gray-900'
           }`}
         >
-          Đã hoàn thành ({stats.completed})
+          Đã hoàn thành
         </button>
         <button
-          onClick={() => setFilter('rejected')}
+          onClick={() => handleFilterChange('rejected')}
           className={`px-4 py-2 font-medium border-b-2 transition-colors ${
             filter === 'rejected'
               ? 'border-red-600 text-red-600'
               : 'border-transparent text-gray-600 hover:text-gray-900'
           }`}
         >
-          Đã từ chối ({stats.rejected})
+          Đã từ chối
         </button>
       </div>
 
@@ -362,6 +405,7 @@ export default function SignRequestsPage() {
                 <tr>
                   <th className="px-4 py-3 text-left text-sm font-medium">Mã yêu cầu</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Tên tài liệu</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Loại tài liệu</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Người tạo</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Ngày tạo</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Tiến độ</th>
@@ -378,7 +422,11 @@ export default function SignRequestsPage() {
                   </tr>
                 ) : filteredData && filteredData.length > 0 ? (
                   filteredData.map((request) => (
-                    <tr key={request.id} className="border-b hover:bg-muted/30 transition-colors">
+                    <tr 
+                      key={request.id} 
+                      className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => router.push(`/documents/${request.document.id}/flow`)}
+                    >
                       <td className="px-4 py-3">
                         <span className="font-mono text-sm">
                           {request.document.document_number || `#${request.id}`}
@@ -387,6 +435,11 @@ export default function SignRequestsPage() {
                       <td className="px-4 py-3">
                         <span className="font-medium">
                           {request.document.title || request.document.original_file_name}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-sm text-gray-600">
+                          {request.document.document_type || '—'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -420,7 +473,7 @@ export default function SignRequestsPage() {
                         {getStatusBadge(request.progress, request.status)}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 justify-center">
+                        <div className="flex items-center gap-1 justify-center" onClick={(e) => e.stopPropagation()}>
                           {/* Edit Workflow Button - Show for draft documents */}
                           {request.status === 'draft' && (
                             <Button
@@ -445,12 +498,12 @@ export default function SignRequestsPage() {
                             </Button>
                           )}
 
-                          {/* View Details Button */}
+                          {/* View Document Flow Button */}
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => router.push(`/sign-requests/${request.id}`)}
-                            title="Xem luồng"
+                            onClick={() => router.push(`/documents/${request.document.id}/flow`)}
+                            title="Xem tài liệu"
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
@@ -530,14 +583,6 @@ export default function SignRequestsPage() {
                                   <DropdownMenuSeparator />
                                 </>
                               )}
-
-                              {/* View Flow */}
-                              <DropdownMenuItem
-                                onClick={() => router.push(`/documents/${request.document.id}/flow`)}
-                              >
-                                <GitBranch className="w-4 h-4 mr-2" />
-                                Xem luồng chi tiết
-                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -555,6 +600,65 @@ export default function SignRequestsPage() {
             </table>
           </div>
         </CardContent>
+        {/* Pagination */}
+        {!isLoading && filteredData && filteredData.length > 0 && pagination && (
+          <div className="flex items-center justify-between px-4 py-3 border-t">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Hiển thị {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, pagination.total)} trong tổng số {pagination.total}
+              </span>
+              <Select value={itemsPerPage.toString()} onValueChange={(value) => { setItemsPerPage(parseInt(value)); setCurrentPage(1); }}>
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="30">30</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronsLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm">
+                Trang {currentPage} / {pagination.totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage >= pagination.totalPages}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(pagination.totalPages)}
+                disabled={currentPage >= pagination.totalPages}
+              >
+                <ChevronsRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Confirmation Dialog */}
@@ -567,6 +671,50 @@ export default function SignRequestsPage() {
         confirmText={confirmDialog.confirmText}
         cancelText="Hủy"
       />
+
+      {/* Cancel Dialog with Reason */}
+      {cancelDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-2">Hủy luồng ký</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Vui lòng nhập lý do hủy. Email thông báo sẽ được gửi đến tất cả người ký.
+              </p>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">
+                  Lý do hủy <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="VD: Tài liệu cần chỉnh sửa lại nội dung..."
+                  value={cancelDialog.reason}
+                  onChange={(e) => setCancelDialog({ ...cancelDialog, reason: e.target.value })}
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setCancelDialog({ open: false, signRequestId: null, reason: '' })}
+                  disabled={cancelMutation.isPending}
+                >
+                  Đóng
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={confirmCancel}
+                  disabled={cancelMutation.isPending || !cancelDialog.reason.trim()}
+                >
+                  {cancelMutation.isPending ? 'Đang hủy...' : 'Xác nhận hủy'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

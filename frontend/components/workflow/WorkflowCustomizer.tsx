@@ -26,9 +26,10 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
     },
   });
 
+  // ✅ Fetch only active users for selection
   const { data: usersData } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => fetchJson<any>('/users'),
+    queryKey: ['users', 'active'],
+    queryFn: () => fetchJson<any>('/users/active'),
   });
 
   const users = (usersData as any) || [];
@@ -113,16 +114,27 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
             onChange={() => {
               setUseDefault(false);
               if (customSteps.length === 0) {
-                // Initialize with default steps
+                // Initialize with default steps structure
                 setCustomSteps(
-                  defaultSteps.map((step: any, idx: number) => ({
-                    step_name: step.step_name,
-                    approver_type: step.approver_type,
-                    approver_id: step.approver_id,
-                    participant_role: step.participant_role || 'approver', // ✅ Include role
-                    due_in_days: step.due_in_days,
-                    order: idx + 1, // ✅ Add order field
-                  }))
+                  defaultSteps.map((step: any, idx: number) => {
+                    // ✅ Keep approver_id from template ONLY if it's a valid user type
+                    // Otherwise set to null and let user choose
+                    let approverId = null;
+                    
+                    if (step.approver_type === 'user' && step.approver_id) {
+                      approverId = step.approver_id;
+                    }
+                    // For department/role/manager types, leave null - user must choose
+                    
+                    return {
+                      step_name: step.step_name,
+                      approver_type: 'user', // ✅ Force to 'user' type for customization
+                      approver_id: approverId, // ✅ null if not user type - user must select
+                      participant_role: step.participant_role || 'approver',
+                      due_in_days: step.due_in_days || 3,
+                      order: idx + 1,
+                    };
+                  })
                 );
               }
             }}
@@ -204,10 +216,25 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
               💡 <strong>Mẹo:</strong> Bạn có thể tùy chỉnh số thứ tự của mỗi bước bằng cách nhập vào ô số bên trái
             </p>
           </div>
-          {customSteps.map((step, index) => (
+          
+          {/* ✅ Warning if any step has no approver */}
+          {customSteps.some(s => !s.approver_id || s.approver_id <= 0) && (
+            <div className="p-3 bg-amber-50 rounded-lg border border-amber-300">
+              <p className="text-xs text-amber-800 font-medium">
+                ⚠️ <strong>Cảnh báo:</strong> Có {customSteps.filter(s => !s.approver_id || s.approver_id <= 0).length} bước chưa chọn người phê duyệt/ký. 
+                Vui lòng chọn người cho tất cả các bước trước khi tải lên.
+              </p>
+            </div>
+          )}
+          {customSteps.map((step, index) => {
+            const hasApprover = step.approver_id && step.approver_id > 0;
+            const borderColor = hasApprover ? 'border-gray-200' : 'border-amber-300';
+            const bgColor = hasApprover ? 'bg-white' : 'bg-amber-50';
+            
+            return (
             <div
               key={index}
-              className="flex items-start gap-2 p-3 bg-white rounded-lg border border-gray-200"
+              className={`flex items-start gap-2 p-3 rounded-lg border ${borderColor} ${bgColor}`}
             >
               {/* ✅ Order input instead of fixed number */}
               <div className="flex-shrink-0">
@@ -252,6 +279,11 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
                       onChange={(value) => handleUpdateStep(index, 'approver_id', typeof value === 'string' ? parseInt(value) : value)}
                       placeholder={step.participant_role === 'signer' ? '-- Chọn người ký --' : '-- Chọn người phê duyệt --'}
                     />
+                    {!hasApprover && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        ⚠️ Vui lòng chọn người {step.participant_role === 'signer' ? 'ký' : 'phê duyệt'}
+                      </p>
+                    )}
                   </div>
                   <input
                     type="number"
@@ -274,7 +306,8 @@ export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowC
                 <Trash2 className="w-4 h-4 text-red-500" />
               </Button>
             </div>
-          ))}
+          );
+          })}
 
           <Button
             type="button"

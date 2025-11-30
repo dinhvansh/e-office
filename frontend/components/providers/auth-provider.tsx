@@ -188,16 +188,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           logout();
           throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
         }
-        const json = await res.json();
-        if (!json.success) {
+        // Handle non-JSON responses
+        let json;
+        try {
+          json = await res.json();
+        } catch (parseError) {
+          console.error('[Auth] Failed to parse JSON response:', parseError);
+          throw new Error(`Request failed with status ${res.status}`);
+        }
+
+        // Check if response has success field
+        if (json.success === false) {
           console.error('[Auth] Request failed:', json.error);
           // Backend returns error as string directly, not as object
           const errorMessage = typeof json.error === 'string' 
             ? json.error 
-            : json.error?.message ?? 'Request failed';
+            : json.error?.message ?? `Request failed with status ${res.status}`;
           throw new Error(errorMessage);
         }
-        return json.data as T;
+
+        // If no success field but has data, return data
+        if (json.data !== undefined) {
+          return json.data as T;
+        }
+
+        // If success is true, return data
+        if (json.success === true) {
+          return json.data as T;
+        }
+
+        // Otherwise return the whole response
+        return json as T;
       };
       return attempt();
     },

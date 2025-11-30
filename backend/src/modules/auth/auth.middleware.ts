@@ -5,11 +5,17 @@ import { authService } from "./auth.service";
 
 export const authGuard = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
   try {
+    // Try to get token from header first, then from query string
+    let token: string | undefined;
+    
     const header = req.headers.authorization;
-    if (!header || !header.startsWith("Bearer ")) {
-      throw ApiError.unauthorized("Missing authorization header", "AUTH_HEADER_REQUIRED");
+    if (header && header.startsWith("Bearer ")) {
+      token = header.replace("Bearer ", "").trim();
+    } else if (req.query.token && typeof req.query.token === 'string') {
+      // Support token in query string for iframe/embed scenarios
+      token = req.query.token.trim();
     }
-    const token = header.replace("Bearer ", "").trim();
+    
     if (!token || token === "null" || token === "undefined") {
       throw ApiError.unauthorized("Missing token", "TOKEN_REQUIRED");
     }

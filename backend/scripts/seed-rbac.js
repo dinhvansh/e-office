@@ -53,6 +53,7 @@ async function seedRBAC() {
     // Settings
     { resource: 'settings', action: 'read', description: 'View settings' },
     { resource: 'settings', action: 'update', description: 'Update settings' },
+    { resource: 'settings', action: 'manage', description: 'Manage system settings' },
   ];
 
   console.log('Creating permissions...');

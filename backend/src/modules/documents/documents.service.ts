@@ -9,6 +9,12 @@ import { numberingService } from "../numbering/numbering.service";
 import { prisma } from "../../config/prisma";
 import { CreateDocumentData, documentsRepository } from "./documents.repository";
 import { canViewDocument, filterViewableDocuments } from "./documents.access";
+import { number } from "zod";
+import { number } from "zod";
+import { number } from "zod";
+import { number } from "zod";
+import { number } from "zod";
+import { number } from "zod";
 
 export interface CreateDocumentInput {
   fileName: string;
@@ -64,9 +70,11 @@ class DocumentsService {
     userId: number | undefined,
     page: number = 1,
     limit: number = 10,
-    noSigningOnly = false
+    noSigningOnly = false,
+    status?: string,
+    search?: string
   ) {
-    const result = await documentsRepository.listByTenantPaginated(tenantId, { page, limit }, noSigningOnly);
+    const result = await documentsRepository.listByTenantPaginated(tenantId, { page, limit }, noSigningOnly, status, search);
     
     // If no userId provided (admin context), return all documents
     if (!userId) {
@@ -974,11 +982,24 @@ class DocumentsService {
       filePath = path.resolve(process.cwd(), document.file_path);
     }
     
-    // Extract filename from path
-    const fileName = path.basename(document.file_path);
+    // ✅ Create meaningful filename for download (original file)
+    // Format: [DocumentNumber]_[Title]_Original.pdf
+    let fileName: string;
+    
+    const docNumber = document.document_number || `DOC-${document.id}`;
+    const title = document.title || document.original_file_name.replace(/\.[^/.]+$/, ''); // Remove extension
+    
+    // Sanitize filename
+    const sanitizedTitle = title
+      .replace(/[^a-zA-Z0-9\s\-_]/g, '')
+      .replace(/\s+/g, '-')
+      .substring(0, 50);
+    
+    const ext = path.extname(document.file_path);
+    fileName = `${docNumber}_${sanitizedTitle}_Original${ext}`;
     
     // Determine mime type from extension
-    const ext = path.extname(fileName).toLowerCase();
+    const extLower = ext.toLowerCase();
     const mimeTypes: Record<string, string> = {
       '.pdf': 'application/pdf',
       '.doc': 'application/msword',
@@ -993,13 +1014,68 @@ class DocumentsService {
       '.zip': 'application/zip',
     };
     
-    const mimeType = mimeTypes[ext] || 'application/octet-stream';
+    const mimeType = mimeTypes[extLower] || 'application/octet-stream';
     
     // Check if file exists
     try {
       await fs.access(filePath);
     } catch (error) {
       throw ApiError.notFound("File not found on disk", "FILE_NOT_FOUND");
+    }
+    
+    return { filePath, fileName, mimeType };
+  }
+
+  async getSignedDocumentFile(documentId: number, tenantId: number, userId?: number): Promise<{
+    filePath: string;
+    fileName: string;
+    mimeType: string;
+  }> {
+    const document = await this.getDocument(documentId, tenantId, userId);
+    
+    // Check if signed file exists
+    if (!document.signed_file_path) {
+      throw ApiError.notFound("Signed file not available", "SIGNED_FILE_NOT_FOUND");
+    }
+    
+    // Get absolute file path
+    const path = require('path');
+    
+    let filePath: string;
+    
+    if (path.isAbsolute(document.signed_file_path)) {
+      filePath = document.signed_file_path;
+    } else if (document.signed_file_path.startsWith('storage/') || document.signed_file_path.startsWith('storage\\')) {
+      filePath = path.resolve(process.cwd(), document.signed_file_path);
+    } else {
+      filePath = path.resolve(process.cwd(), document.signed_file_path);
+    }
+    
+    // ✅ Create meaningful filename for download
+    // Format: [DocumentNumber]_[Title]_[Status].pdf
+    // Example: 027-2025_Giay-De-Nghi_Signed.pdf or 027-2025_Giay-De-Nghi_Draft.pdf
+    let fileName: string;
+    
+    const docNumber = document.document_number || `DOC-${document.id}`;
+    const title = document.title || document.original_file_name.replace('.pdf', '');
+    const status = document.status === 'completed' ? 'Signed' : 'Draft';
+    
+    // Sanitize filename (remove special chars, limit length)
+    const sanitizedTitle = title
+      .replace(/[^a-zA-Z0-9\s\-_]/g, '') // Remove special chars
+      .replace(/\s+/g, '-')               // Replace spaces with dash
+      .substring(0, 50);                  // Limit length
+    
+    fileName = `${docNumber}_${sanitizedTitle}_${status}.pdf`;
+    
+    // Signed files are always PDF
+    const mimeType = 'application/pdf';
+    
+    // Check if file exists
+    try {
+      await fs.access(filePath);
+    } catch (error) {
+      throw ApiError.notFound("Signed file not found on disk", "FILE_NOT_FOUND");
     }
     
     return { filePath, fileName, mimeType };
@@ -1055,6 +1131,32 @@ class DocumentsService {
     }
     
     return await this.getDocument(documentId, tenantId, userId);
+  }
+
+  async archiveDocument(documentId: number, tenantId: number, userId: number): Promise<void> {
+    const document = await this.getDocument(documentId, tenantId, userId);
+    
+    if (document.status !== 'completed') {
+      throw ApiError.badRequest('Only completed documents can be archived', 'DOCUMENT_NOT_COMPLETED');
+    }
+    
+    await prisma.documents.update({
+      where: { id: documentId },
+      data: { status: 'archived' }
+    });
+  }
+
+  async cancelDocument(documentId: number, tenantId: number, userId: number): Promise<void> {
+    const document = await this.getDocument(documentId, tenantId, userId);
+    
+    if (document.status !== 'completed') {
+      throw ApiError.badRequest('Only completed documents can be cancelled', 'DOCUMENT_NOT_COMPLETED');
+    }
+    
+    await prisma.documents.update({
+      where: { id: documentId },
+      data: { status: 'cancelled' }
+    });
   }
 }
 

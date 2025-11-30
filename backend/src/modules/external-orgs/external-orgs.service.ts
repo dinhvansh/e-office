@@ -6,6 +6,17 @@ export class ExternalOrgsService {
     return externalOrgsRepository.findAll(tenantId);
   }
 
+  async getAllPaginated(
+    tenantId: number,
+    options: {
+      page: number;
+      limit: number;
+      category?: string;
+    }
+  ) {
+    return externalOrgsRepository.findAllPaginated(tenantId, options);
+  }
+
   async getById(id: number, tenantId: number) {
     const org = await externalOrgsRepository.findById(id, tenantId);
     if (!org) {

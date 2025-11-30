@@ -27,11 +27,11 @@ export function InternalSignersSelector({ signers, onChange, allowEdit = false }
   const { fetchJson } = useAuth();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
-  // Fetch internal users
+  // ✅ Fetch only active users
   const { data: users } = useQuery({
-    queryKey: ['users'],
+    queryKey: ['users', 'active'],
     queryFn: async () => {
-      const data = await fetchJson<any>('/users');
+      const data = await fetchJson<any>('/users/active');
       return Array.isArray(data) ? data : [];
     },
   });

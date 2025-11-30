@@ -14,6 +14,8 @@ export class SignRequestsRepository {
     where: Prisma.sign_requestsWhereInput;
     include?: Prisma.sign_requestsInclude;
     orderBy?: Prisma.sign_requestsOrderByWithRelationInput;
+    skip?: number;
+    take?: number;
   }) {
     return prisma.sign_requests.findMany(params);
   }
@@ -29,7 +31,10 @@ export class SignRequestsRepository {
         signers: {
           orderBy: { signing_order: 'asc' }
         }, 
-        document: true
+        document: true,
+        fields: {
+          orderBy: { id: 'asc' }
+        }
       },
     });
   }

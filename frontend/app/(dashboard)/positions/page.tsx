@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Users, Briefcase } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Briefcase, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Position {
   id: number;
@@ -31,6 +32,10 @@ export default function PositionsPage() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [filter, setFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -38,15 +43,53 @@ export default function PositionsPage() {
     level: '',
   });
 
-  // Fetch positions
-  const { data: positions = [], isLoading } = useQuery({
-    queryKey: ['positions'],
+  // Fetch positions with pagination
+  const { data: response, isLoading } = useQuery({
+    queryKey: ['positions', currentPage, itemsPerPage, filter],
     queryFn: async () => {
-      const response = await fetchJson('/positions') as any;
-      return response.positions || [];
+      const params = new URLSearchParams();
+      params.append('page', currentPage.toString());
+      params.append('limit', itemsPerPage.toString());
+      if (filter === 'active') {
+        params.append('is_active', 'true');
+      } else if (filter === 'inactive') {
+        params.append('is_active', 'false');
+      }
+      
+      return await fetchJson<{
+        positions: Position[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+          hasNext: boolean;
+          hasPrev: boolean;
+        };
+      }>(`/positions?${params.toString()}`);
     },
     refetchOnMount: 'always',
   });
+
+  const positions = response?.positions || [];
+  const pagination = response?.pagination;
+
+  // Client-side search filter
+  const filteredPositions = positions.filter(position => {
+    if (!searchQuery) return true;
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      position.name.toLowerCase().includes(searchLower) ||
+      position.code.toLowerCase().includes(searchLower) ||
+      position.description?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Reset to page 1 when filter changes
+  const handleFilterChange = (newFilter: string) => {
+    setFilter(newFilter);
+    setCurrentPage(1);
+  };
 
   // Create mutation
   const createMutation = useMutation({
@@ -58,6 +101,7 @@ export default function PositionsPage() {
     },
     onSuccess: () => {
       toast.success('Tạo chức danh thành công!');
+      setCurrentPage(1);
       queryClient.invalidateQueries({ queryKey: ['positions'] });
       handleCloseDialog();
     },
@@ -122,6 +166,12 @@ export default function PositionsPage() {
     setFormData({ code: '', name: '', description: '', level: '' });
   };
 
+  const totalStats = {
+    total: pagination?.total || 0,
+    active: positions.filter(p => p.is_active).length,
+    totalUsers: positions.reduce((sum, p) => sum + (p._count?.users || 0), 0),
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -173,24 +223,49 @@ export default function PositionsPage() {
         }
       />
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg border p-4">
-          <div className="text-sm text-gray-500">Tổng số chức danh</div>
-          <div className="text-2xl font-bold">{positions.length}</div>
-        </div>
-        <div className="bg-white rounded-lg border p-4">
-          <div className="text-sm text-gray-500">Đang hoạt động</div>
-          <div className="text-2xl font-bold text-green-600">
-            {positions.filter((p: Position) => p.is_active).length}
-          </div>
-        </div>
-        <div className="bg-white rounded-lg border p-4">
-          <div className="text-sm text-gray-500">Tổng nhân viên</div>
-          <div className="text-2xl font-bold text-blue-600">
-            {positions.reduce((sum: number, p: Position) => sum + (p._count?.users || 0), 0)}
-          </div>
-        </div>
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2 border-b">
+        <button
+          onClick={() => handleFilterChange('all')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            filter === 'all'
+              ? 'border-violet-600 text-violet-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Tất cả {pagination && `(${pagination.total})`}
+        </button>
+        <button
+          onClick={() => handleFilterChange('active')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            filter === 'active'
+              ? 'border-green-600 text-green-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Hoạt động
+        </button>
+        <button
+          onClick={() => handleFilterChange('inactive')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            filter === 'inactive'
+              ? 'border-gray-600 text-gray-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Không hoạt động
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Input
+          placeholder="Tìm theo tên, mã, mô tả..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
       </div>
 
       {/* Table */}
@@ -209,7 +284,14 @@ export default function PositionsPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {positions.map((position: Position) => (
+              {filteredPositions.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                    {searchQuery ? 'Không tìm thấy chức danh nào' : 'Chưa có chức danh nào'}
+                  </td>
+                </tr>
+              ) : (
+                filteredPositions.map((position: Position) => (
                 <tr key={position.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-mono">{position.code}</td>
                   <td className="px-4 py-3 text-sm font-medium">{position.name}</td>
@@ -252,10 +334,76 @@ export default function PositionsPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {!isLoading && filteredPositions.length > 0 && pagination && (
+          <div className="flex items-center justify-between px-4 py-3 border-t">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Hiển thị {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, pagination.total)} trong tổng số {pagination.total}
+              </span>
+              <Select 
+                value={itemsPerPage.toString()} 
+                onValueChange={(value) => { 
+                  setItemsPerPage(parseInt(value)); 
+                  setCurrentPage(1); 
+                }}
+              >
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="30">30</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronsLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm">
+                Trang {currentPage} / {pagination.totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage >= pagination.totalPages}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(pagination.totalPages)}
+                disabled={currentPage >= pagination.totalPages}
+              >
+                <ChevronsRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Dialog */}

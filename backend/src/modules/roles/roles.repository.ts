@@ -123,4 +123,25 @@ export const rolesRepository = {
       },
     });
   },
+
+  async getRoleUsers(roleId: number, tenantId: number) {
+    const userRoles = await prisma.user_roles.findMany({
+      where: {
+        role_id: roleId,
+        user: {
+          tenant_id: tenantId,
+        },
+      },
+      include: {
+        user: {
+          include: {
+            department: true,
+            position: true,
+          },
+        },
+      },
+    });
+
+    return userRoles.map(ur => ur.user);
+  },
 };

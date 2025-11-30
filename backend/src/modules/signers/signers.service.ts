@@ -6,6 +6,7 @@ import { auditService } from "../audit/audit.service";
 import { emailService } from "../common/email.service";
 import { webhookService } from "../webhooks/webhooks.service";
 import { signersRepository } from "./signers.repository";
+import { pdfGenerationService } from "../signRequests/pdfGeneration.service";
 
 const OTP_EXPIRY_MINUTES = 10;
 
@@ -83,6 +84,38 @@ class SignersService {
       position_data: input.signature_data ? (input.signature_data as Prisma.InputJsonValue) : undefined,
     });
     await this.updateSignRequestStatus(signer.sign_request_id);
+    
+    // Generate progressive PDF after each signature
+    try {
+      const [completed, total] = await Promise.all([
+        signersRepository.countCompleted(signer.sign_request_id),
+        signersRepository.countTotal(signer.sign_request_id),
+      ]);
+      const allSigned = total > 0 && completed === total;
+      
+      console.log(`[Signers Service] Generating progressive PDF for sign request ${signer.sign_request_id}`);
+      console.log(`[Signers Service] Progress: ${completed}/${total} signed, All signed: ${allSigned}`);
+      
+      const pdfPath = await pdfGenerationService.generateProgressivePdf(
+        signer.sign_request_id,
+        {
+          includeAuditTrail: allSigned,
+          addWatermark: !allSigned
+        }
+      );
+      
+      // Update document with signed file path
+      await prisma.documents.update({
+        where: { id: signer.sign_request.document_id },
+        data: { signed_file_path: pdfPath }
+      });
+      
+      console.log(`[Signers Service] Progressive PDF generated: ${pdfPath}`);
+    } catch (error: any) {
+      console.error(`[Signers Service] Failed to generate progressive PDF: ${error.message}`);
+      // Don't throw - signing was successful, PDF generation is secondary
+    }
+    
     await auditService.record({
       tenantId,
       documentId: signer.sign_request.document_id,

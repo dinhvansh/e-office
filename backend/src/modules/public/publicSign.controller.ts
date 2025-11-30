@@ -6,6 +6,9 @@ import { ApiError } from '../../core/errors/api-error';
 import { signRequestFieldValuesService } from '../signRequests/signRequestFieldValues.service';
 import { signersService } from '../signers/signers.service';
 import { pdfSigningService } from './pdfSigning.service';
+import { pdfGenerationService } from '../signRequests/pdfGeneration.service';
+import { notificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/notifications.types';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -300,16 +303,44 @@ export class PublicSignController {
       throw ApiError.notFound('Invalid signing link');
     }
 
-    // Check if signer has signed
-    if (signer.status !== 'signed' && signer.status !== 'completed') {
-      throw ApiError.badRequest('You must sign the document first');
+    const document = signer.sign_request.document;
+
+    // Check if signed PDF exists
+    if (!document.signed_file_path) {
+      // If not exists yet, check if all signed and generate
+      const allSigners = await prisma.signers.findMany({
+        where: { sign_request_id: signer.sign_request_id }
+      });
+      
+      const allSigned = allSigners.every(s => s.status === 'signed' || s.status === 'completed');
+      
+      if (allSigned) {
+        console.log('📄 Generating signed PDF on-demand...');
+        const signedFilePath = await pdfGenerationService.generateSignedPdf(signer.sign_request_id);
+        
+        // Update document
+        await prisma.documents.update({
+          where: { id: document.id },
+          data: { signed_file_path: signedFilePath }
+        });
+        
+        document.signed_file_path = signedFilePath;
+      } else {
+        throw ApiError.badRequest('Document signing is not complete yet');
+      }
     }
 
-    // Generate signed PDF
-    const pdfBuffer = await pdfSigningService.generateSignedPdf(signer.sign_request_id);
+    // Read signed PDF file
+    const filePath = path.resolve(__dirname, '../../../', document.signed_file_path);
+    
+    if (!fs.existsSync(filePath)) {
+      throw ApiError.notFound('Signed PDF file not found');
+    }
+
+    const pdfBuffer = fs.readFileSync(filePath);
 
     // Send PDF as download
-    const filename = `${signer.sign_request.document.original_file_name || 'document'}_signed.pdf`;
+    const filename = `${document.document_number || document.original_file_name || 'document'}_signed.pdf`;
     
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -490,42 +521,20 @@ export class PublicSignController {
         data: { status: 'completed' },
       });
 
-      // ⭐ Generate signed PDF with all signatures
-      console.log('📄 Generating signed PDF with all signatures...');
+      // ⭐ Generate signed PDF with all signatures + audit trail
+      console.log('📄 Generating signed PDF with audit trail...');
       try {
-        const signedPdfBuffer = await pdfSigningService.generateSignedPdf(signer.sign_request_id);
+        const signedFilePath = await pdfGenerationService.generateSignedPdf(signer.sign_request_id);
         
-        // Save signed PDF to storage
-        const signedFileName = `signed_${Date.now()}_${signer.sign_request.document_id}.pdf`;
-        const document = await prisma.documents.findUnique({
-          where: { id: signer.sign_request.document_id }
+        // Update document with signed_file_path
+        await prisma.documents.update({
+          where: { id: signer.sign_request.document_id },
+          data: { 
+            status: 'completed',
+            signed_file_path: signedFilePath
+          },
         });
-        
-        if (document) {
-          // Get tenant_id from document's file_path
-          const tenantId = document.file_path.split('/')[1] || document.file_path.split('\\')[1];
-          const signedFilePath = path.join('storage', tenantId, signedFileName);
-          
-          // Ensure directory exists
-          const signedDir = path.dirname(signedFilePath);
-          if (!fs.existsSync(signedDir)) {
-            fs.mkdirSync(signedDir, { recursive: true });
-          }
-          
-          // Write signed PDF
-          fs.writeFileSync(signedFilePath, signedPdfBuffer);
-          console.log('✅ Signed PDF saved:', signedFilePath);
-          
-          // Update document with signed_file_path
-          await prisma.documents.update({
-            where: { id: signer.sign_request.document_id },
-            data: { 
-              status: 'completed',
-              signed_file_path: signedFilePath
-            },
-          });
-          console.log('✅ Document updated with signed_file_path');
-        }
+        console.log('✅ Document updated with signed PDF');
       } catch (error) {
         console.error('❌ Failed to generate signed PDF:', error);
         // Don't fail the signing process, just log the error
@@ -537,6 +546,23 @@ export class PublicSignController {
       }
       
       console.log('✅ Sign request and document marked as completed');
+
+      // Send completion notification to document owner
+      const document = await prisma.documents.findUnique({
+        where: { id: signer.sign_request.document_id },
+        include: { owner: true },
+      });
+
+      if (document?.owner) {
+        notificationsService.createNotification({
+          tenantId: document.tenant_id,
+          userId: document.owner.id,
+          type: NotificationType.SIGN_COMPLETED,
+          title: 'Ký hoàn tất',
+          message: `Tài liệu "${document.title || 'Untitled'}" đã được ký hoàn tất`,
+          link: `/documents/${document.id}`,
+        }).catch(err => console.error('Failed to create notification:', err));
+      }
     } else {
       console.log('⏳ Not all signed yet, updating to in_progress...');
       // Update to in_progress
@@ -564,8 +590,30 @@ export class PublicSignController {
           data: { status: 'pending' }
         });
         
-        // Send email notification to next signer
-        if (!nextSigner.is_internal && nextSigner.signing_token) {
+        // Send notification based on signer type
+        if (nextSigner.is_internal && nextSigner.user_id) {
+          // Internal signer: Send in-app notification
+          console.log(`📱 Sending in-app notification to internal user ${nextSigner.user_id}`);
+          try {
+            const document = await prisma.documents.findUnique({
+              where: { id: signer.sign_request.document_id }
+            });
+            
+            await notificationsService.createNotification({
+              tenantId: document?.tenant_id || 0,
+              userId: nextSigner.user_id,
+              type: NotificationType.SIGN_REQUEST_RECEIVED,
+              title: 'Đến lượt bạn ký tài liệu',
+              message: `Tài liệu "${signer.sign_request.title || 'Untitled'}" đang chờ bạn ký`,
+              link: `/sign-requests/${signer.sign_request_id}/internal-sign`,
+            });
+            console.log(`✅ In-app notification sent to user ${nextSigner.user_id}`);
+          } catch (error) {
+            console.error(`❌ Failed to send in-app notification:`, error);
+          }
+        } else if (!nextSigner.is_internal && nextSigner.signing_token) {
+          // External signer: Send email with OTP
+          console.log(`📧 Sending email to external signer: ${nextSigner.email}`);
           const { emailService } = await import('../../modules/common/email.service');
           const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
           const signUrl = `${frontendUrl}/sign/${nextSigner.signing_token}`;
@@ -592,12 +640,12 @@ export class PublicSignController {
               recipientName: nextSigner.name,
               documentTitle: signer.sign_request.title || 'Document',
               senderName: 'System',
-              message: `It's now your turn to sign. Previous signer has completed.`,
+              message: `Đến lượt bạn ký. Người ký trước đã hoàn thành.`,
               signUrl: signUrl,
               otp: otp,
               expiryMinutes: 10
             });
-            console.log(`📧 Email sent to next signer: ${nextSigner.email}`);
+            console.log(`✅ Email sent to next signer: ${nextSigner.email}`);
           } catch (error) {
             console.error(`❌ Failed to send email to ${nextSigner.email}:`, error);
           }

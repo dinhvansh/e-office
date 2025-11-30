@@ -67,13 +67,26 @@ export default function LoginPage() {
           Email
           <input value={email} onChange={(e) => setEmail(e.target.value)} className="input mt-2" type="email" required />
         </label>
-        <label className="mb-6 block text-sm font-medium text-slate-600">
+        <label className="mb-2 block text-sm font-medium text-slate-600">
           Mật khẩu
           <input value={password} onChange={(e) => setPassword(e.target.value)} className="input mt-2" type="password" required />
         </label>
+        <div className="mb-6 flex justify-end">
+          <a href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+            Quên mật khẩu?
+          </a>
+        </div>
         <button type="submit" disabled={isSubmitting} className="button-primary w-full">
           {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}
         </button>
+        <div className="mt-6 text-center">
+          <p className="text-sm text-slate-600">
+            Chưa có tài khoản?{' '}
+            <a href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
+              Đăng ký ngay
+            </a>
+          </p>
+        </div>
         <p className="mt-4 text-center text-xs text-slate-400">Được bảo vệ bởi hệ thống license WP Sign.</p>
       </form>
     </div>

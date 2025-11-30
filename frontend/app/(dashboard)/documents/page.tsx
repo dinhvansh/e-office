@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { ChangeEvent, useState, useEffect } from "react";
-import { FileText, Upload, Trash2, Download, Eye, Send } from "lucide-react";
+import { FileText, Upload, Trash2, Download, Eye, Send, Archive, XCircle } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { DocumentRecord, DocumentType } from "@/lib/types";
 import { PageHeader } from "@/components/ui/page-header";
@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusTag } from "@/components/ui/status-tag";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SelectWithIcon } from "@/components/ui/select-with-icon";
@@ -54,10 +55,24 @@ export default function DocumentsPage() {
   // Pagination state
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'all' | 'archive'>('all');
+  
+  // Filter and search state
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: documentsData, isLoading } = useQuery({
-    queryKey: ["documents", page, limit],
+    queryKey: ["documents", page, limit, statusFilter, searchQuery],
     queryFn: async () => {
+      let url = `/documents?page=${page}&limit=${limit}`;
+      if (statusFilter && statusFilter !== 'all') {
+        url += `&status=${statusFilter}`;
+      }
+      if (searchQuery) {
+        url += `&search=${encodeURIComponent(searchQuery)}`;
+      }
       const data = await fetchJson<{ 
         documents: DocumentRecord[];
         pagination?: {
@@ -66,7 +81,7 @@ export default function DocumentsPage() {
           total: number;
           totalPages: number;
         };
-      }>(`/documents?page=${page}&limit=${limit}&no_signing_only=true`); // Only documents without signing requirement
+      }>(url); // All documents including signed ones
       return data;
     },
   });
@@ -312,64 +327,12 @@ export default function DocumentsPage() {
     setDeleteConfirm({ open: true, id });
   };
 
-  const handleView = async (id: number) => {
-    try {
-      // Get token from auth session
-      const sessionStr = localStorage.getItem('esign.auth');
-      const session = sessionStr ? JSON.parse(sessionStr) : null;
-      const token = session?.tokens?.accessToken;
-      
-      if (!token) {
-        throw new Error('Vui lòng đăng nhập lại');
-      }
-      
-      const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${id}/view`;
-      
-      console.log('Viewing document:', { id, url, hasToken: !!token });
-      
-      // Fetch with token, then create blob URL
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
-      console.log('View response:', { status: response.status, ok: response.ok });
-      
-      if (!response.ok) {
-        // Try to get error message from response
-        const contentType = response.headers.get('content-type');
-        if (contentType?.includes('application/json')) {
-          const errorData = await response.json();
-          console.error('View error data:', errorData);
-          const errorMsg = errorData.error?.message || 'Failed to load document';
-          
-          // User-friendly message for seed data
-          if (errorMsg.includes('seed data')) {
-            throw new Error('Tài liệu này không có file thật. Vui lòng upload tài liệu mới để test.');
-          }
-          
-          throw new Error(errorMsg);
-        }
-        throw new Error(`Failed to load document (${response.status})`);
-      }
-      
-      const blob = await response.blob();
-      console.log('Blob created:', { size: blob.size, type: blob.type });
-      
-      const blobUrl = URL.createObjectURL(blob);
-      window.open(blobUrl, '_blank');
-      
-      // Clean up blob URL after a delay
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-    } catch (error: any) {
-      const message = error?.message || 'Không thể xem tài liệu';
-      toast.error(message);
-      console.error('View error:', error);
-    }
+  const handleView = (id: number) => {
+    // Navigate to document flow page
+    router.push(`/documents/${id}/flow`);
   };
 
-  const handleDownload = async (id: number, fileName?: string) => {
+  const handleDownload = async (id: number, fileName?: string, document?: DocumentRecord) => {
     try {
       // Get token from auth session
       const sessionStr = localStorage.getItem('esign.auth');
@@ -380,9 +343,12 @@ export default function DocumentsPage() {
         throw new Error('Vui lòng đăng nhập lại');
       }
       
-      const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${id}/download`;
+      // Use signed version if document is completed and has signed file
+      const useSigned = document?.status === 'completed' && document?.signed_file_path;
+      const endpoint = useSigned ? 'download-signed' : 'download';
+      const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${id}/${endpoint}`;
       
-      console.log('Downloading document:', { id, url, hasToken: !!token });
+      console.log('Downloading document:', { id, url, hasToken: !!token, useSigned });
       
       const response = await fetch(url, {
         headers: {
@@ -509,6 +475,46 @@ export default function DocumentsPage() {
         signRequestId: cancelDialog.signRequestId,
         reason: cancelDialog.reason || 'Không có lý do',
       });
+    }
+  };
+
+  // Archive document mutation
+  const archiveDocumentMutation = useMutation({
+    mutationFn: async (documentId: number) => {
+      await fetchJson(`/documents/${documentId}/archive`, { method: 'POST' });
+    },
+    onSuccess: () => {
+      toast.success('Đã thanh lý tài liệu');
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || 'Không thể thanh lý');
+    },
+  });
+
+  // Cancel document mutation
+  const cancelDocumentMutation = useMutation({
+    mutationFn: async (documentId: number) => {
+      await fetchJson(`/documents/${documentId}/cancel`, { method: 'POST' });
+    },
+    onSuccess: () => {
+      toast.success('Đã hủy tài liệu');
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || 'Không thể hủy');
+    },
+  });
+
+  const handleArchiveDocument = (documentId: number) => {
+    if (confirm('Bạn có chắc muốn thanh lý tài liệu này?')) {
+      archiveDocumentMutation.mutate(documentId);
+    }
+  };
+
+  const handleCancelDocument = (documentId: number) => {
+    if (confirm('Bạn có chắc muốn hủy tài liệu này?')) {
+      cancelDocumentMutation.mutate(documentId);
     }
   };
 
@@ -760,11 +766,74 @@ export default function DocumentsPage() {
               </CardDescription>
             </div>
             <Badge variant="outline">
-              {isLoading ? "Đang tải..." : `${documents?.length ?? 0} tài liệu`}
+              {isLoading ? "Đang tải..." : `${pagination?.total ?? documents?.length ?? 0} tài liệu`}
             </Badge>
           </div>
         </CardHeader>
         <CardContent>
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={(value) => {
+            setActiveTab(value as 'all' | 'archive');
+            setPage(1);
+            setSearchQuery('');
+            // Auto-set filter based on tab
+            if (value === 'archive') {
+              setStatusFilter('completed');
+            } else {
+              setStatusFilter('all');
+            }
+          }} className="mb-4">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="all">📋 Tất cả tài liệu</TabsTrigger>
+              <TabsTrigger value="archive">📦 Quản lý lưu trữ</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* Filter and Search Section */}
+          <div className="mb-4 flex flex-col sm:flex-row gap-3">
+            <div className="flex-1">
+              <Input
+                placeholder="🔍 Tìm kiếm theo tên, số văn bản..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(1); // Reset to first page
+                }}
+                className="w-full"
+              />
+            </div>
+            <div className="sm:w-64">
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1); // Reset to first page
+                }}
+              >
+                {activeTab === 'all' ? (
+                  <>
+                    <option value="all">📋 Tất cả trạng thái</option>
+                    <option value="draft">📝 Nháp</option>
+                    <option value="pending_approval">⏳ Chờ duyệt</option>
+                    <option value="approved">✅ Đã duyệt</option>
+                    <option value="pending_signature">✍️ Chờ ký</option>
+                    <option value="completed">✅ Hoàn thành</option>
+                    <option value="active">✅ Hoạt động</option>
+                    <option value="rejected">❌ Từ chối</option>
+                    <option value="cancelled">🚫 Đã hủy</option>
+                    <option value="archived">📦 Đã thanh lý</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="completed">✅ Hoàn thành</option>
+                    <option value="archived">📦 Đã thanh lý</option>
+                    <option value="cancelled">🚫 Đã hủy</option>
+                  </>
+                )}
+              </select>
+            </div>
+          </div>
           {isLoading ? (
             <div className="rounded-lg border">
               <div className="overflow-x-auto">
@@ -813,6 +882,8 @@ export default function DocumentsPage() {
                       <th className="px-4 py-3 text-left font-medium">ID</th>
                       <th className="px-4 py-3 text-left font-medium">Tên file</th>
                       <th className="px-4 py-3 text-left font-medium">Số văn bản</th>
+                      <th className="px-4 py-3 text-left font-medium">Loại văn bản</th>
+                      <th className="px-4 py-3 text-left font-medium">Bảo mật</th>
                       <th className="px-4 py-3 text-left font-medium">Trạng thái</th>
                       <th className="px-4 py-3 text-left font-medium">Ngày tạo</th>
                       <th className="px-4 py-3 text-right font-medium">Thao tác</th>
@@ -840,19 +911,35 @@ export default function DocumentsPage() {
                           )}
                         </td>
                         <td className="px-4 py-3">
+                          {doc.document_type ? (
+                            <span className="text-sm">{doc.document_type}</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {doc.confidential_level === 'high' && <Badge variant="destructive">🔒 Cao</Badge>}
+                          {doc.confidential_level === 'medium' && <Badge variant="outline" className="border-orange-500 text-orange-700">🔐 Trung bình</Badge>}
+                          {doc.confidential_level === 'normal' && <Badge variant="secondary">📄 Thường</Badge>}
+                          {!doc.confidential_level && <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-4 py-3">
                           {doc.status === 'draft' && <Badge variant="secondary">📝 Nháp</Badge>}
-                          {doc.status === 'pending_approval' && <Badge variant="outline" className="border-yellow-500 text-yellow-700">⏳ Chờ duyệt</Badge>}
-                          {doc.status === 'approved' && <Badge variant="outline" className="border-green-500 text-green-700">✅ Đã duyệt</Badge>}
-                          {doc.status === 'pending_signature' && <Badge variant="outline" className="border-blue-500 text-blue-700">✍️ Chờ ký</Badge>}
-                          {doc.status === 'completed' && <Badge variant="default" className="bg-green-600">✅ Hoàn thành</Badge>}
-                          {doc.status === 'active' && <Badge variant="default">✅ Hoạt động</Badge>}
-                          {doc.status === 'rejected' && <Badge variant="destructive">❌ Từ chối</Badge>}
+                          {doc.status === 'pending_approval' && <Badge variant="outline" className="border-yellow-500 text-yellow-700 bg-yellow-50">⏳ Chờ duyệt</Badge>}
+                          {doc.status === 'approved' && <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">✅ Đã duyệt</Badge>}
+                          {doc.status === 'pending_signature' && <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50">✍️ Chờ ký</Badge>}
+                          {doc.status === 'completed' && <Badge variant="default" className="bg-green-600 text-white">✅ Hoàn thành</Badge>}
+                          {doc.status === 'active' && <Badge variant="default" className="bg-green-600 text-white">✅ Hoạt động</Badge>}
+                          {doc.status === 'rejected' && <Badge variant="destructive" className="bg-red-600 text-white">❌ Từ chối</Badge>}
+                          {doc.status === 'cancelled' && <Badge variant="outline" className="border-red-500 text-red-700 bg-red-50">🚫 Đã hủy</Badge>}
+                          {doc.status === 'archived' && <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50">📦 Đã thanh lý</Badge>}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
                           {dayjs(doc.created_at).format("DD/MM/YYYY HH:mm")}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
+                            {/* Always show View button */}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -862,48 +949,21 @@ export default function DocumentsPage() {
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              title="Tải xuống"
-                              onClick={() => handleDownload(doc.id, doc.original_file_name || doc.title || `document-${doc.id}.pdf`)}
-                            >
-                              <Download className="w-4 h-4" />
-                            </Button>
-                            {doc.sign_request_id && (
+                            
+                            {/* Hide Download for archived/cancelled documents */}
+                            {doc.status !== 'archived' && doc.status !== 'cancelled' && (
                               <Button
                                 variant="ghost"
-                                size="sm"
-                                className="h-8 hover:bg-blue-50 hover:text-blue-600"
-                                onClick={() => window.location.href = `/sign-requests/${doc.sign_request_id}/editor`}
-                                title="Chỉnh sửa fields ký"
+                                size="icon"
+                                className="h-8 w-8"
+                                title="Tải xuống"
+                                onClick={() => handleDownload(doc.id, doc.original_file_name || doc.title || `document-${doc.id}.pdf`, doc)}
                               >
-                                📝 Fields
+                                <Download className="w-4 h-4" />
                               </Button>
                             )}
-                            {doc.status === "draft" && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 hover:bg-primary/10 hover:text-primary"
-                                onClick={() => handleSubmitApproval(doc.id)}
-                                title="Trình duyệt"
-                              >
-                                📤 Trình duyệt
-                              </Button>
-                            )}
-                            {(doc.status === "pending_approval" || doc.status === "pending_signature") && doc.sign_request_id && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 hover:bg-red-50 hover:text-red-600"
-                                onClick={() => handleCancelSignRequest(doc.sign_request_id!)}
-                                title="Hủy luồng ký"
-                              >
-                                ❌ Hủy
-                              </Button>
-                            )}
+                            
+                            {/* Delete button - always show for draft */}
                             {doc.status === "draft" && (
                               <Button
                                 variant="ghost"
@@ -914,6 +974,59 @@ export default function DocumentsPage() {
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
+                            )}
+                            
+                            {/* Other action buttons only for non-archived/cancelled */}
+                            {doc.status !== 'archived' && doc.status !== 'cancelled' && doc.status !== 'draft' && (
+                              <>
+                                {doc.sign_request_id && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 hover:bg-blue-50 hover:text-blue-600"
+                                    onClick={() => window.location.href = `/sign-requests/${doc.sign_request_id}/editor`}
+                                    title="Chỉnh sửa fields ký"
+                                  >
+                                    📝 Fields
+                                  </Button>
+                                )}
+                                {(doc.status === "pending_approval" || doc.status === "pending_signature") && doc.sign_request_id && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 hover:bg-red-50 hover:text-red-600"
+                                    onClick={() => handleCancelSignRequest(doc.sign_request_id!)}
+                                    title="Hủy luồng ký"
+                                  >
+                                    ❌ Hủy
+                                  </Button>
+                                )}
+                                {/* Archive tab actions - only for completed */}
+                                {activeTab === 'archive' && doc.status === 'completed' && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 hover:bg-orange-50"
+                                      onClick={() => handleArchiveDocument(doc.id)}
+                                      title="Thanh lý"
+                                    >
+                                      <Archive className="w-4 h-4 text-orange-600 mr-1" />
+                                      Thanh lý
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 hover:bg-red-50"
+                                      onClick={() => handleCancelDocument(doc.id)}
+                                      title="Hủy tài liệu"
+                                    >
+                                      <XCircle className="w-4 h-4 text-red-600 mr-1" />
+                                      Hủy
+                                    </Button>
+                                  </>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>

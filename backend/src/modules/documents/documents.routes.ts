@@ -15,7 +15,9 @@ documentsRouter.use(authGuard);
 documentsRouter.get("/", requirePermission('documents', 'read'), asyncHandler(controller.list));
 documentsRouter.get("/tags/all", requirePermission('documents', 'read'), asyncHandler(controller.getAllTags));
 documentsRouter.get("/:id/download", requirePermission('documents', 'read'), asyncHandler(controller.download));
+documentsRouter.get("/:id/download-signed", requirePermission('documents', 'read'), asyncHandler(controller.downloadSigned));
 documentsRouter.get("/:id/view", requirePermission('documents', 'read'), asyncHandler(controller.view));
+documentsRouter.get("/:id/view-signed", requirePermission('documents', 'read'), asyncHandler(controller.viewSigned));
 documentsRouter.get("/:id/tags", requirePermission('documents', 'read'), asyncHandler(controller.getTags));
 documentsRouter.get("/:id", requirePermission('documents', 'read'), asyncHandler(controller.getById));
 documentsRouter.get("/:id/permissions", requirePermission('documents', 'read'), asyncHandler(controller.getPermissions));
@@ -30,6 +32,8 @@ documentsRouter.post("/:id/tags", requirePermission('documents', 'update'), asyn
 documentsRouter.post("/:id/permissions", requirePermission('documents', 'update'), asyncHandler(controller.grantPermission));
 documentsRouter.post("/:id/versions", requirePermission('documents', 'update'), asyncHandler(controller.createVersion));
 documentsRouter.post("/:id/submit-for-approval", requirePermission('documents', 'update'), asyncHandler(controller.submitForApproval));
+documentsRouter.post("/:id/archive", requirePermission('documents', 'update'), asyncHandler(controller.archiveDocument));
+documentsRouter.post("/:id/cancel", requirePermission('documents', 'update'), asyncHandler(controller.cancelDocument));
 documentsRouter.delete("/:id/tags", requirePermission('documents', 'update'), asyncHandler(controller.removeTag));
 documentsRouter.delete("/:id/permissions", requirePermission('documents', 'update'), asyncHandler(controller.revokePermission));
 

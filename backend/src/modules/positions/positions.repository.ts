@@ -19,6 +19,50 @@ export const positionsRepository = {
     });
   },
 
+  async findByTenantPaginated(tenantId: number, options: {
+    page: number;
+    limit: number;
+    is_active?: boolean;
+  }) {
+    const { page, limit, is_active } = options;
+    const skip = (page - 1) * limit;
+
+    const where: any = { tenant_id: tenantId };
+    if (is_active !== undefined) {
+      where.is_active = is_active;
+    }
+
+    const [positions, total] = await Promise.all([
+      prisma.positions.findMany({
+        where,
+        include: {
+          _count: {
+            select: { users: true },
+          },
+        },
+        orderBy: [
+          { level: 'asc' },
+          { name: 'asc' },
+        ],
+        skip,
+        take: limit,
+      }),
+      prisma.positions.count({ where }),
+    ]);
+
+    return {
+      positions,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+    };
+  },
+
   async findById(id: number, tenantId: number) {
     return prisma.positions.findFirst({
       where: {

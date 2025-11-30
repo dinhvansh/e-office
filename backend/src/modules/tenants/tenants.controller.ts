@@ -18,4 +18,9 @@ export class TenantsController {
       }),
     );
   };
+
+  stats = async (req: Request, res: Response): Promise<void> => {
+    const stats = await tenantsService.getTenantStats(req.auth!.tenantId);
+    res.json(ok({ stats }));
+  };
 }

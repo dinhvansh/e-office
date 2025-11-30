@@ -262,6 +262,7 @@ export class DocumentFlowService {
         status: overallStatus,
         document_type: document.document_type?.name,
         created_at: document.created_at.toISOString(),
+        signed_file_path: document.signed_file_path, // ✅ Include signed file path for progressive PDF
         owner: {
           id: document.owner.id,
           name: document.owner.full_name || document.owner.email,

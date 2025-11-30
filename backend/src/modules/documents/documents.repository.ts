@@ -56,7 +56,9 @@ export class DocumentsRepository {
   async listByTenantPaginated(
     tenantId: number,
     params: PaginationParams = {},
-    noSigningOnly = false
+    noSigningOnly = false,
+    status?: string,
+    search?: string
   ): Promise<PaginatedResult<documents>> {
     const page = params.page || 1;
     const limit = params.limit || 10;
@@ -70,10 +72,33 @@ export class DocumentsRepository {
         require_digital_signing: false
       };
     }
+    
+    if (status) {
+      whereClause.status = status;
+    }
+    
+    if (search) {
+      whereClause.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { original_file_name: { contains: search, mode: 'insensitive' } },
+        { document_number: { contains: search, mode: 'insensitive' } },
+        { summary: { contains: search, mode: 'insensitive' } },
+      ];
+    }
 
     const [data, total] = await Promise.all([
       prisma.documents.findMany({
         where: whereClause,
+        include: {
+          document_type: true,
+          owner: {
+            select: {
+              id: true,
+              full_name: true,
+              email: true,
+            }
+          }
+        },
         orderBy: { created_at: "desc" },
         skip,
         take: limit,

@@ -101,4 +101,8 @@ export const rolesService = {
 
     return rolesRepository.removePermission(roleId, permissionId);
   },
+
+  async getRoleUsers(roleId: number, tenantId: number) {
+    return rolesRepository.getRoleUsers(roleId, tenantId);
+  },
 };

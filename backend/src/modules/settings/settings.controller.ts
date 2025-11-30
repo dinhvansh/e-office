@@ -1,0 +1,83 @@
+import { Request, Response } from 'express';
+import { settingsService } from './settings.service';
+
+export const settingsController = {
+  async getEmailConfig(req: Request, res: Response) {
+    try {
+      const tenantId = req.auth!.tenantId;
+      const config = await settingsService.getEmailConfig(tenantId);
+      res.json({ success: true, data: config });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
+  async saveEmailConfig(req: Request, res: Response) {
+    try {
+      const tenantId = req.auth!.tenantId;
+      const userId = req.auth!.userId;
+      const config = req.body;
+
+      await settingsService.saveEmailConfig(tenantId, config, userId);
+      res.json({ success: true, message: 'Email config saved successfully' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
+  async testEmail(req: Request, res: Response) {
+    try {
+      const { testEmail } = req.body;
+      const tenantId = req.auth!.tenantId;
+      
+      // Get email config
+      const config = await settingsService.getEmailConfig(tenantId);
+      if (!config) {
+        return res.status(400).json({ success: false, error: 'Email config not found' });
+      }
+
+      // TODO: Send test email using the config
+      // For now, just return success
+      res.json({ 
+        success: true, 
+        message: `Test email would be sent to ${testEmail}`,
+        note: 'Test email functionality coming soon'
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
+  async getWatermarkConfig(req: Request, res: Response) {
+    try {
+      const tenantId = req.auth!.tenantId;
+      const config = await settingsService.getWatermarkConfig(tenantId);
+      res.json({ success: true, data: config });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
+  async saveWatermarkConfig(req: Request, res: Response) {
+    try {
+      const tenantId = req.auth!.tenantId;
+      const userId = req.auth!.userId;
+      const config = req.body;
+
+      await settingsService.saveWatermarkConfig(tenantId, config, userId);
+      res.json({ success: true, message: 'Watermark config saved successfully' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
+  async getAllSettings(req: Request, res: Response) {
+    try {
+      const tenantId = req.auth!.tenantId;
+      const settings = await settingsService.getAllSettings(tenantId);
+      res.json({ success: true, data: settings });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+};

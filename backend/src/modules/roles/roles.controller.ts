@@ -84,4 +84,15 @@ export const rolesController = {
       res.status(400).json({ success: false, error: error.message });
     }
   },
+
+  async getRoleUsers(req: Request, res: Response) {
+    try {
+      const tenantId = (req as any).auth.tenantId;
+      const roleId = parseInt(req.params.id);
+      const users = await rolesService.getRoleUsers(roleId, tenantId);
+      res.json({ success: true, data: { users } });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: { message: error.message } });
+    }
+  },
 };

@@ -8,30 +8,49 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, PenTool, Check, FileText, Download } from 'lucide-react';
 import SignatureCanvas from 'react-signature-canvas';
 import InternalSigningSidebar from '@/components/signing/InternalSigningSidebar';
+import PDFSigningViewer from '@/components/pdf/PDFSigningViewer';
 import { toast } from 'sonner';
 
-// Simple PDF Viewer Component
-function PDFViewer({ documentId }: { documentId: number }) {
+// Simple PDF Viewer Component with Auto-refresh
+function PDFViewer({ documentId, signRequestStatus, signedFilePath, accessToken }: { 
+  documentId: number; 
+  signRequestStatus?: string; 
+  signedFilePath?: string;
+  accessToken?: string;
+}) {
   const { fetchJson } = useAuth();
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Auto-reload PDF when signed_file_path changes (progressive PDF updated)
   useEffect(() => {
-    loadPDF();
-  }, [documentId]);
+    if (accessToken) {
+      loadPDF();
+    }
+  }, [documentId, signRequestStatus, signedFilePath, accessToken]);
 
   const loadPDF = async () => {
     try {
       setLoading(true);
       setError(null);
       
+      // ✅ Use signed file if available (progressive or completed)
+      const hasSignedFile = signedFilePath && signedFilePath.length > 0;
+      const endpoint = hasSignedFile 
+        ? `/documents/${documentId}/view-signed` 
+        : `/documents/${documentId}/view`;
+      
+      // Add timestamp to bust cache
+      const timestamp = Date.now();
+      const cacheBuster = hasSignedFile ? `?t=${timestamp}` : '';
+      
       // Fetch PDF as blob with authentication
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/documents/${documentId}/view`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}${endpoint}${cacheBuster}`,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${accessToken}`
           }
         }
       );
@@ -42,6 +61,12 @@ function PDFViewer({ documentId }: { documentId: number }) {
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
+      
+      // Revoke old URL to prevent memory leak
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+      
       setPdfUrl(url);
     } catch (err: any) {
       console.error('PDF load error:', err);
@@ -54,10 +79,10 @@ function PDFViewer({ documentId }: { documentId: number }) {
   const handleDownload = async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/documents/${documentId}/download`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${documentId}/download`,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${accessToken}`
           }
         }
       );
@@ -128,17 +153,31 @@ function PDFViewer({ documentId }: { documentId: number }) {
   );
 }
 
+interface SignatureField {
+  id: number;
+  type: string;
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  assigned_signer_id?: number;
+}
+
 interface SigningData {
   sign_request: {
     id: number;
     title: string;
     message: string;
     workflow_type: string;
+    status: string;
     document: {
       id: number;
       title: string;
       original_file_name: string;
       document_number: string;
+      file_path: string;
+      signed_file_path?: string;
     };
     signers: Array<{
       id: number;
@@ -150,13 +189,14 @@ interface SigningData {
       role: string;
       signing_order?: number;
     }>;
+    fields: SignatureField[];
   };
 }
 
 export default function InternalSigningPage() {
   const params = useParams();
   const router = useRouter();
-  const { fetchJson, user } = useAuth();
+  const { fetchJson, user, tokens } = useAuth();
   const signRequestId = parseInt(params.id as string);
   const sigCanvasRef = useRef<SignatureCanvas>(null);
 
@@ -165,12 +205,32 @@ export default function InternalSigningPage() {
   const [signatureData, setSignatureData] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [mySigner, setMySigner] = useState<any>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [myFields, setMyFields] = useState<SignatureField[]>([]);
+  const [currentFieldId, setCurrentFieldId] = useState<number | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [guidedMode, setGuidedMode] = useState(true);  // Enable guided mode
+  const [currentFieldIndex, setCurrentFieldIndex] = useState(0);
+  const [completedFields, setCompletedFields] = useState<number[]>([]);
+  const [fieldSignatures, setFieldSignatures] = useState<Record<number, string>>({});
 
   useEffect(() => {
     fetchSigningData();
-  }, [signRequestId]);
+    
+    // Auto-refresh every 10 seconds if sign request is in progress
+    const interval = setInterval(() => {
+      if (data?.sign_request?.status === 'in_progress') {
+        fetchSigningData(true); // Pass true to allow refresh
+      }
+    }, 10000);
+    
+    return () => clearInterval(interval);
+  }, [signRequestId, data?.sign_request?.status]);
 
-  const fetchSigningData = async () => {
+  const fetchSigningData = async (forceRefresh = false) => {
+    // Guard: only fetch once unless force refresh
+    if (data && !forceRefresh) return;
+    
     try {
       const result = await fetchJson<SigningData>(`/sign-requests/${signRequestId}`);
       
@@ -187,6 +247,39 @@ export default function InternalSigningPage() {
 
       setMySigner(currentSigner);
       setData(result);
+
+      // Filter fields assigned to current signer
+      const fieldsForMe = result.sign_request.fields?.filter(
+        (f: SignatureField) => f.assigned_signer_id === currentSigner.id
+      ) || [];
+      console.log('📝 Total fields:', result.sign_request.fields?.length);
+      console.log('📝 My fields:', fieldsForMe.length, fieldsForMe);
+      console.log('👤 Current signer ID:', currentSigner.id);
+      setMyFields(fieldsForMe);
+
+      // Load PDF
+      if (result.sign_request.document.file_path) {
+        setPdfLoading(true);
+        try {
+          const pdfResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${result.sign_request.document.id}/view`,
+            {
+              headers: {
+                'Authorization': `Bearer ${tokens?.accessToken}`
+              }
+            }
+          );
+          if (pdfResponse.ok) {
+            const blob = await pdfResponse.blob();
+            const url = URL.createObjectURL(blob);
+            setPdfUrl(url);
+          }
+        } catch (err) {
+          console.error('PDF load error:', err);
+        } finally {
+          setPdfLoading(false);
+        }
+      }
 
       // Check if already signed
       if (currentSigner.status === 'signed' || currentSigner.status === 'completed') {
@@ -206,35 +299,29 @@ export default function InternalSigningPage() {
   };
 
   const handleSubmit = async () => {
-    // Check if canvas is empty
-    if (sigCanvasRef.current?.isEmpty()) {
-      toast.error('Vui lòng vẽ chữ ký trước khi gửi');
-      return;
-    }
-
-    // Get signature data from canvas
-    const currentSignature = sigCanvasRef.current?.toDataURL('image/png');
-    if (!currentSignature) {
-      toast.error('Không thể lấy chữ ký');
+    // Check if all fields are completed
+    if (myFields.length > 0 && completedFields.length < myFields.length) {
+      toast.error(`Vui lòng hoàn thành tất cả ${myFields.length} vùng ký`);
       return;
     }
 
     setSubmitting(true);
 
     try {
+      // Send field_signatures object (new format)
       const result = await fetchJson(`/sign-requests/${signRequestId}/sign-internal`, {
         method: 'POST',
         body: JSON.stringify({
-          signature_data: currentSignature,
+          field_signatures: fieldSignatures,
           signature_type: 'drawn'
         })
       });
       
       toast.success((result as any).message || 'Ký thành công!');
       
-      // Reload to show updated status
+      // Redirect to my-tasks page
       setTimeout(() => {
-        router.push('/sign-requests');
+        router.push('/my-tasks');
       }, 1500);
       
     } catch (error: any) {
@@ -308,10 +395,10 @@ export default function InternalSigningPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left: Sidebar */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-2">
             <InternalSigningSidebar
               signers={data.sign_request.signers}
               activities={[]}
@@ -320,64 +407,129 @@ export default function InternalSigningPage() {
             />
           </div>
 
-          {/* Center: PDF Viewer */}
-          <div className="lg:col-span-1">
+          {/* Center: PDF Viewer with Signature Fields */}
+          <div className="lg:col-span-7">
             <div className="bg-white rounded-lg shadow-sm border">
               <div className="p-4 border-b">
                 <h2 className="text-lg font-semibold flex items-center gap-2">
                   <FileText className="w-5 h-5 text-gray-600" />
                   Xem tài liệu
                 </h2>
+                {myFields.length > 0 && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Click vào vùng màu xanh để ký
+                  </p>
+                )}
               </div>
               <div className="p-4">
-                <PDFViewer documentId={data.sign_request.document.id} />
+                {pdfUrl && myFields.length > 0 ? (
+                  <PDFSigningViewer
+                    pdfUrl={pdfUrl}
+                    fields={myFields}
+                    signerId={mySigner.id}
+                    onFieldClick={(field) => {
+                      console.log('Field clicked:', field);
+                    }}
+                    guidedMode={guidedMode}
+                    currentFieldId={guidedMode ? myFields[currentFieldIndex]?.id : undefined}
+                    completedFieldIds={completedFields}
+                    existingFieldValues={fieldSignatures}
+                    onFieldComplete={(fieldId, signature) => {
+                      console.log('Field completed:', fieldId);
+                      setFieldSignatures(prev => ({ ...prev, [fieldId]: signature }));
+                      setCompletedFields(prev => [...prev, fieldId]);
+                      
+                      // Move to next field in guided mode
+                      if (guidedMode && currentFieldIndex < myFields.length - 1) {
+                        setCurrentFieldIndex(prev => prev + 1);
+                      }
+                    }}
+                  />
+                ) : pdfUrl ? (
+                  <PDFViewer 
+                    documentId={data.sign_request.document.id} 
+                    signRequestStatus={data.sign_request.status}
+                    signedFilePath={data.sign_request.document.signed_file_path}
+                    accessToken={tokens?.accessToken}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-[600px] bg-gray-100 rounded-lg">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                      <p className="text-gray-600">Đang tải PDF...</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Right: Signature Panel */}
-          <div className="lg:col-span-1">
+          {/* Right: Signature Panel or Download */}
+          <div className="lg:col-span-3">
             {!alreadySigned ? (
               <div className="bg-white rounded-lg shadow-sm border">
                 <div className="p-4 border-b">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
                     <PenTool className="w-5 h-5 text-gray-600" />
-                    Chữ ký của bạn
+                    Tiến độ ký
                   </h2>
                 </div>
                 <div className="p-4 space-y-4">
-                  {/* Canvas */}
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg bg-white">
-                    <SignatureCanvas
-                      ref={sigCanvasRef}
-                      canvasProps={{
-                        className: 'w-full h-48 cursor-crosshair',
-                        style: { background: 'white' }
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 text-center">
-                    Vẽ chữ ký của bạn ở trên, sau đó bấm "Hoàn tất ký"
-                  </p>
-
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={handleClear}
-                      disabled={submitting}
-                      className="w-full"
-                      size="sm"
-                    >
-                      Xóa và vẽ lại
-                    </Button>
-                  </div>
+                  {/* Progress */}
+                  {myFields.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Đã hoàn thành</span>
+                        <span className="font-semibold text-blue-600">
+                          {completedFields.length} / {myFields.length}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all"
+                          style={{ width: `${(completedFields.length / myFields.length) * 100}%` }}
+                        />
+                      </div>
+                      
+                      {/* Field list */}
+                      <div className="space-y-2 mt-4">
+                        {myFields.map((field, idx) => {
+                          const isCompleted = completedFields.includes(field.id);
+                          const isCurrent = guidedMode && idx === currentFieldIndex;
+                          return (
+                            <div 
+                              key={field.id}
+                              className={`flex items-center gap-2 p-2 rounded text-sm ${
+                                isCurrent ? 'bg-blue-50 border border-blue-200' :
+                                isCompleted ? 'bg-green-50' : 'bg-gray-50'
+                              }`}
+                            >
+                              {isCompleted ? (
+                                <Check className="w-4 h-4 text-green-600" />
+                              ) : isCurrent ? (
+                                <div className="w-4 h-4 rounded-full border-2 border-blue-600 animate-pulse" />
+                              ) : (
+                                <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
+                              )}
+                              <span className={isCompleted ? 'text-green-700' : 'text-gray-700'}>
+                                {field.type === 'signature' ? '✍️ Chữ ký' : '📝 Văn bản'} - Trang {field.page}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      <p className="text-xs text-gray-500 mt-3">
+                        💡 Click vào vùng màu vàng trên PDF để ký
+                      </p>
+                    </div>
+                  )}
 
                   {/* Submit Button */}
                   <div className="flex flex-col gap-2 pt-4 border-t">
                     <Button
                       onClick={handleSubmit}
-                      disabled={submitting}
+                      disabled={submitting || completedFields.length < myFields.length}
                       className="w-full bg-green-600 hover:bg-green-700"
                     >
                       {submitting ? (
@@ -388,7 +540,7 @@ export default function InternalSigningPage() {
                       ) : (
                         <>
                           <Check className="w-4 h-4 mr-2" />
-                          Hoàn tất ký
+                          Hoàn tất ký ({completedFields.length}/{myFields.length})
                         </>
                       )}
                     </Button>
@@ -414,7 +566,50 @@ export default function InternalSigningPage() {
                   <p className="text-green-700 mb-4 text-sm">
                     Bạn đã ký tài liệu này vào {new Date(mySigner.signed_at).toLocaleString('vi-VN')}
                   </p>
-                  <Button onClick={() => router.push('/sign-requests')} size="sm">
+                  
+                  {/* Check if all signers completed */}
+                  {data.sign_request.signers.every(s => s.status === 'signed' || s.status === 'completed') && (
+                    <div className="mb-4 p-4 bg-white rounded-lg border border-green-300">
+                      <p className="text-sm text-gray-700 mb-3">
+                        ✅ Tất cả người ký đã hoàn thành. Bạn có thể tải xuống tài liệu đã ký.
+                      </p>
+                      <Button 
+                        onClick={async () => {
+                          try {
+                            // Public routes don't have /api/v1 prefix
+                            const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:4000';
+                            const response = await fetch(
+                              `${apiBaseUrl}/public/sign/${mySigner.signing_token}/download-signed`
+                            );
+                            
+                            if (!response.ok) {
+                              throw new Error('Không thể tải xuống');
+                            }
+                            
+                            const blob = await response.blob();
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `${data.sign_request.document.document_number}_signed.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            
+                            toast.success('Đã tải xuống tài liệu đã ký');
+                          } catch (error: any) {
+                            toast.error(error.message || 'Không thể tải xuống');
+                          }
+                        }}
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Tải xuống tài liệu đã ký
+                      </Button>
+                    </div>
+                  )}
+                  
+                  <Button onClick={() => router.push('/sign-requests')} size="sm" variant="outline">
                     Quay về danh sách
                   </Button>
                 </div>

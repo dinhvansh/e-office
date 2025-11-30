@@ -6,9 +6,10 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { FlowTimeline } from '@/components/flow/FlowTimeline';
 import { FlowActivities } from '@/components/flow/FlowActivities';
 import { FlowParticipants } from '@/components/flow/FlowParticipants';
+import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, FileText, Download } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, FileText, Download, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 export default function DocumentFlowPage() {
   const params = useParams();
@@ -16,15 +17,47 @@ export default function DocumentFlowPage() {
   const { fetchJson } = useAuth();
   const documentId = params.id as string;
   const [activeTab, setActiveTab] = useState<'activities' | 'participants'>('activities');
+  const [pdfUrl, setPdfUrl] = useState<string>('');
 
-  // Fetch flow data
-  const { data: flowData, isLoading } = useQuery({
+  // Fetch flow data with auto-refresh to show new signatures
+  const { data: flowData, isLoading, refetch, isFetching } = useQuery<any>({
     queryKey: ['document-flow', documentId],
     queryFn: async () => {
       const response = await fetchJson(`/documents/${documentId}/flow`);
       return response;
     },
+    refetchInterval: (data) => {
+      // Auto-refresh every 10 seconds if document is in progress
+      // Stop refreshing when completed or rejected
+      const status = data?.document?.status;
+      if (status === 'in_progress' || status === 'pending') {
+        return 10000; // 10 seconds
+      }
+      return false; // Stop auto-refresh
+    },
+    refetchOnWindowFocus: true, // Refresh when user returns to tab
   });
+
+  // Set PDF URL - use progressive/signed version if available
+  useEffect(() => {
+    if (typeof window !== 'undefined' && documentId && flowData) {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+      
+      // Priority: Use signed_file_path if exists (progressive or completed)
+      // This shows the latest PDF with signatures as they are added
+      const hasSignedFile = flowData?.document?.signed_file_path;
+      const endpoint = hasSignedFile ? 'view-signed' : 'view';
+      
+      // Add timestamp to force reload when signed_file_path changes
+      // This prevents browser from showing cached old PDF
+      const timestamp = Date.now();
+      const cacheBuster = hasSignedFile ? `?t=${timestamp}` : '';
+      
+      setPdfUrl(`${apiUrl}/documents/${documentId}/${endpoint}${cacheBuster}`);
+    }
+  }, [documentId, flowData?.document?.signed_file_path, flowData?.document?.status]);
+
+
 
   if (isLoading) {
     return (
@@ -46,7 +79,12 @@ export default function DocumentFlowPage() {
     );
   }
 
-  const { document, phases, steps, activities, can_approve, can_sign } = flowData;
+  const document = flowData?.document;
+  const phases = flowData?.phases || [];
+  const steps = flowData?.steps || [];
+  const activities = flowData?.activities || [];
+  const can_approve = flowData?.can_approve;
+  const can_sign = flowData?.can_sign;
 
   // Calculate progress percentage
   const completedSteps = steps.filter((s: any) => 
@@ -73,16 +111,76 @@ export default function DocumentFlowPage() {
                 <div className="flex items-center gap-2">
                   <FileText className="w-5 h-5 text-gray-400" />
                   <h1 className="text-xl font-semibold">{document.title}</h1>
+                  {(document.status === 'in_progress' || document.status === 'pending') && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-full">
+                      <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse"></span>
+                      Tự động cập nhật
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-gray-500 mt-1">
                   {document.document_number} • {document.document_type}
+                  {document.signed_file_path && (
+                    <span className="ml-2 text-green-600">
+                      • {document.status === 'completed' ? 'Có PDF hoàn thành' : 'Có PDF đang ký'}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                title="Làm mới để xem cập nhật mới nhất"
+              >
+                <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+                    // Use signed file if available (progressive or completed)
+                    const hasSignedFile = document?.signed_file_path;
+                    const endpoint = hasSignedFile ? 'download-signed' : 'download';
+                    
+                    const authData = localStorage.getItem('esign.auth');
+                    const token = authData ? JSON.parse(authData).tokens?.accessToken : null;
+                    
+                    const response = await fetch(`${apiUrl}/documents/${documentId}/${endpoint}`, {
+                      headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    if (!response.ok) throw new Error('Download failed');
+                    
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = window.document.createElement('a');
+                    a.href = url;
+                    
+                    // Add status to filename
+                    const statusLabel = document?.status === 'completed' ? 'hoan-thanh' : 'dang-ky';
+                    const filename = hasSignedFile 
+                      ? `${document.document_number || 'document'}-${statusLabel}.pdf`
+                      : `${document.document_number || 'document'}.pdf`;
+                    
+                    a.download = filename;
+                    window.document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    window.document.body.removeChild(a);
+                  } catch (error) {
+                    console.error('Download error:', error);
+                    alert('Không thể tải xuống file');
+                  }
+                }}
+              >
                 <Download className="w-4 h-4 mr-2" />
-                Tải xuống
+                Tải xuống {document?.signed_file_path ? (document?.status === 'completed' ? '(Hoàn thành)' : '(Đang ký)') : ''}
               </Button>
             </div>
           </div>
@@ -128,10 +226,10 @@ export default function DocumentFlowPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left: Timeline */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-3">
             <FlowTimeline
               steps={steps}
               canApprove={can_approve}
@@ -139,24 +237,18 @@ export default function DocumentFlowPage() {
             />
           </div>
 
-          {/* Center: Document Viewer */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h2 className="text-lg font-semibold mb-4">Xem tài liệu</h2>
-              <div className="aspect-[3/4] bg-gray-100 rounded-lg flex items-center justify-center">
-                <div className="text-center">
-                  <FileText className="w-16 h-16 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">PDF Viewer</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Tích hợp PDF viewer ở đây
-                  </p>
-                </div>
-              </div>
-            </div>
+          {/* Center: Document Viewer - Larger */}
+          <div className="lg:col-span-6">
+            {pdfUrl && (
+              <SimplePDFViewer 
+                key={`${documentId}-${flowData?.document?.signed_file_path || 'original'}`}
+                pdfUrl={pdfUrl} 
+              />
+            )}
           </div>
 
           {/* Right: Activities & Participants */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-3">
             <div className="bg-white rounded-lg shadow-sm border">
               {/* Tabs */}
               <div className="border-b">

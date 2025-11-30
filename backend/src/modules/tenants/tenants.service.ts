@@ -9,6 +9,10 @@ class TenantsService {
     }
     return tenant;
   }
+
+  async getTenantStats(tenantId: number) {
+    return tenantsRepository.getStats(tenantId);
+  }
 }
 
 export const tenantsService = new TenantsService();

@@ -21,13 +21,13 @@ const variantStyles: Record<StatusVariant, string> = {
 const getVariantFromStatus = (status: string): StatusVariant => {
   const lower = status.toLowerCase();
   
-  if (lower.includes('hoàn') || lower.includes('thành công') || lower.includes('active') || lower.includes('approved')) {
+  if (lower.includes('hoàn') || lower.includes('thành công') || lower.includes('active') || lower.includes('approved') || lower.includes('completed')) {
     return 'success';
   }
   if (lower.includes('chờ') || lower.includes('pending') || lower.includes('waiting')) {
     return 'pending';
   }
-  if (lower.includes('cảnh báo') || lower.includes('warning')) {
+  if (lower.includes('cảnh báo') || lower.includes('warning') || lower.includes('archived') || lower.includes('thanh lý')) {
     return 'warning';
   }
   if (lower.includes('từ chối') || lower.includes('hủy') || lower.includes('rejected') || lower.includes('cancelled') || lower.includes('inactive')) {

@@ -7,8 +7,17 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { cn } from "@/lib/utils";
 import { SIDEBAR_STRUCTURE } from "@/constants/sidebarItems";
 import { filterSidebarByPermissions } from "@/lib/permissions";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Settings, LogOut, User, FileSignature, Upload } from "lucide-react";
 import { LoadingBar } from "@/components/ui/loading-bar";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { tokens, user, tenant, logout, isLoading } = useAuth();
@@ -141,50 +150,66 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             ))}
           </nav>
-          <div className={cn(
-            "mt-auto space-y-3 rounded-xl border border-slate-200 bg-slate-50 text-sm",
-            isCollapsed ? "p-2 flex flex-col items-center" : "p-4"
-          )}>
-            {isCollapsed ? (
-              <>
-                <div 
-                  className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:scale-105 transition-transform"
-                  title={user?.email}
-                >
-                  {user?.email?.[0]?.toUpperCase() ?? "U"}
-                </div>
-                <button
-                  onClick={logout}
-                  className="w-full rounded-lg bg-white border border-slate-200 p-2 text-xs font-medium text-slate-700 transition hover:bg-slate-100 hover:border-slate-300"
-                  title="Đăng xuất"
-                >
-                  ↪
-                </button>
-              </>
-            ) : (
-              <>
-                <div>
-                  <p className="text-xs font-medium text-slate-500 mb-1">Đăng nhập</p>
-                  <p className="font-semibold text-slate-900 truncate">{user?.email}</p>
-                  <p className="text-xs text-slate-600 mt-1">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
-                      {user?.role ?? "user"}
-                    </span>
-                  </p>
-                </div>
-                <button
-                  onClick={logout}
-                  className="w-full rounded-lg bg-white border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:border-slate-300"
-                >
-                  Đăng xuất
-                </button>
-              </>
-            )}
-          </div>
         </aside>
-        <main className="p-6 space-y-6 overflow-y-auto">
-          {children}
-        </main>
+        <div className="flex flex-col h-screen">
+          {/* Header */}
+          <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-4 md:px-6 py-3 flex items-center justify-between shadow-sm">
+            <div className="flex-1">
+              {/* Breadcrumb or page title can go here */}
+            </div>
+            <div className="flex items-center gap-2 md:gap-3">
+              <NotificationBell />
+              <div className="h-6 w-px bg-slate-200" />
+              
+              {/* User Menu Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex items-center gap-2 hover:bg-slate-50 rounded-lg p-1.5 transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-bold text-sm">
+                    {user?.email?.[0]?.toUpperCase() ?? "U"}
+                  </div>
+                  <div className="hidden sm:block text-left">
+                    <p className="text-sm font-medium text-slate-900">{user?.full_name || user?.email}</p>
+                    <p className="text-xs text-slate-500 capitalize">{user?.role ?? "user"}</p>
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium">{user?.full_name || user?.email}</p>
+                      <p className="text-xs text-muted-foreground">{user?.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/profile')}>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Thông tin cá nhân</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/profile?tab=avatar')}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    <span>Upload Avatar</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/profile?tab=signature')}>
+                    <FileSignature className="mr-2 h-4 w-4" />
+                    <span>Cài đặt chữ ký</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/settings/tenant')}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Cài đặt</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-600 focus:text-red-600">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Đăng xuất</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </header>
+          {/* Main content */}
+          <main className="flex-1 p-6 space-y-6 overflow-y-auto">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   );

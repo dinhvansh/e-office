@@ -5,6 +5,8 @@ export const usersController = {
   async getUsers(req: Request, res: Response) {
     try {
       const tenantId = (req as any).auth.tenantId;
+      const page = req.query.page ? parseInt(req.query.page as string) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
       const filters = {
         department_id: req.query.department_id ? parseInt(req.query.department_id as string) : undefined,
         role: req.query.role as string,
@@ -12,8 +14,19 @@ export const usersController = {
         search: req.query.search as string,
       };
       
-      const users = await usersService.getUsers(tenantId, filters);
-      res.json({ success: true, data: users });
+      const result = await usersService.getUsers(tenantId, filters, page, limit);
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
+  // ✅ NEW: Get only active users (for dropdowns/selectors)
+  async getActiveUsers(req: Request, res: Response) {
+    try {
+      const tenantId = (req as any).auth.tenantId;
+      const users = await usersService.getActiveUsers(tenantId);
+      res.json(users); // Return array directly for backward compatibility
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }

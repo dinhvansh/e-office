@@ -5,6 +5,27 @@ export const positionsController = {
   async getPositions(req: Request, res: Response) {
     try {
       const tenantId = (req as any).auth.tenantId;
+      const page = parseInt(req.query.page as string) || undefined;
+      const limit = parseInt(req.query.limit as string) || undefined;
+      const is_active = req.query.is_active as string | undefined;
+      
+      // If pagination requested
+      if (page && limit) {
+        const result = await positionsService.getPositionsPaginated(tenantId, {
+          page,
+          limit,
+          is_active: is_active === 'true' ? true : is_active === 'false' ? false : undefined,
+        });
+        return res.json({
+          success: true,
+          data: {
+            positions: result.positions,
+            pagination: result.pagination,
+          },
+        });
+      }
+      
+      // Otherwise return all
       const filters = req.query;
       const positions = await positionsService.getPositions(tenantId, filters);
       res.json({ success: true, data: { positions } });

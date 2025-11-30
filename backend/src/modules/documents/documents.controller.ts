@@ -64,6 +64,8 @@ export class DocumentsController {
     const page = req.query.page ? parseInt(req.query.page as string) : undefined;
     const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
     const noSigningOnly = req.query.no_signing_only === 'true';
+    const status = req.query.status as string | undefined;
+    const search = req.query.search as string | undefined;
 
     if (page || limit) {
       // Use paginated endpoint
@@ -72,7 +74,9 @@ export class DocumentsController {
         req.auth!.userId,
         page || 1,
         limit || 10,
-        noSigningOnly
+        noSigningOnly,
+        status,
+        search
       );
       res.json(ok({
         documents: toDocumentDTOs(result.data),
@@ -80,7 +84,7 @@ export class DocumentsController {
       }));
     } else {
       // Use original non-paginated endpoint (backward compatibility)
-      const documents = await documentsService.listDocuments(req.auth!.tenantId, req.auth!.userId, noSigningOnly);
+      const documents = await documentsService.listDocuments(req.auth!.tenantId, req.auth!.userId, noSigningOnly, status);
       res.json(ok({ documents: toDocumentDTOs(documents) }));
     }
   };
@@ -294,6 +298,57 @@ export class DocumentsController {
     });
   };
 
+  downloadSigned = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    const { filePath, fileName, mimeType } = await documentsService.getSignedDocumentFile(
+      documentId,
+      req.auth!.tenantId,
+      req.auth!.userId
+    );
+
+    // Set headers for download
+    res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    
+    // Send file
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error('Error sending file:', err);
+        if (!res.headersSent) {
+          res.status(404).json({ success: false, error: { message: 'File not found' } });
+        }
+      }
+    });
+  };
+
+  viewSigned = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    const { filePath, fileName, mimeType } = await documentsService.getSignedDocumentFile(
+      documentId,
+      req.auth!.tenantId,
+      req.auth!.userId
+    );
+
+    // Set headers for inline viewing
+    res.setHeader('Content-Type', mimeType || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    
+    // Disable caching to ensure latest progressive PDF is always shown
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
+    // Send file
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error('Error sending file:', err);
+        if (!res.headersSent) {
+          res.status(404).json({ success: false, error: { message: 'File not found' } });
+        }
+      }
+    });
+  };
+
   submitForApproval = async (req: Request, res: Response): Promise<void> => {
     const documentId = idSchema.parse(req.params.id);
     const { workflow_id } = req.body;
@@ -306,5 +361,29 @@ export class DocumentsController {
     );
     
     res.json(ok({ document: toDocumentDTO(document) }));
+  };
+
+  archiveDocument = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    
+    await documentsService.archiveDocument(
+      documentId,
+      req.auth!.tenantId,
+      req.auth!.userId
+    );
+    
+    res.json(ok({ message: 'Document archived successfully' }));
+  };
+
+  cancelDocument = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    
+    await documentsService.cancelDocument(
+      documentId,
+      req.auth!.tenantId,
+      req.auth!.userId
+    );
+    
+    res.json(ok({ message: 'Document cancelled successfully' }));
   };
 }

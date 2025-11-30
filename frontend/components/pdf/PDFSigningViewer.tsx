@@ -202,11 +202,14 @@ export default function PDFSigningViewer({
     });
     setActiveFieldId(null);
     
-    // In guided mode, notify parent component
-    if (guidedMode && onFieldComplete) {
+    // Notify parent component
+    if (onFieldComplete) {
       console.log('📞 Calling onFieldComplete');
       onFieldComplete(fieldId, signatureData);
-    } else if (!guidedMode) {
+    }
+    
+    // Also call onFieldClick for backward compatibility
+    if (!guidedMode) {
       console.log('📞 Calling onFieldClick');
       onFieldClick({ id: fieldId } as SignatureField);
     }
@@ -305,10 +308,12 @@ export default function PDFSigningViewer({
                   key={field.id}
                   id={`field-${field.id}`}
                   className={`absolute border-2 cursor-pointer pointer-events-auto transition-all ${
-                    isCurrent
+                    isCurrent && !isActive
                       ? 'border-blue-600 bg-blue-100 shadow-2xl z-30 ring-4 ring-blue-300 animate-pulse'
                       : isActive
                       ? 'border-blue-500 bg-white shadow-lg z-20'
+                      : isCurrent && isActive
+                      ? 'border-blue-600 bg-blue-100 shadow-2xl z-30 ring-4 ring-blue-300'
                       : hasSigned
                       ? 'border-green-500 bg-green-50'
                       : isDisabled
@@ -340,7 +345,8 @@ export default function PDFSigningViewer({
                       } else if (!isCurrent) {
                         console.log('⏳ Guided mode: Not current field, ignoring');
                       } else if (isActive) {
-                        console.log('🔄 Guided mode: Field already active');
+                        console.log('🔄 Guided mode: Field already active, ignoring click');
+                        // Don't close - user might be drawing signature
                       }
                     } else {
                       // Normal mode
@@ -349,6 +355,9 @@ export default function PDFSigningViewer({
                         handleFieldClick(field);
                       } else if (isDisabled) {
                         console.log('⏳ Normal mode: Field is disabled');
+                      } else if (isActive) {
+                        console.log('🔄 Normal mode: Field already active, ignoring click');
+                        // Don't close - user might be drawing signature
                       }
                     }
                   }}

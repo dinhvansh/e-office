@@ -37,6 +37,8 @@ export default function RolesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [showUsersDialog, setShowUsersDialog] = useState(false);
+  const [viewingRoleUsers, setViewingRoleUsers] = useState<Role | null>(null);
   const [formData, setFormData] = useState({ name: '', description: '' });
   const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]);
   const queryClient = useQueryClient();
@@ -80,6 +82,17 @@ export default function RolesPage() {
   const { data: allPermissions } = useQuery({
     queryKey: ['all-permissions'],
     queryFn: () => fetchJson<any>('/roles/permissions'),
+  });
+
+  // Fetch users for a specific role
+  const { data: roleUsers, isLoading: isLoadingUsers } = useQuery({
+    queryKey: ['role-users', viewingRoleUsers?.id],
+    queryFn: async () => {
+      if (!viewingRoleUsers) return [];
+      const response = await fetchJson<any>(`/roles/${viewingRoleUsers.id}/users`);
+      return response.users || [];
+    },
+    enabled: !!viewingRoleUsers && showUsersDialog,
   });
 
   const deleteRoleMutation = useMutation({
@@ -222,9 +235,24 @@ export default function RolesPage() {
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Users className="w-4 h-4" />
-                    <span>{role._count.user_roles} người dùng</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Users className="w-4 h-4" />
+                      <span>{role._count.user_roles} người dùng</span>
+                    </div>
+                    {role._count.user_roles > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setViewingRoleUsers(role);
+                          setShowUsersDialog(true);
+                        }}
+                        className="text-xs"
+                      >
+                        Xem danh sách
+                      </Button>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -514,6 +542,72 @@ export default function RolesPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Users Dialog */}
+      <Dialog open={showUsersDialog} onOpenChange={setShowUsersDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Người dùng có vai trò: {viewingRoleUsers?.name}</DialogTitle>
+            <DialogDescription>
+              Danh sách {viewingRoleUsers?._count.user_roles || 0} người dùng đang có vai trò này
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="max-h-[400px] overflow-y-auto">
+            {isLoadingUsers ? (
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : roleUsers && roleUsers.length > 0 ? (
+              <div className="space-y-2">
+                {roleUsers.map((user: any) => (
+                  <div 
+                    key={user.id} 
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Users className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="font-medium">{user.full_name || user.email}</div>
+                        <div className="text-sm text-muted-foreground">{user.email}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {user.department && (
+                        <Badge variant="outline" className="text-xs">
+                          {user.department.name}
+                        </Badge>
+                      )}
+                      {user.position && (
+                        <Badge variant="outline" className="text-xs">
+                          {user.position.name}
+                        </Badge>
+                      )}
+                      <StatusTag status={user.status} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={Users}
+                title="Chưa có người dùng"
+                description="Chưa có người dùng nào được gán vai trò này"
+              />
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUsersDialog(false)}>
+              Đóng
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
