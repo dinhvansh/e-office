@@ -207,7 +207,7 @@ export default function DocumentTypesPage() {
                   )}
                   {type.require_digital_signing && (
                     <span className="flex items-center gap-1">
-                      ✍️ Ký số
+                      ✍️ Ký điện tử
                     </span>
                   )}
                   {type.require_approval && (
@@ -452,7 +452,7 @@ export default function DocumentTypesPage() {
                       className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
                     />
                     <span className="text-sm font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-                      ✍️ Yêu cầu ký số điện tử
+                      ✍️ Yêu cầu ký điện tử
                     </span>
                   </label>
                 </div>

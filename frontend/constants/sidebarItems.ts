@@ -60,7 +60,7 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         label: "Công việc của tôi", 
         href: "/my-tasks", 
         icon: CheckSquare,
-        caption: "Phê duyệt & Ký số",
+        caption: "Phê duyệt & Ký điện tử",
         color: "text-amber-600"
       },
     ]

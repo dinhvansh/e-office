@@ -298,7 +298,7 @@ export default function RegisterPage() {
         <div className="max-w-md text-white">
           <h2 className="text-4xl font-bold mb-6">Chào mừng đến với E-Office!</h2>
           <p className="text-lg text-blue-100 mb-8">
-            Hệ thống quản lý tài liệu và luồng ký số hiện đại, giúp doanh nghiệp của bạn vận hành hiệu quả hơn.
+            Hệ thống quản lý tài liệu và luồng ký điện tử hiện đại, giúp doanh nghiệp của bạn vận hành hiệu quả hơn.
           </p>
           <div className="space-y-4">
             <div className="flex items-start">
@@ -324,7 +324,7 @@ export default function RegisterPage() {
                 <CheckCircle className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-semibold mb-1">Ký số an toàn</h3>
+                <h3 className="font-semibold mb-1">Ký điện tử an toàn</h3>
                 <p className="text-sm text-blue-100">Ký tài liệu điện tử với bảo mật cao</p>
               </div>
             </div>

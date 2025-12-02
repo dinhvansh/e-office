@@ -1,4 +1,5 @@
 import { sendEmail } from "../../config/email";
+import { getOtpEmailTemplate } from "./email-templates";
 
 export interface OtpEmailData {
   recipientEmail: string;
@@ -452,52 +453,12 @@ Xem tài liệu: ${data.documentUrl}`;
   }
 
   private generateOtpEmailHtml(data: OtpEmailData): string {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-          .otp-box { background: white; border: 2px dashed #667eea; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; }
-          .otp-code { font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 8px; }
-          .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>🔐 Mã OTP xác thực</h1>
-          </div>
-          <div class="content">
-            <p>Xin chào <strong>${data.recipientName}</strong>,</p>
-            <p>Bạn đã yêu cầu ký tài liệu${data.documentTitle ? `: <strong>${data.documentTitle}</strong>` : ""}.</p>
-            <p>Vui lòng sử dụng mã OTP bên dưới để xác thực chữ ký của bạn:</p>
-            
-            <div class="otp-box">
-              <div class="otp-code">${data.otp}</div>
-            </div>
-
-            <div class="warning">
-              <strong>⚠️ Lưu ý:</strong>
-              <ul style="margin: 10px 0; padding-left: 20px;">
-                <li>Mã OTP này có hiệu lực trong <strong>${data.expiryMinutes} phút</strong></li>
-                <li>Không chia sẻ mã này với bất kỳ ai</li>
-                <li>Nếu bạn không yêu cầu mã này, vui lòng bỏ qua email</li>
-              </ul>
-            </div>
-          </div>
-          <div class="footer">
-            <p>Email này được gửi tự động từ WP Sign. Vui lòng không trả lời email này.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    return getOtpEmailTemplate({
+      recipientName: data.recipientName,
+      otp: data.otp,
+      documentTitle: data.documentTitle,
+      expiryMinutes: data.expiryMinutes,
+    });
   }
 
   private generateOtpEmailText(data: OtpEmailData): string {
@@ -593,6 +554,90 @@ WP Sign System
     await sendEmail({
       to: data.to,
       subject: `❌ Yêu cầu ký đã bị hủy - ${data.documentTitle}`,
+      html,
+      text,
+    });
+  }
+
+  async sendDocumentSharedEmail(data: {
+    recipientEmail: string;
+    documentTitle: string;
+    documentNumber?: string;
+    senderName: string;
+    message?: string;
+    documentUrl: string;
+  }): Promise<void> {
+    const docInfo = data.documentNumber 
+      ? `${data.documentTitle} (${data.documentNumber})`
+      : data.documentTitle;
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+          .doc-info { background: white; padding: 15px; border-left: 4px solid #667eea; margin: 15px 0; border-radius: 4px; }
+          .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin: 0;">📄 Tài liệu được chia sẻ</h1>
+          </div>
+          <div class="content">
+            <p>Xin chào,</p>
+            <p><strong>${data.senderName}</strong> đã chia sẻ tài liệu với bạn (CC):</p>
+            
+            <div class="doc-info">
+              <strong>📄 Tài liệu:</strong> ${docInfo}
+            </div>
+            
+            ${data.message ? `
+            <div class="doc-info">
+              <strong>💬 Lời nhắn:</strong><br>
+              ${data.message}
+            </div>
+            ` : ''}
+            
+            <p>Bạn có thể xem tài liệu này để tham khảo.</p>
+            
+            <div style="text-align: center;">
+              <a href="${data.documentUrl}" class="button">Xem tài liệu</a>
+            </div>
+            
+            <div class="footer">
+              <p>Email này được gửi tự động từ hệ thống E-Office</p>
+              <p>Vui lòng không trả lời email này</p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `
+Tài liệu được chia sẻ
+
+${data.senderName} đã chia sẻ tài liệu với bạn (CC):
+
+Tài liệu: ${docInfo}
+${data.message ? `\nLời nhắn: ${data.message}\n` : ''}
+Xem tài liệu: ${data.documentUrl}
+
+---
+Email này được gửi tự động từ hệ thống E-Office
+    `;
+
+    await sendEmail({
+      to: data.recipientEmail,
+      subject: `📄 [CC] ${docInfo}`,
       html,
       text,
     });

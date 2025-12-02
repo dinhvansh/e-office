@@ -80,7 +80,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-4 md:space-y-6 p-4 md:p-6">
+    <div className="space-y-3 md:space-y-6 p-3 md:p-6">
       <PageHeader
         icon={TrendingUp}
         title="Dashboard"
@@ -147,7 +147,7 @@ export default function DashboardPage() {
                 <p className="text-sm">Chưa có dữ liệu</p>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={200} className="md:h-[250px]">
                 <PieChart>
                   <Pie
                     data={documentStatusData}
@@ -155,7 +155,7 @@ export default function DashboardPage() {
                     cy="50%"
                     labelLine={false}
                     label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
-                    outerRadius={window.innerWidth < 768 ? 60 : 80}
+                    outerRadius={typeof window !== 'undefined' && window.innerWidth < 768 ? 50 : 80}
                     fill="#8884d8"
                     dataKey="value"
                   >
@@ -163,8 +163,8 @@ export default function DashboardPage() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
+                  <Tooltip contentStyle={{ fontSize: '12px' }} />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} iconSize={10} />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -181,12 +181,12 @@ export default function DashboardPage() {
             {isLoadingDocs || isLoadingStats ? (
               <Skeleton className="h-48 md:h-64 w-full" />
             ) : (
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={200} className="md:h-[250px]">
                 <BarChart data={activityData}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} className="md:text-xs" />
+                  <YAxis tick={{ fontSize: 10 }} className="md:text-xs" />
+                  <Tooltip contentStyle={{ fontSize: '12px' }} />
+                  <Bar dataKey="value" fill="#3b82f6" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}

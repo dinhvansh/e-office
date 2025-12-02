@@ -66,6 +66,8 @@ export class DocumentsController {
     const noSigningOnly = req.query.no_signing_only === 'true';
     const status = req.query.status as string | undefined;
     const search = req.query.search as string | undefined;
+    const documentTypeId = req.query.document_type_id ? parseInt(req.query.document_type_id as string) : undefined;
+    const confidentialLevel = req.query.confidential_level as string | undefined;
 
     if (page || limit) {
       // Use paginated endpoint
@@ -76,7 +78,9 @@ export class DocumentsController {
         limit || 10,
         noSigningOnly,
         status,
-        search
+        search,
+        documentTypeId,
+        confidentialLevel
       );
       res.json(ok({
         documents: toDocumentDTOs(result.data),

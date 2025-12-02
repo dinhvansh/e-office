@@ -7,9 +7,10 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { cn } from "@/lib/utils";
 import { SIDEBAR_STRUCTURE } from "@/constants/sidebarItems";
 import { filterSidebarByPermissions } from "@/lib/permissions";
-import { ChevronLeft, ChevronRight, Settings, LogOut, User, FileSignature, Upload } from "lucide-react";
+import { ChevronLeft, ChevronRight, Settings, LogOut, User, FileSignature, Upload, Menu, X } from "lucide-react";
 import { LoadingBar } from "@/components/ui/loading-bar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { MobileBottomNav } from "@/components/ui/mobile-nav";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Filter sidebar based on user role
   const filteredSidebar = filterSidebarByPermissions(SIDEBAR_STRUCTURE, user?.role);
@@ -46,20 +48,42 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
       <LoadingBar />
       <div className={cn(
-        "grid gap-0 transition-all duration-300",
+        "grid gap-0 transition-all duration-300 min-w-0",
         isCollapsed ? "md:grid-cols-[100px_1fr]" : "md:grid-cols-[280px_1fr]"
       )}>
+        {/* Mobile Sidebar Overlay */}
+        {isMobileMenuOpen && (
+          <div 
+            className="md:hidden fixed inset-0 bg-black/50 z-50 transition-opacity"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* Sidebar - Desktop + Mobile */}
         <aside className={cn(
-          "hidden h-screen sticky top-0 flex-col border-r border-slate-200 bg-white shadow-xl md:flex overflow-visible transition-all duration-300 relative hide-scrollbar",
-          isCollapsed ? "p-3" : "p-6"
+          "h-screen sticky top-0 flex-col border-r border-slate-200 bg-white shadow-xl overflow-visible transition-all duration-300 relative hide-scrollbar",
+          isCollapsed ? "p-3" : "p-6",
+          // Mobile styles
+          "md:flex",
+          isMobileMenuOpen 
+            ? "fixed left-0 top-0 z-50 w-[280px] flex" 
+            : "hidden"
         )}>
-          {/* Toggle Button */}
+          {/* Toggle Button - Desktop only */}
           <button 
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="absolute -right-3 top-6 bg-white border border-slate-200 rounded-full p-1.5 shadow-md hover:shadow-lg hover:bg-slate-50 text-slate-600 transition-all duration-200 z-50"
+            className="hidden md:block absolute -right-3 top-6 bg-white border border-slate-200 rounded-full p-1.5 shadow-md hover:shadow-lg hover:bg-slate-50 text-slate-600 transition-all duration-200 z-50"
             title={isCollapsed ? "Mở rộng" : "Thu gọn"}
           >
             {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+          </button>
+
+          {/* Close Button - Mobile only */}
+          <button 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="md:hidden absolute right-4 top-4 p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-slate-600" />
           </button>
 
           <div className={cn(
@@ -151,10 +175,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             ))}
           </nav>
         </aside>
-        <div className="flex flex-col h-screen">
+        <div className="flex flex-col h-screen min-w-0 overflow-hidden">
           {/* Header */}
           <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-4 md:px-6 py-3 flex items-center justify-between shadow-sm">
-            <div className="flex-1">
+            {/* Mobile Hamburger Menu */}
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="md:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <Menu className="w-5 h-5 text-slate-600" />
+            </button>
+
+            <div className="flex-1 md:flex-none">
               {/* Breadcrumb or page title can go here */}
             </div>
             <div className="flex items-center gap-2 md:gap-3">
@@ -206,11 +238,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </header>
           {/* Main content */}
-          <main className="flex-1 p-6 space-y-6 overflow-y-auto">
+          <main className="flex-1 p-3 md:p-6 space-y-3 md:space-y-6 overflow-y-auto overflow-x-hidden pb-20 md:pb-6 min-w-0">
             {children}
           </main>
         </div>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav />
     </div>
   );
 }

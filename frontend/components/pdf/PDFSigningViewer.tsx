@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import SignatureCanvas from '@/components/signature/SignatureCanvas';
 import * as pdfjsLib from 'pdfjs-dist';
+import { toast } from 'sonner';
 
 // Configure PDF.js worker
 if (typeof window !== 'undefined') {
@@ -286,7 +287,7 @@ export default function PDFSigningViewer({
           >
             {pageFields.map((field) => {
               const isActive = field.id === activeFieldId;
-              const hasSigned = fieldSignatures[field.id] || completedFieldIds.includes(field.id);
+              const hasSigned = (field.id in fieldSignatures) || completedFieldIds.includes(field.id);
               const isSignatureField = field.type === 'signature';
               const isCurrent = guidedMode && field.id === currentFieldId;
               const isDisabled = guidedMode && !isCurrent && !hasSigned;
@@ -449,8 +450,11 @@ export default function PDFSigningViewer({
                                     [field.id]: dateValue,
                                   });
                                 }
+                                
                                 setActiveFieldId(null);
-                                if (guidedMode && onFieldComplete) {
+                                
+                                // Always call onFieldComplete if available (not just in guided mode)
+                                if (onFieldComplete) {
                                   onFieldComplete(field.id, dateValue);
                                 }
                               }}
@@ -470,6 +474,7 @@ export default function PDFSigningViewer({
                           <input
                             type="text"
                             placeholder="Nhập nội dung..."
+                            defaultValue={fieldSignatures[field.id] || existingFieldValues?.[field.id] || ''}
                             className="w-full border-2 border-blue-400 rounded-lg px-4 py-3 text-lg bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
                             onChange={(e) => {
                               setFieldSignatures({
@@ -492,8 +497,15 @@ export default function PDFSigningViewer({
                             <Button
                               onClick={() => {
                                 const textValue = fieldSignatures[field.id] || '';
+                                if (!textValue || textValue.trim() === '') {
+                                  toast.error('Vui lòng nhập nội dung');
+                                  return;
+                                }
+                                
                                 setActiveFieldId(null);
-                                if (guidedMode && onFieldComplete) {
+                                
+                                // Always call onFieldComplete if available (not just in guided mode)
+                                if (onFieldComplete) {
                                   onFieldComplete(field.id, textValue);
                                 }
                               }}

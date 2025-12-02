@@ -62,39 +62,86 @@ export class SignRequestFieldValuesService {
    * Validate that all required fields are filled
    */
   async validateRequiredFields(signerId: number): Promise<boolean> {
-    // Get all required fields assigned to this signer
+    // Get signer info to find sign_request_id
+    const signer = await prisma.signers.findUnique({
+      where: { id: signerId },
+      select: { id: true, sign_request_id: true },
+    });
+
+    if (!signer) {
+      return false;
+    }
+
+    // Get all required fields for this sign request that are:
+    // 1. Assigned to this signer, OR
+    // 2. Not assigned to anyone (assigned_signer_id is null) - shared fields
     const requiredFields = await prisma.sign_request_fields.findMany({
       where: {
-        assigned_signer_id: signerId,
+        sign_request_id: signer.sign_request_id,
         required: true,
+        OR: [
+          { assigned_signer_id: signerId },
+          { assigned_signer_id: null },
+        ],
       },
-      select: { id: true },
+      select: { id: true, label: true, type: true },
     });
 
-    // Get filled field values
+    // Get filled field values for this signer
     const filledFields = await prisma.sign_request_field_values.findMany({
       where: { signer_id: signerId },
-      select: { field_id: true },
+      select: { field_id: true, value: true },
     });
 
-    const filledFieldIds = new Set(filledFields.map((f) => f.field_id));
+    const filledFieldIds = new Set(
+      filledFields
+        .filter(f => {
+          // Check if value is not empty
+          if (f.value === null || f.value === undefined) return false;
+          if (typeof f.value === 'string' && f.value.trim() === '') return false;
+          return true;
+        })
+        .map((f) => f.field_id)
+    );
 
     // Check if all required fields are filled
     for (const field of requiredFields) {
       if (!filledFieldIds.has(field.id)) {
+        console.log(`❌ Required field not filled: ${field.label} (ID: ${field.id}, Type: ${field.type})`);
         return false;
       }
     }
 
+    console.log(`✅ All ${requiredFields.length} required fields are filled`);
     return true;
   }
 
   /**
    * Get fields assigned to a signer with their values
+   * Includes both fields assigned to this signer AND unassigned (shared) fields
    */
   async getSignerFieldsWithValues(signerId: number) {
+    // Get signer info to find sign_request_id
+    const signer = await prisma.signers.findUnique({
+      where: { id: signerId },
+      select: { id: true, sign_request_id: true },
+    });
+
+    if (!signer) {
+      return [];
+    }
+
+    // Get fields that are:
+    // 1. Assigned to this signer, OR
+    // 2. Not assigned to anyone (assigned_signer_id is null) - shared fields
     const fields = await prisma.sign_request_fields.findMany({
-      where: { assigned_signer_id: signerId },
+      where: {
+        sign_request_id: signer.sign_request_id,
+        OR: [
+          { assigned_signer_id: signerId },
+          { assigned_signer_id: null },
+        ],
+      },
       include: {
         values: {
           where: { signer_id: signerId },
@@ -115,6 +162,7 @@ export class SignRequestFieldValuesService {
       label: field.label,
       placeholder: field.placeholder,
       read_only: field.read_only,
+      assigned_signer_id: field.assigned_signer_id,
       value: field.values[0]?.value || null,
       filled_at: field.values[0]?.filled_at || null,
     }));

@@ -328,8 +328,8 @@ export default function SignRequestsPage() {
       <div className="flex items-center justify-between">
         <PageHeader
           icon={PenTool}
-          title="Yêu cầu Ký số"
-          description="Theo dõi và quản lý các yêu cầu ký số bạn đã tạo"
+          title="Yêu cầu Ký điện tử"
+          description="Theo dõi và quản lý các yêu cầu ký điện tử bạn đã tạo"
           iconColor="text-green-600"
         />
         <Button
@@ -396,27 +396,27 @@ export default function SignRequestsPage() {
         />
       </div>
 
-      {/* Table */}
-      <Card>
+      {/* Desktop Table View */}
+      <Card className="hidden md:block">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-muted/50 border-b">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Mã yêu cầu</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Tên tài liệu</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Loại tài liệu</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Người tạo</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Ngày tạo</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Tiến độ</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Trạng thái</th>
-                  <th className="px-4 py-3 text-center text-sm font-medium">Hành động</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium">Mã YC</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium">Tên tài liệu</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium">Loại</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium">Người tạo</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium">Ngày</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium">Tiến độ</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium">Trạng thái</th>
+                  <th className="px-2 py-2 text-center text-xs font-medium">Hành động</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                       Đang tải...
                     </td>
                   </tr>
@@ -427,34 +427,34 @@ export default function SignRequestsPage() {
                       className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
                       onClick={() => router.push(`/documents/${request.document.id}/flow`)}
                     >
-                      <td className="px-4 py-3">
-                        <span className="font-mono text-sm">
+                      <td className="px-2 py-3">
+                        <span className="font-mono text-xs">
                           {request.document.document_number || `#${request.id}`}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="font-medium">
+                      <td className="px-2 py-3">
+                        <span className="font-medium text-sm truncate max-w-[150px] inline-block">
                           {request.document.title || request.document.original_file_name}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-600">
+                      <td className="px-2 py-3">
+                        <span className="text-xs text-gray-600 truncate max-w-[100px] inline-block">
                           {request.document.document_type || '—'}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm">
+                      <td className="px-2 py-3">
+                        <span className="text-xs truncate max-w-[120px] inline-block">
                           {request.document.owner.full_name || request.document.owner.email}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-muted-foreground">
-                          {dayjs(request.created_at).format('DD/MM/YYYY')}
+                      <td className="px-2 py-3">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {dayjs(request.created_at).format('DD/MM/YY')}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden min-w-[80px]">
+                      <td className="px-2 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden min-w-[60px]">
                             <div
                               className={`h-full transition-all ${getProgressColor(
                                 request.progress.percentage,
@@ -464,15 +464,15 @@ export default function SignRequestsPage() {
                               style={{ width: `${request.progress.percentage}%` }}
                             />
                           </div>
-                          <span className="text-sm font-medium min-w-[50px]">
+                          <span className="text-xs font-medium min-w-[40px] whitespace-nowrap">
                             {request.progress.signed}/{request.progress.total}
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-3">
                         {getStatusBadge(request.progress, request.status)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-3">
                         <div className="flex items-center gap-1 justify-center" onClick={(e) => e.stopPropagation()}>
                           {/* Edit Workflow Button - Show for draft documents */}
                           {request.status === 'draft' && (
@@ -480,9 +480,9 @@ export default function SignRequestsPage() {
                               size="sm"
                               onClick={() => router.push(`/sign-requests/${request.id}/editor`)}
                               title="Chỉnh sửa luồng ký"
-                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                              className="bg-blue-600 hover:bg-blue-700 text-white h-7 w-7 p-0"
                             >
-                              <Edit className="w-4 h-4" />
+                              <Edit className="w-3.5 h-3.5" />
                             </Button>
                           )}
                           
@@ -492,9 +492,9 @@ export default function SignRequestsPage() {
                               size="sm"
                               onClick={() => router.push(`/sign-requests/${request.id}/sign`)}
                               title="Ký ngay"
-                              className="bg-green-600 hover:bg-green-700 text-white"
+                              className="bg-green-600 hover:bg-green-700 text-white h-7 w-7 p-0"
                             >
-                              <PenTool className="w-4 h-4" />
+                              <PenTool className="w-3.5 h-3.5" />
                             </Button>
                           )}
 
@@ -504,8 +504,9 @@ export default function SignRequestsPage() {
                             variant="outline"
                             onClick={() => router.push(`/documents/${request.document.id}/flow`)}
                             title="Xem tài liệu"
+                            className="h-7 w-7 p-0"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
                           </Button>
                           
                           {/* More Actions Dropdown */}
@@ -514,10 +515,10 @@ export default function SignRequestsPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 w-8 p-0"
+                                className="h-7 w-7 p-0"
                                 disabled={deleteMutation.isPending || cancelMutation.isPending || revokeMutation.isPending}
                               >
-                                <MoreVertical className="w-4 h-4" />
+                                <MoreVertical className="w-3.5 h-3.5" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
@@ -591,7 +592,7 @@ export default function SignRequestsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                       {searchQuery ? 'Không tìm thấy yêu cầu ký nào' : 'Chưa có yêu cầu ký nào'}
                     </td>
                   </tr>
@@ -660,6 +661,140 @@ export default function SignRequestsPage() {
           </div>
         )}
       </Card>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          <Card>
+            <CardContent className="p-4 text-center text-gray-500">
+              Đang tải...
+            </CardContent>
+          </Card>
+        ) : filteredData && filteredData.length > 0 ? (
+          <>
+            {filteredData.map((request) => (
+              <Card 
+                key={request.id}
+                className="hover:shadow-md transition-shadow"
+                onClick={() => router.push(`/documents/${request.document.id}/flow`)}
+              >
+                <CardContent className="p-3">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">
+                        {request.document.title || request.document.original_file_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {request.document.document_number || `#${request.id}`}
+                      </p>
+                    </div>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      {getStatusBadge(request.progress, request.status)}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                    <div>
+                      <span className="text-muted-foreground">Loại:</span>
+                      <p className="font-medium truncate">{request.document.document_type || '—'}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Ngày:</span>
+                      <p className="font-medium">{dayjs(request.created_at).format('DD/MM/YY')}</p>
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Tiến độ</span>
+                      <span className="font-medium">{request.progress.signed}/{request.progress.total}</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${getProgressColor(request.progress.percentage, request.progress.rejected, request.status)}`}
+                        style={{ width: `${request.progress.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    {request.status === 'draft' && (
+                      <Button size="sm" onClick={() => router.push(`/sign-requests/${request.id}/editor`)} className="flex-1 bg-blue-600 text-white text-xs h-8">
+                        <Edit className="w-3.5 h-3.5 mr-1" />Chỉnh sửa
+                      </Button>
+                    )}
+                    {isCurrentUserPendingSigner(request) && isCurrentUserTurn(request) && (
+                      <Button size="sm" onClick={() => router.push(`/sign-requests/${request.id}/sign`)} className="flex-1 bg-green-600 text-white text-xs h-8">
+                        <PenTool className="w-3.5 h-3.5 mr-1" />Ký ngay
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => router.push(`/documents/${request.document.id}/flow`)} className="flex-1 text-xs h-8">
+                      <Eye className="w-3.5 h-3.5 mr-1" />Xem
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        {request.status === 'draft' && (
+                          <DropdownMenuItem onClick={() => handleDelete(request.id, request.document.id)} className="text-red-600">
+                            <Trash2 className="w-4 h-4 mr-2" />Xóa
+                          </DropdownMenuItem>
+                        )}
+                        {(request.status === 'pending' || request.status === 'in_progress') && (
+                          <DropdownMenuItem onClick={() => handleCancel(request.id)} className="text-orange-600">
+                            <XCircle className="w-4 h-4 mr-2" />Hủy
+                          </DropdownMenuItem>
+                        )}
+                        {request.signers.some(s => !s.is_internal) && (
+                          <>
+                            <DropdownMenuItem onClick={() => handleCopySigningLink(request)}>📋 Copy link</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleResendEmail(request.id)}>📧 Gửi lại</DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {/* Mobile Pagination */}
+            {pagination && (
+              <div className="flex items-center justify-between px-2 py-3">
+                <span className="text-xs text-muted-foreground">
+                  {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, pagination.total)} / {pagination.total}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="h-8 w-8 p-0">
+                    <ChevronsLeft className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1} className="h-8 w-8 p-0">
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </Button>
+                  <span className="text-xs px-2">{currentPage}/{pagination.totalPages}</span>
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage >= pagination.totalPages} className="h-8 w-8 p-0">
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(pagination.totalPages)} disabled={currentPage >= pagination.totalPages} className="h-8 w-8 p-0">
+                    <ChevronsRight className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <Card>
+            <CardContent className="p-8 text-center text-gray-500">
+              <PenTool className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p className="font-medium text-sm">
+                {searchQuery ? 'Không tìm thấy' : 'Chưa có yêu cầu ký'}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* Confirmation Dialog */}
       <ConfirmationDialog

@@ -90,7 +90,7 @@ export default function ThankYouPage({
                   <div>
                     <span className="text-gray-600 block mb-1">Tiêu đề yêu cầu ký</span>
                     <span className="font-semibold text-gray-900 block">
-                      {signRequestTitle || documentTitle || 'Tài liệu ký số'}
+                      {signRequestTitle || documentTitle || 'Tài liệu ký điện tử'}
                     </span>
                   </div>
                   {documentNumber && (
@@ -221,10 +221,10 @@ export default function ThankYouPage({
           <div className="bg-gray-50 px-8 py-6 border-t border-gray-200">
             <div className="text-center">
               <p className="text-sm text-gray-600 mb-1">
-                🔒 Cảm ơn bạn đã sử dụng dịch vụ ký số điện tử của chúng tôi
+                🔒 Cảm ơn bạn đã sử dụng dịch vụ ký điện tử của chúng tôi
               </p>
               <p className="text-xs text-gray-500">
-                Hệ thống ký số an toàn, bảo mật và tuân thủ pháp luật Việt Nam
+                Hệ thống ký điện tử an toàn, bảo mật và tuân thủ pháp luật Việt Nam
               </p>
             </div>
           </div>

@@ -27,6 +27,8 @@ import { AddRecipientsDialog } from "@/components/sign-requests/AddRecipientsDia
 import { SignersSection, Signer } from "@/components/documents/SignersSection";
 import { CCEmailsSection } from "@/components/documents/CCEmailsSection";
 import { AttachmentsSection } from "@/components/documents/AttachmentsSection";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreVertical } from "lucide-react";
 
 export default function DocumentsPage() {
   const { fetchJson } = useAuth();
@@ -62,9 +64,11 @@ export default function DocumentsPage() {
   // Filter and search state
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [documentTypeFilter, setDocumentTypeFilter] = useState<string>('all');
+  const [confidentialLevelFilter, setConfidentialLevelFilter] = useState<string>('all');
 
   const { data: documentsData, isLoading } = useQuery({
-    queryKey: ["documents", page, limit, statusFilter, searchQuery],
+    queryKey: ["documents", page, limit, statusFilter, searchQuery, documentTypeFilter, confidentialLevelFilter],
     queryFn: async () => {
       let url = `/documents?page=${page}&limit=${limit}`;
       if (statusFilter && statusFilter !== 'all') {
@@ -72,6 +76,12 @@ export default function DocumentsPage() {
       }
       if (searchQuery) {
         url += `&search=${encodeURIComponent(searchQuery)}`;
+      }
+      if (documentTypeFilter && documentTypeFilter !== 'all') {
+        url += `&document_type_id=${documentTypeFilter}`;
+      }
+      if (confidentialLevelFilter && confidentialLevelFilter !== 'all') {
+        url += `&confidential_level=${confidentialLevelFilter}`;
       }
       const data = await fetchJson<{ 
         documents: DocumentRecord[];
@@ -519,21 +529,21 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0 overflow-x-hidden">
       <PageHeader
         icon={FileText}
         title="Quản lý tài liệu"
         description="Upload, theo dõi và quản lý tài liệu PDF"
         iconColor="text-purple-600"
         actions={
-          <Badge variant="secondary" className="text-sm">
+          <Badge variant="secondary" className="text-xs md:text-sm whitespace-nowrap">
             {documents?.length ?? 0} tài liệu
           </Badge>
         }
       />
 
-      {/* Upload Section */}
-      <Card>
+      {/* Upload Section - Hidden on mobile */}
+      <Card className="hidden md:block">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="w-5 h-5 text-primary" />
@@ -610,7 +620,7 @@ export default function DocumentsPage() {
                   </p>
                   {selectedDocType?.require_digital_signing && (
                     <div className="flex items-center gap-2 p-2 bg-purple-50 rounded border border-purple-200">
-                      <span className="text-purple-600 font-semibold text-xs">✍️ Loại văn bản này yêu cầu chữ ký số</span>
+                      <span className="text-purple-600 font-semibold text-xs">✍️ Loại văn bản này yêu cầu chữ ký điện tử</span>
                     </div>
                   )}
                 </div>
@@ -756,7 +766,7 @@ export default function DocumentsPage() {
       </Card>
 
       {/* Documents List */}
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -770,7 +780,7 @@ export default function DocumentsPage() {
             </Badge>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="min-w-0">
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={(value) => {
             setActiveTab(value as 'all' | 'archive');
@@ -783,7 +793,7 @@ export default function DocumentsPage() {
               setStatusFilter('all');
             }
           }} className="mb-4">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsList className="grid w-full max-w-full sm:max-w-md grid-cols-2">
               <TabsTrigger value="all">📋 Tất cả tài liệu</TabsTrigger>
               <TabsTrigger value="archive">📦 Quản lý lưu trữ</TabsTrigger>
             </TabsList>
@@ -802,13 +812,13 @@ export default function DocumentsPage() {
                 className="w-full"
               />
             </div>
-            <div className="sm:w-64">
+            <div className="sm:w-48">
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
-                  setPage(1); // Reset to first page
+                  setPage(1);
                 }}
               >
                 {activeTab === 'all' ? (
@@ -833,121 +843,173 @@ export default function DocumentsPage() {
                 )}
               </select>
             </div>
+            <div className="sm:w-48">
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={documentTypeFilter}
+                onChange={(e) => {
+                  setDocumentTypeFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="all">📄 Tất cả loại VB</option>
+                {documentTypesData?.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="sm:w-48">
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={confidentialLevelFilter}
+                onChange={(e) => {
+                  setConfidentialLevelFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="all">🔒 Tất cả mức bảo mật</option>
+                <option value="normal">🔓 Thường</option>
+                <option value="confidential">🔐 Mật</option>
+                <option value="secret">🔒 Tối mật</option>
+              </select>
+            </div>
           </div>
           {isLoading ? (
-            <div className="rounded-lg border">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 border-b">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-medium">ID</th>
-                      <th className="px-4 py-3 text-left font-medium">Tên file</th>
-                      <th className="px-4 py-3 text-left font-medium">Loại</th>
-                      <th className="px-4 py-3 text-left font-medium">Người tạo</th>
-                      <th className="px-4 py-3 text-left font-medium">Số văn bản</th>
-                      <th className="px-4 py-3 text-left font-medium">Trạng thái</th>
-                      <th className="px-4 py-3 text-left font-medium">Ngày tạo</th>
-                      <th className="px-4 py-3 text-right font-medium">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <tr key={i} className="border-b">
-                        <td className="px-4 py-3"><Skeleton className="h-5 w-12" /></td>
-                        <td className="px-4 py-3"><Skeleton className="h-5 w-48" /></td>
-                        <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
-                        <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
-                        <td className="px-4 py-3"><Skeleton className="h-5 w-24" /></td>
-                        <td className="px-4 py-3"><Skeleton className="h-6 w-20" /></td>
-                        <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-2">
-                            <Skeleton className="h-8 w-8 rounded" />
-                            <Skeleton className="h-8 w-8 rounded" />
-                            <Skeleton className="h-8 w-16 rounded" />
-                          </div>
-                        </td>
+            <>
+              <div className="rounded-lg border hidden md:block">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 border-b">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium">ID</th>
+                        <th className="px-4 py-3 text-left font-medium">Tên file</th>
+                        <th className="px-4 py-3 text-left font-medium">Loại</th>
+                        <th className="px-4 py-3 text-left font-medium">Người tạo</th>
+                        <th className="px-4 py-3 text-left font-medium">Số văn bản</th>
+                        <th className="px-4 py-3 text-left font-medium">Trạng thái</th>
+                        <th className="px-4 py-3 text-left font-medium">Ngày tạo</th>
+                        <th className="px-4 py-3 text-right font-medium">Thao tác</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <tr key={i} className="border-b">
+                          <td className="px-4 py-3"><Skeleton className="h-5 w-12" /></td>
+                          <td className="px-4 py-3"><Skeleton className="h-5 w-48" /></td>
+                          <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
+                          <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
+                          <td className="px-4 py-3"><Skeleton className="h-5 w-24" /></td>
+                          <td className="px-4 py-3"><Skeleton className="h-6 w-20" /></td>
+                          <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <Skeleton className="h-8 w-8 rounded" />
+                              <Skeleton className="h-8 w-8 rounded" />
+                              <Skeleton className="h-8 w-16 rounded" />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+              <div className="md:hidden space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="rounded-lg border p-3">
+                    <Skeleton className="h-5 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-1/2 mb-3" />
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Skeleton className="h-8 flex-1" />
+                      <Skeleton className="h-8 flex-1" />
+                      <Skeleton className="h-8 w-8" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           ) : documents && documents.length > 0 ? (
-            <div className="rounded-lg border">
+            <>
+            <div className="rounded-lg border hidden md:block overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[800px]">
                   <thead className="bg-muted/50 border-b">
                     <tr>
-                      <th className="px-4 py-3 text-left font-medium">ID</th>
-                      <th className="px-4 py-3 text-left font-medium">Tên file</th>
-                      <th className="px-4 py-3 text-left font-medium">Số văn bản</th>
-                      <th className="px-4 py-3 text-left font-medium">Loại văn bản</th>
-                      <th className="px-4 py-3 text-left font-medium">Bảo mật</th>
-                      <th className="px-4 py-3 text-left font-medium">Trạng thái</th>
-                      <th className="px-4 py-3 text-left font-medium">Ngày tạo</th>
-                      <th className="px-4 py-3 text-right font-medium">Thao tác</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium">ID</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium">Tên file</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium">Số VB</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium">Loại</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium">Bảo mật</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium">Trạng thái</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium">Ngày</th>
+                      <th className="px-2 py-2 text-right text-xs font-medium">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
                     {documents.map((doc) => (
                       <tr key={doc.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                        <td className="px-4 py-3 font-semibold">#{doc.id}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-muted-foreground" />
-                            <span className="truncate max-w-xs">
+                        <td className="px-2 py-3 font-semibold text-xs">#{doc.id}</td>
+                        <td className="px-2 py-3">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <FileText className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                            <span className="truncate text-sm">
                               {doc.original_file_name || doc.title || `Document #${doc.id}`}
                             </span>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 py-3">
                           {doc.document_number ? (
-                            <Badge variant="secondary" className="font-mono text-xs">
+                            <Badge variant="secondary" className="font-mono text-xs whitespace-nowrap">
                               {doc.document_number}
                             </Badge>
                           ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <span className="text-muted-foreground text-xs">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 py-3">
                           {doc.document_type ? (
-                            <span className="text-sm">{doc.document_type}</span>
+                            <span className="text-xs truncate max-w-[100px] inline-block">{doc.document_type}</span>
                           ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <span className="text-muted-foreground text-xs">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
-                          {doc.confidential_level === 'high' && <Badge variant="destructive">🔒 Cao</Badge>}
-                          {doc.confidential_level === 'medium' && <Badge variant="outline" className="border-orange-500 text-orange-700">🔐 Trung bình</Badge>}
-                          {doc.confidential_level === 'normal' && <Badge variant="secondary">📄 Thường</Badge>}
-                          {!doc.confidential_level && <span className="text-muted-foreground">—</span>}
+                        <td className="px-2 py-3">
+                          {doc.confidential_level === 'high' && <Badge variant="destructive" className="text-xs whitespace-nowrap">🔒 Cao</Badge>}
+                          {doc.confidential_level === 'medium' && <Badge variant="outline" className="border-orange-500 text-orange-700 text-xs whitespace-nowrap">🔐 TB</Badge>}
+                          {doc.confidential_level === 'normal' && <Badge variant="secondary" className="text-xs whitespace-nowrap">📄 Thường</Badge>}
+                          {!doc.confidential_level && <span className="text-muted-foreground text-xs">—</span>}
                         </td>
-                        <td className="px-4 py-3">
-                          {doc.status === 'draft' && <Badge variant="secondary">📝 Nháp</Badge>}
-                          {doc.status === 'pending_approval' && <Badge variant="outline" className="border-yellow-500 text-yellow-700 bg-yellow-50">⏳ Chờ duyệt</Badge>}
-                          {doc.status === 'approved' && <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">✅ Đã duyệt</Badge>}
-                          {doc.status === 'pending_signature' && <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50">✍️ Chờ ký</Badge>}
-                          {doc.status === 'completed' && <Badge variant="default" className="bg-green-600 text-white">✅ Hoàn thành</Badge>}
-                          {doc.status === 'active' && <Badge variant="default" className="bg-green-600 text-white">✅ Hoạt động</Badge>}
-                          {doc.status === 'rejected' && <Badge variant="destructive" className="bg-red-600 text-white">❌ Từ chối</Badge>}
-                          {doc.status === 'cancelled' && <Badge variant="outline" className="border-red-500 text-red-700 bg-red-50">🚫 Đã hủy</Badge>}
-                          {doc.status === 'archived' && <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50">📦 Đã thanh lý</Badge>}
+                        <td className="px-2 py-3">
+                          {doc.status === 'draft' && <Badge variant="secondary" className="text-xs whitespace-nowrap">📝 Nháp</Badge>}
+                          {doc.status === 'pending_approval' && <Badge variant="outline" className="border-yellow-500 text-yellow-700 bg-yellow-50 text-xs whitespace-nowrap">⏳ Chờ duyệt</Badge>}
+                          {doc.status === 'approved' && <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50 text-xs whitespace-nowrap">✅ Đã duyệt</Badge>}
+                          {doc.status === 'pending_signature' && <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50 text-xs whitespace-nowrap">✍️ Chờ ký</Badge>}
+                          {doc.status === 'completed' && <Badge variant="default" className="bg-green-600 text-white text-xs whitespace-nowrap">✅ Hoàn thành</Badge>}
+                          {doc.status === 'active' && <Badge variant="default" className="bg-green-600 text-white text-xs whitespace-nowrap">✅ Hoạt động</Badge>}
+                          {doc.status === 'rejected' && <Badge variant="destructive" className="bg-red-600 text-white text-xs whitespace-nowrap">❌ Từ chối</Badge>}
+                          {doc.status === 'cancelled' && <Badge variant="outline" className="border-red-500 text-red-700 bg-red-50 text-xs whitespace-nowrap">🚫 Đã hủy</Badge>}
+                          {doc.status === 'archived' && <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50 text-xs whitespace-nowrap">📦 Thanh lý</Badge>}
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {dayjs(doc.created_at).format("DD/MM/YYYY HH:mm")}
+                        <td className="px-2 py-3 text-muted-foreground text-xs whitespace-nowrap">
+                          {dayjs(doc.created_at).format("DD/MM/YY")}
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-2">
+                        <td className="px-2 py-3">
+                          <div className="flex items-center justify-end gap-1">
                             {/* Always show View button */}
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
+                              className="h-7 w-7"
                               title="Xem"
                               onClick={() => handleView(doc.id)}
                             >
-                              <Eye className="w-4 h-4" />
+                              <Eye className="w-3.5 h-3.5" />
                             </Button>
                             
                             {/* Hide Download for archived/cancelled documents */}
@@ -955,11 +1017,11 @@ export default function DocumentsPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8"
+                                className="h-7 w-7"
                                 title="Tải xuống"
                                 onClick={() => handleDownload(doc.id, doc.original_file_name || doc.title || `document-${doc.id}.pdf`, doc)}
                               >
-                                <Download className="w-4 h-4" />
+                                <Download className="w-3.5 h-3.5" />
                               </Button>
                             )}
                             
@@ -968,33 +1030,22 @@ export default function DocumentsPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                                className="h-7 w-7 hover:bg-destructive/10 hover:text-destructive"
                                 onClick={() => handleDelete(doc.id)}
                                 title="Xóa"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3.5 h-3.5" />
                               </Button>
                             )}
                             
                             {/* Other action buttons only for non-archived/cancelled */}
                             {doc.status !== 'archived' && doc.status !== 'cancelled' && doc.status !== 'draft' && (
                               <>
-                                {doc.sign_request_id && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 hover:bg-blue-50 hover:text-blue-600"
-                                    onClick={() => window.location.href = `/sign-requests/${doc.sign_request_id}/editor`}
-                                    title="Chỉnh sửa fields ký"
-                                  >
-                                    📝 Fields
-                                  </Button>
-                                )}
                                 {(doc.status === "pending_approval" || doc.status === "pending_signature") && doc.sign_request_id && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-8 hover:bg-red-50 hover:text-red-600"
+                                    className="h-7 px-2 text-xs hover:bg-red-50 hover:text-red-600 whitespace-nowrap"
                                     onClick={() => handleCancelSignRequest(doc.sign_request_id!)}
                                     title="Hủy luồng ký"
                                   >
@@ -1007,21 +1058,21 @@ export default function DocumentsPage() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="h-8 hover:bg-orange-50"
+                                      className="h-7 px-2 text-xs hover:bg-orange-50 whitespace-nowrap"
                                       onClick={() => handleArchiveDocument(doc.id)}
                                       title="Thanh lý"
                                     >
-                                      <Archive className="w-4 h-4 text-orange-600 mr-1" />
+                                      <Archive className="w-3 h-3 text-orange-600 mr-1" />
                                       Thanh lý
                                     </Button>
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="h-8 hover:bg-red-50"
+                                      className="h-7 px-2 text-xs hover:bg-red-50 whitespace-nowrap"
                                       onClick={() => handleCancelDocument(doc.id)}
                                       title="Hủy tài liệu"
                                     >
-                                      <XCircle className="w-4 h-4 text-red-600 mr-1" />
+                                      <XCircle className="w-3 h-3 text-red-600 mr-1" />
                                       Hủy
                                     </Button>
                                   </>
@@ -1108,6 +1159,85 @@ export default function DocumentsPage() {
                 </div>
               )}
             </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-3">
+              {documents.map((doc) => (
+                <div key={doc.id} className="rounded-lg border bg-card hover:shadow-md transition-shadow p-3">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">
+                        {doc.title || doc.original_file_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {doc.document_number || `#${doc.id}`}
+                      </p>
+                    </div>
+                    <StatusTag status={doc.status ?? "draft"} variant={doc.status === "active" ? "success" : "default"} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                    <div>
+                      <span className="text-muted-foreground">Loại:</span>
+                      <p className="font-medium truncate">{doc.document_type?.name || '—'}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Ngày:</span>
+                      <p className="font-medium">{dayjs(doc.created_at).format('DD/MM/YY')}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => router.push(`/documents/${doc.id}/flow`)} className="flex-1 text-xs h-8">
+                      <Eye className="w-3.5 h-3.5 mr-1" />Xem
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleDownload(doc.id)} className="flex-1 text-xs h-8">
+                      <Download className="w-3.5 h-3.5 mr-1" />Tải
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {doc.status !== 'archived' && doc.status !== 'cancelled' && doc.status !== 'draft' && (
+                          <>
+                            {(doc.status === "pending_approval" || doc.status === "pending_signature") && doc.sign_request_id && (
+                              <DropdownMenuItem onClick={() => handleCancelSignRequest(doc.sign_request_id!)} className="text-red-600">
+                                <XCircle className="w-4 h-4 mr-2" />Hủy luồng ký
+                              </DropdownMenuItem>
+                            )}
+                          </>
+                        )}
+                        {doc.status === 'draft' && (
+                          <DropdownMenuItem onClick={() => handleDelete(doc.id)} className="text-red-600">
+                            <Trash2 className="w-4 h-4 mr-2" />Xóa
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              ))}
+
+              {/* Mobile Pagination */}
+              {pagination && pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between px-2 py-3">
+                  <span className="text-xs text-muted-foreground">
+                    {(pagination.page - 1) * pagination.limit + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} / {pagination.total}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" onClick={() => setPage(1)} disabled={pagination.page === 1} className="h-8 w-8 p-0">««</Button>
+                    <Button variant="outline" size="sm" onClick={() => setPage(pagination.page - 1)} disabled={pagination.page === 1} className="h-8 w-8 p-0">‹</Button>
+                    <span className="text-xs px-2">{pagination.page}/{pagination.totalPages}</span>
+                    <Button variant="outline" size="sm" onClick={() => setPage(pagination.page + 1)} disabled={pagination.page === pagination.totalPages} className="h-8 w-8 p-0">›</Button>
+                    <Button variant="outline" size="sm" onClick={() => setPage(pagination.totalPages)} disabled={pagination.page === pagination.totalPages} className="h-8 w-8 p-0">»»</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+            </>
           ) : (
             <EmptyState
               icon={FileText}

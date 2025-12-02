@@ -79,7 +79,7 @@ export function FlowTimeline({ steps, canApprove, canSign }: FlowTimelineProps) 
   };
 
   const getTypeLabel = (type: FlowStep['type']) => {
-    return type === 'approval' ? 'Phê duyệt' : 'Ký số';
+    return type === 'approval' ? 'Phê duyệt' : 'Ký điện tử';
   };
 
   const handleStepAction = (step: FlowStep) => {

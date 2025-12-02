@@ -71,12 +71,13 @@ export class PdfSigningService {
         const width = (field.width / 100) * pageWidth;
         const height = (field.height / 100) * pageHeight;
 
-        // Draw signature box
+        // Draw signature box with white background
         page.drawRectangle({
           x,
           y,
           width,
           height,
+          color: rgb(1, 1, 1), // White background
           borderColor: rgb(0, 0.53, 0.71),
           borderWidth: 1,
         });

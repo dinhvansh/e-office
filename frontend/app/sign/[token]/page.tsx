@@ -146,14 +146,7 @@ export default function PublicSigningPage() {
 
       setOtpSent(true);
       toast.success('📧 Mã OTP đã được gửi đến email của bạn');
-      
-      // Show debug OTP if available (dev mode)
-      if (result.data?.debug_otp) {
-        console.log('🔑 DEBUG OTP:', result.data.debug_otp);
-        toast.info(`🔑 DEBUG OTP: ${result.data.debug_otp}`, { duration: 10000 });
-      }
     } catch (error: any) {
-      console.error('❌ Send OTP error:', error);
       toast.error(error.message || 'Không thể gửi OTP');
     }
   };
@@ -259,23 +252,16 @@ export default function PublicSigningPage() {
     });
 
   const handleStartGuided = () => {
-    console.log('🚀 handleStartGuided called');
-    console.log('🔐 otpVerified:', otpVerified);
-    console.log('📋 myFields:', myFields.map(f => ({ id: f.id, label: f.label, page: f.page, x: f.x, y: f.y })));
-    
     if (!otpVerified) {
       toast.error('🔐 Vui lòng xác thực OTP trước');
       return;
     }
     
-    console.log('🔄 Resetting guided mode state...');
     // Reset all guided mode state
     setCompletedFields([]);
     setFieldSignatures({});
     setCurrentFieldIndex(0);
     
-    console.log('✅ Setting guidedMode to TRUE');
-    console.log('🎯 First field ID:', myFields[0]?.id);
     setGuidedMode(true);
     scrollToField(0);
   };
@@ -301,46 +287,29 @@ export default function PublicSigningPage() {
   };
 
   const handleFieldComplete = (fieldId: number, signature: string) => {
-    console.log('🎯 Field completed:', fieldId);
-    console.log('📊 Current index:', currentFieldIndex);
-    console.log('📋 Total fields:', myFields.length);
-    console.log('📋 Current completedFields:', completedFields);
-    
     const newCompletedFields = [...completedFields, fieldId];
     const newFieldSignatures = { ...fieldSignatures, [fieldId]: signature };
     
     setCompletedFields(newCompletedFields);
     setFieldSignatures(newFieldSignatures);
     
-    console.log('📋 New completedFields:', newCompletedFields);
-    console.log('🔍 Check: currentFieldIndex < myFields.length - 1:', currentFieldIndex, '<', myFields.length - 1, '=', currentFieldIndex < myFields.length - 1);
-    
     if (currentFieldIndex < myFields.length - 1) {
       // Next field
       const nextIndex = currentFieldIndex + 1;
-      const nextField = myFields[nextIndex];
-      console.log('➡️ Moving to next field, index:', nextIndex);
-      console.log('🎯 Next field:', { id: nextField?.id, label: nextField?.label, type: nextField?.type, page: nextField?.page });
-      console.log('📊 Progress:', `${nextIndex + 1} / ${myFields.length}`);
       
       // Move to next field (including date fields)
       setCurrentFieldIndex(nextIndex);
       setTimeout(() => scrollToField(nextIndex), 500);
     } else {
       // All done
-      console.log('✅ All fields completed!');
-      console.log('🔄 Setting guidedMode to FALSE');
       setGuidedMode(false);
       
       // Show confirmation dialog
-      console.log('💬 Showing confirmation dialog...');
       setShowConfirmDialog(true);
     }
   };
 
   const handleFieldClick = (field: any) => {
-    console.log('📍 Parent handleFieldClick:', field.id, 'guidedMode:', guidedMode);
-    
     // In guided mode, clicks are handled entirely in PDFSigningViewer
     // This callback should not block anything
     if (guidedMode) {
@@ -350,22 +319,13 @@ export default function PublicSigningPage() {
     
     // In normal mode, signature is handled in PDFSigningViewer
     // This function is only called for non-signature fields
-    if (field.type !== 'signature') {
-      // Handle text/date/checkbox fields here
-      console.log('Non-signature field clicked:', field);
-    }
   };
 
   const handleConfirmSubmit = () => {
-    console.log('📤 User confirmed submit from guided mode...');
-    console.log('🔍 Current fieldSignatures:', fieldSignatures);
-    console.log('🔍 Current signatureData:', signatureData);
-    console.log('🔍 Current otp:', otp);
     handleSubmitSignature();
   };
 
   const handleCancelSubmit = () => {
-    console.log('📋 User chose to review first');
     toast.success('✅ Đã ký xong tất cả! Bạn có thể xem lại và nhấn "Hoàn tất ký" phía dưới khi sẵn sàng.', {
       duration: 5000
     });
@@ -408,14 +368,6 @@ export default function PublicSigningPage() {
         field_values: field_values,
       };
       
-      console.log('📤 Submitting signature:', {
-        otp: otp.substring(0, 2) + '****',
-        signature_data_length: firstSignature?.length || 0,
-        signature_type: requestBody.signature_type,
-        field_values_count: field_values.length,
-        field_values: field_values,
-      });
-      
       const res = await fetch(
         `${apiBase}/public/sign/${token}/sign`,
         {
@@ -428,12 +380,6 @@ export default function PublicSigningPage() {
       const result = await res.json();
 
       if (!res.ok) {
-        console.error('❌ Submit failed:', {
-          status: res.status,
-          statusText: res.statusText,
-          result: result,
-        });
-        
         // Handle specific error cases
         // Backend returns error in format: { success: false, error: { message: "...", code: "..." } }
         const errorMsg = result.error?.message || result.message || 'Không thể ký tài liệu';
@@ -464,7 +410,6 @@ export default function PublicSigningPage() {
         throw new Error(errorMessage);
       }
 
-      console.log('✅ Submit successful:', result);
       toast.success('🎉 Ký tài liệu thành công!');
       
       // Show success message and reload to show thank you screen
@@ -472,7 +417,6 @@ export default function PublicSigningPage() {
         fetchSigningData();
       }, 1500);
     } catch (error: any) {
-      console.error('❌ Submit error:', error);
       toast.error(error.message || 'Không thể ký tài liệu');
     } finally {
       setSubmitting(false);
@@ -540,7 +484,6 @@ export default function PublicSigningPage() {
             document.body.removeChild(a);
             toast.success('✅ Tải xuống thành công!');
           } catch (error: any) {
-            console.error('Download error:', error);
             toast.error(error.message || 'Không thể tải xuống PDF');
           }
         }}

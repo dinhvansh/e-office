@@ -268,7 +268,7 @@ export default function BillingPage() {
                 {[
                   { feature: 'Quản lý tài liệu', onprem: true, saas: true },
                   { feature: 'Workflow & Approval', onprem: true, saas: true },
-                  { feature: 'Chữ ký số', onprem: true, saas: true },
+                  { feature: 'Chữ ký điện tử', onprem: true, saas: true },
                   { feature: 'Mobile App', onprem: false, saas: true },
                   { feature: 'Tự động cập nhật', onprem: false, saas: true },
                   { feature: 'Cloud Storage', onprem: false, saas: true },

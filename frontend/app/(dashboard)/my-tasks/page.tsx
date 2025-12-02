@@ -86,33 +86,35 @@ export default function MyTasksPage() {
   const getStatusBadge = (task: Task) => {
     if (task.task_type === 'approval') {
       switch (task.status) {
-        case 'pending': return <Badge className="bg-orange-500">Chờ duyệt</Badge>;
-        case 'approved': return <Badge className="bg-green-500">Đã duyệt</Badge>;
-        case 'rejected': return <Badge className="bg-red-500">Từ chối</Badge>;
-        case 'info_requested': return <Badge className="bg-blue-500">Yêu cầu bổ sung</Badge>;
-        default: return <Badge>{task.status}</Badge>;
+        case 'pending': return <Badge className="bg-orange-500 text-xs whitespace-nowrap">Chờ duyệt</Badge>;
+        case 'approved': return <Badge className="bg-green-500 text-xs whitespace-nowrap">Đã duyệt</Badge>;
+        case 'rejected': return <Badge className="bg-red-500 text-xs whitespace-nowrap">Từ chối</Badge>;
+        case 'info_requested': return <Badge className="bg-blue-500 text-xs whitespace-nowrap">Yêu cầu BS</Badge>;
+        default: return <Badge className="text-xs">{task.status}</Badge>;
       }
     } else {
       switch (task.status) {
         case 'pending':
-        case 'otp_sent': return <Badge className="bg-orange-500">Chờ ký</Badge>;
-        case 'signed': return <Badge className="bg-green-500">Đã ký</Badge>;
-        case 'rejected': return <Badge className="bg-red-500">Từ chối</Badge>;
-        default: return <Badge>{task.status}</Badge>;
+        case 'otp_sent': return <Badge className="bg-orange-500 text-xs whitespace-nowrap">Chờ ký</Badge>;
+        case 'signed': return <Badge className="bg-green-500 text-xs whitespace-nowrap">Đã ký</Badge>;
+        case 'rejected': return <Badge className="bg-red-500 text-xs whitespace-nowrap">Từ chối</Badge>;
+        default: return <Badge className="text-xs">{task.status}</Badge>;
       }
     }
   };
 
-  const getActionButton = (task: Task) => {
+  const getActionButton = (task: Task, isMobile = false) => {
+    const buttonClass = isMobile ? "w-full" : "text-xs px-2 py-1 h-7";
+    
     if (task.task_type === 'approval') {
       if (task.status === 'pending') {
         return (
           <Button
             size="sm"
             onClick={() => handleTaskClick(task)}
-            className="bg-blue-600 hover:bg-blue-700"
+            className={`bg-blue-600 hover:bg-blue-700 whitespace-nowrap ${buttonClass}`}
           >
-            <CheckCircle className="w-4 h-4 mr-1" />
+            <CheckCircle className="w-3 h-3 mr-1" />
             Phê duyệt
           </Button>
         );
@@ -122,6 +124,7 @@ export default function MyTasksPage() {
           size="sm"
           variant="outline"
           onClick={() => handleTaskClick(task)}
+          className={`whitespace-nowrap ${buttonClass}`}
         >
           Xem
         </Button>
@@ -132,9 +135,9 @@ export default function MyTasksPage() {
           <Button
             size="sm"
             onClick={() => handleTaskClick(task)}
-            className="bg-green-600 hover:bg-green-700"
+            className={`bg-green-600 hover:bg-green-700 whitespace-nowrap ${buttonClass}`}
           >
-            <PenTool className="w-4 h-4 mr-1" />
+            <PenTool className="w-3 h-3 mr-1" />
             Ký ngay
           </Button>
         );
@@ -144,6 +147,7 @@ export default function MyTasksPage() {
           size="sm"
           variant="outline"
           onClick={() => handleTaskClick(task)}
+          className={buttonClass}
         >
           Xem
         </Button>
@@ -152,36 +156,36 @@ export default function MyTasksPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Công việc của tôi</h1>
-        <p className="text-muted-foreground">Quản lý phê duyệt và ký tài liệu</p>
+        <h1 className="text-xl md:text-2xl font-bold">Công việc của tôi</h1>
+        <p className="text-sm md:text-base text-muted-foreground">Quản lý phê duyệt và ký tài liệu</p>
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg border p-4">
-          <div className="text-sm text-muted-foreground">Tổng công việc</div>
-          <div className="text-2xl font-bold">{statistics.total}</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <div className="bg-white rounded-lg border p-3 md:p-4">
+          <div className="text-xs md:text-sm text-muted-foreground">Tổng công việc</div>
+          <div className="text-xl md:text-2xl font-bold">{statistics.total}</div>
         </div>
-        <div className="bg-white rounded-lg border p-4">
-          <div className="text-sm text-muted-foreground">Chờ phê duyệt</div>
-          <div className="text-2xl font-bold text-orange-600">{statistics.approval_pending}</div>
+        <div className="bg-white rounded-lg border p-3 md:p-4">
+          <div className="text-xs md:text-sm text-muted-foreground">Chờ duyệt</div>
+          <div className="text-xl md:text-2xl font-bold text-orange-600">{statistics.approval_pending}</div>
         </div>
-        <div className="bg-white rounded-lg border p-4">
-          <div className="text-sm text-muted-foreground">Chờ ký</div>
-          <div className="text-2xl font-bold text-blue-600">{statistics.signing_pending}</div>
+        <div className="bg-white rounded-lg border p-3 md:p-4">
+          <div className="text-xs md:text-sm text-muted-foreground">Chờ ký</div>
+          <div className="text-xl md:text-2xl font-bold text-blue-600">{statistics.signing_pending}</div>
         </div>
-        <div className="bg-white rounded-lg border p-4">
-          <div className="text-sm text-muted-foreground">Đã hoàn thành</div>
-          <div className="text-2xl font-bold text-green-600">{statistics.completed}</div>
+        <div className="bg-white rounded-lg border p-3 md:p-4">
+          <div className="text-xs md:text-sm text-muted-foreground">Hoàn thành</div>
+          <div className="text-xl md:text-2xl font-bold text-green-600">{statistics.completed}</div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg border p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white rounded-lg border p-3 md:p-4 space-y-3 md:space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -246,63 +250,65 @@ export default function MyTasksPage() {
         ) : tasks.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">Không có công việc nào</div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Desktop Table View */}
+          <div className="overflow-x-auto hidden md:block">
             <table className="w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã văn bản</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên tài liệu</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Người tạo</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày tạo</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hành động</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Mã VB</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tên tài liệu</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Người tạo</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Hành động</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {tasks.map((task: Task) => (
                   <tr key={`${task.task_type}-${task.task_id}`} className="hover:bg-gray-50">
-                    <td className="px-4 py-4">
+                    <td className="px-2 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                        <span className="font-medium text-sm">{task.document_number}</span>
+                      </div>
+                    </td>
+                    <td className="px-2 py-3">
+                      <div>
+                        <div className="font-medium text-sm">{task.document_title || 'Untitled'}</div>
+                        <div className="text-xs text-muted-foreground">{task.document_type?.name}</div>
+                      </div>
+                    </td>
+                    <td className="px-2 py-3">
                       {task.task_type === 'approval' ? (
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs whitespace-nowrap">
                           <CheckCircle className="w-3 h-3 mr-1" />
                           Phê duyệt
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs whitespace-nowrap">
                           <PenTool className="w-3 h-3 mr-1" />
                           Ký
                         </Badge>
                       )}
                     </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-gray-400" />
-                        <span className="font-medium">{task.document_number}</span>
+                    <td className="px-2 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                        <span className="text-xs truncate max-w-[120px]">{task.owner?.full_name || task.owner?.email}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-4">
-                      <div>
-                        <div className="font-medium">{task.document_title || 'Untitled'}</div>
-                        <div className="text-sm text-muted-foreground">{task.document_type?.name}</div>
+                    <td className="px-2 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                        <span className="text-xs whitespace-nowrap">{new Date(task.created_at).toLocaleDateString('vi-VN')}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm">{task.owner?.full_name || task.owner?.email}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm">{new Date(task.created_at).toLocaleDateString('vi-VN')}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
+                    <td className="px-2 py-3">
                       {getStatusBadge(task)}
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-2 py-3">
                       {getActionButton(task)}
                     </td>
                   </tr>
@@ -310,11 +316,64 @@ export default function MyTasksPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-3 p-3">
+            {tasks.map((task: Task) => (
+              <div key={`${task.task_type}-${task.task_id}`} className="rounded-lg border bg-card p-3 space-y-3">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      {task.task_type === 'approval' ? (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Phê duyệt
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                          <PenTool className="w-3 h-3 mr-1" />
+                          Ký
+                        </Badge>
+                      )}
+                      {getStatusBadge(task)}
+                    </div>
+                    <div className="font-medium text-sm truncate">{task.document_title || 'Untitled'}</div>
+                    <div className="text-xs text-muted-foreground font-mono">{task.document_number}</div>
+                  </div>
+                </div>
+
+                {/* Info Grid */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-muted-foreground">Loại:</span>
+                    <p className="font-medium truncate">{task.document_type?.name}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Người tạo:</span>
+                    <p className="font-medium truncate">{task.owner?.full_name || task.owner?.email}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Ngày tạo:</span>
+                    <p className="font-medium">{new Date(task.created_at).toLocaleDateString('vi-VN')}</p>
+                  </div>
+                </div>
+
+                {/* Action Button */}
+                <div className="pt-2 border-t">
+                  {getActionButton(task, true)}
+                </div>
+              </div>
+            ))}
+          </div>
+          </>
         )}
 
         {/* Pagination */}
         {!isLoading && tasks.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t">
+          <>
+          {/* Desktop Pagination */}
+          <div className="hidden md:flex items-center justify-between px-4 py-3 border-t">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">
                 Hiển thị {(page - 1) * limit + 1} - {Math.min(page * limit, pagination.total)} trong tổng số {pagination.total}
@@ -370,6 +429,29 @@ export default function MyTasksPage() {
               </Button>
             </div>
           </div>
+
+          {/* Mobile Pagination */}
+          <div className="md:hidden flex items-center justify-between px-3 py-3 border-t">
+            <span className="text-xs text-muted-foreground">
+              {(page - 1) * limit + 1}-{Math.min(page * limit, pagination.total)} / {pagination.total}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={() => setPage(1)} disabled={page === 1} className="h-8 w-8 p-0">
+                <ChevronsLeft className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page === 1} className="h-8 w-8 p-0">
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-xs px-2">{page}/{pagination.totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= pagination.totalPages} className="h-8 w-8 p-0">
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPage(pagination.totalPages)} disabled={page >= pagination.totalPages} className="h-8 w-8 p-0">
+                <ChevronsRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+          </>
         )}
       </div>
     </div>

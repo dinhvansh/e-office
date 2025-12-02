@@ -58,7 +58,9 @@ export class DocumentsRepository {
     params: PaginationParams = {},
     noSigningOnly = false,
     status?: string,
-    search?: string
+    search?: string,
+    documentTypeId?: number,
+    confidentialLevel?: string
   ): Promise<PaginatedResult<documents>> {
     const page = params.page || 1;
     const limit = params.limit || 10;
@@ -75,6 +77,14 @@ export class DocumentsRepository {
     
     if (status) {
       whereClause.status = status;
+    }
+    
+    if (documentTypeId) {
+      whereClause.document_type_id = documentTypeId;
+    }
+    
+    if (confidentialLevel) {
+      whereClause.confidential_level = confidentialLevel;
     }
     
     if (search) {
@@ -120,7 +130,21 @@ export class DocumentsRepository {
   }
 
   findById(id: number, tenantId: number): Promise<documents | null> {
-    return prisma.documents.findFirst({ where: { id, tenant_id: tenantId } });
+    return prisma.documents.findFirst({ 
+      where: { id, tenant_id: tenantId },
+      include: {
+        cc_emails: true,
+        attachments: true,
+        document_type: true,
+        owner: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+          }
+        }
+      }
+    });
   }
 
   create(data: CreateDocumentData): Promise<documents> {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Configure PDF.js worker
@@ -16,6 +16,7 @@ interface SimplePDFViewerProps {
 
 export default function SimplePDFViewer({ pdfUrl }: SimplePDFViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [pdf, setPdf] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -108,6 +109,7 @@ export default function SimplePDFViewer({ pdfUrl }: SimplePDFViewerProps) {
 
   const handleZoomIn = () => setScale(s => Math.min(s + 0.2, 3.0));
   const handleZoomOut = () => setScale(s => Math.max(s - 0.2, 0.5));
+  const handleFitToWidth = () => setScale(1.0);
   const handlePrevPage = () => setCurrentPage(p => Math.max(p - 1, 1));
   const handleNextPage = () => setCurrentPage(p => Math.min(p + 1, totalPages));
 
@@ -146,7 +148,7 @@ export default function SimplePDFViewer({ pdfUrl }: SimplePDFViewerProps) {
           >
             <ZoomOut className="w-4 h-4" />
           </Button>
-          <span className="text-sm">{Math.round(scale * 100)}%</span>
+          <span className="text-sm min-w-[50px] text-center">{Math.round(scale * 100)}%</span>
           <Button
             variant="outline"
             size="sm"
@@ -155,13 +157,22 @@ export default function SimplePDFViewer({ pdfUrl }: SimplePDFViewerProps) {
           >
             <ZoomIn className="w-4 h-4" />
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleFitToWidth}
+            disabled={loading}
+            title="Fit 100%"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
       {/* Canvas */}
-      <div className="flex-1 overflow-auto bg-gray-100 p-4">
+      <div ref={containerRef} className="flex-1 overflow-auto bg-gray-100 p-4">
         <div className="flex justify-center">
-          <canvas ref={canvasRef} className="shadow-lg" />
+          <canvas ref={canvasRef} className="shadow-lg max-w-full h-auto" />
         </div>
       </div>
     </div>

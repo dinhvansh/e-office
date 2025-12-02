@@ -41,6 +41,18 @@ export async function canViewDocument(
     return true; // Approver can view document
   }
 
+  // Layer 3.6: CC check - if user's email is in CC list
+  const ccEmail = await prisma.document_cc_emails.findFirst({
+    where: {
+      document_id: doc.id,
+      email: user.email
+    }
+  });
+  
+  if (ccEmail) {
+    return true; // CC recipient can view document
+  }
+
   // Layer 4: Visibility scope
   const scope = (doc.visibility_scope as DocumentVisibilityScope) ?? 'public';
   

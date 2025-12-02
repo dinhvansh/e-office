@@ -30,7 +30,7 @@ export function NotificationDropdown({
     );
   }
 
-  if (notifications.length === 0) {
+  if (!notifications || notifications.length === 0) {
     return (
       <div className="w-96 p-4">
         <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -56,7 +56,7 @@ export function NotificationDropdown({
     );
   }
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = notifications?.filter(n => !n.is_read).length || 0;
 
   return (
     <div className="w-96 max-h-[500px] flex flex-col">

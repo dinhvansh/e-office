@@ -257,12 +257,24 @@ export default function InternalSigningPage() {
       console.log('👤 Current signer ID:', currentSigner.id);
       setMyFields(fieldsForMe);
 
-      // Load PDF
+      // Load PDF - use signed version if available
       if (result.sign_request.document.file_path) {
         setPdfLoading(true);
         try {
+          // Check if signed file exists
+          const hasSignedFile = result.sign_request.document.signed_file_path && 
+                                result.sign_request.document.signed_file_path.length > 0;
+          
+          const endpoint = hasSignedFile 
+            ? `/documents/${result.sign_request.document.id}/view-signed`
+            : `/documents/${result.sign_request.document.id}/view`;
+          
+          // Add timestamp to bust cache
+          const timestamp = Date.now();
+          const cacheBuster = hasSignedFile ? `?t=${timestamp}` : '';
+          
           const pdfResponse = await fetch(
-            `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${result.sign_request.document.id}/view`,
+            `${process.env.NEXT_PUBLIC_API_BASE_URL}${endpoint}${cacheBuster}`,
             {
               headers: {
                 'Authorization': `Bearer ${tokens?.accessToken}`
@@ -271,6 +283,12 @@ export default function InternalSigningPage() {
           );
           if (pdfResponse.ok) {
             const blob = await pdfResponse.blob();
+            
+            // Revoke old URL to prevent memory leak
+            if (pdfUrl) {
+              URL.revokeObjectURL(pdfUrl);
+            }
+            
             const url = URL.createObjectURL(blob);
             setPdfUrl(url);
           }
@@ -318,6 +336,12 @@ export default function InternalSigningPage() {
       });
       
       toast.success((result as any).message || 'Ký thành công!');
+      
+      // Turn off guided mode
+      setGuidedMode(false);
+      
+      // Refetch data to update PDF with signatures
+      await fetchSigningData(true);
       
       // Redirect to my-tasks page
       setTimeout(() => {
@@ -425,13 +449,13 @@ export default function InternalSigningPage() {
                 {pdfUrl && myFields.length > 0 ? (
                   <PDFSigningViewer
                     pdfUrl={pdfUrl}
-                    fields={myFields}
+                    fields={alreadySigned ? [] : myFields}
                     signerId={mySigner.id}
                     onFieldClick={(field) => {
                       console.log('Field clicked:', field);
                     }}
-                    guidedMode={guidedMode}
-                    currentFieldId={guidedMode ? myFields[currentFieldIndex]?.id : undefined}
+                    guidedMode={false}
+                    currentFieldId={undefined}
                     completedFieldIds={completedFields}
                     existingFieldValues={fieldSignatures}
                     onFieldComplete={(fieldId, signature) => {

@@ -72,9 +72,19 @@ class DocumentsService {
     limit: number = 10,
     noSigningOnly = false,
     status?: string,
-    search?: string
+    search?: string,
+    documentTypeId?: number,
+    confidentialLevel?: string
   ) {
-    const result = await documentsRepository.listByTenantPaginated(tenantId, { page, limit }, noSigningOnly, status, search);
+    const result = await documentsRepository.listByTenantPaginated(
+      tenantId, 
+      { page, limit }, 
+      noSigningOnly, 
+      status, 
+      search,
+      documentTypeId,
+      confidentialLevel
+    );
     
     // If no userId provided (admin context), return all documents
     if (!userId) {
@@ -572,13 +582,34 @@ class DocumentsService {
     
     // ✅ Save CC emails if provided
     if (input.ccEmails && input.ccEmails.length > 0) {
+      const owner = await prisma.users.findUnique({
+        where: { id: ownerId },
+        select: { full_name: true, email: true }
+      });
+
       for (const email of input.ccEmails) {
         await prisma.document_cc_emails.create({
           data: {
             document_id: document.id,
             email,
+            sent_at: new Date(),
           },
         });
+
+        // Send notification email to CC
+        try {
+          const { emailService } = await import('../common/email.service');
+          await emailService.sendDocumentSharedEmail({
+            recipientEmail: email,
+            documentTitle: input.title || input.fileName,
+            documentNumber: document.document_number || undefined,
+            senderName: owner?.full_name || owner?.email || 'System',
+            documentUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/documents/${document.id}`,
+          });
+        } catch (error) {
+          console.error(`Failed to send CC email to ${email}:`, error);
+          // Don't fail the whole operation if email fails
+        }
       }
     }
     

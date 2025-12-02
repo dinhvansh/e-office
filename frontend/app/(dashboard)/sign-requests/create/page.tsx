@@ -342,7 +342,7 @@ export default function CreateSignRequestPage() {
             {/* Workflow Mode Indicator */}
             {selectedDocType && selectedDocType.require_digital_signing && (
               <div className="mt-3 p-3 bg-purple-50 rounded-lg text-sm text-purple-700">
-                ✍️ Loại văn bản này yêu cầu chữ ký số
+                ✍️ Loại văn bản này yêu cầu chữ ký điện tử
               </div>
             )}
           </CardContent>
