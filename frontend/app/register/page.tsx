@@ -15,6 +15,8 @@ export default function RegisterPage() {
     password: '',
     confirmPassword: '',
     full_name: '',
+    company_name: '',
+    create_tenant: false,
     terms_accepted: false
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -60,6 +62,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (formData.create_tenant && !formData.company_name.trim()) {
+      setError('Vui lòng nhập tên công ty khi tạo tenant mới');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -70,6 +77,8 @@ export default function RegisterPage() {
           email: formData.email,
           password: formData.password,
           full_name: formData.full_name,
+          company_name: formData.company_name,
+          create_tenant: formData.create_tenant,
           terms_accepted: formData.terms_accepted
         })
       });
@@ -98,12 +107,20 @@ export default function RegisterPage() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Đăng ký thành công!</h1>
             <p className="text-gray-600 mb-6">
-              Tài khoản của bạn đã được tạo và đang chờ phê duyệt từ quản trị viên.
+              {formData.create_tenant 
+                ? 'Workspace mới và tài khoản của bạn đã được tạo, đang chờ phê duyệt từ quản trị viên.'
+                : 'Tài khoản của bạn đã được tạo và đang chờ phê duyệt từ quản trị viên.'
+              }
             </p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
               <p className="text-sm text-blue-800 font-medium mb-2">
                 📧 Chúng tôi đã gửi email xác nhận đến: <strong>{formData.email}</strong>
               </p>
+              {formData.create_tenant && formData.company_name && (
+                <p className="text-sm text-blue-800 font-medium mb-2">
+                  🏢 Workspace: <strong>{formData.company_name}</strong>
+                </p>
+              )}
               <p className="text-sm text-blue-700">
                 Bạn sẽ nhận được email thông báo khi tài khoản được kích hoạt (thường trong vòng 24 giờ).
               </p>
@@ -179,6 +196,42 @@ export default function RegisterPage() {
                   disabled={loading}
                 />
               </div>
+            </div>
+
+            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+              <div className="flex items-start mb-3">
+                <input
+                  id="create_tenant"
+                  type="checkbox"
+                  checked={formData.create_tenant}
+                  onChange={(e) => setFormData({ ...formData, create_tenant: e.target.checked })}
+                  className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  disabled={loading}
+                />
+                <label htmlFor="create_tenant" className="ml-2 text-sm font-medium text-gray-700">
+                  Tạo workspace mới cho công ty của tôi
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mb-3">
+                Chọn tùy chọn này nếu bạn muốn tạo workspace riêng cho công ty. Nếu không, bạn sẽ tham gia workspace mặc định.
+              </p>
+              
+              {formData.create_tenant && (
+                <div>
+                  <label htmlFor="company_name" className="block text-sm font-medium text-gray-700 mb-2">
+                    Tên công ty <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    id="company_name"
+                    type="text"
+                    value={formData.company_name}
+                    onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                    placeholder="Công ty TNHH ABC"
+                    required={formData.create_tenant}
+                    disabled={loading}
+                  />
+                </div>
+              )}
             </div>
 
             <div>

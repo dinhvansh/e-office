@@ -602,7 +602,7 @@ export class PublicSignController {
             await notificationsService.createNotification({
               tenantId: document?.tenant_id || 0,
               userId: nextSigner.user_id,
-              type: NotificationType.SIGN_REQUEST_RECEIVED,
+              type: NotificationType.SIGN_REQUEST,
               title: 'Đến lượt bạn ký tài liệu',
               message: `Tài liệu "${signer.sign_request.title || 'Untitled'}" đang chờ bạn ký`,
               link: `/sign-requests/${signer.sign_request_id}/internal-sign`,

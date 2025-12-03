@@ -21,8 +21,9 @@ class AuthService {
     if (!isMatch) {
       throw ApiError.unauthorized("Invalid credentials", "INVALID_CREDENTIALS");
     }
-    // Get primary role from user_roles (first role or fallback to user.role)
-    const primaryRole = user.user_roles?.[0]?.role?.name ?? user.role;
+    // Get primary role from user_roles (prioritize Admin role, then first role, fallback to user.role)
+    const roles = user.user_roles?.map(ur => ur.role?.name).filter(Boolean) ?? [];
+    const primaryRole = roles.includes('Admin') ? 'Admin' : (roles[0] ?? user.role);
     return this.buildAuthResponse(user.id, user.tenant_id, user.email, primaryRole, user.tenant?.name ?? null, user.tenant?.plan ?? null, user.tenant?.status ?? null);
   }
 
@@ -32,8 +33,9 @@ class AuthService {
     if (!user) {
       throw ApiError.unauthorized("Invalid refresh token", "INVALID_REFRESH_TOKEN");
     }
-    // Get primary role from user_roles (first role or fallback to user.role)
-    const primaryRole = user.user_roles?.[0]?.role?.name ?? user.role;
+    // Get primary role from user_roles (prioritize Admin role, then first role, fallback to user.role)
+    const roles = user.user_roles?.map(ur => ur.role?.name).filter(Boolean) ?? [];
+    const primaryRole = roles.includes('Admin') ? 'Admin' : (roles[0] ?? user.role);
     return this.buildAuthResponse(user.id, user.tenant_id, user.email, primaryRole, user.tenant?.name ?? null, user.tenant?.plan ?? null, user.tenant?.status ?? null);
   }
 

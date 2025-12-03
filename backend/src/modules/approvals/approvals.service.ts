@@ -12,7 +12,11 @@ class ApprovalsService {
    */
   async listApprovals(tenantId: number) {
     return await prisma.document_approvals.findMany({
-      where: { tenant_id: tenantId },
+      where: { 
+        document: {
+          tenant_id: tenantId
+        }
+      },
       include: {
         document: {
           select: { id: true, title: true, status: true }
@@ -20,7 +24,7 @@ class ApprovalsService {
         workflow_step: {
           select: { step_name: true, step_order: true }
         },
-        approver_user: {
+        approver: {
           select: { id: true, email: true, full_name: true }
         }
       },
@@ -294,7 +298,7 @@ class ApprovalsService {
       signature_data: signatureData,
       signature_type: signatureType,
       acted_at: new Date(),
-    });
+    } as any);
 
     // Check if all approvals for this step are done
     const stepApprovals = await approvalsRepository.findStepApprovals(

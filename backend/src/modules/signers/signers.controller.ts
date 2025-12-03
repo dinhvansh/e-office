@@ -20,7 +20,7 @@ const idSchema = z.coerce.number().int().positive();
 
 export class SignersController {
   addSigner = async (req: Request, res: Response): Promise<void> => {
-    const body = createSchema.parse(req.body);
+    const body = createSchema.parse(req.body) as any;
     await signersService.addSigner(req.auth!.tenantId, body);
     res.status(201).json(ok({ created: true }));
   };

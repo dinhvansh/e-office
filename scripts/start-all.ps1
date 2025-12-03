@@ -68,7 +68,9 @@ Write-Host "   Redis:     localhost:6379" -ForegroundColor White
 Write-Host ""
 Write-Host "🔐 Login Credentials:" -ForegroundColor Yellow
 Write-Host "   Email:     admin@acme.local" -ForegroundColor White
-Write-Host "   Password:  admin123" -ForegroundColor White
+Write-Host "   Password:  [Check INSTALL.md or contact admin]" -ForegroundColor White
+Write-Host ""
+Write-Host "⚠️  Change password immediately after first login!" -ForegroundColor Red
 Write-Host ""
 Write-Host "🌐 Opening browser..." -ForegroundColor Yellow
 Start-Sleep -Seconds 3

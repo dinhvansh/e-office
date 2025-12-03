@@ -640,16 +640,13 @@ class SignRequestsService {
         // Send notification to next signer
         if (nextSigner.is_internal && nextSigner.user_id) {
           try {
-            await notificationsService.create({
+            await notificationsService.createNotification({
               tenantId,
               userId: nextSigner.user_id,
-              type: NotificationType.SIGN_REQUEST_RECEIVED,
+              type: NotificationType.SIGN_REQUEST,
               title: 'Đến lượt bạn ký tài liệu',
               message: `Tài liệu "${signRequest.title}" đang chờ bạn ký`,
-              metadata: {
-                sign_request_id: signRequestId,
-                document_id: signRequest.document_id
-              }
+              link: `/sign-requests/${signRequestId}/internal-sign`
             });
           } catch (error) {
             console.error('Failed to send notification to next signer:', error);
@@ -681,7 +678,7 @@ class SignRequestsService {
       await documentsRepository.update(signRequest.document_id, {
         signed_file_path: signedPdfPath,
         status: allSigned ? 'completed' : 'in_progress'
-      });
+      } as any);
       
       console.log(`[Internal Signing] Progressive PDF generated: ${signedPdfPath}`);
     } catch (error: any) {
@@ -747,11 +744,10 @@ class SignRequestsService {
     try {
       await auditService.record({
         tenantId,
-        documentId: null,
-        event: 'sign_request.signer_removed',
-        metadata: { sign_request_id: signRequestId, signer_id: signerId }
-      });
-    } catch (error) {
+        documentId: null as any,
+        event: 'sign_request.signer_removed'
+      } as any);
+    } catch (error: any) {
       console.error('⚠️ Audit log failed (non-critical):', error.message);
     }
   }
@@ -795,18 +791,17 @@ class SignRequestsService {
       await signersRepository.update(signerId, updateData);
     } else {
       // Just update other fields
-      await signersRepository.update(signerId, updates);
+      await signersRepository.update(signerId, updates as any);
     }
 
     // Audit log (optional - may fail if audit service has issues)
     try {
       await auditService.record({
         tenantId,
-        documentId: null,
-        event: 'sign_request.signer_updated',
-        metadata: { signer_id: signerId, updates }
-      });
-    } catch (error) {
+        documentId: null as any,
+        event: 'sign_request.signer_updated'
+      } as any);
+    } catch (error: any) {
       console.error('⚠️ Audit log failed (non-critical):', error.message);
     }
 
@@ -833,11 +828,10 @@ class SignRequestsService {
     try {
       await auditService.record({
         tenantId,
-        documentId: null,
-        event: 'sign_request.signers_reordered',
-        metadata: { sign_request_id: signRequestId, signers }
-      });
-    } catch (error) {
+        documentId: null as any,
+        event: 'sign_request.signers_reordered'
+      } as any);
+    } catch (error: any) {
       console.error('⚠️ Audit log failed (non-critical):', error.message);
     }
 

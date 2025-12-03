@@ -1,8 +1,9 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
+  # Temporarily disabled - build happens on VPS
+  # push:
+  #   branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:

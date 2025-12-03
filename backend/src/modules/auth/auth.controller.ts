@@ -15,7 +15,7 @@ const refreshSchema = z.object({
 
 export class AuthController {
   login = async (req: Request, res: Response): Promise<void> => {
-    const body = loginSchema.parse(req.body);
+    const body = loginSchema.parse(req.body) as { email: string; password: string };
     const result = await authService.login(body);
     res.json(ok(result));
   };

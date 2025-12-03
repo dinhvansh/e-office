@@ -73,7 +73,7 @@ export class SignRequestsController {
       message: body.message,
       workflow_type: body.workflow_type,
       deadline: body.deadline ? new Date(body.deadline) : null,
-      signers: body.signers,
+      signers: body.signers as any,
     });
     res.status(201).json(ok({ sign_request: signRequest }));
   };
@@ -105,7 +105,7 @@ export class SignRequestsController {
     const signer = await signRequestsService.addSigner(
       signRequestId,
       req.auth!.tenantId,
-      signerData
+      signerData as any
     );
     
     res.status(201).json(ok({ signer }));
@@ -198,7 +198,7 @@ export class SignRequestsController {
     }
 
     // Update signing_order for all signers
-    await signRequestsService.reorderSigners(signRequestId, req.auth!.tenantId, signers);
+    await signRequestsService.reorderSigners(signRequestId, req.auth!.tenantId, signers as any);
 
     res.json(ok({ message: 'Đã cập nhật thứ tự ký' }));
   };
@@ -245,7 +245,7 @@ export class SignRequestsController {
       })
     );
     const fields = fieldsSchema.parse(req.body.fields);
-    await signRequestFieldsService.saveFields(id, fields, req.auth!.tenantId, req.auth!.userId);
+    await signRequestFieldsService.saveFields(id, fields as any, req.auth!.tenantId, req.auth!.userId);
     res.json(ok({ saved: true }));
   };
 

@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import { usersRepository } from './users.repository';
 
 export const usersService = {
-  async getUsers(tenantId: number, filters?: any) {
+  async getUsers(tenantId: number | null, filters?: any) {
     return usersRepository.findByTenant(tenantId, filters);
   },
 
@@ -60,7 +60,7 @@ export const usersService = {
     return usersRepository.findById(user.id, tenantId);
   },
 
-  async updateUser(id: number, tenantId: number, data: {
+  async updateUser(id: number, tenantId: number | null, data: {
     full_name?: string;
     phone?: string;
     department_id?: number;
@@ -93,7 +93,7 @@ export const usersService = {
     return usersRepository.findById(id, tenantId);
   },
 
-  async deleteUser(id: number, tenantId: number) {
+  async deleteUser(id: number, tenantId: number | null) {
     const existing = await usersRepository.findById(id, tenantId);
     if (!existing) {
       throw new Error('User not found');
