@@ -6,6 +6,11 @@ on:
       - main
   workflow_dispatch:
 
+# Skip CI checks for faster deployment
+concurrency:
+  group: production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy to VPS (docker-compose)
