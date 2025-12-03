@@ -4,30 +4,42 @@ Enterprise-grade document management and approval workflow system with multi-ten
 
 ## 🚀 Quick Start
 
-### First Time Setup
+### Development (Local)
+```bash
+npm run dev              # Start both backend + frontend
+# Backend:  http://localhost:4000
+# Frontend: http://localhost:3000
+# Login:    admin@acme.local / admin123
+```
+
+### Docker (Recommended)
+```bash
+docker-compose up -d     # Start all services
+# See docs/docker/README.md for setup guide
+```
+
+### First Time Setup (Local)
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/dinhvansh/e-office.git
-cd e-office
+# 1. Install dependencies
+cd backend && npm install
+cd ../frontend && npm install
 
 # 2. Setup backend
 cd backend
-npm install
 cp .env.example .env
 npx prisma generate
 npx prisma db push
-node scripts/seed.js
 node scripts/seed-rbac.js
 node scripts/seed-document-types.js
 node scripts/seed-workflows-simple.js
+node scripts/seed-org-final.js
 
 # 3. Setup frontend
 cd ../frontend
-npm install
 cp .env.example .env.local
 
-# 4. Start all services (from root)
+# 4. Start services (from root)
 cd ..
 ./start-all.ps1
 

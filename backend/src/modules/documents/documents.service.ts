@@ -9,12 +9,6 @@ import { numberingService } from "../numbering/numbering.service";
 import { prisma } from "../../config/prisma";
 import { CreateDocumentData, documentsRepository } from "./documents.repository";
 import { canViewDocument, filterViewableDocuments } from "./documents.access";
-import { number } from "zod";
-import { number } from "zod";
-import { number } from "zod";
-import { number } from "zod";
-import { number } from "zod";
-import { number } from "zod";
 
 export interface CreateDocumentInput {
   fileName: string;

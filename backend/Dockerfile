@@ -6,28 +6,26 @@ FROM base AS deps
 COPY package.json package-lock.json* .npmrc* ./
 RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
-# Build application
-FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
-COPY prisma ./prisma
-RUN npx prisma generate
-COPY tsconfig.json ./
-COPY src ./src
-RUN npm run build
-
-# Production image
+# Production image - Run with ts-node (no build needed)
 FROM node:20-alpine AS production
 WORKDIR /app
-ENV NODE_ENV=production
+ENV NODE_ENV=development
 
-# Install production dependencies only
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl
+
+# Copy package files
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production --legacy-peer-deps && npm cache clean --force
 
-# Copy built application
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# Install ALL dependencies (including dev deps for ts-node)
+RUN npm ci --legacy-peer-deps && npm cache clean --force
+
+# Copy application code
 COPY prisma ./prisma
+RUN npx prisma generate
+
+COPY tsconfig.json ./
+COPY src ./src
 COPY scripts ./scripts
 
 # Create storage directory
@@ -39,4 +37,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 EXPOSE 4000
 
-CMD ["node", "dist/server.js"]
+# Run with ts-node in transpileOnly mode (no type checking)
+CMD ["npx", "ts-node", "--transpile-only", "src/server.ts"]
