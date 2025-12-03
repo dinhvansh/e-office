@@ -135,13 +135,17 @@ class TenantsService {
 
       for (const permission of allPermissions) {
         const [resource, action] = permission.split('.');
-        await tx.role_permissions.create({
-          data: {
-            role_id: adminRole.id,
-            resource,
-            action
-          }
+        const perm = await tx.permissions.findUnique({
+          where: { resource_action: { resource, action } }
         });
+        if (perm) {
+          await tx.role_permissions.create({
+            data: {
+              role_id: adminRole.id,
+              permission_id: perm.id
+            }
+          });
+        }
       }
 
       // 7. Create default department
@@ -178,9 +182,7 @@ class TenantsService {
             tenant_id: tenant.id,
             code: docType.code,
             name: docType.name,
-            numbering_prefix: docType.prefix,
-            numbering_pattern: `{prefix}-{seq}-{year}`,
-            current_sequence: 0
+            description: null
           }
         });
       }

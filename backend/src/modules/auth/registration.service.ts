@@ -229,14 +229,18 @@ export class RegistrationService {
         ...(tenantId !== null && { tenant_id: tenantId }),
         status: 'pending'
       },
-      include: {
-        tenant: true
-      },
       select: {
         id: true,
         email: true,
         full_name: true,
-        created_at: true
+        created_at: true,
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            domain: true
+          }
+        }
       },
       orderBy: {
         created_at: 'desc'

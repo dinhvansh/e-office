@@ -88,7 +88,7 @@ export class DocumentsController {
       }));
     } else {
       // Use original non-paginated endpoint (backward compatibility)
-      const documents = await documentsService.listDocuments(req.auth!.tenantId, req.auth!.userId, noSigningOnly, status);
+      const documents = await documentsService.listDocuments(req.auth!.tenantId, req.auth!.userId, noSigningOnly);
       res.json(ok({ documents: toDocumentDTOs(documents) }));
     }
   };
@@ -115,11 +115,11 @@ export class DocumentsController {
         confidentialLevel: body.confidential_level,
         visibilityScope: body.visibility_scope,
         workflowId: body.workflow_id, // ✅ Pass workflow_id to service
-        adhocSteps: body.adhoc_steps,
-        customizedSteps: body.customized_steps,
-        signers: body.signers,
-        ccEmails: body.cc_emails,
-        attachments: body.attachments,
+        adhocSteps: body.adhoc_steps as any,
+        customizedSteps: body.customized_steps as any,
+        signers: body.signers as any,
+        ccEmails: body.cc_emails as any,
+        attachments: body.attachments as any,
       },
       req.auth!.tenantId,
       req.auth!.userId,

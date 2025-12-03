@@ -182,7 +182,7 @@ export class DocumentFlowService {
             email: signer.email,
           },
           status: this.mapSignerStatus(signer.status),
-          started_at: signer.created_at?.toISOString(),
+          started_at: undefined, // Signers don't have created_at field
           completed_at: signer.signed_at?.toISOString(),
           signer_kind: signer.is_internal ? 'internal' : 'external',
         });

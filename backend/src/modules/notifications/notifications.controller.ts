@@ -5,7 +5,7 @@ export const notificationsController = {
   async getNotifications(req: Request, res: Response) {
     try {
       const userId = req.user!.id;
-      const tenantId = req.user!.tenantId;
+      const tenantId = req.user!.tenant_id;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
       const unreadOnly = req.query.unreadOnly === 'true';
@@ -26,7 +26,7 @@ export const notificationsController = {
   async getUnreadCount(req: Request, res: Response) {
     try {
       const userId = req.user!.id;
-      const tenantId = req.user!.tenantId;
+      const tenantId = req.user!.tenant_id;
 
       const count = await notificationsService.getUnreadCount(userId, tenantId);
 
@@ -40,7 +40,7 @@ export const notificationsController = {
   async markAsRead(req: Request, res: Response) {
     try {
       const userId = req.user!.id;
-      const tenantId = req.user!.tenantId;
+      const tenantId = req.user!.tenant_id;
       const id = parseInt(req.params.id);
 
       const result = await notificationsService.markAsRead(id, userId, tenantId);
@@ -59,7 +59,7 @@ export const notificationsController = {
   async markAllAsRead(req: Request, res: Response) {
     try {
       const userId = req.user!.id;
-      const tenantId = req.user!.tenantId;
+      const tenantId = req.user!.tenant_id;
 
       const result = await notificationsService.markAllAsRead(userId, tenantId);
 
@@ -73,7 +73,7 @@ export const notificationsController = {
   async deleteNotification(req: Request, res: Response) {
     try {
       const userId = req.user!.id;
-      const tenantId = req.user!.tenantId;
+      const tenantId = req.user!.tenant_id;
       const id = parseInt(req.params.id);
 
       const result = await notificationsService.deleteNotification(id, userId, tenantId);

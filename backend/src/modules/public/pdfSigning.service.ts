@@ -54,7 +54,7 @@ export class PdfSigningService {
     for (const signer of signRequest.signers) {
       // Find signature fields for this signer
       const signatureFields = signRequest.fields.filter(
-        f => f.signer_id === signer.id && f.type === 'signature'
+        f => f.assigned_signer_id === signer.id && f.type === 'signature'
       );
 
       for (const field of signatureFields) {
@@ -146,7 +146,7 @@ export class PdfSigningService {
 
       // Add date fields
       const dateFields = signRequest.fields.filter(
-        f => f.signer_id === signer.id && f.type === 'date'
+        f => f.assigned_signer_id === signer.id && f.type === 'date'
       );
 
       for (const field of dateFields) {
@@ -199,7 +199,7 @@ export class PdfSigningService {
     });
 
     // Add completion timestamp
-    const completedAt = signRequest.updated_at || new Date();
+    const completedAt = new Date(); // Use current time as completion time
     firstPage.drawText(`Completed: ${completedAt.toLocaleString('vi-VN')}`, {
       x: width - 200,
       y: height - 50,

@@ -71,7 +71,7 @@ export class WorkflowsController {
   };
 
   create = async (req: Request, res: Response): Promise<void> => {
-    const body = createWorkflowSchema.parse(req.body);
+    const body = createWorkflowSchema.parse(req.body) as any;
     const workflow = await workflowsService.createWorkflow(
       body,
       req.auth!.tenantId,
@@ -102,7 +102,7 @@ export class WorkflowsController {
 
   createStep = async (req: Request, res: Response): Promise<void> => {
     const workflowId = idSchema.parse(req.params.id);
-    const body = createStepSchema.parse(req.body);
+    const body = createStepSchema.parse(req.body) as any;
     const step = await workflowsService.createWorkflowStep(
       workflowId,
       body,
@@ -129,7 +129,7 @@ export class WorkflowsController {
     const body = reorderStepsSchema.parse(req.body);
     const steps = await workflowsService.reorderWorkflowSteps(
       workflowId,
-      body.steps,
+      body.steps as any,
       req.auth!.tenantId
     );
     res.json(ok({ steps }));

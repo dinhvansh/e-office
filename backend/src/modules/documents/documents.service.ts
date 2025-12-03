@@ -9,12 +9,6 @@ import { numberingService } from "../numbering/numbering.service";
 import { prisma } from "../../config/prisma";
 import { CreateDocumentData, documentsRepository } from "./documents.repository";
 import { canViewDocument, filterViewableDocuments } from "./documents.access";
-import { number } from "zod";
-import { number } from "zod";
-import { number } from "zod";
-import { number } from "zod";
-import { number } from "zod";
-import { number } from "zod";
 
 export interface CreateDocumentInput {
   fileName: string;
@@ -818,15 +812,19 @@ class DocumentsService {
     }
     
     // 3. Delete workflow instance and approvals if exists
-    if (document.workflow_instance_id) {
+    const workflowInstance = await prisma.workflow_instances.findUnique({
+      where: { document_id: document.id }
+    });
+    
+    if (workflowInstance) {
       // Delete approvals first
       await prisma.document_approvals.deleteMany({
-        where: { workflow_instance_id: document.workflow_instance_id }
+        where: { document_id: document.id }
       });
       
       // Delete workflow instance
       await prisma.workflow_instances.delete({
-        where: { id: document.workflow_instance_id }
+        where: { document_id: document.id }
       });
     }
     

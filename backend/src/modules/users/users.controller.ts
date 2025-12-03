@@ -19,7 +19,7 @@ export const usersController = {
         search: req.query.search as string,
       };
       
-      const result = await usersService.getUsers(isSuperAdmin ? null : tenantId, filters, page, limit);
+      const result = await usersService.getUsers(isSuperAdmin ? null : tenantId, { ...filters, page, limit });
       res.json({ success: true, data: result });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });

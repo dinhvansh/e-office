@@ -8,6 +8,7 @@ RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
 # Build application
 FROM base AS builder
+COPY package.json package-lock.json* ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY prisma ./prisma
 RUN npx prisma generate
