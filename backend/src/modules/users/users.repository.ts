@@ -3,13 +3,13 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export const usersRepository = {
-  async findByTenant(tenantId: number, filters?: {
+  async findByTenant(tenantId: number | null, filters?: {
     department_id?: number;
     role?: string;
     status?: string;
     search?: string;
   }) {
-    const where: any = { tenant_id: tenantId };
+    const where: any = tenantId !== null ? { tenant_id: tenantId } : {};
 
     if (filters?.department_id) {
       where.department_id = filters.department_id;
@@ -33,6 +33,9 @@ export const usersRepository = {
     return prisma.users.findMany({
       where,
       include: {
+        tenant: {
+          select: { id: true, name: true, domain: true },
+        },
         department: {
           select: { id: true, name: true },
         },
@@ -54,9 +57,12 @@ export const usersRepository = {
     });
   },
 
-  async findById(id: number, tenantId: number) {
+  async findById(id: number, tenantId: number | null) {
     return prisma.users.findFirst({
-      where: { id, tenant_id: tenantId },
+      where: { 
+        id, 
+        ...(tenantId !== null && { tenant_id: tenantId })
+      },
       include: {
         department: true,
         position: true,

@@ -11,7 +11,9 @@ export class RegistrationService {
     password: string;
     full_name: string;
     tenant_id?: number;
-  }): Promise<{ success: boolean; message: string; userId?: number }> {
+    company_name?: string;
+    create_tenant?: boolean;
+  }): Promise<{ success: boolean; message: string; userId?: number; tenantId?: number }> {
     // Check if email already exists
     const existingUser = await prisma.users.findUnique({
       where: { email: data.email }
@@ -43,8 +45,22 @@ export class RegistrationService {
     // Hash password
     const passwordHash = await bcrypt.hash(data.password, 10);
 
-    // Get default tenant (tenant_id = 1) if not provided
-    const tenantId = data.tenant_id || 1;
+    let tenantId = data.tenant_id;
+
+    // Create new tenant if requested
+    if (data.create_tenant && data.company_name) {
+      const newTenant = await prisma.tenants.create({
+        data: {
+          name: data.company_name,
+          domain: data.email.split('@')[1], // Use email domain
+          status: 'active'
+        }
+      });
+      tenantId = newTenant.id;
+    } else {
+      // Get default tenant (tenant_id = 1) if not provided
+      tenantId = tenantId || 1;
+    }
 
     // Create user with 'pending' status
     const user = await prisma.users.create({
@@ -73,14 +89,18 @@ export class RegistrationService {
     return {
       success: true,
       message: 'Registration successful. Please wait for admin approval.',
-      userId: user.id
+      userId: user.id,
+      tenantId: tenantId
     };
   }
 
   // Admin approves user
   async approveUser(userId: number, approvedBy: number): Promise<{ success: boolean; message: string }> {
     const user = await prisma.users.findUnique({
-      where: { id: userId }
+      where: { id: userId },
+      include: {
+        tenant: true
+      }
     });
 
     if (!user) {
@@ -91,17 +111,31 @@ export class RegistrationService {
       throw new Error('User is not in pending status.');
     }
 
-    // Update user status to active
-    await prisma.users.update({
-      where: { id: userId },
-      data: { status: 'active' }
+    // Check if this user created the tenant (is the first user in tenant)
+    const usersInTenant = await prisma.users.count({
+      where: { 
+        tenant_id: user.tenant_id,
+        status: { in: ['active', 'inactive'] }
+      }
     });
 
-    // Assign default role (User role)
+    const isFirstUserInTenant = usersInTenant === 0;
+
+    // Update user status to active and set role
+    await prisma.users.update({
+      where: { id: userId },
+      data: { 
+        status: 'active',
+        role: isFirstUserInTenant ? 'admin' : 'user'
+      }
+    });
+
+    // Assign RBAC role (Admin or User)
+    const roleName = isFirstUserInTenant ? 'Admin' : 'User';
     const defaultRole = await prisma.roles.findFirst({
       where: {
         tenant_id: user.tenant_id,
-        name: 'User'
+        name: roleName
       }
     });
 
@@ -112,6 +146,34 @@ export class RegistrationService {
           role_id: defaultRole.id
         }
       });
+    } else if (isFirstUserInTenant) {
+      // If Admin role doesn't exist in new tenant, create it
+      console.log(`Creating Admin role for tenant ${user.tenant_id}`);
+      const adminRole = await prisma.roles.create({
+        data: {
+          name: 'Admin',
+          description: 'Administrator with full access',
+          tenant_id: user.tenant_id
+        }
+      });
+
+      await prisma.user_roles.create({
+        data: {
+          user_id: userId,
+          role_id: adminRole.id
+        }
+      });
+
+      // Assign all permissions to admin role
+      const allPermissions = await prisma.permissions.findMany();
+      for (const permission of allPermissions) {
+        await prisma.role_permissions.create({
+          data: {
+            role_id: adminRole.id,
+            permission_id: permission.id
+          }
+        }).catch(() => {}); // Ignore duplicates
+      }
     }
 
     // Send approval email (async)
@@ -161,11 +223,14 @@ export class RegistrationService {
   }
 
   // Get pending users for admin
-  async getPendingUsers(tenantId: number): Promise<any[]> {
+  async getPendingUsers(tenantId: number | null): Promise<any[]> {
     return await prisma.users.findMany({
       where: {
-        tenant_id: tenantId,
+        ...(tenantId !== null && { tenant_id: tenantId }),
         status: 'pending'
+      },
+      include: {
+        tenant: true
       },
       select: {
         id: true,
@@ -218,31 +283,47 @@ export class RegistrationService {
       <html>
       <head>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-          .info { background: #dbeafe; border-left: 4px solid #3b82f6; padding: 12px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background-color: #f3f4f6; }
+          .container { max-width: 600px; margin: 0 auto; background: white; }
+          .header { background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%); padding: 40px 30px; display: flex; align-items: center; }
+          .logo { width: 60px; height: 60px; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-right: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+          .logo-text { font-size: 24px; font-weight: bold; color: #0ea5e9; }
+          .header-title { color: white; margin: 0; }
+          .header-title h1 { margin: 0; font-size: 28px; font-weight: 600; }
+          .header-title p { margin: 5px 0 0 0; font-size: 14px; opacity: 0.9; }
+          .content { padding: 40px 30px; }
+          .greeting { font-size: 18px; color: #1f2937; margin-bottom: 20px; }
+          .info-box { background: #e0f2fe; border-left: 4px solid #0ea5e9; padding: 16px; margin: 24px 0; border-radius: 4px; }
+          .info-box strong { color: #0369a1; }
+          .footer { background: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb; }
+          .footer p { margin: 5px 0; color: #6b7280; font-size: 12px; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>Đăng ký thành công!</h1>
+            <div class="logo">
+              <span class="logo-text">E</span>
+            </div>
+            <div class="header-title">
+              <h1>Đăng ký thành công!</h1>
+              <p>E-Office - Quản lý tài liệu thông minh</p>
+            </div>
           </div>
           <div class="content">
-            <p>Xin chào <strong>${userName}</strong>,</p>
+            <p class="greeting">Xin chào <strong>${userName}</strong>,</p>
             <p>Cảm ơn bạn đã đăng ký tài khoản E-Office!</p>
-            <div class="info">
+            <div class="info-box">
               <p><strong>ℹ️ Trạng thái:</strong> Tài khoản của bạn đang chờ phê duyệt từ quản trị viên.</p>
             </div>
             <p>Chúng tôi sẽ gửi email thông báo khi tài khoản được kích hoạt. Thời gian xử lý thường trong vòng 24 giờ.</p>
-            <p>Trân trọng,<br><strong>E-Office Team</strong></p>
+            <p style="margin-top: 30px;">Trân trọng,<br><strong>E-Office Team</strong></p>
           </div>
           <div class="footer">
             <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+            <p>© 2024 E-Office. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -257,24 +338,40 @@ export class RegistrationService {
       <html>
       <head>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .success { background: #d1fae5; border-left: 4px solid #10b981; padding: 12px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background-color: #f3f4f6; }
+          .container { max-width: 600px; margin: 0 auto; background: white; }
+          .header { background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%); padding: 40px 30px; display: flex; align-items: center; }
+          .logo { width: 60px; height: 60px; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-right: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+          .logo-text { font-size: 24px; font-weight: bold; color: #0ea5e9; }
+          .header-title { color: white; margin: 0; }
+          .header-title h1 { margin: 0; font-size: 28px; font-weight: 600; }
+          .header-title p { margin: 5px 0 0 0; font-size: 14px; opacity: 0.9; }
+          .content { padding: 40px 30px; }
+          .greeting { font-size: 18px; color: #1f2937; margin-bottom: 20px; }
+          .success-box { background: #d1fae5; border-left: 4px solid #10b981; padding: 16px; margin: 24px 0; border-radius: 4px; }
+          .success-box strong { color: #047857; }
+          .button { display: inline-block; background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; box-shadow: 0 4px 6px rgba(14, 165, 233, 0.3); }
+          .button:hover { box-shadow: 0 6px 8px rgba(14, 165, 233, 0.4); }
+          .footer { background: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb; }
+          .footer p { margin: 5px 0; color: #6b7280; font-size: 12px; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>🎉 Tài khoản đã được kích hoạt!</h1>
+            <div class="logo">
+              <span class="logo-text">E</span>
+            </div>
+            <div class="header-title">
+              <h1>🎉 Tài khoản đã kích hoạt!</h1>
+              <p>E-Office - Quản lý tài liệu thông minh</p>
+            </div>
           </div>
           <div class="content">
-            <p>Xin chào <strong>${userName}</strong>,</p>
-            <div class="success">
+            <p class="greeting">Xin chào <strong>${userName}</strong>,</p>
+            <div class="success-box">
               <p><strong>✓ Chúc mừng!</strong> Tài khoản E-Office của bạn đã được phê duyệt và kích hoạt.</p>
             </div>
             <p>Bạn có thể đăng nhập và bắt đầu sử dụng hệ thống ngay bây giờ:</p>
@@ -282,10 +379,11 @@ export class RegistrationService {
               <a href="${loginUrl}" class="button">Đăng nhập ngay</a>
             </div>
             <p>Chúc bạn có trải nghiệm tốt với E-Office!</p>
-            <p>Trân trọng,<br><strong>E-Office Team</strong></p>
+            <p style="margin-top: 30px;">Trân trọng,<br><strong>E-Office Team</strong></p>
           </div>
           <div class="footer">
             <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+            <p>© 2024 E-Office. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -340,25 +438,42 @@ export class RegistrationService {
       <html>
       <head>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; background: #f59e0b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .info { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background-color: #f3f4f6; }
+          .container { max-width: 600px; margin: 0 auto; background: white; }
+          .header { background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%); padding: 40px 30px; display: flex; align-items: center; }
+          .logo { width: 60px; height: 60px; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-right: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+          .logo-text { font-size: 24px; font-weight: bold; color: #0ea5e9; }
+          .header-title { color: white; margin: 0; }
+          .header-title h1 { margin: 0; font-size: 28px; font-weight: 600; }
+          .header-title p { margin: 5px 0 0 0; font-size: 14px; opacity: 0.9; }
+          .content { padding: 40px 30px; }
+          .greeting { font-size: 18px; color: #1f2937; margin-bottom: 20px; }
+          .info-box { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 24px 0; border-radius: 4px; }
+          .info-box p { margin: 8px 0; }
+          .info-box strong { color: #92400e; }
+          .button { display: inline-block; background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; box-shadow: 0 4px 6px rgba(14, 165, 233, 0.3); }
+          .button:hover { box-shadow: 0 6px 8px rgba(14, 165, 233, 0.4); }
+          .footer { background: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb; }
+          .footer p { margin: 5px 0; color: #6b7280; font-size: 12px; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>🔔 Đăng ký mới cần phê duyệt</h1>
+            <div class="logo">
+              <span class="logo-text">E</span>
+            </div>
+            <div class="header-title">
+              <h1>🔔 Đăng ký mới cần duyệt</h1>
+              <p>E-Office - Quản lý tài liệu thông minh</p>
+            </div>
           </div>
           <div class="content">
-            <p>Xin chào Admin,</p>
+            <p class="greeting">Xin chào Admin,</p>
             <p>Có một đăng ký tài khoản mới cần được phê duyệt:</p>
-            <div class="info">
+            <div class="info-box">
               <p><strong>Tên:</strong> ${userName}</p>
               <p><strong>Email:</strong> ${userEmail}</p>
             </div>
@@ -366,10 +481,11 @@ export class RegistrationService {
             <div style="text-align: center;">
               <a href="${dashboardUrl}" class="button">Xem danh sách chờ duyệt</a>
             </div>
-            <p>Trân trọng,<br><strong>E-Office System</strong></p>
+            <p style="margin-top: 30px;">Trân trọng,<br><strong>E-Office System</strong></p>
           </div>
           <div class="footer">
             <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+            <p>© 2024 E-Office. All rights reserved.</p>
           </div>
         </div>
       </body>

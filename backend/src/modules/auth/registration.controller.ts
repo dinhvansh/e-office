@@ -7,7 +7,9 @@ const registerSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   full_name: z.string().min(1, 'Full name is required'),
-  terms_accepted: z.boolean().refine(val => val === true, 'You must accept terms and conditions')
+  terms_accepted: z.boolean().refine(val => val === true, 'You must accept terms and conditions'),
+  company_name: z.string().optional(),
+  create_tenant: z.boolean().optional()
 });
 
 const approveRejectSchema = z.object({
@@ -18,12 +20,14 @@ export class RegistrationController {
   // POST /auth/register - Public registration
   async register(req: Request, res: Response) {
     try {
-      const { email, password, full_name } = registerSchema.parse(req.body);
+      const { email, password, full_name, company_name, create_tenant } = registerSchema.parse(req.body);
 
       const result = await registrationService.registerUser({
         email,
         password,
-        full_name
+        full_name,
+        company_name,
+        create_tenant
       });
 
       res.status(201).json(result);
@@ -52,9 +56,13 @@ export class RegistrationController {
   // GET /users/pending - Get pending users (admin only)
   async getPendingUsers(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).user?.tenant_id || 1;
+      const user = (req as any).user;
+      const tenantId = user?.tenant_id || 1;
+      
+      // Check if user is super admin (can see all tenants)
+      const isSuperAdmin = user?.role === 'super_admin' || user?.email === 'admin@acme.local';
 
-      const users = await registrationService.getPendingUsers(tenantId);
+      const users = await registrationService.getPendingUsers(isSuperAdmin ? null : tenantId);
 
       res.json({ users });
     } catch (error: any) {

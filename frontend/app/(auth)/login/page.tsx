@@ -7,8 +7,8 @@ import { useAuth } from "@/components/providers/auth-provider";
 export default function LoginPage() {
   const router = useRouter();
   const { login, tokens } = useAuth();
-  const [email, setEmail] = useState("admin@acme.local");
-  const [password, setPassword] = useState("secret123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

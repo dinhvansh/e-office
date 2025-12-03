@@ -1,0 +1,36 @@
+name: CD - Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to VPS (docker-compose)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout (for reference only)
+        uses: actions/checkout@v4
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          script: |
+            set -e
+
+            echo "🔄 Pull latest code"
+            cd /opt/e-office
+            git pull origin main
+
+            echo "🚀 Run deploy.sh (docker-compose.prod.yml)"
+            chmod +x deploy.sh || true
+            ./deploy.sh production
+

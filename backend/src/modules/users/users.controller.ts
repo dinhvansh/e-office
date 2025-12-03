@@ -4,7 +4,12 @@ import { usersService } from './users.service';
 export const usersController = {
   async getUsers(req: Request, res: Response) {
     try {
+      const user = (req as any).user;
       const tenantId = (req as any).auth.tenantId;
+      
+      // Check if user is super admin
+      const isSuperAdmin = user?.role === 'super_admin' || user?.email === 'admin@acme.local';
+      
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
       const filters = {
@@ -14,7 +19,7 @@ export const usersController = {
         search: req.query.search as string,
       };
       
-      const result = await usersService.getUsers(tenantId, filters, page, limit);
+      const result = await usersService.getUsers(isSuperAdmin ? null : tenantId, filters, page, limit);
       res.json({ success: true, data: result });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -55,10 +60,15 @@ export const usersController = {
 
   async updateUser(req: Request, res: Response) {
     try {
+      const user = (req as any).user;
       const tenantId = (req as any).auth.tenantId;
+      
+      // Check if user is super admin
+      const isSuperAdmin = user?.role === 'super_admin' || user?.email === 'admin@acme.local';
+      
       const { id } = req.params;
-      const user = await usersService.updateUser(parseInt(id), tenantId, req.body);
-      res.json({ success: true, data: user });
+      const updatedUser = await usersService.updateUser(parseInt(id), isSuperAdmin ? null : tenantId, req.body);
+      res.json({ success: true, data: updatedUser });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
     }
@@ -66,9 +76,14 @@ export const usersController = {
 
   async deleteUser(req: Request, res: Response) {
     try {
+      const user = (req as any).user;
       const tenantId = (req as any).auth.tenantId;
+      
+      // Check if user is super admin (can delete from any tenant)
+      const isSuperAdmin = user?.role === 'super_admin' || user?.email === 'admin@acme.local';
+      
       const { id } = req.params;
-      await usersService.deleteUser(parseInt(id), tenantId);
+      await usersService.deleteUser(parseInt(id), isSuperAdmin ? null : tenantId);
       res.json({ success: true, message: 'User deleted' });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });

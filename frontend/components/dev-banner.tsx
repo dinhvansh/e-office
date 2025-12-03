@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Info, User, Key, TestTube } from 'lucide-react';
+import { X, Info, TestTube } from 'lucide-react';
 import { Button } from './ui/button';
 
 export function DevBanner() {
@@ -18,19 +18,12 @@ export function DevBanner() {
           <Info className="w-5 h-5 flex-shrink-0" />
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <div className="flex items-center gap-2">
-              <User className="w-4 h-4" />
-              <span className="font-medium">Login:</span>
-              <code className="bg-white/20 px-2 py-0.5 rounded">admin@acme.local</code>
-            </div>
-            <div className="flex items-center gap-2">
-              <Key className="w-4 h-4" />
-              <span className="font-medium">Password:</span>
-              <code className="bg-white/20 px-2 py-0.5 rounded">secret123</code>
-            </div>
-            <div className="flex items-center gap-2">
               <TestTube className="w-4 h-4" />
-              <span className="font-medium">Test:</span>
-              <span>Thử tạo phòng ban mã "IT" để xem error handling</span>
+              <span className="font-medium">Development Mode</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Info className="w-4 h-4" />
+              <span>Môi trường phát triển - Không sử dụng trong production</span>
             </div>
           </div>
         </div>

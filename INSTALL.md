@@ -63,7 +63,10 @@ Email:    admin@acme.local
 Password: secret123
 ```
 
-⚠️ **Quan trọng**: Đổi password ngay sau khi đăng nhập!
+⚠️ **QUAN TRỌNG - BẢO MẬT**: 
+- Đây là mật khẩu mặc định CHỈ dùng cho lần đầu cài đặt
+- **PHẢI đổi password ngay sau khi đăng nhập lần đầu**
+- Xem hướng dẫn chi tiết trong [SECURITY.md](./SECURITY.md)
 
 ---
 

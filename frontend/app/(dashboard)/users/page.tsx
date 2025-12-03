@@ -23,6 +23,7 @@ interface User {
   full_name?: string;
   phone?: string;
   status: string;
+  tenant?: { id: number; name: string; domain?: string };
   department?: { id: number; name: string };
   user_roles: Array<{ role: { id: number; name: string } }>;
   created_at: string;
@@ -251,6 +252,9 @@ export default function UsersPage() {
                     Người dùng
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Workspace
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Phòng ban
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -284,6 +288,16 @@ export default function UsersPage() {
                         <div className="text-sm text-muted-foreground">{user.email}</div>
                         {user.phone && (
                           <div className="text-sm text-muted-foreground">{user.phone}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="text-sm font-medium">
+                          {user.tenant?.name || '-'}
+                        </div>
+                        {user.tenant?.domain && (
+                          <div className="text-xs text-muted-foreground">{user.tenant.domain}</div>
                         )}
                       </div>
                     </td>
