@@ -39,8 +39,9 @@ print_warning() {
 
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then 
-    print_warning "Please do not run as root. Run as normal user with sudo privileges."
-    exit 1
+    print_warning "Running as root. This is not recommended for production."
+    print_info "Press Ctrl+C to cancel, or wait 5 seconds to continue..."
+    sleep 5
 fi
 
 # Detect OS
