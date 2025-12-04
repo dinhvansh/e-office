@@ -18,16 +18,22 @@ All localhost fallbacks have been removed from the codebase. The application now
 
 ### Frontend Files Updated
 
-1. **`frontend/lib/api.ts`**
-   - Removed: `|| 'http://localhost:4000/api/v1'`
-   - Now validates `NEXT_PUBLIC_API_URL` at runtime (not build time)
-   - Throws error if variable is not set when API is used
+1. **`frontend/lib/env.ts`** (NEW)
+   - Created centralized environment variable helpers
+   - `getApiBaseUrl()` - Returns NEXT_PUBLIC_API_BASE_URL with validation
+   - `getApiUrl()` - Returns NEXT_PUBLIC_API_URL with validation
+   - `getPublicApiBaseUrl()` - Returns base URL without /api/v1
+   - All functions validate at runtime (browser only), not build time
 
-2. **`frontend/components/providers/auth-provider.tsx`**
-   - Removed: `DEFAULT_API_URL` constant
-   - Removed: `?? DEFAULT_API_URL` fallback
-   - Now validates `NEXT_PUBLIC_API_BASE_URL` at runtime (not build time)
-   - Throws error if variable is not set when auth is used
+2. **`frontend/lib/api.ts`**
+   - Removed: `|| 'http://localhost:4000/api/v1'`
+   - Now uses `getApiUrl()` helper
+   - Validates at runtime when API is used
+
+3. **`frontend/components/providers/auth-provider.tsx`**
+   - Removed: `DEFAULT_API_URL` constant and fallback
+   - Now uses `getApiBaseUrl()` helper
+   - Validates at runtime when auth is used
 
 3. **`frontend/app/sign/[token]/page.tsx`**
    - Removed: `|| 'http://localhost:4000'` fallbacks (6 instances)

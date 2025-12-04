@@ -32,19 +32,9 @@ type AuthContextValue = {
   fetchJson: <T>(path: string, init?: RequestInit) => Promise<T>;
 };
 
+import { getApiBaseUrl } from '@/lib/env';
+
 const STORAGE_KEY = 'esign.auth';
-
-// Get API URL - validate at runtime, not build time
-const getApiBaseUrl = () => {
-  if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
-    throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
-  }
-  return process.env.NEXT_PUBLIC_API_BASE_URL.trim().replace(/\/+$/, '');
-};
-
-// For build time, use empty string (will be validated at runtime)
-const API_BASE_URL = typeof window !== 'undefined' ? getApiBaseUrl() : '';
-
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 type StoredSession = {
@@ -100,7 +90,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [tokens, user, tenant]);
 
   const performLogin = useCallback(async (email: string, password: string) => {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    const apiBaseUrl = getApiBaseUrl();
+    const res = await fetch(`${apiBaseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -144,7 +135,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return false;
     }
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      const apiBaseUrl = getApiBaseUrl();
+      const res = await fetch(`${apiBaseUrl}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: tokens.refreshToken }),
@@ -178,7 +170,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const fetchJson = useCallback(
     async <T,>(path: string, init?: RequestInit): Promise<T> => {
       const attempt = async (retry = false): Promise<T> => {
-        const res = await fetch(`${API_BASE_URL}${path}`, {
+        const apiBaseUrl = getApiBaseUrl();
+        const res = await fetch(`${apiBaseUrl}${path}`, {
           ...init,
           headers: {
             'Content-Type': 'application/json',
