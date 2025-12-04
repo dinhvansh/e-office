@@ -4,7 +4,7 @@ WORKDIR /app
 # Install dependencies
 FROM base AS deps
 COPY package.json package-lock.json* .npmrc* ./
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 # Build application
 FROM base AS builder

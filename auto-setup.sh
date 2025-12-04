@@ -270,7 +270,17 @@ echo ""
 echo -e "${BLUE}[8/10]${NC} Đang build Docker images..."
 echo "   (Quá trình này có thể mất 5-10 phút)"
 
-if docker compose build --no-cache; then
+# Detect docker compose command (plugin vs standalone)
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+elif command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+else
+    echo -e "${RED}❌ Docker Compose not found${NC}"
+    exit 1
+fi
+
+if $DOCKER_COMPOSE build --no-cache; then
     echo -e "${GREEN}✓${NC} Docker images đã được build"
 else
     echo -e "${RED}❌ Build failed${NC}"
@@ -283,17 +293,17 @@ fi
 echo ""
 echo -e "${BLUE}[9/10]${NC} Đang khởi động services..."
 
-docker compose up -d
+$DOCKER_COMPOSE up -d
 
 echo "   Đợi services khởi động (30 giây)..."
 sleep 30
 
 # Check if services are running
-if docker compose ps | grep -q "Up"; then
+if $DOCKER_COMPOSE ps | grep -q "Up"; then
     echo -e "${GREEN}✓${NC} Services đã được khởi động"
 else
     echo -e "${RED}❌ Một số services không khởi động được${NC}"
-    docker compose ps
+    $DOCKER_COMPOSE ps
     exit 1
 fi
 
@@ -304,14 +314,14 @@ echo ""
 echo -e "${BLUE}[10/10]${NC} Đang setup database..."
 
 echo "   Chạy migrations..."
-docker exec eoffice-backend npx prisma migrate deploy 2>/dev/null || \
-docker exec eoffice-backend npx prisma db push
+$DOCKER_COMPOSE exec -T backend npx prisma migrate deploy 2>/dev/null || \
+$DOCKER_COMPOSE exec -T backend npx prisma db push
 
 echo "   Seeding data..."
-docker exec eoffice-backend node scripts/seed.js
-docker exec eoffice-backend node scripts/seed-rbac.js
-docker exec eoffice-backend node scripts/seed-document-types.js
-docker exec eoffice-backend node scripts/seed-workflows-simple.js
+$DOCKER_COMPOSE exec -T backend node scripts/seed.js
+$DOCKER_COMPOSE exec -T backend node scripts/seed-rbac.js
+$DOCKER_COMPOSE exec -T backend node scripts/seed-document-types.js
+$DOCKER_COMPOSE exec -T backend node scripts/seed-workflows-simple.js
 
 echo -e "${GREEN}✓${NC} Database đã được setup"
 

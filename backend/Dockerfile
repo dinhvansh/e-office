@@ -4,7 +4,7 @@ WORKDIR /app
 # Install dependencies
 FROM base AS deps
 COPY package.json package-lock.json* .npmrc* ./
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 # Production image - Run with ts-node (no build needed)
 FROM node:20-alpine AS production
@@ -18,7 +18,7 @@ RUN apk add --no-cache openssl
 COPY package.json package-lock.json* ./
 
 # Install ALL dependencies (including dev deps for ts-node)
-RUN npm ci --legacy-peer-deps && npm cache clean --force
+RUN npm install --legacy-peer-deps && npm cache clean --force
 
 # Copy application code
 COPY prisma ./prisma
