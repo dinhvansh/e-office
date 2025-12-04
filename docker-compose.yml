@@ -69,10 +69,12 @@ services:
     build: 
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: http://36.50.27.139:4000
+        NEXT_PUBLIC_API_URL: http://36.50.27.139:4000/api/v1
+        NEXT_PUBLIC_API_BASE_URL: http://36.50.27.139:4000/api/v1
     container_name: eoffice-frontend
     environment:
-      NEXT_PUBLIC_API_URL: http://36.50.27.139:4000
+      NEXT_PUBLIC_API_URL: http://36.50.27.139:4000/api/v1
+      NEXT_PUBLIC_API_BASE_URL: http://36.50.27.139:4000/api/v1
       NODE_ENV: production
     ports:
       - "3000:3000"

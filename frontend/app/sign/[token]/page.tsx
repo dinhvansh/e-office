@@ -730,7 +730,7 @@ export default function PublicSigningPage() {
           <h2 className="text-lg font-semibold p-4 border-b">📄 Tài liệu</h2>
           <div className="h-[700px]">
             <PDFSigningViewer
-              pdfUrl={`http://localhost:4000/public/sign/${token}/document`}
+              pdfUrl={`${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:4000'}/public/sign/${token}/document`}
               fields={data.fields || []}
               signerId={data.signer.id}
               onFieldClick={handleFieldClick}
