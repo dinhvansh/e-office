@@ -1,9 +1,20 @@
 import { expect, request as playwrightRequest, test } from "@playwright/test";
 
-const API_BASE = process.env.PLAYWRIGHT_API_BASE_URL ?? "http://localhost:4000/api/v1";
+// Require environment variables - no fallback to localhost
+if (!process.env.PLAYWRIGHT_API_BASE_URL) {
+  throw new Error('PLAYWRIGHT_API_BASE_URL environment variable is required');
+}
+if (!process.env.PLAYWRIGHT_EMAIL) {
+  throw new Error('PLAYWRIGHT_EMAIL environment variable is required');
+}
+if (!process.env.PLAYWRIGHT_PASSWORD) {
+  throw new Error('PLAYWRIGHT_PASSWORD environment variable is required');
+}
+
+const API_BASE = process.env.PLAYWRIGHT_API_BASE_URL;
 const creds = {
-  email: process.env.PLAYWRIGHT_EMAIL ?? "admin@acme.local",
-  password: process.env.PLAYWRIGHT_PASSWORD ?? "secret123",
+  email: process.env.PLAYWRIGHT_EMAIL,
+  password: process.env.PLAYWRIGHT_PASSWORD,
 };
 
 async function authenticate(api = playwrightRequest) {

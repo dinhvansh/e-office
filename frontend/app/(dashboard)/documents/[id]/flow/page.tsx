@@ -41,7 +41,10 @@ export default function DocumentFlowPage() {
   // Set PDF URL - use progressive/signed version if available
   useEffect(() => {
     if (typeof window !== 'undefined' && documentId && flowData) {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+      if (!process.env.NEXT_PUBLIC_API_URL) {
+        throw new Error('NEXT_PUBLIC_API_URL environment variable is required');
+      }
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
       
       // Priority: Use signed_file_path if exists (progressive or completed)
       // This shows the latest PDF with signatures as they are added
@@ -143,7 +146,10 @@ export default function DocumentFlowPage() {
                 size="sm"
                 onClick={async () => {
                   try {
-                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+                    if (!process.env.NEXT_PUBLIC_API_URL) {
+                      throw new Error('NEXT_PUBLIC_API_URL environment variable is required');
+                    }
+                    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
                     // Use signed file if available (progressive or completed)
                     const hasSignedFile = document?.signed_file_path;
                     const endpoint = hasSignedFile ? 'download-signed' : 'download';

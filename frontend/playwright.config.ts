@@ -1,6 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+// Require environment variable - no fallback to localhost
+if (!process.env.PLAYWRIGHT_BASE_URL) {
+  throw new Error('PLAYWRIGHT_BASE_URL environment variable is required');
+}
+
+const baseURL = process.env.PLAYWRIGHT_BASE_URL;
 
 export default defineConfig({
   testDir: "./tests",

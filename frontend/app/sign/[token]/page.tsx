@@ -88,7 +88,10 @@ export default function PublicSigningPage() {
 
   const fetchSigningData = async () => {
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:4000';
+      if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
+        throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
+      }
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
       const res = await fetch(`${apiBase}/public/sign/${token}`);
       const result = await res.json();
 
@@ -114,7 +117,10 @@ export default function PublicSigningPage() {
 
   const handleSendOtp = async () => {
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:4000';
+      if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
+        throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
+      }
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
       const res = await fetch(
         `${apiBase}/public/sign/${token}/send-otp`,
         {
@@ -166,7 +172,10 @@ export default function PublicSigningPage() {
 
     setVerifying(true);
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:4000';
+      if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
+        throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
+      }
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
       const res = await fetch(`${apiBase}/public/sign/${token}/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -348,7 +357,10 @@ export default function PublicSigningPage() {
     setSubmitting(true);
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:4000';
+      if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
+        throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
+      }
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
       
       // Prepare field values for guided mode
       const field_values = Object.entries(fieldSignatures).map(([fieldId, value]) => ({
@@ -459,7 +471,10 @@ export default function PublicSigningPage() {
         onDownload={async () => {
           try {
             toast.info('Đang tạo file PDF có chữ ký...');
-            const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:4000';
+            if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
+              throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
+            }
+            const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
             const res = await fetch(`${apiBase}/public/sign/${token}/download-signed`);
             if (!res.ok) {
               const result = await res.json();
@@ -730,7 +745,7 @@ export default function PublicSigningPage() {
           <h2 className="text-lg font-semibold p-4 border-b">📄 Tài liệu</h2>
           <div className="h-[700px]">
             <PDFSigningViewer
-              pdfUrl={`${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:4000'}/public/sign/${token}/document`}
+              pdfUrl={`${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || ''}/public/sign/${token}/document`}
               fields={data.fields || []}
               signerId={data.signer.id}
               onFieldClick={handleFieldClick}

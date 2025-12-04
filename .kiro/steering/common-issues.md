@@ -2,6 +2,42 @@
 
 This document contains common issues encountered during development and their solutions.
 
+## Environment Variables
+
+### Missing Environment Variables
+
+**Problem**: Application fails to start with error "environment variable is required".
+
+**Symptoms**:
+```
+Error: NEXT_PUBLIC_API_BASE_URL environment variable is required
+Error: NEXT_PUBLIC_API_URL environment variable is required
+```
+
+**Root Cause**: Environment variables are not set. The application **does not use localhost fallbacks** - all variables must be explicitly configured.
+
+**Solution**:
+
+Frontend:
+```bash
+cd frontend
+cp .env.example .env.local
+# Edit .env.local with your values
+npm run dev
+```
+
+Backend:
+```bash
+cd backend
+cp .env.example .env
+# Edit .env with your values
+npm run dev
+```
+
+**Reference**: `docs/dev/ENVIRONMENT-VARIABLES-REQUIRED.md`
+
+---
+
 ## CORS Issues
 
 ### Custom Headers in Fetch Requests

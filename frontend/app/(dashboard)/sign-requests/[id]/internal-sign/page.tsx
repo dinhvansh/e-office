@@ -601,7 +601,10 @@ export default function InternalSigningPage() {
                         onClick={async () => {
                           try {
                             // Public routes don't have /api/v1 prefix
-                            const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:4000';
+                            if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
+                              throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
+                            }
+                            const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
                             const response = await fetch(
                               `${apiBaseUrl}/public/sign/${mySigner.signing_token}/download-signed`
                             );

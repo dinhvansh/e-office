@@ -33,8 +33,13 @@ type AuthContextValue = {
 };
 
 const STORAGE_KEY = 'esign.auth';
-const DEFAULT_API_URL = 'http://localhost:4000/api/v1';
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_URL).trim().replace(/\/+$/, '');
+
+// Require environment variable - no fallback to localhost
+if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
+  throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
+}
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL.trim().replace(/\/+$/, '');
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
