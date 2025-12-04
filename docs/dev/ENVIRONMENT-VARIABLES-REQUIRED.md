@@ -20,12 +20,14 @@ All localhost fallbacks have been removed from the codebase. The application now
 
 1. **`frontend/lib/api.ts`**
    - Removed: `|| 'http://localhost:4000/api/v1'`
-   - Now throws error if `NEXT_PUBLIC_API_URL` is not set
+   - Now validates `NEXT_PUBLIC_API_URL` at runtime (not build time)
+   - Throws error if variable is not set when API is used
 
 2. **`frontend/components/providers/auth-provider.tsx`**
    - Removed: `DEFAULT_API_URL` constant
    - Removed: `?? DEFAULT_API_URL` fallback
-   - Now throws error if `NEXT_PUBLIC_API_BASE_URL` is not set
+   - Now validates `NEXT_PUBLIC_API_BASE_URL` at runtime (not build time)
+   - Throws error if variable is not set when auth is used
 
 3. **`frontend/app/sign/[token]/page.tsx`**
    - Removed: `|| 'http://localhost:4000'` fallbacks (6 instances)
@@ -104,6 +106,8 @@ Error: NEXT_PUBLIC_API_BASE_URL environment variable is required
 Error: NEXT_PUBLIC_API_URL environment variable is required
 Error: PLAYWRIGHT_BASE_URL environment variable is required
 ```
+
+**Note**: Validation happens at **runtime** (when the API is actually used), not at build time. This allows the build to succeed even without environment variables, but the application will fail immediately when trying to make API calls if variables are not set.
 
 ## Migration Guide
 

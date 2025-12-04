@@ -34,12 +34,16 @@ type AuthContextValue = {
 
 const STORAGE_KEY = 'esign.auth';
 
-// Require environment variable - no fallback to localhost
-if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
-  throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
-}
+// Get API URL - validate at runtime, not build time
+const getApiBaseUrl = () => {
+  if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
+    throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
+  }
+  return process.env.NEXT_PUBLIC_API_BASE_URL.trim().replace(/\/+$/, '');
+};
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL.trim().replace(/\/+$/, '');
+// For build time, use empty string (will be validated at runtime)
+const API_BASE_URL = typeof window !== 'undefined' ? getApiBaseUrl() : '';
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
