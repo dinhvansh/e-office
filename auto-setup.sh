@@ -66,9 +66,17 @@ if docker compose version &> /dev/null; then
     echo -e "${GREEN}✓${NC} Docker Compose đã được cài đặt"
 else
     echo "   Đang cài đặt Docker Compose..."
-    sudo apt-get update
-    sudo apt-get install -y docker-compose-plugin
-    echo -e "${GREEN}✓${NC} Docker Compose đã được cài đặt"
+    
+    # Try plugin first
+    if sudo apt-get install -y docker-compose-plugin 2>/dev/null; then
+        echo -e "${GREEN}✓${NC} Docker Compose plugin đã được cài đặt"
+    else
+        # Fallback to standalone docker-compose
+        echo "   Plugin không có, cài standalone docker-compose..."
+        sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        sudo chmod +x /usr/local/bin/docker-compose
+        echo -e "${GREEN}✓${NC} Docker Compose standalone đã được cài đặt"
+    fi
 fi
 
 # ============================================
