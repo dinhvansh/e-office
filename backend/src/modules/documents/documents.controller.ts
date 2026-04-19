@@ -50,6 +50,8 @@ const createSchema = z
       file_base64: z.string().min(1),
       file_type: z.string(),
     })).optional(),
+
+    create_sign_request: z.boolean().optional(),
   })
   .refine((data) => data.file_base64 || data.storage_path, {
     message: "file_base64 or storage_path is required",
@@ -120,6 +122,7 @@ export class DocumentsController {
         signers: body.signers as any,
         ccEmails: body.cc_emails as any,
         attachments: body.attachments as any,
+        forceSignRequest: body.create_sign_request,
       },
       req.auth!.tenantId,
       req.auth!.userId,

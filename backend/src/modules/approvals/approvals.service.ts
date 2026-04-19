@@ -495,6 +495,13 @@ class ApprovalsService {
             where: { id: approval.document_id },
             data: { status: 'completed' },
           });
+
+          if (document.sign_request_id) {
+            await prisma.sign_requests.update({
+              where: { id: document.sign_request_id },
+              data: { status: 'completed' },
+            });
+          }
         }
       } else if (document?.document_type?.require_digital_signing && document.sign_request_id) {
         // Check if document requires digital signing (external signers already added)
@@ -505,6 +512,13 @@ class ApprovalsService {
           where: { id: approval.document_id },
           data: { status: 'completed' },
         });
+
+        if (document?.sign_request_id) {
+          await prisma.sign_requests.update({
+            where: { id: document.sign_request_id },
+            data: { status: 'completed' },
+          });
+        }
       }
 
       // Send completion notification to document owner
@@ -611,6 +625,13 @@ class ApprovalsService {
       where: { id: approval.document_id },
       data: { status: 'rejected' },
     });
+
+    if (approval.document.sign_request_id) {
+      await prisma.sign_requests.update({
+        where: { id: approval.document.sign_request_id },
+        data: { status: 'rejected' },
+      });
+    }
 
     // Send rejection notification to document owner
     const document = await prisma.documents.findUnique({

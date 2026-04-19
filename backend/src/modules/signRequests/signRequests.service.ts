@@ -61,7 +61,9 @@ class SignRequestsService {
       }
     };
 
-    if (status) {
+    if (status === "pending") {
+      where.status = { in: ["pending_approval", "pending", "in_progress"] };
+    } else if (status) {
       where.status = status;
     }
 
@@ -347,7 +349,11 @@ class SignRequestsService {
     const signRequest = await this.getSignRequest(id, tenantId);
 
     // ✅ Allow resend: Only block if completed or cancelled
-    if (signRequest.status === "completed" || signRequest.status === "cancelled") {
+    if (
+      signRequest.status === "completed" ||
+      signRequest.status === "cancelled" ||
+      signRequest.status === "rejected"
+    ) {
       throw ApiError.badRequest(
         `Cannot send sign request with status: ${signRequest.status}`, 
         "SIGN_REQUEST_INVALID_STATUS"
@@ -360,6 +366,72 @@ class SignRequestsService {
       const validation = await signRequestFieldsService.validateFieldsBeforeSend(id);
       if (!validation.valid) {
         throw ApiError.badRequest(validation.message || "Field validation failed");
+      }
+    }
+
+    if (signRequest.status === "pending_approval") {
+      await signRequestsRepository.updateStatus(id, tenantId, "pending");
+    }
+
+    if (signRequest.status === "draft") {
+      const documentType = signRequest.document?.document_type_id
+        ? await prisma.document_types.findUnique({
+            where: { id: signRequest.document.document_type_id },
+          })
+        : null;
+
+      if (documentType?.require_approval) {
+        const draftSigners = await signersRepository.findBySignRequest(id);
+        for (const signer of draftSigners) {
+          await signersRepository.update(signer.id, {
+            status: "waiting_approval",
+          });
+        }
+
+        await signRequestsRepository.updateStatus(id, tenantId, "pending_approval");
+
+        const documentWorkflow = await prisma.workflows.findFirst({
+          where: {
+            tenant_id: tenantId,
+            created_for_doc: signRequest.document_id,
+            is_active: true,
+          },
+          orderBy: { id: "desc" },
+        });
+
+        const workflowId = documentWorkflow?.id || documentType.default_workflow_id;
+        if (!workflowId) {
+          throw ApiError.badRequest("Workflow is required for approval flow", "WORKFLOW_REQUIRED");
+        }
+
+        const { approvalsService } = await import("../approvals/approvals.service");
+        await approvalsService.submitForApproval(signRequest.document_id, workflowId, tenantId, userId);
+
+        await auditService.record({
+          tenantId,
+          documentId: signRequest.document_id,
+          event: "sign.submitted_for_approval",
+          userId,
+        });
+
+        return this.getSignRequest(id, tenantId);
+      }
+
+      const orderedSigners = (await signersRepository.findBySignRequest(id)).sort(
+        (a, b) => (a.signing_order || 0) - (b.signing_order || 0)
+      );
+
+      for (let index = 0; index < orderedSigners.length; index += 1) {
+        const signer = orderedSigners[index];
+        await signersRepository.update(signer.id, {
+          status: index === 0 ? "pending" : "waiting_signing",
+        });
+      }
+
+      if (signRequest.document_id) {
+        await documentsRepository.update(signRequest.document_id, {
+          status: "pending_signature",
+        });
       }
     }
 
@@ -410,6 +482,18 @@ class SignRequestsService {
     console.log(`📧 Sending emails to ${pendingSigners.length} pending signers (${waitingSigners.length} waiting)...`);
     
     for (const signer of pendingSigners) {
+      if (signer.is_internal && signer.user_id) {
+        await notificationsService.createNotification({
+          tenantId,
+          userId: signer.user_id,
+          type: NotificationType.SIGN_REQUEST,
+          title: 'Yeu cau ky moi',
+          message: `Ban co yeu cau ky cho tai lieu "${signRequest.title || signRequest.document?.title || 'Document'}"`,
+          link: `/sign-requests/${signRequest.id}/internal-sign`,
+        }).catch(err => console.error(`Failed to create notification for user ${signer.user_id}:`, err));
+        continue;
+      }
+
       if (!signer.is_internal && signer.signing_token) {
         const signUrl = `${frontendUrl}/sign/${signer.signing_token}`;
         

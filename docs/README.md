@@ -1,64 +1,22 @@
-# E-Office Documentation
+# Documentation
 
-## 📚 Documentation Structure
+This folder contains the maintained project documentation for the current repo state.
 
-### Setup & Deployment
-- **[Docker Deployment](docker/README.md)** - Docker setup và deployment guide
-- **[Email Setup](email-setup.md)** - Cấu hình email notifications
-- **[Testing Guide](testing-guide.md)** - Hướng dẫn test
+## Recommended Entry Points
 
-### Development
-- **[Development Docs](dev/README.md)** - Development guides và session logs
-- **[API Spec](api-spec.md)** - API documentation
-- **[SaaS Onboarding](SAAS-ONBOARDING-API.md)** - Multi-tenant onboarding API
+- [../README.md](../README.md): repo overview and startup paths
+- [../START-HERE-E-OFFICE.md](../START-HERE-E-OFFICE.md): functional overview
+- [../FUNCTIONAL_SPEC.md](../FUNCTIONAL_SPEC.md): product scope
+- [testing-guide.md](testing-guide.md): testing notes
+- [email-setup.md](email-setup.md): SMTP configuration
+- [DEPLOYMENT-GUIDE.md](DEPLOYMENT-GUIDE.md): deployment reference
 
-### Project Info
-- **[Functional Spec](../FUNCTIONAL_SPEC.md)** - Product requirements
-- **[Start Here](../START-HERE-E-OFFICE.md)** - Project overview
-- **[Security Checklist](../SECURITY-CHECKLIST.md)** - Security guidelines
-- **[Production Ready](../PRODUCTION-READY-SUMMARY.md)** - Production deployment checklist
+## Notable Subfolders
 
-## 🚀 Quick Links
+- `dev/`: session logs and implementation notes
+- `archive/`: historical material that should not be treated as the current source of truth
 
-### For Developers
-1. Start with [START-HERE-E-OFFICE.md](../START-HERE-E-OFFICE.md)
-2. Setup environment: [Docker](docker/README.md) or Local
-3. Read [Development Rules](dev/README.md)
-4. Check [Testing Guide](testing-guide.md)
+## Notes
 
-### For DevOps
-1. [Docker Deployment Guide](docker/DOCKER-DEPLOYMENT-GUIDE.md)
-2. [Production Checklist](../PRODUCTION-READY-SUMMARY.md)
-3. [Security Checklist](../SECURITY-CHECKLIST.md)
-
-### For Product/PM
-1. [Functional Spec](../FUNCTIONAL_SPEC.md)
-2. [Feature Status](dev/PHASE-1-FINAL-STATUS.md)
-3. [Development Sessions](dev/)
-
-## 📁 Folder Structure
-
-```
-docs/
-├── docker/              # Docker deployment docs
-├── dev/                 # Development docs & session logs
-├── setup-and-backup/    # Setup guides
-├── email-setup.md       # Email configuration
-├── testing-guide.md     # Testing guide
-└── README.md           # This file
-```
-
-## 🔍 Finding Information
-
-**Need to setup Docker?** → `docs/docker/`  
-**Need to understand a feature?** → `docs/dev/FEATURE-*.md`  
-**Need to fix a bug?** → `docs/dev/FIX-*.md`  
-**Need session history?** → `docs/dev/SESSION-*.md`  
-**Need API docs?** → `docs/api-spec.md`
-
-## 📝 Documentation Guidelines
-
-- Feature docs: `docs/dev/FEATURE-{name}.md`
-- Session logs: `docs/dev/SESSION-{date}-{topic}.md`
-- Bug fixes: `docs/dev/FIX-{issue}.md`
-- Keep root clean - move completed docs to `docs/dev/`
+- Some older markdown files in this repository were written during intermediate migration phases.
+- If two docs disagree, prefer the root `README.md`, the current source tree, and the active environment examples.

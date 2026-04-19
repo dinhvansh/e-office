@@ -153,8 +153,9 @@ export default function SignRequestEditorPage() {
       return;
     }
     
-    // Require at least one field
-    if (fields.length === 0) {
+    const requiresFields = signers.length > 0;
+
+    if (requiresFields && fields.length === 0) {
       toast.error('Vui lòng thêm ít nhất 1 field chữ ký trước khi gửi');
       return;
     }
@@ -324,6 +325,9 @@ export default function SignRequestEditorPage() {
           {signers.length === 0 && (
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm">
               <p className="font-medium text-amber-900 mb-2">⚠️ Chưa có người ký</p>
+              <p className="text-amber-700 mb-2">
+                Workflow báº¡n chá»n hiá»‡n chÆ°a táº¡o ra bÆ°á»›c kÃ½ nÃ o, nÃªn mÃ n hÃ¬nh nÃ y chÆ°a cÃ³ signer Ä‘á»ƒ gáº¯n field.
+              </p>
               <p className="text-amber-700 mb-3">
                 Vui lòng thêm người ký trước khi thêm fields chữ ký.
               </p>
@@ -568,3 +572,4 @@ export default function SignRequestEditorPage() {
     </div>
   );
 }
+

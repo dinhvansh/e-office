@@ -20,7 +20,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/v1", router);
 
-app.use((err: unknown, _req: express.Request, res: express.Response) => {
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   // eslint-disable-next-line no-console
   console.error(err);
   res.status(500).json({

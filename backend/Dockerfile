@@ -1,41 +1,38 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 
-# Install dependencies
 FROM base AS deps
+RUN apk add --no-cache openssl
 COPY package.json package-lock.json* .npmrc* ./
 RUN npm install --legacy-peer-deps
 
-# Production image - Run with ts-node (no build needed)
+FROM base AS builder
+RUN apk add --no-cache openssl
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json* tsconfig.json ./
+COPY prisma ./prisma
+COPY scripts ./scripts
+COPY src ./src
+RUN npx prisma generate
+RUN npm run build
+
 FROM node:20-alpine AS production
 WORKDIR /app
-ENV NODE_ENV=development
+ENV NODE_ENV=production
 
-# Install OpenSSL for Prisma
 RUN apk add --no-cache openssl
 
-# Copy package files
-COPY package.json package-lock.json* ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/dist ./dist
 
-# Install ALL dependencies (including dev deps for ts-node)
-RUN npm install --legacy-peer-deps && npm cache clean --force
-
-# Copy application code
-COPY prisma ./prisma
-RUN npx prisma generate
-
-COPY tsconfig.json ./
-COPY src ./src
-COPY scripts ./scripts
-
-# Create storage directory
 RUN mkdir -p /app/storage /app/backups
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 EXPOSE 4000
 
-# Run with ts-node in transpileOnly mode (no type checking)
-CMD ["npx", "ts-node", "--transpile-only", "src/server.ts"]
+CMD ["node", "dist/server.js"]

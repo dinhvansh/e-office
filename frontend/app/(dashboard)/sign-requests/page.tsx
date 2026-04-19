@@ -287,6 +287,9 @@ export default function SignRequestsPage() {
     if (progress.percentage === 100 || status === 'completed') {
       return <Badge className="bg-green-500 hover:bg-green-600">Đã hoàn thành</Badge>;
     }
+    if (status === 'pending_approval') {
+      return <Badge className="bg-amber-500 hover:bg-amber-600">Chờ duyệt</Badge>;
+    }
     if (status === 'pending' || status === 'in_progress') {
       return <Badge className="bg-yellow-500 hover:bg-yellow-600">Chờ ký</Badge>;
     }
@@ -318,7 +321,7 @@ export default function SignRequestsPage() {
 
   const stats = {
     all: data?.length || 0,
-    pending: data?.filter(r => r.status === 'pending' || r.status === 'in_progress').length || 0,
+    pending: data?.filter(r => r.status === 'pending_approval' || r.status === 'pending' || r.status === 'in_progress').length || 0,
     completed: data?.filter(r => r.status === 'completed' || r.progress.percentage === 100).length || 0,
     rejected: data?.filter(r => r.progress.rejected > 0).length || 0,
   };
@@ -853,3 +856,5 @@ export default function SignRequestsPage() {
     </div>
   );
 }
+
+

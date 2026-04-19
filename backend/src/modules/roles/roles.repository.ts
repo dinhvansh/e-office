@@ -111,6 +111,15 @@ export const rolesRepository = {
   },
 
   async checkPermission(userId: number, resource: string, action: string) {
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    if (user?.role === 'super_admin') {
+      return true;
+    }
+
     const permissions = await this.getUserPermissions(userId);
     return permissions.some(p => p.resource === resource && p.action === action);
   },

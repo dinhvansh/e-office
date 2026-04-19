@@ -1,4 +1,4 @@
-import { documents } from "@prisma/client";
+import { Prisma, documents } from "@prisma/client";
 import { promises as fs } from "fs";
 import crypto from "crypto";
 import { ApiError } from "../../core/errors/api-error";
@@ -35,6 +35,7 @@ export interface CreateDocumentInput {
     file_base64: string;
     file_type: string;
   }>;
+  forceSignRequest?: boolean;
 }
 
 class DocumentsService {
@@ -217,8 +218,13 @@ class DocumentsService {
       }
     }
 
-    // Determine initial status based on approval requirement
-    const initialStatus = documentType?.require_approval ? "draft" : "active";
+    const shouldCreateSignRequest =
+      !!input.forceSignRequest ||
+      !!documentType?.require_digital_signing ||
+      !!(input.signers && input.signers.length > 0);
+
+    const initialStatus =
+      documentType?.require_approval || shouldCreateSignRequest ? "draft" : "active";
 
     const payload: CreateDocumentData = {
       tenant_id: tenantId,
@@ -239,8 +245,8 @@ class DocumentsService {
     };
     const document = await documentsRepository.create(payload);
     
-    // Auto-create sign request if document type requires digital signing
-    if (documentType?.require_digital_signing) {
+    // Auto-create sign request for digital-sign document types or inline signer flows
+    if (shouldCreateSignRequest) {
       const { signRequestsService } = await import('../signRequests/signRequests.service');
       const signRequest = await signRequestsService.createDraftSignRequest({
         document_id: document.id,
@@ -271,12 +277,21 @@ class DocumentsService {
         console.log(`[Workflow] Customized workflow created: ID ${workflow.id}`);
       }
       // Priority 2: Specific workflow ID
-      else if (input.workflowId) {
-        console.log(`[Workflow] Loading workflow ID: ${input.workflowId}`);
-        workflow = await prisma.workflows.findUnique({
-          where: { id: input.workflowId },
-          include: { steps: { orderBy: { step_order: 'asc' } } }
-        });
+      else if (input.adhocSteps && input.adhocSteps.length > 0) {
+        workflow = await this.createAdhocWorkflow(
+          input.adhocSteps,
+          document.id,
+          tenantId,
+          ownerId
+        );
+      }
+      else if (input.workflowId && documentType?.require_approval) {
+        workflow = await this.cloneWorkflowForDocument(
+          input.workflowId,
+          document.id,
+          tenantId,
+          ownerId
+        );
       }
       // Priority 3: Default workflow from document type
       else if (documentType.default_workflow_id) {
@@ -285,6 +300,124 @@ class DocumentsService {
           where: { id: documentType.default_workflow_id },
           include: { steps: { orderBy: { step_order: 'asc' } } }
         });
+      }
+
+      const draftSignerStatus = documentType?.require_approval ? 'waiting_approval' : 'draft';
+
+      if (workflow?.steps) {
+        const { signersRepository } = await import('../signers/signers.repository');
+        const signerSteps = workflow.steps.filter((step: any) => step.participant_role === 'signer');
+
+        for (const step of signerSteps) {
+          let email = '';
+          let name = '';
+
+          if (step.approver_type === 'user' && step.approver_id) {
+            const user = await prisma.users.findUnique({
+              where: { id: step.approver_id },
+              select: { email: true, full_name: true }
+            });
+            if (user) {
+              email = user.email;
+              name = user.full_name || user.email;
+            }
+          } else if (step.approver_type === 'role' && step.approver_id) {
+            const userRole = await prisma.user_roles.findFirst({
+              where: { role_id: step.approver_id },
+              include: { user: { select: { email: true, full_name: true } } }
+            });
+            if (userRole?.user) {
+              email = userRole.user.email;
+              name = userRole.user.full_name || userRole.user.email;
+            }
+          } else if (step.approver_type === 'department' && step.approver_id) {
+            const dept = await prisma.departments.findUnique({
+              where: { id: step.approver_id },
+              include: { manager: { select: { email: true, full_name: true } } }
+            });
+            if (dept?.manager) {
+              email = dept.manager.email;
+              name = dept.manager.full_name || dept.manager.email;
+            }
+          } else if (step.approver_type === 'manager') {
+            const owner = await prisma.users.findUnique({
+              where: { id: ownerId },
+              include: { manager: { select: { email: true, full_name: true } } }
+            });
+            if (owner?.manager) {
+              email = owner.manager.email;
+              name = owner.manager.full_name || owner.manager.email;
+            }
+          }
+
+          if (!email) {
+            continue;
+          }
+
+          const internalUser = await prisma.users.findFirst({
+            where: {
+              tenant_id: tenantId,
+              email,
+              status: 'active'
+            },
+            select: { id: true }
+          });
+
+          const signerData: any = {
+            sign_request: { connect: { id: signRequest.id } },
+            email,
+            name,
+            role: 'signer',
+            signing_order: step.step_order,
+            status: draftSignerStatus,
+            is_internal: !!internalUser,
+          };
+
+          if (internalUser) {
+            signerData.user = { connect: { id: internalUser.id } };
+          }
+
+          await signersRepository.create(signerData);
+        }
+      }
+
+      if (input.signers && input.signers.length > 0) {
+        const { signersRepository } = await import('../signers/signers.repository');
+        const signerEmails = input.signers.map(s => s.email);
+        const internalUsers = await prisma.users.findMany({
+          where: {
+            tenant_id: tenantId,
+            email: { in: signerEmails },
+            status: 'active'
+          },
+          select: { id: true, email: true }
+        });
+        const internalEmailMap = new Map(internalUsers.map(u => [u.email, u.id]));
+        const sortedSigners = [...input.signers].sort((a, b) => a.order - b.order);
+
+        for (const signer of sortedSigners) {
+          const userId = internalEmailMap.get(signer.email);
+          const signerData: any = {
+            sign_request: { connect: { id: signRequest.id } },
+            email: signer.email,
+            name: signer.name,
+            role: 'signer',
+            signing_order: signer.order,
+            status: draftSignerStatus,
+            is_internal: !!userId,
+          };
+
+          if (userId) {
+            signerData.user = { connect: { id: userId } };
+          }
+
+          await signersRepository.create(signerData);
+        }
+      }
+
+      const draftUpdatedDoc = await documentsRepository.findById(document.id, tenantId);
+      if (draftUpdatedDoc) {
+        return draftUpdatedDoc;
       }
       
       // ✅ STEP 2: CREATE APPROVALS (if document requires approval and workflow exists)
@@ -978,6 +1111,70 @@ class DocumentsService {
     });
 
     return workflowWithSteps!;
+  }
+
+  async cloneWorkflowForDocument(
+    templateId: number,
+    documentId: number,
+    tenantId: number,
+    userId: number
+  ) {
+    const template = await prisma.workflows.findFirst({
+      where: {
+        id: templateId,
+        tenant_id: tenantId,
+        is_active: true,
+      },
+      include: {
+        steps: {
+          orderBy: { step_order: 'asc' }
+        }
+      }
+    });
+
+    if (!template) {
+      throw ApiError.notFound('Workflow not found', 'WORKFLOW_NOT_FOUND');
+    }
+
+    const workflow = await prisma.workflows.create({
+      data: {
+        tenant_id: tenantId,
+        name: `${template.name} (Document #${documentId})`,
+        description: template.description,
+        document_type_id: template.document_type_id,
+        is_template: false,
+        created_for_doc: documentId,
+        based_on_template: template.is_template ? template.id : template.based_on_template || template.id,
+        created_by: userId,
+        is_active: true,
+      }
+    });
+
+    for (const step of template.steps) {
+      await prisma.workflow_steps.create({
+        data: {
+          workflow_id: workflow.id,
+          step_order: step.step_order,
+          step_name: step.step_name,
+          approver_type: step.approver_type,
+          approver_id: step.approver_id,
+          participant_role: step.participant_role,
+          due_in_days: step.due_in_days,
+          is_required: step.is_required,
+          is_parallel: step.is_parallel,
+          conditions: step.conditions as Prisma.InputJsonValue,
+        }
+      });
+    }
+
+    return prisma.workflows.findUnique({
+      where: { id: workflow.id },
+      include: {
+        steps: {
+          orderBy: { step_order: 'asc' }
+        }
+      }
+    });
   }
 
   async getDocumentFile(documentId: number, tenantId: number, userId?: number): Promise<{

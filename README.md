@@ -1,286 +1,83 @@
-# 🏢 E-Office - Document Management & Approval System
+# E-Office
 
-Enterprise-grade document management and approval workflow system with multi-tenant support.
+Multi-tenant document management, approval, and e-signature system.
 
-## 🚀 Quick Start
+## Services
 
-### Development (Local)
-```bash
-npm run dev              # Start both backend + frontend
-# Backend:  http://localhost:4000
-# Frontend: http://localhost:3000
-# Login:    admin@acme.local / admin123
-```
+- `frontend`: Next.js 14 dashboard and public signing UI
+- `backend`: Express + TypeScript API with Prisma/PostgreSQL
+- `license-server`: standalone license validation service
 
-### Docker (Recommended)
-```bash
-docker-compose up -d     # Start all services
-# See docs/docker/README.md for setup guide
-```
+## Quick Start
 
-### First Time Setup (Local)
+### Local development
+
+1. Install dependencies:
 
 ```bash
-# 1. Install dependencies
-cd backend && npm install
-cd ../frontend && npm install
-
-# 2. Setup backend
-cd backend
-cp .env.example .env
-npx prisma generate
-npx prisma db push
-node scripts/seed-rbac.js
-node scripts/seed-document-types.js
-node scripts/seed-workflows-simple.js
-node scripts/seed-org-final.js
-
-# 3. Setup frontend
-cd ../frontend
-cp .env.example .env.local
-
-# 4. Start services (from root)
-cd ..
-./start-all.ps1
-
-# 5. Access
-Frontend: http://localhost:3000
-Backend: http://localhost:4000
-Login: admin@acme.local / [check installation docs]
+npm run install:all
 ```
 
-### After Pull (Update)
+2. Create environment files:
 
 ```bash
-# Pull latest code
-git pull origin main
-
-# Install new dependencies
-cd frontend && npm install
-cd ../backend && npm install
-
-# Start servers
-cd ..
-./start-all.ps1
+copy backend\.env.example backend\.env
+copy frontend\.env.example frontend\.env.local
+copy license-server\.env.example license-server\.env
 ```
 
-**📖 See [SETUP-FOR-DEV1.md](SETUP-FOR-DEV1.md) for detailed setup guide**
-
-## 📚 Documentation
-
-### 🚀 Getting Started
-- **[SETUP-FOR-DEV1.md](SETUP-FOR-DEV1.md)** - ⭐ Setup guide after pull (NEW)
-- **[QUICK-START.md](QUICK-START.md)** - Quick setup guide
-- **[START-SERVERS.md](START-SERVERS.md)** - Server management
-- **[README-TESTING.md](README-TESTING.md)** - Testing guide
-
-### 📋 Architecture & Planning
-- **[ERD.md](ERD.md)** - Database schema (full E-Office)
-- **[FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md)** - Functional requirements
-- **[ROADMAP-E-OFFICE.md](ROADMAP-E-OFFICE.md)** - 14-week development roadmap
-- **[SYSTEM-COMPARISON.md](SYSTEM-COMPARISON.md)** - Current vs target comparison
-- **[PHASE-1-PLAN.md](PHASE-1-PLAN.md)** - Phase 1 plan (COMPLETE)
-- **[PHASE-2-PLAN.md](PHASE-2-PLAN.md)** - Phase 2 plan (90% complete)
-
-### 🔧 Technical Docs
-- **[CODE-MAP.md](CODE-MAP.md)** - Codebase architecture guide
-- **[docs/testing-guide.md](docs/testing-guide.md)** - Testing strategies
-- **[docs/email-setup.md](docs/email-setup.md)** - Email configuration
-- **[test-api.http](test-api.http)** - API testing (REST Client)
-- **[SECURITY-AUDIT-REPORT.md](SECURITY-AUDIT-REPORT.md)** - Security audit
-- **[SECURITY-QUICK-FIXES.md](SECURITY-QUICK-FIXES.md)** - Security improvements
-
-### 📝 Development Logs
-- **[docs/dev/SESSION-2025-11-21-UI-IMPROVEMENTS.md](docs/dev/SESSION-2025-11-21-UI-IMPROVEMENTS.md)** - Latest session
-- **[docs/dev/SESSION-2025-11-20-PHASE-2-FRONTEND-COMPLETE.md](docs/dev/SESSION-2025-11-20-PHASE-2-FRONTEND-COMPLETE.md)** - Phase 2 frontend
-- **[AGENTS.md](AGENTS.md)** - AI development log
-- **[LESSONS-LEARNED.md](LESSONS-LEARNED.md)** - Critical patterns & pitfalls
-
-## ✨ Features
-
-### Phase 0: E-Signature Base ✅
-- ✅ Multi-tenant architecture
-- ✅ User/Department/Role management with RBAC (27 permissions)
-- ✅ Document upload & storage
-- ✅ Sign request workflow with OTP
-- ✅ Email integration (Gmail, Outlook, SendGrid, AWS SES, Mailgun)
-- ✅ License management (offline validation)
-- ✅ Webhook notifications
-- ✅ Audit logs
-- ✅ Progressive PDF signing (real-time updates)
-- ✅ Internal & external signers
-
-### Phase 1: Foundation Enhancement ✅ (100%)
-- ✅ Document types (8 types with icons)
-- ✅ Auto-numbering system (pattern-based)
-- ✅ External organizations (5 seeded)
-- ✅ Document tags
-- ✅ Document permissions (granular)
-- ✅ Document versions
-- ✅ Full CRUD operations
-- ✅ Document visibility & access control
-
-### Phase 2: Workflow Engine ✅ (100%)
-- ✅ Workflow templates (card grid UI)
-- ✅ Multi-step configuration
-- ✅ Approval flow (Approve/Reject/Request Info)
-- ✅ Approver types (User/Role/Department/Manager)
-- ✅ Step management UI
-- ✅ Workflow selection in document upload
-- ✅ Sequential & parallel approval modes
-- ✅ Sequential & parallel signing modes
-- ✅ Document flow timeline with activities
-- ✅ My Tasks unified page (approvals + signing)
-- ✅ Email notifications (professional templates)
-- ✅ Mobile responsive optimization
-- ✅ CC/Share document feature
-- ✅ Document filters & search
-
-### Phase 3-7: Planned 🔜
-- Incoming/Outgoing documents
-- Contract management
-- Advanced search & filters
-- Dashboard & KPI reports
-- Real-time notifications (WebSocket)
-- Version control & comparison
-
-## 🏗️ Tech Stack
-
-### Frontend
-- **Framework**: Next.js 14 (App Router)
-- **UI**: React 18, TailwindCSS, shadcn/ui
-- **Components**: @radix-ui (Dialog, Switch, Tabs)
-- **State**: React Query, Context API
-- **Icons**: Lucide React
-- **Notifications**: Sonner (toast)
-- **Date**: dayjs
-
-### Backend
-- **Runtime**: Node.js 20+
-- **Framework**: Express.js
-- **Language**: TypeScript
-- **ORM**: Prisma
-- **Database**: PostgreSQL 14+
-- **Cache**: Redis
-- **Email**: Nodemailer
-- **Auth**: JWT + bcrypt
-- **Validation**: Zod
-
-### DevOps
-- **Containerization**: Docker + Docker Compose
-- **License**: JWT-based offline validation
-- **File Storage**: Local filesystem (configurable)
-
-## 📁 Project Structure
-
-```
-├── backend/              # Express API server
-│   ├── src/
-│   │   ├── modules/      # Feature modules
-│   │   ├── middleware/   # Auth, permissions
-│   │   └── config/       # Configuration
-│   ├── prisma/           # Database schema
-│   └── scripts/          # Seed & test scripts
-├── frontend/             # Next.js dashboard
-│   └── app/
-│       └── (dashboard)/  # Protected routes
-├── license-server/       # License validation
-├── docs/                 # Documentation
-└── docker-compose.yml    # Dev environment
-```
-
-## 🗺️ Development Roadmap
-
-| Phase | Duration | Focus | Status | Progress |
-|-------|----------|-------|--------|----------|
-| Phase 0 | ✅ Done | E-Signature Base | Complete | 100% |
-| Phase 1 | Week 1-2 | Document Types + Numbering | ✅ Complete | 100% |
-| Phase 2 | Week 3-4 | Workflow Engine | ✅ Complete | 100% |
-| Phase 3 | Week 5-6 | In/Out Documents | 🔜 Next | 0% |
-| Phase 4 | Week 7-8 | Advanced Features | Pending | 0% |
-| Phase 5 | Week 9-10 | Dashboard & Reports | Pending | 0% |
-| Phase 6 | Week 11-12 | Integrations | Pending | 0% |
-| Phase 7 | Week 13-14 | Testing & Polish | Pending | 0% |
-
-**Total Timeline**: 14 weeks (~3.5 months)  
-**Current Progress**: Week 4 of 14 (35% complete) - Phase 2 Complete! 🎉
-
-See [ROADMAP-E-OFFICE.md](ROADMAP-E-OFFICE.md) for details.
-
-## 🧪 Testing
+3. Start PostgreSQL and Redis, then run:
 
 ```bash
-# Backend tests
-cd backend
-npm test
-
-# E2E tests
-cd frontend
-npm run test:e2e
-
-# API testing
-# Open test-api.http in VS Code with REST Client extension
+npm run dev
 ```
 
-## 🔐 Security
+Default URLs:
 
-- Role-based access control (RBAC)
-- Granular permissions (27 permissions across 7 resources)
-- JWT authentication
-- Password hashing (bcrypt)
-- Tenant data isolation
-- Audit logging
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:4000`
+- License server: `http://localhost:5000`
 
-## 📧 Email Configuration
+### Docker
 
-Supports multiple providers:
-- Gmail
-- Outlook
-- SendGrid
-- AWS SES
-- Mailgun
+1. Create a compose env file from the example:
 
-See [docs/email-setup.md](docs/email-setup.md) for configuration.
-
-## 🚢 Deployment
-
-### Environment Variables
-See `.env.example` files in each service folder.
-
-### Database Migrations
 ```bash
-cd backend
-npx prisma migrate deploy
+copy .env.compose.example .env
 ```
 
-### Production Build
+2. Review and replace the placeholder secrets and URLs in `.env`.
+
+3. Start the stack:
+
 ```bash
-# Backend
-cd backend && npm run build
-
-# Frontend
-cd frontend && npm run build
+docker compose up -d --build
 ```
 
-## 📝 License
+## Environment Files
 
-[Your License Here]
+- `backend/.env.example`: backend runtime variables
+- `frontend/.env.example`: frontend runtime/build variables
+- `license-server/.env.example`: license service variables
+- `.env.compose.example`: variables consumed by `docker-compose.yml`
 
-## 🤝 Contributing
+## Current Status
 
-### Development Guidelines
-- **[docs/dev/DEVELOPMENT-RULES.md](docs/dev/DEVELOPMENT-RULES.md)** - ⭐ Quy tắc bắt buộc (MANDATORY)
-- **[docs/dev/LESSONS-LEARNED.md](docs/dev/LESSONS-LEARNED.md)** - ⭐ Học từ lỗi đã fix
-- **[docs/dev/INDEX.md](docs/dev/INDEX.md)** - 📚 Documentation index
-- **[docs/archive/agents.md](docs/archive/agents.md)** - AI development log (archived)
+- Local builds currently pass for `backend`, `frontend`, and `license-server`
+- Frontend production build still skips type-checking and linting by config
+- Deployment docs in `docs/` are partially historical; prefer the files linked below
 
-## 📞 Support
+## Key Documentation
 
-For issues and questions, please check:
-1. [QUICK-START.md](QUICK-START.md)
-2. [docs/testing-guide.md](docs/testing-guide.md)
-3. [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md)
+- [docs/README.md](/e:/2.CODE/new%20office/e-office/docs/README.md)
+- [FUNCTIONAL_SPEC.md](/e:/2.CODE/new%20office/e-office/FUNCTIONAL_SPEC.md)
+- [START-HERE-E-OFFICE.md](/e:/2.CODE/new%20office/e-office/START-HERE-E-OFFICE.md)
+- [docs/testing-guide.md](/e:/2.CODE/new%20office/e-office/docs/testing-guide.md)
+- [docs/DEPLOYMENT-GUIDE.md](/e:/2.CODE/new%20office/e-office/docs/DEPLOYMENT-GUIDE.md)
 
----
+## Upgrade Priorities
 
-**Built with ❤️ for enterprise document management**
+1. Remove build-time quality bypasses and make lint/type-check required.
+2. Consolidate documentation around the actual deployed workflow.
+3. Replace historical backup files in active source folders with clean git history.
+4. Review and update vulnerable or deprecated npm dependencies.

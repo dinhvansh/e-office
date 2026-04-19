@@ -80,8 +80,11 @@ export default function CreateSignRequestPage() {
     },
   });
 
-  // Filter only document types that require digital signing (for Sign Requests menu)
-  const activeDocumentTypes = documentTypes?.filter((type) => type.is_active && type.require_digital_signing) || [];
+  // Show active types that participate in either signing or approval flows.
+  const activeDocumentTypes =
+    documentTypes?.filter(
+      (type) => type.is_active && (type.require_digital_signing || type.require_approval)
+    ) || [];
   const activeWorkflows = Array.isArray(workflowsData) ? workflowsData.filter((wf: any) => wf.is_active) : [];
 
   // Detect workflow mode when document type changes
@@ -214,6 +217,8 @@ export default function CreateSignRequestPage() {
         payload.attachments = await Promise.all(attachmentPromises);
       }
 
+      payload.create_sign_request = true;
+
       // Upload document with all data as JSON
       const response = await fetchJson<{ document: any }>('/documents', {
         method: 'POST',
@@ -231,11 +236,11 @@ export default function CreateSignRequestPage() {
       setCcEmails([]);
       setAttachments([]);
       
-      toast.success('Tạo yêu cầu ký thành công!');
+      toast.success('Tạo nháp thành công!');
       
       // Navigate to editor if has sign_request_id
       if (document.sign_request_id) {
-        toast.info('Đang chuyển đến màn hình thêm chữ ký...');
+        toast.info('Đang chuyển đến màn hình hoàn thiện quy trình...');
         setTimeout(() => {
           router.push(`/sign-requests/${document.sign_request_id}/editor`);
         }, 1000);
@@ -485,3 +490,4 @@ export default function CreateSignRequestPage() {
     </div>
   );
 }
+

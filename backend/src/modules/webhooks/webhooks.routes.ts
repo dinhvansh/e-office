@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../core/utils/asyncHandler";
+import { requirePermission } from "../../middleware/permission";
 import { authGuard } from "../auth/auth.middleware";
 import { WebhooksController } from "./webhooks.controller";
 
@@ -7,12 +8,12 @@ const controller = new WebhooksController();
 
 export const webhooksRouter = Router();
 
-webhooksRouter.get("/", authGuard, asyncHandler(controller.list));
-webhooksRouter.post("/", authGuard, asyncHandler(controller.create));
-webhooksRouter.get("/:id", authGuard, asyncHandler(controller.getById));
-webhooksRouter.put("/:id", authGuard, asyncHandler(controller.update));
-webhooksRouter.delete("/:id", authGuard, asyncHandler(controller.delete));
-webhooksRouter.get("/:id/logs", authGuard, asyncHandler(controller.getLogs));
+webhooksRouter.get("/", authGuard, requirePermission("webhooks", "read"), asyncHandler(controller.list));
+webhooksRouter.post("/", authGuard, requirePermission("webhooks", "create"), asyncHandler(controller.create));
+webhooksRouter.get("/:id", authGuard, requirePermission("webhooks", "read"), asyncHandler(controller.getById));
+webhooksRouter.put("/:id", authGuard, requirePermission("webhooks", "update"), asyncHandler(controller.update));
+webhooksRouter.delete("/:id", authGuard, requirePermission("webhooks", "delete"), asyncHandler(controller.delete));
+webhooksRouter.get("/:id/logs", authGuard, requirePermission("webhooks", "read"), asyncHandler(controller.getLogs));
 
 // Legacy endpoint
-webhooksRouter.post("/register", authGuard, asyncHandler(controller.create));
+webhooksRouter.post("/register", authGuard, requirePermission("webhooks", "create"), asyncHandler(controller.create));
