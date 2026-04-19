@@ -197,7 +197,7 @@ export default function ApprovalDetailPage() {
                       if (!token) throw new Error('No token');
 
                       const response = await fetch(
-                        `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${approval.document.id}/download`,
+                        `${process.env.NEXT_PUBLIC_API_BASE_URL}/approvals/${approval.id}/document/download`,
                         {
                           headers: {
                             'Authorization': `Bearer ${token}`
@@ -226,7 +226,10 @@ export default function ApprovalDetailPage() {
                   Tải xuống
                 </Button>
               </div>
-              <DocumentPDFViewer documentId={approval.document.id} />
+              <DocumentPDFViewer
+                documentId={approval.document.id}
+                pdfUrl={`${process.env.NEXT_PUBLIC_API_BASE_URL}/approvals/${approval.id}/document/view`}
+              />
             </div>
           </div>
 

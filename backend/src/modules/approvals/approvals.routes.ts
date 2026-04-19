@@ -68,6 +68,18 @@ router.post(
   asyncHandler(approvalsController.requestInfo)
 );
 
+router.get(
+  '/:id/document/view',
+  requirePermission('approvals', 'read'),
+  asyncHandler(approvalsController.viewDocument)
+);
+
+router.get(
+  '/:id/document/download',
+  requirePermission('approvals', 'read'),
+  asyncHandler(approvalsController.downloadDocument)
+);
+
 // Get approval by ID (MUST be last among GET routes)
 router.get(
   '/:id',

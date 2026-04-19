@@ -1,476 +1,192 @@
-
-# 📄 **FUNCTIONAL_SPEC.md**  
-**E-Office System – Functional Specification Document**  
-Version: 1.0  
-Last Updated: 2025-11-18  
-Author: ChatGPT (Generated for Anh Dăn)
-
----
-
-# 1. Overview
-
-This document defines **the functional requirements**, **modules**, **flows**, and **system behavior** of the **E-Office (Electronic Office / Document Management & Approval System)** intended for enterprise use.
-
-The purpose is to provide developers (backend + frontend + mobile + AI assistant tools such as Cursor/Codex, GPT, etc.) with a clear, structured blueprint to implement the entire system step-by-step.
-
----
-
-# 2. System Goals
-
-The system enables:
-
-- Management of **documents, templates, versions, metadata**
-- Full **approval workflow** (multi-step, conditional)
-- Handling **incoming** and **outgoing** documents
-- Tracking **task deadlines**, **assignments**, and **notifications**
-- Secure **permissions**, **audit logs**, and **digital signatures**
-- Search, dashboard, reporting, and integration with external systems
-
----
-
-# 3. Major Modules
-
-1. User Management  
-2. Organization Structure  
-3. Roles & Permissions  
-4. Master Data / System Configuration  
-5. Document Management (Core)  
-6. Approval Workflow Engine  
-7. Incoming Documents  
-8. Outgoing Documents / Proposals / Contracts  
-9. Notifications & Reminders  
-10. Search & Reporting  
-11. Audit Logs  
-12. Integrations (Digital Signing, Email, SSO, API)
-
----
-
-# 4. Module Details
-
----
-
-## 4.1. User Management
-
-### Function: User Authentication
-- Login with email/password (later SSO).
-- Features:
-  - Account activation/deactivation
-  - Password reset via email
-  - JWT/Session-based auth
-
-### Function: User Account Management
-- Fields:
-  - FullName
-  - Email
-  - Phone
-  - Position
-  - Department
-  - Roles
-- Admin abilities:
-  - Create, update, disable user
-  - Reset password
-
----
-
-## 4.2. Organization Structure
-
-### Function: Department Hierarchy
-- Multi-level structure: Company → Division → Department → Team
-- Each user can belong to multiple departments
-- Configurable "Line Manager" and "Default Approver"
-
-### Function: Department Management
-- CRUD for department tree
-- Assign users to departments
-
----
-
-## 4.3. Roles & Permissions
-
-### Function: Role Definition
-- Examples:
-  - User
-  - Manager
-  - Document Officer (Văn thư)
-  - Legal
-  - Finance
-  - Admin
-
-### Function: Permission Types
-- Document_Read
-- Document_Edit
-- Document_Delete
-- Document_Approve
-- Workflow_Configure
-- System_Settings
-
-### Function: Permission Assignment
-- Assign role → permission
-- Assign user → role
-
----
-
-## 4.4. Master Data & System Configurations
-
-### Document Types
-- Incoming
-- Outgoing
-- Contract
-- Proposal
-- Internal Memo
-- Decision
-- Meeting Minutes
-
-Fields:
-- Code
-- Name
-- Description
-- RequireNumbering (bool)
-- RequireDigitalSigning (bool)
-
-### External Organizations
-- For incoming/outgoing docs
-- Fields:
-  - Name
-  - Address
-  - Contact Info
-  - Category (Government, Supplier, Customer)
-
-### Document Numbering Rule
-- Format: `{AutoNumber}/{Unit}/{Year}`
-- Per document type
-- Auto-increment by year
-
----
-
-# 5. Document Management (Core)
-
-## 5.1. Create Document
-Fields:
-- Title
-- DocumentTypeID
-- Summary
-- Department
-- CreatorUserID
-- Tags
-- ConfidentialLevel (Normal / Confidential / Secret)
-- PriorityLevel (Low / Normal / High)
-- Status (Draft, Processing, Approved, Rejected, Completed)
-- Attachments (multiple files)
-
-## 5.2. File Upload & Versioning
-- Every upload creates a new version:
-  - VersionNumber (1, 2, 3…)
-  - UploadedBy
-  - FilePath
-  - Timestamp
-- Ability to revert to previous version
-
-## 5.3. Document Metadata
-- EffectiveDate
-- ExpirationDate
-- IssuedDate
-- ReceivedDate (incoming)
-- SignedBy
-- SignedDate
-
-## 5.4. Document Permissions
-Assign permissions per:
-- User
-- Role
-- Department
-
-Types:
-- READ
-- EDIT
-- APPROVE
-- SHARE
-- DELETE
-
----
-
-# 6. Approval Workflow Engine
-
-## 6.1. Workflow Template
-Fields:
-- WorkflowName
-- DocumentTypeID
-- Steps[]
-
-## 6.2. Workflow Step
-Step fields:
-- StepOrder
-- ApproverType (User / Role / Department)
-- ApproverID
-- Conditions (e.g., Amount > 100M)
-- DueDateRule (e.g., 2 days)
-
-## 6.3. Submit for Approval
-- Validate document is ready
-- Assign workflow
-- Set CurrentStep = 1
-- Create approval tracking record
-- Notify approver
-
-## 6.4. Approval Actions
-- Approve:
-  - Move to next step
-  - Log action
-- Reject:
-  - Set document status → Rejected
-  - Return to creator
-- RequestMoreInfo:
-  - Status → NeedMoreInfo
-  - Creator updates → resubmit
-
-## 6.5. Approval History
-Each action logged with:
-- UserID
-- Step
-- Action (Approve / Reject / RequestInfo)
-- Comment
-- Timestamp
-
----
-
-# 7. Incoming Documents (Văn bản đến)
-
-## 7.1. Register Incoming Document
-Fields:
-- IncomingNumber (auto)
-- OriginalNumber
-- IssueDate
-- ReceivedDate
-- IssuedBy (external org)
-- Summary
-- Attachments
-- UrgencyLevel
-- ConfidentialLevel
-
-## 7.2. Assignment
-- Main handling department
-- Supporting departments
-- Assigned users
-
-## 7.3. Incoming Document Status
-- Received
-- Assigned
-- Processing
-- Responded
-- Closed
-
----
-
-# 8. Outgoing Documents
-
-## 8.1. Drafting Outgoing Document
-Additional fields:
-- RecipientOrganization
-- DeliveryMethod (Email / Postal / Direct)
-- SignedMethod (Hand-sign / Digital)
-
-## 8.2. Document Numbering
-- Auto-generate document number based on configured rule
-- Lock modification after number assignment
-
-## 8.3. Contract Management
-Additional fields:
-- ContractNumber
-- ContractValue
-- Partner
-- ValidFrom / ValidTo
-- ContractType
-
----
-
-# 9. Notifications & Reminder System
-
-## 9.1. Internal Notification Types
-- Document assigned to you
-- Document waiting for approval
-- Document rejected
-- Workflow overdue
-- New version uploaded
-
-## 9.2. Reminder Logic
-- Cron job (daily)
-- If CurrentStep.DueDate exceeded → send overdue alert
-
----
-
-# 10. Search & Reporting
-
-## 10.1. Search Filters
-Search by:
-- Title
-- Document Number
-- Document Type
-- Creator
-- Department
-- Tag
-- Date range
-- Workflow status
-- External organization
-- Urgency/Confidential level
-
-## 10.2. Reporting Dashboards
-KPIs:
-- Documents by status
-- Documents by department
-- Number of overdue workflows
-- Incoming vs outgoing count
-- Contract expiration warnings
-
----
-
-# 11. Audit Logs
-
-## 11.1. Logged Events
-- Login/Logout
-- Document creation
-- Metadata update
-- Permission changes
-- File uploads
-- Approval actions
-- Search queries (optional)
-
-## 11.2. Log Fields
-- UserID
-- Action
-- TargetType (Document/User/Workflow)
-- TargetID
-- Timestamp
-- IP Address
-- Device info (optional)
-
----
-
-# 12. Integrations
-
-## 12.1. Digital Signature Integration
-- Send PDF file + metadata
-- Receive signed file callback
-- Store signed document version
-
-## 12.2. Email Integration
-- Send outgoing documents via email
-- Email templates per department
-
-## 12.3. SSO (Future)
-- OAuth2 / SAML / LDAP
-
-## 12.4. Public API
-Expose:
-- Create document
-- Upload attachment
-- Trigger approval
-- Query document status
-
----
-
-# 13. Non-Functional Requirements
-
-## Security
-- Role-based access control + object-level permissions
-- Encrypt file storage (optional)
-- Secure JWT tokens
-- Audit trail immutable storage
-
-## Performance
-- Large file handling
-- Full-text search index
-- Workflow scaling for 1,000+ users
-
-## UI/UX
-- Dashboard home page
-- Clean, modern UI using React + Tailwind (suggest)
-- Mobile-friendly layout
-
-## Scalability
-- Stateless backend
-- Object storage for files
-- Workflow engine modular for multiple document types
-
----
-
-# 14. Database Entities (High-Level ERD in Text)
-
-### User  
-### Role  
-### Permission  
-### UserRole  
-### Department  
-### UserDepartment  
-### Document  
-### DocumentVersion  
-### DocumentMetadata  
-### DocumentPermission  
-### Workflow  
-### WorkflowStep  
-### DocumentApproval  
-### IncomingDocument  
-### OutgoingDocument  
-### ExternalOrganization  
-### Notification  
-### SystemLog  
-### NumberingRule  
-
-*(Dev team can expand into detailed ERD later.)*
-
----
-
-# 15. Development Roadmap (MVP → Full)
-
-### **Phase 1 (MVP – Core):**
-- User/Role/Dept
-- Document Management
-- Workflow Engine (simple linear)
+# Functional Specification
+
+## 1. Mục tiêu
+
+E-Office là hệ thống quản lý tài liệu nội bộ với 3 phần chính:
+
+- quản lý tài liệu và metadata
+- luồng phê duyệt nhiều bước
+- luồng ký điện tử nội bộ và bên ngoài
+
+## 2. Vai trò chính
+
+- `Admin`: toàn quyền cấu hình hệ thống, người dùng, role, workflow
+- `Manager`: xem và xử lý công việc phê duyệt, quản lý dữ liệu nghiệp vụ được cấp quyền
+- `User`: tạo tài liệu, gửi duyệt, tạo yêu cầu ký, xử lý phần việc được giao
+- `Viewer`: chỉ xem dữ liệu được cấp phép
+
+## 3. Module hiện có
+
+- Authentication
+- Users
+- Departments
+- Positions
+- Roles & Permissions
+- Document Types
+- Workflows
+- Documents
+- Sign Requests
+- Approvals
+- External Organizations
 - Notifications
-- Basic Search
+- Audit Logs
+- Webhooks
+- License validation
 
-### **Phase 2:**
-- Incoming/Outgoing docs
-- Document numbering
-- Contract module
+## 4. Mô hình dữ liệu nghiệp vụ
 
-### **Phase 3:**
-- Digital signing integration
-- Dashboard + reporting
-- Advanced permissions
-- Multi-condition workflows
+### Document
 
----
+Đại diện cho một tài liệu nghiệp vụ.
 
-# 16. Appendix
+Thuộc tính quan trọng:
 
-Optional specifications:
-- API endpoints list  
-- UI wireframes  
-- Sample workflow definitions  
-- Sample documents  
-- Integration mock APIs  
+- loại văn bản
+- số văn bản
+- người tạo
+- phòng ban
+- trạng thái
+- file gốc
+- file đã ký
 
----
+### Sign Request
 
-# 17. Deployment Models (SaaS + On-Premise)
+Đại diện cho một quy trình ký gắn với document.
 
-The system supports two deployment modes:
+Thuộc tính quan trọng:
 
-## 17.1 SaaS (Multi-Tenant Cloud)
-- Shared backend, shared database
-- Tenants separated via tenant_id
-- Subscription plans and billing
-- Auto scaling & monitoring
-- API rate limiting per tenant
-- Tenant onboarding wizard
+- document liên kết
+- trạng thái luồng ký
+- danh sách signer
+- field ký trên PDF
 
-## 17.2 On-Premise (Self-Hosted)
-- Single-tenant isolated deployment
-- Local database and file storage
-- Offline license activation
-- LDAP/AD integration optional
-- CLI updater and backup tools
-- Full admin control by customer
-# ✔ Ready to use
+### Approval
 
-Place this file in the repository root or under `/docs/FUNCTIONAL_SPEC.md` so that AI coding assistants (Cursor, Codex, GPT, etc.) can read and understand the overall system design.
+Đại diện cho từng bước phê duyệt trong workflow.
+
+## 5. Trạng thái chính
+
+### Document status
+
+- `draft`
+- `pending_approval`
+- `pending_signature`
+- `completed`
+- `rejected`
+- `cancelled`
+- `archived`
+
+### Sign request status
+
+- `draft`
+- `pending_approval`
+- `pending`
+- `in_progress`
+- `completed`
+- `rejected`
+- `cancelled`
+
+### Signer status
+
+- `draft`
+- `waiting_approval`
+- `pending`
+- `waiting_signing`
+- `otp_sent`
+- `signed`
+- `rejected`
+
+## 6. Flow nghiệp vụ chuẩn
+
+### 6.1 Tạo yêu cầu ký
+
+1. User vào `/sign-requests/create`
+2. Upload file
+3. Chọn loại văn bản
+4. Chọn workflow nếu cần approval
+5. Có thể thêm signer bên ngoài ngay từ bước tạo
+6. Hệ thống tạo:
+   - `document`
+   - `sign_request`
+7. Cả hai ở trạng thái `draft`
+
+### 6.2 Hoàn thiện editor
+
+Tại màn `/sign-requests/:id/editor`, người tạo:
+
+- thêm hoặc sửa signer
+- đặt field ký
+- lưu nháp nhiều lần
+
+### 6.3 Gửi quy trình
+
+Khi bấm gửi:
+
+- nếu loại văn bản cần approval:
+  - sign request chuyển `pending_approval`
+  - document chuyển `pending_approval`
+  - workflow instance và approval records được tạo
+- nếu không cần approval:
+  - signer đầu tiên được kích hoạt
+  - sign request chuyển `pending`
+  - document chuyển `pending_signature`
+
+### 6.4 Phê duyệt
+
+- approver xử lý tại `/my-tasks` hoặc `/approvals/:id`
+- khi tất cả bước duyệt hoàn tất:
+  - nếu có signer thì kích hoạt pha ký
+  - nếu không có signer thì document hoàn tất
+
+### 6.5 Ký
+
+- signer nội bộ thấy việc tại `/my-tasks`
+- signer bên ngoài nhận link + OTP qua email
+- ký tuần tự theo `signing_order`
+- signer cuối ký xong thì:
+  - sign request `completed`
+  - document `completed`
+
+## 7. Phân biệt approver và signer
+
+- `approver` là người duyệt nội dung
+- `signer` là người ký trên tài liệu
+
+Một workflow có thể:
+
+- chỉ có approver
+- chỉ có signer
+- hoặc có cả hai
+
+Nếu workflow chỉ có approver, editor sẽ không có signer tự sinh ra để gán field ký.
+
+## 8. Permission model
+
+RBAC dùng bảng:
+
+- `roles`
+- `permissions`
+- `role_permissions`
+- `user_roles`
+
+Quyền được kiểm tra qua `requirePermission(resource, action)`.
+
+Riêng `super_admin` có bypass ở permission engine.
+
+## 9. My Tasks
+
+Màn `/my-tasks` gộp 2 loại việc:
+
+- approval tasks
+- signing tasks
+
+Điều kiện hiển thị:
+
+- approval task: user là `approver_user_id`
+- signing task: user là signer nội bộ với trạng thái đến lượt xử lý
+
+## 10. Giới hạn hiện tại
+
+- frontend build hiện còn bỏ qua lint/type-check trong cấu hình build
+- tài liệu lịch sử trong `docs/` rất nhiều, không nên coi là nguồn sự thật
+- workflow mẫu seed chủ yếu là approval workflow; muốn auto sinh signer từ workflow thì step phải có `participant_role = signer`

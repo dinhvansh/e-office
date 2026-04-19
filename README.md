@@ -1,83 +1,104 @@
 # E-Office
 
-Multi-tenant document management, approval, and e-signature system.
+Monorepo cho hệ thống quản lý tài liệu, phê duyệt nội bộ và ký điện tử.
 
-## Services
+## Thành phần
 
-- `frontend`: Next.js 14 dashboard and public signing UI
-- `backend`: Express + TypeScript API with Prisma/PostgreSQL
-- `license-server`: standalone license validation service
+- `frontend`: Next.js 14, dashboard nội bộ và trang ký công khai
+- `backend`: Express + TypeScript + Prisma
+- `license-server`: service kiểm tra license độc lập
+- `docker-compose.yml`: stack local/prod cơ bản với Postgres, Redis, backend, frontend, license server
 
-## Quick Start
+## Trạng thái hiện tại
 
-### Local development
+Repo hiện đang chạy theo mô hình:
 
-1. Install dependencies:
+- tạo tài liệu từ màn `/sign-requests/create`
+- tạo ra `document` và `sign_request` ở trạng thái `draft`
+- người tạo vào editor để thêm/chỉnh signer và field
+- bấm gửi thì mới bắt đầu approval hoặc signing
+
+Flow hiện tại:
+
+- loại văn bản có `require_approval = true`
+  - tạo nháp trước
+  - gửi xong mới chuyển sang `pending_approval`
+- loại văn bản có `require_digital_signing = true` hoặc có signer thủ công
+  - tạo nháp trước
+  - gửi xong mới chuyển sang `pending_signature`
+
+## Tài khoản mẫu
+
+Sau khi seed dữ liệu:
+
+- Admin:
+  - email: `admin@acme.local`
+  - password: `secret123`
+- Các tài khoản mẫu tổ chức:
+  - password mặc định: `password123`
+
+## Chạy bằng Docker
+
+1. Tạo file `.env` từ mẫu:
 
 ```bash
-npm run install:all
+cp .env.compose.example .env
 ```
 
-2. Create environment files:
+2. Sửa các giá trị secret và URL trong `.env`.
 
-```bash
-copy backend\.env.example backend\.env
-copy frontend\.env.example frontend\.env.local
-copy license-server\.env.example license-server\.env
-```
-
-3. Start PostgreSQL and Redis, then run:
-
-```bash
-npm run dev
-```
-
-Default URLs:
-
-- Frontend: `http://localhost:3000`
-- Backend: `http://localhost:4000`
-- License server: `http://localhost:5000`
-
-### Docker
-
-1. Create a compose env file from the example:
-
-```bash
-copy .env.compose.example .env
-```
-
-2. Review and replace the placeholder secrets and URLs in `.env`.
-
-3. Start the stack:
+3. Build và chạy stack:
 
 ```bash
 docker compose up -d --build
 ```
 
-## Environment Files
+4. Seed dữ liệu:
 
-- `backend/.env.example`: backend runtime variables
-- `frontend/.env.example`: frontend runtime/build variables
-- `license-server/.env.example`: license service variables
-- `.env.compose.example`: variables consumed by `docker-compose.yml`
+```bash
+docker exec eoffice-backend npx prisma migrate deploy
+docker exec eoffice-backend node scripts/seed.js
+docker exec eoffice-backend node scripts/seed-rbac.js
+docker exec eoffice-backend node scripts/seed-document-types.js
+docker exec eoffice-backend node scripts/seed-workflows-simple.js
+```
 
-## Current Status
+URL mặc định:
 
-- Local builds currently pass for `backend`, `frontend`, and `license-server`
-- Frontend production build still skips type-checking and linting by config
-- Deployment docs in `docs/` are partially historical; prefer the files linked below
+- frontend: `http://localhost:3000`
+- backend: `http://localhost:4000`
+- license server: `http://localhost:5000`
 
-## Key Documentation
+## Chạy local không qua Docker
 
-- [docs/README.md](/e:/2.CODE/new%20office/e-office/docs/README.md)
-- [FUNCTIONAL_SPEC.md](/e:/2.CODE/new%20office/e-office/FUNCTIONAL_SPEC.md)
-- [START-HERE-E-OFFICE.md](/e:/2.CODE/new%20office/e-office/START-HERE-E-OFFICE.md)
-- [docs/testing-guide.md](/e:/2.CODE/new%20office/e-office/docs/testing-guide.md)
-- [docs/DEPLOYMENT-GUIDE.md](/e:/2.CODE/new%20office/e-office/docs/DEPLOYMENT-GUIDE.md)
+1. Tạo env:
 
-## Upgrade Priorities
+- `backend/.env`
+- `frontend/.env.local`
+- `license-server/.env`
 
-1. Remove build-time quality bypasses and make lint/type-check required.
-2. Consolidate documentation around the actual deployed workflow.
-3. Replace historical backup files in active source folders with clean git history.
-4. Review and update vulnerable or deprecated npm dependencies.
+2. Cài package cho từng service.
+
+3. Chạy Postgres và Redis riêng.
+
+4. Chạy build hoặc dev:
+
+```bash
+cd backend && npm run build
+cd frontend && npm run build
+cd license-server && npm run build
+```
+
+## Tài liệu nên đọc trước
+
+- [START-HERE-E-OFFICE.md](START-HERE-E-OFFICE.md)
+- [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md)
+- [docs/README.md](docs/README.md)
+- [docs/DEPLOYMENT-GUIDE.md](docs/DEPLOYMENT-GUIDE.md)
+- [docs/testing-guide.md](docs/testing-guide.md)
+
+## Lưu ý quan trọng
+
+- `docs/archive/` và `docs/dev/` chứa tài liệu lịch sử, ghi chép phiên làm việc và phân tích cũ.
+- Nguồn sự thật hiện tại là code đang chạy, file env example, `README.md`, và các doc chính vừa liệt kê ở trên.
+- Repo đã được dọn bớt file backup, PDF test output và file workflow backup khỏi source tree.

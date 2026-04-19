@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 
 interface DocumentPDFViewerProps {
   documentId: number;
+  pdfUrl?: string;
 }
 
-export default function DocumentPDFViewer({ documentId }: DocumentPDFViewerProps) {
+export default function DocumentPDFViewer({ documentId, pdfUrl }: DocumentPDFViewerProps) {
   const [blobUrl, setBlobUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -19,7 +20,7 @@ export default function DocumentPDFViewer({ documentId }: DocumentPDFViewerProps
         URL.revokeObjectURL(blobUrl);
       }
     };
-  }, [documentId]);
+  }, [documentId, pdfUrl]);
 
   const loadPDF = async () => {
     try {
@@ -47,7 +48,7 @@ export default function DocumentPDFViewer({ documentId }: DocumentPDFViewerProps
         throw new Error('Không tìm thấy token xác thực. Vui lòng đăng nhập lại.');
       }
 
-      const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${documentId}/view`;
+      const url = pdfUrl || `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${documentId}/view`;
       console.log('📡 Fetching PDF from:', url);
 
       const response = await fetch(url, {

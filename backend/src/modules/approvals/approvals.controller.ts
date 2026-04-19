@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { ok } from '../../core/utils/response';
 import { approvalsService } from './approvals.service';
+import { documentsService } from '../documents/documents.service';
 
 const submitSchema = z.object({
   document_id: z.coerce.number().int().positive(),
@@ -36,6 +37,60 @@ export class ApprovalsController {
       req.auth!.tenantId
     );
     res.json(ok(result));
+  };
+
+  viewDocument = async (req: Request, res: Response): Promise<void> => {
+    const approvalId = idSchema.parse(req.params.id);
+    const approval = await approvalsService.getApprovalById(
+      approvalId,
+      req.auth!.userId,
+      req.auth!.tenantId
+    );
+
+    const { filePath, fileName, mimeType } = await documentsService.getDocumentFile(
+      approval.document.id,
+      req.auth!.tenantId,
+      req.auth!.userId
+    );
+
+    res.setHeader('Content-Type', mimeType || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error('Error sending approval document file:', err);
+        if (!res.headersSent) {
+          res.status(404).json({ success: false, error: { message: 'File not found' } });
+        }
+      }
+    });
+  };
+
+  downloadDocument = async (req: Request, res: Response): Promise<void> => {
+    const approvalId = idSchema.parse(req.params.id);
+    const approval = await approvalsService.getApprovalById(
+      approvalId,
+      req.auth!.userId,
+      req.auth!.tenantId
+    );
+
+    const { filePath, fileName, mimeType } = await documentsService.getDocumentFile(
+      approval.document.id,
+      req.auth!.tenantId,
+      req.auth!.userId
+    );
+
+    res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error('Error downloading approval document file:', err);
+        if (!res.headersSent) {
+          res.status(404).json({ success: false, error: { message: 'File not found' } });
+        }
+      }
+    });
   };
 
   // Submit document for approval

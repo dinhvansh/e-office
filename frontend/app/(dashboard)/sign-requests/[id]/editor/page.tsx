@@ -505,7 +505,7 @@ export default function SignRequestEditorPage() {
             <>
               {!selectedSigner && (
                 <p className="text-xs text-amber-600 mb-3 p-2 bg-amber-50 rounded">
-                  Select a signer first
+                  Select a signer before adding fields
                 </p>
               )}
               <div className="space-y-2">
