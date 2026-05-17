@@ -383,60 +383,84 @@ export function ManageSignersDialog({
                   })
                 )}
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-md border bg-white px-3 py-2">
+                  <div className="text-xs font-medium text-gray-500">Đã chọn</div>
+                  {selectedUserId ? (
+                    <div className="mt-1">
+                      <div className="truncate text-sm font-medium text-gray-900">{newName}</div>
+                      <div className="truncate text-xs text-gray-500">{newEmail}</div>
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-sm text-gray-400">Chưa chọn người dùng</div>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="new-role-internal" className="text-xs">Vai trò *</Label>
+                  <select
+                    id="new-role-internal"
+                    value={newRole}
+                    onChange={(event) => setNewRole(event.target.value)}
+                    className="h-10 w-full rounded-md border bg-white px-3 text-sm outline-none hover:border-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="signer">Người ký</option>
+                    <option value="approver">Người phê duyệt</option>
+                  </select>
+                </div>
+              </div>
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label htmlFor="new-email" className="text-xs">Email *</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <Input
-                  id="new-email"
-                  type="email"
-                  placeholder="email@example.com"
-                  value={newEmail}
-                  onChange={(event) => {
-                    setNewEmail(event.target.value);
-                    if (addMode === 'internal') setSelectedUserId(null);
-                  }}
-                  className="pl-9"
-                  readOnly={addMode === 'internal'}
-                  onKeyDown={(event) => event.key === 'Enter' && handleAddSigner()}
-                />
+          {addMode === 'external' && (
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label htmlFor="new-email" className="text-xs">Email *</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    id="new-email"
+                    type="email"
+                    placeholder="email@example.com"
+                    value={newEmail}
+                    onChange={(event) => setNewEmail(event.target.value)}
+                    className="pl-9"
+                    onKeyDown={(event) => event.key === 'Enter' && handleAddSigner()}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="new-name" className="text-xs">Họ tên *</Label>
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    id="new-name"
+                    type="text"
+                    placeholder="Nguyễn Văn A"
+                    value={newName}
+                    onChange={(event) => setNewName(event.target.value)}
+                    className="pl-9"
+                    onKeyDown={(event) => event.key === 'Enter' && handleAddSigner()}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="new-role-external" className="text-xs">Vai trò *</Label>
+                <select
+                  id="new-role-external"
+                  value={newRole}
+                  onChange={(event) => setNewRole(event.target.value)}
+                  className="h-10 w-full rounded-md border bg-white px-3 text-sm outline-none hover:border-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="signer">Người ký</option>
+                  <option value="approver">Người phê duyệt</option>
+                </select>
               </div>
             </div>
-
-            <div>
-              <Label htmlFor="new-name" className="text-xs">Họ tên *</Label>
-              <div className="relative">
-                <UserIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <Input
-                  id="new-name"
-                  type="text"
-                  placeholder="Nguyễn Văn A"
-                  value={newName}
-                  onChange={(event) => setNewName(event.target.value)}
-                  className="pl-9"
-                  readOnly={addMode === 'internal'}
-                  onKeyDown={(event) => event.key === 'Enter' && handleAddSigner()}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="new-role" className="text-xs">Vai trò *</Label>
-              <select
-                id="new-role"
-                value={newRole}
-                onChange={(event) => setNewRole(event.target.value)}
-                className="h-10 w-full rounded-md border bg-white px-3 text-sm outline-none hover:border-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="signer">Người ký</option>
-                <option value="approver">Người phê duyệt</option>
-              </select>
-            </div>
-          </div>
+          )}
 
           <Button onClick={handleAddSigner} disabled={addSignerMutation.isPending || !newEmail || !newName} className="w-full">
             {addSignerMutation.isPending ? (
