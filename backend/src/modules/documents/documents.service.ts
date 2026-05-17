@@ -136,7 +136,7 @@ class DocumentsService {
       throw ApiError.forbidden("You do not have access to this document", "DOCUMENT_ACCESS_DENIED");
     }
     
-    return document;
+    return await documentsRepository.findById(document.id, tenantId) || document;
   }
 
   async createDocument(input: CreateDocumentInput & {
@@ -559,7 +559,7 @@ class DocumentsService {
     }
     */
 
-    return document;
+    return await documentsRepository.findById(document.id, tenantId) || document;
   }
 
   async deleteDocument(documentId: number, tenantId: number, userId?: number): Promise<void> {

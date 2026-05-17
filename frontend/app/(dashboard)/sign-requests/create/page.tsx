@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -70,11 +70,12 @@ export default function CreateSignRequestPage() {
 
   const activeDocumentTypes = useMemo(
     () => (documentTypes || []).filter((type) => type.is_active && (type.require_digital_signing || type.require_approval)),
-    [documentTypes]
+    [documentTypes],
   );
+
   const activeWorkflows = useMemo(
     () => (Array.isArray(workflowsData) ? workflowsData.filter((workflow: any) => workflow.is_active) : []),
-    [workflowsData]
+    [workflowsData],
   );
 
   useEffect(() => {
@@ -180,7 +181,7 @@ export default function CreateSignRequestPage() {
             file_name: attachment.name,
             file_base64: await fileToBase64(attachment),
             file_type: attachment.type,
-          }))
+          })),
         );
       }
 
@@ -191,12 +192,15 @@ export default function CreateSignRequestPage() {
       return response.document;
     },
     onSuccess: (document: any) => {
-      toast.success('Đã tạo bản nháp trình ký');
-      if (document.sign_request_id) {
-        router.push(`/sign-requests/${document.sign_request_id}/editor`);
-      } else {
-        router.push('/sign-requests');
+      const signRequestId = Number(document?.sign_request_id);
+      if (Number.isFinite(signRequestId) && signRequestId > 0) {
+        toast.success('Đã tạo bản nháp trình ký. Đang mở editor...');
+        router.replace(`/sign-requests/${signRequestId}/editor`);
+        return;
       }
+
+      toast.error('Đã tạo tài liệu nhưng chưa lấy được luồng trình ký. Vui lòng mở lại từ danh sách.');
+      router.replace('/sign-requests');
     },
     onError: (error: any) => {
       toast.error(error.message || 'Không thể tạo trình ký');
@@ -208,7 +212,7 @@ export default function CreateSignRequestPage() {
       <PageHeader
         icon={Upload}
         title="Tạo trình ký"
-        description="Tạo bản nháp, kéo sẵn luồng ký nếu có, rồi chuyển sang editor để đặt vị trí ký"
+        description="Tạo bản nháp, kéo sẵn luồng ký nếu có, rồi chuyển thẳng sang editor để đặt vị trí ký."
         iconColor="text-blue-600"
       />
 
@@ -224,7 +228,7 @@ export default function CreateSignRequestPage() {
             <div>
               <h3 className="text-lg font-semibold">1. Chọn tài liệu và loại văn bản</h3>
               <p className="mt-1 text-sm text-slate-500">
-                Sau khi tạo, hệ thống sẽ chuyển thẳng sang editor. Nếu loại văn bản có workflow, danh sách người ký sẽ được kéo lên sẵn.
+                Sau khi tạo, hệ thống chuyển thẳng sang editor. Nếu loại văn bản có workflow, danh sách người ký sẽ được kéo lên sẵn.
               </p>
             </div>
 
