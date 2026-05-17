@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Check, GripVertical, Mail, Plus, Search, User as UserIcon, Users, X } from 'lucide-react';
+import { Building2, Check, GripVertical, Mail, Plus, Search, User as UserIcon, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '../ui/button';
@@ -25,6 +25,15 @@ interface DirectoryUser {
   full_name?: string | null;
   department?: { id: number; name: string } | null;
   position?: { id: number; name: string; code?: string | null } | null;
+}
+
+interface ExternalOrg {
+  id: number;
+  name: string;
+  code?: string | null;
+  email?: string | null;
+  contact_person?: string | null;
+  is_active?: boolean;
 }
 
 interface ManageSignersDialogProps {
@@ -53,7 +62,9 @@ export function ManageSignersDialog({
   const [newRole, setNewRole] = useState<string>('signer');
   const [addMode, setAddMode] = useState<AddMode>('internal');
   const [userSearch, setUserSearch] = useState('');
+  const [externalSearch, setExternalSearch] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedExternalOrgId, setSelectedExternalOrgId] = useState<number | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [localSigners, setLocalSigners] = useState<Signer[]>(signers);
 
@@ -67,6 +78,16 @@ export function ManageSignersDialog({
     queryFn: async () => {
       const data = await fetchJson<{ users: DirectoryUser[] }>('/users/directory');
       return Array.isArray(data?.users) ? data.users : [];
+    },
+  });
+
+  const { data: externalOrgs = [], isLoading: isLoadingExternalOrgs } = useQuery<ExternalOrg[]>({
+    queryKey: ['external-orgs-for-signers'],
+    enabled: isOpen && addMode === 'external',
+    queryFn: async () => {
+      const data = await fetchJson<ExternalOrg[] | { orgs?: ExternalOrg[] }>('/external-orgs');
+      if (Array.isArray(data)) return data;
+      return Array.isArray(data?.orgs) ? data.orgs : [];
     },
   });
 
@@ -85,18 +106,41 @@ export function ManageSignersDialog({
       .slice(0, 8);
   }, [directoryUsers, existingEmails, userSearch]);
 
+  const filteredExternalOrgs = useMemo(() => {
+    const keyword = externalSearch.trim().toLowerCase();
+    return externalOrgs
+      .filter((org) => org.is_active !== false)
+      .filter((org) => {
+        if (!keyword) return true;
+        return [org.name, org.code, org.email, org.contact_person]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(keyword));
+      })
+      .slice(0, 8);
+  }, [externalOrgs, externalSearch]);
+
   const resetAddForm = () => {
     setNewEmail('');
     setNewName('');
     setNewRole('signer');
     setSelectedUserId(null);
+    setSelectedExternalOrgId(null);
     setUserSearch('');
+    setExternalSearch('');
   };
 
   const selectInternalUser = (user: DirectoryUser) => {
     setSelectedUserId(user.id);
+    setSelectedExternalOrgId(null);
     setNewEmail(user.email);
     setNewName(user.full_name || user.email);
+  };
+
+  const selectExternalOrg = (org: ExternalOrg) => {
+    setSelectedExternalOrgId(org.id);
+    setSelectedUserId(null);
+    setNewEmail(org.email || '');
+    setNewName(org.contact_person || org.name);
   };
 
   const addSignerMutation = useMutation({
@@ -414,50 +458,104 @@ export function ManageSignersDialog({
           )}
 
           {addMode === 'external' && (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-3 rounded-lg border bg-orange-50/50 p-3">
               <div>
-                <Label htmlFor="new-email" className="text-xs">Email *</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Label htmlFor="external-org-search" className="text-xs">Chọn từ tổ chức/đối tác ngoài</Label>
+                <div className="relative mt-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <Input
-                    id="new-email"
-                    type="email"
-                    placeholder="email@example.com"
-                    value={newEmail}
-                    onChange={(event) => setNewEmail(event.target.value)}
+                    id="external-org-search"
+                    value={externalSearch}
+                    onChange={(event) => setExternalSearch(event.target.value)}
+                    placeholder="Tìm theo tên tổ chức, mã, email hoặc người liên hệ"
                     className="pl-9"
-                    onKeyDown={(event) => event.key === 'Enter' && handleAddSigner()}
                   />
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="new-name" className="text-xs">Họ tên *</Label>
-                <div className="relative">
-                  <UserIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <Input
-                    id="new-name"
-                    type="text"
-                    placeholder="Nguyễn Văn A"
-                    value={newName}
-                    onChange={(event) => setNewName(event.target.value)}
-                    className="pl-9"
-                    onKeyDown={(event) => event.key === 'Enter' && handleAddSigner()}
-                  />
-                </div>
+              <div className="max-h-44 overflow-y-auto rounded-md border bg-white">
+                {isLoadingExternalOrgs ? (
+                  <div className="p-3 text-sm text-gray-500">Đang tải danh sách tổ chức ngoài...</div>
+                ) : filteredExternalOrgs.length === 0 ? (
+                  <div className="p-3 text-sm text-gray-500">Chưa có tổ chức ngoài phù hợp. Có thể nhập thủ công bên dưới.</div>
+                ) : (
+                  filteredExternalOrgs.map((org) => {
+                    const selected = selectedExternalOrgId === org.id;
+                    return (
+                      <button
+                        key={org.id}
+                        type="button"
+                        onClick={() => selectExternalOrg(org)}
+                        className={`flex w-full items-center gap-3 border-b px-3 py-2 text-left last:border-b-0 hover:bg-orange-50 ${selected ? 'bg-orange-50' : ''}`}
+                      >
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-700">
+                          <Building2 className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium text-gray-900">
+                            {org.name}{org.code ? ` (${org.code})` : ''}
+                          </div>
+                          <div className="truncate text-xs text-gray-500">
+                            {[org.contact_person, org.email].filter(Boolean).join(' - ') || 'Chưa có email liên hệ'}
+                          </div>
+                        </div>
+                        {selected && <Check className="h-4 w-4 flex-shrink-0 text-orange-600" />}
+                      </button>
+                    );
+                  })
+                )}
               </div>
 
-              <div>
-                <Label htmlFor="new-role-external" className="text-xs">Vai trò *</Label>
-                <select
-                  id="new-role-external"
-                  value={newRole}
-                  onChange={(event) => setNewRole(event.target.value)}
-                  className="h-10 w-full rounded-md border bg-white px-3 text-sm outline-none hover:border-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="signer">Người ký</option>
-                  <option value="approver">Người phê duyệt</option>
-                </select>
+              <div className="text-xs font-medium text-gray-500">Hoặc nhập người ký ngoài thủ công</div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label htmlFor="new-email" className="text-xs">Email *</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Input
+                      id="new-email"
+                      type="email"
+                      placeholder="email@example.com"
+                      value={newEmail}
+                      onChange={(event) => {
+                        setNewEmail(event.target.value);
+                        setSelectedExternalOrgId(null);
+                      }}
+                      className="pl-9"
+                      onKeyDown={(event) => event.key === 'Enter' && handleAddSigner()}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="new-name" className="text-xs">Họ tên / đơn vị *</Label>
+                  <div className="relative">
+                    <UserIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Input
+                      id="new-name"
+                      type="text"
+                      placeholder="Nguyễn Văn A hoặc Công ty ABC"
+                      value={newName}
+                      onChange={(event) => setNewName(event.target.value)}
+                      className="pl-9"
+                      onKeyDown={(event) => event.key === 'Enter' && handleAddSigner()}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="new-role-external" className="text-xs">Vai trò *</Label>
+                  <select
+                    id="new-role-external"
+                    value={newRole}
+                    onChange={(event) => setNewRole(event.target.value)}
+                    className="h-10 w-full rounded-md border bg-white px-3 text-sm outline-none hover:border-blue-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="signer">Người ký</option>
+                    <option value="approver">Người phê duyệt</option>
+                  </select>
+                </div>
               </div>
             </div>
           )}
