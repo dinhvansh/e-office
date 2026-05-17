@@ -84,6 +84,19 @@ export class SignRequestsController {
     res.json(ok({ sign_request: signRequest }));
   };
 
+  listComments = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id);
+    const comments = await signRequestsService.listComments(id, req.auth!.tenantId);
+    res.json(ok({ comments }));
+  };
+
+  addComment = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id);
+    const body = z.object({ body: z.string().min(1).max(2000) }).parse(req.body);
+    const comment = await signRequestsService.addComment(id, req.auth!.tenantId, req.auth!.userId, body.body);
+    res.status(201).json(ok({ comment }));
+  };
+
   // Signers Management
 
   addSigner = async (req: Request, res: Response): Promise<void> => {

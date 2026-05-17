@@ -18,6 +18,7 @@ model tenants {
   users      users[]
   documents  documents[]
   sign_requests sign_requests[]
+  sign_request_comments sign_request_comments[]
   departments departments[]
   positions  positions[]
   roles      roles[]
@@ -57,6 +58,7 @@ model users {
   signers       signers[]     @relation("signer_user") // ✅ Relation to signers
   password_reset_tokens password_reset_tokens[]
   notifications notifications[]
+  sign_request_comments sign_request_comments[]
 }
 
 model documents {
@@ -122,6 +124,24 @@ model sign_requests {
   linked_document     documents? @relation("document_sign_request")
   signers             signers[]
   fields              sign_request_fields[]
+  comments            sign_request_comments[]
+}
+
+model sign_request_comments {
+  id              Int           @id @default(autoincrement())
+  tenant_id       Int
+  sign_request_id Int
+  user_id         Int?
+  body            String
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
+
+  tenant          tenants       @relation(fields: [tenant_id], references: [id])
+  sign_request    sign_requests @relation(fields: [sign_request_id], references: [id], onDelete: Cascade)
+  user            users?        @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([tenant_id, sign_request_id])
+  @@index([user_id])
 }
 
 model signers {

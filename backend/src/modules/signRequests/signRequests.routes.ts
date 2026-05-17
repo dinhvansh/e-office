@@ -40,6 +40,16 @@ signRequestsRouter.get(
   requirePermission("sign_requests", "read"),
   asyncHandler(controller.getEditor)
 );
+signRequestsRouter.get(
+  "/:id/comments",
+  requirePermission("sign_requests", "read"),
+  asyncHandler(controller.listComments)
+);
+signRequestsRouter.post(
+  "/:id/comments",
+  requirePermission("sign_requests", "update"),
+  asyncHandler(controller.addComment)
+);
 signRequestsRouter.post(
   "/:id/fields",
   requirePermission("sign_requests", "update"),

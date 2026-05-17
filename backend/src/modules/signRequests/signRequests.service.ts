@@ -103,6 +103,66 @@ class SignRequestsService {
     };
   }
 
+  async listComments(signRequestId: number, tenantId: number) {
+    const signRequest = await this.getSignRequest(signRequestId, tenantId);
+
+    return prisma.sign_request_comments.findMany({
+      where: {
+        tenant_id: tenantId,
+        sign_request_id: signRequestId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { created_at: "asc" },
+    });
+  }
+
+  async addComment(signRequestId: number, tenantId: number, userId: number, body: string) {
+    const content = body.trim();
+    if (!content) {
+      throw ApiError.badRequest("Comment is required", "COMMENT_REQUIRED");
+    }
+    if (content.length > 2000) {
+      throw ApiError.badRequest("Comment must be 2000 characters or less", "COMMENT_TOO_LONG");
+    }
+
+    const signRequest = await this.getSignRequest(signRequestId, tenantId);
+
+    const comment = await prisma.sign_request_comments.create({
+      data: {
+        tenant_id: tenantId,
+        sign_request_id: signRequestId,
+        user_id: userId,
+        body: content,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    await auditService.record({
+      tenantId,
+      documentId: signRequest.document_id,
+      event: "sign_request.comment_added",
+      userId,
+    });
+
+    return comment;
+  }
+
   /**
    * Get sign requests created by the current user with pagination
    */

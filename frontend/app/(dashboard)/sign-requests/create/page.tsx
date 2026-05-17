@@ -1,29 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/components/providers/auth-provider';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
-import { PageHeader } from '@/components/ui/page-header';
+import { ArrowLeft, ArrowRight, FileText, Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { Upload, ArrowLeft, ArrowRight, X } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { WorkflowPreview } from '@/components/workflow/WorkflowPreview';
-import { WorkflowCustomizer } from '@/components/workflow/WorkflowCustomizer';
+
+import { useAuth } from '@/components/providers/auth-provider';
 import { AdhocWorkflowBuilder } from '@/components/workflow/AdhocWorkflowBuilder';
-import { SignersSection, Signer } from '@/components/documents/SignersSection';
-import { CCEmailsSection } from '@/components/documents/CCEmailsSection';
+import { WorkflowCustomizer } from '@/components/workflow/WorkflowCustomizer';
+import { WorkflowPreview } from '@/components/workflow/WorkflowPreview';
 import { AttachmentsSection } from '@/components/documents/AttachmentsSection';
+import { CCEmailsSection } from '@/components/documents/CCEmailsSection';
+import { Signer, SignersSection } from '@/components/documents/SignersSection';
+import { PageHeader } from '@/components/ui/page-header';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface DocumentType {
   id: number;
@@ -36,458 +30,322 @@ interface DocumentType {
   is_active: boolean;
 }
 
+type WorkflowMode = 'no_approval' | 'strict' | 'flexible' | 'adhoc' | null;
+
 export default function CreateSignRequestPage() {
   const router = useRouter();
   const { fetchJson } = useAuth();
-  
+
   const [file, setFile] = useState<File | null>(null);
   const [documentTypeId, setDocumentTypeId] = useState<number | null>(null);
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState<number | null>(null);
-  const [workflowMode, setWorkflowMode] = useState<'no_approval' | 'strict' | 'flexible' | 'adhoc' | null>(null);
   const [selectedDocType, setSelectedDocType] = useState<DocumentType | null>(null);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<number | null>(null);
+  const [workflowMode, setWorkflowMode] = useState<WorkflowMode>(null);
   const [customizedSteps, setCustomizedSteps] = useState<any[] | null>(null);
   const [adhocSteps, setAdhocSteps] = useState<any[] | null>(null);
-  
-  // Signers, CC, Attachments state
-  const [signers, setSigners] = useState<Signer[]>([]); // External signers
+  const [signers, setSigners] = useState<Signer[]>([]);
   const [ccEmails, setCcEmails] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
 
-  // Fetch document types
   const { data: documentTypes } = useQuery({
     queryKey: ['document-types'],
-    queryFn: async () => {
-      const data = await fetchJson<DocumentType[]>('/document-types');
-      return data;
-    },
+    queryFn: async () => fetchJson<DocumentType[]>('/document-types'),
   });
 
-  // Fetch workflows
   const { data: workflowsData } = useQuery({
     queryKey: ['workflows'],
     queryFn: async () => {
       const data: any = await fetchJson('/workflows');
-      return Array.isArray(data) ? data : (data?.workflows || []);
+      return Array.isArray(data) ? data : data?.workflows || [];
     },
   });
 
-  // Fetch external organizations
   const { data: externalOrgs } = useQuery({
     queryKey: ['external-orgs'],
     queryFn: async () => {
-      const response = await fetchJson<any>('/external-orgs');
-      return Array.isArray(response) ? response : [];
+      const data = await fetchJson<any>('/external-orgs');
+      return Array.isArray(data) ? data : [];
     },
   });
 
-  // Show active types that participate in either signing or approval flows.
-  const activeDocumentTypes =
-    documentTypes?.filter(
-      (type) => type.is_active && (type.require_digital_signing || type.require_approval)
-    ) || [];
-  const activeWorkflows = Array.isArray(workflowsData) ? workflowsData.filter((wf: any) => wf.is_active) : [];
+  const activeDocumentTypes = useMemo(
+    () => (documentTypes || []).filter((type) => type.is_active && (type.require_digital_signing || type.require_approval)),
+    [documentTypes]
+  );
+  const activeWorkflows = useMemo(
+    () => (Array.isArray(workflowsData) ? workflowsData.filter((workflow: any) => workflow.is_active) : []),
+    [workflowsData]
+  );
 
-  // Detect workflow mode when document type changes
   useEffect(() => {
-    if (documentTypeId) {
-      const docType = activeDocumentTypes.find((t) => t.id === documentTypeId);
-      setSelectedDocType(docType || null);
-      
-      if (!docType) {
-        setWorkflowMode(null);
-        setSelectedWorkflowId(null);
-        return;
-      }
-
-      if (!docType.require_approval) {
-        setWorkflowMode('no_approval');
-        setSelectedWorkflowId(null);
-      } else if (!docType.default_workflow_id) {
-        setWorkflowMode('adhoc');
-        setSelectedWorkflowId(null);
-      } else if (!docType.allow_workflow_override) {
-        setWorkflowMode('strict');
-        setSelectedWorkflowId(docType.default_workflow_id);
-      } else {
-        setWorkflowMode('flexible');
-        // ✅ Only set default if no workflow selected yet
-        if (!selectedWorkflowId) {
-          setSelectedWorkflowId(docType.default_workflow_id);
-        }
-      }
-    } else {
-      setWorkflowMode(null);
+    if (!documentTypeId) {
       setSelectedDocType(null);
+      setWorkflowMode(null);
       setSelectedWorkflowId(null);
+      return;
     }
+
+    const docType = activeDocumentTypes.find((type) => type.id === documentTypeId) || null;
+    setSelectedDocType(docType);
+    setCustomizedSteps(null);
+    setAdhocSteps(null);
+
+    if (!docType) {
+      setWorkflowMode(null);
+      setSelectedWorkflowId(null);
+      return;
+    }
+
+    if (!docType.require_approval) {
+      setWorkflowMode('no_approval');
+      setSelectedWorkflowId(docType.default_workflow_id || null);
+      return;
+    }
+
+    if (!docType.default_workflow_id) {
+      setWorkflowMode('adhoc');
+      setSelectedWorkflowId(null);
+      return;
+    }
+
+    if (!docType.allow_workflow_override) {
+      setWorkflowMode('strict');
+      setSelectedWorkflowId(docType.default_workflow_id);
+      return;
+    }
+
+    setWorkflowMode('flexible');
+    setSelectedWorkflowId(docType.default_workflow_id);
   }, [documentTypeId, activeDocumentTypes]);
 
-  // Helper to convert file to base64
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
+  const fileToBase64 = (selectedFile: File): Promise<string> =>
+    new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64 = reader.result as string;
-        resolve(base64.split(',')[1]); // Remove data:*/*;base64, prefix
-      };
+      reader.readAsDataURL(selectedFile);
+      reader.onload = () => resolve(String(reader.result).split(',')[1]);
       reader.onerror = reject;
     });
-  };
 
-  const uploadMutation = useMutation({
+  const createMutation = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error('Vui lòng chọn file');
       if (!documentTypeId) throw new Error('Vui lòng chọn loại văn bản');
-      
-      // Validate external signers if provided
-      if (selectedDocType?.require_digital_signing && signers.length > 0) {
-        for (const signer of signers) {
-          if (!signer.email || !signer.name) {
-            throw new Error('Vui lòng điền đầy đủ thông tin người ký bên ngoài');
-          }
-        }
-      }
 
-      // Validate workflow if required
       if (selectedDocType?.require_approval) {
         if (workflowMode === 'adhoc' && (!adhocSteps || adhocSteps.length === 0)) {
-          throw new Error('Vui lòng thêm ít nhất 1 bước phê duyệt');
+          throw new Error('Vui lòng thêm ít nhất một bước phê duyệt/ký');
         }
         if (workflowMode === 'flexible' && !selectedWorkflowId) {
-          throw new Error('Vui lòng chọn quy trình phê duyệt');
+          throw new Error('Vui lòng chọn quy trình');
         }
       }
 
-      // Convert file to base64 first
-      const base64 = await fileToBase64(file);
-      
-      console.log('📤 Upload debug:', {
-        fileName: file.name,
-        fileSize: file.size,
-        base64Length: base64.length,
-        documentTypeId,
-        signersCount: signers.length,
-      });
-      
-      // Prepare payload - match Documents page format exactly
+      for (const signer of signers) {
+        if (!signer.email || !signer.name) {
+          throw new Error('Vui lòng nhập đủ tên và email người ký ngoài');
+        }
+      }
+
       const payload: any = {
         file_name: file.name,
-        file_base64: base64,
+        file_base64: await fileToBase64(file),
         document_type_id: documentTypeId,
-        title: file.name.replace(/\.[^/.]+$/, ''), // ✅ Use filename without extension as title
+        title: file.name.replace(/\.[^/.]+$/, ''),
+        create_sign_request: true,
       };
 
-      // Add workflow data based on mode
       if (workflowMode === 'strict' && selectedDocType?.default_workflow_id) {
         payload.workflow_id = selectedDocType.default_workflow_id;
-      } else if (workflowMode === 'flexible' && selectedWorkflowId) {
-        // ✅ Use selectedWorkflowId (user's choice), not default_workflow_id
+      }
+      if (workflowMode === 'flexible' && selectedWorkflowId) {
         payload.workflow_id = selectedWorkflowId;
-        if (customizedSteps && customizedSteps.length > 0) {
-          payload.customized_steps = customizedSteps;
-        }
-      } else if (workflowMode === 'adhoc' && adhocSteps && adhocSteps.length > 0) {
+        if (customizedSteps?.length) payload.customized_steps = customizedSteps;
+      }
+      if (workflowMode === 'adhoc' && adhocSteps?.length) {
         payload.adhoc_steps = adhocSteps;
       }
-
-      // Add external signers if provided (order is now managed in workflow)
       if (signers.length > 0) {
-        payload.signers = signers.map((s, index) => ({
-          email: s.email,
-          name: s.name,
+        payload.signers = signers.map((signer, index) => ({
+          email: signer.email,
+          name: signer.name,
           order: index + 1,
-          type: s.type,
-          external_org_id: s.externalOrgId,
+          type: signer.type,
+          external_org_id: signer.externalOrgId,
         }));
       }
-
-      // Add CC emails if provided
-      if (ccEmails.length > 0) {
-        payload.cc_emails = ccEmails;
-      }
-
-      // Add attachments if provided
+      if (ccEmails.length > 0) payload.cc_emails = ccEmails;
       if (attachments.length > 0) {
-        const attachmentPromises = attachments.map(async (file) => ({
-          file_name: file.name,
-          file_base64: await fileToBase64(file),
-          file_type: file.type,
-        }));
-        payload.attachments = await Promise.all(attachmentPromises);
+        payload.attachments = await Promise.all(
+          attachments.map(async (attachment) => ({
+            file_name: attachment.name,
+            file_base64: await fileToBase64(attachment),
+            file_type: attachment.type,
+          }))
+        );
       }
 
-      payload.create_sign_request = true;
-
-      // Upload document with all data as JSON
       const response = await fetchJson<{ document: any }>('/documents', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
-
       return response.document;
     },
     onSuccess: (document: any) => {
-      // Reset form
-      setFile(null);
-      setDocumentTypeId(null);
-      setSelectedWorkflowId(null);
-      setSigners([]);
-      setCcEmails([]);
-      setAttachments([]);
-      
-      toast.success('Tạo nháp thành công!');
-      
-      // Navigate to editor if has sign_request_id
+      toast.success('Đã tạo bản nháp trình ký');
       if (document.sign_request_id) {
-        toast.info('Đang chuyển đến màn hình hoàn thiện quy trình...');
-        setTimeout(() => {
-          router.push(`/sign-requests/${document.sign_request_id}/editor`);
-        }, 1000);
+        router.push(`/sign-requests/${document.sign_request_id}/editor`);
       } else {
-        // No signing required, go back to list
         router.push('/sign-requests');
       }
     },
     onError: (error: any) => {
-      console.error('❌ Upload error:', error);
-      console.error('Error response:', error.response?.data);
-      const message = error.response?.data?.error?.message || error.message || 'Có lỗi xảy ra';
-      toast.error(`Lỗi: ${message}`);
+      toast.error(error.message || 'Không thể tạo trình ký');
     },
   });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    uploadMutation.mutate();
-  };
 
   return (
     <div className="space-y-6">
       <PageHeader
         icon={Upload}
-        title="Tạo yêu cầu ký mới"
-        description="Upload tài liệu và thiết lập luồng ký"
+        title="Tạo trình ký"
+        description="Tạo bản nháp, kéo sẵn luồng ký nếu có, rồi chuyển sang editor để đặt vị trí ký"
         iconColor="text-blue-600"
       />
 
-      <form onSubmit={handleSubmit} className="max-w-5xl mx-auto">
-        {/* Step 1: Upload File & Document Type */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Bước 1: Chọn tài liệu và loại văn bản</h3>
-            
-            {/* Upload File */}
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors mb-4">
+      <form
+        className="mx-auto max-w-5xl space-y-6"
+        onSubmit={(event) => {
+          event.preventDefault();
+          createMutation.mutate();
+        }}
+      >
+        <Card>
+          <CardContent className="space-y-5 p-6">
+            <div>
+              <h3 className="text-lg font-semibold">1. Chọn tài liệu và loại văn bản</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Sau khi tạo, hệ thống sẽ chuyển thẳng sang editor. Nếu loại văn bản có workflow, danh sách người ký sẽ được kéo lên sẵn.
+              </p>
+            </div>
+
+            <div className="rounded-lg border-2 border-dashed border-slate-300 p-6 text-center transition-colors hover:border-blue-400">
               <input
-                type="file"
                 id="file-upload"
+                type="file"
                 className="hidden"
                 accept=".pdf,.doc,.docx"
-                onChange={(e) => {
-                  const selectedFile = e.target.files?.[0];
-                  if (selectedFile) {
-                    setFile(selectedFile);
-                    toast.success(`Đã chọn: ${selectedFile.name}`);
-                  }
-                }}
+                onChange={(event) => setFile(event.target.files?.[0] || null)}
               />
               <label htmlFor="file-upload" className="cursor-pointer">
-                <Upload className="w-10 h-10 mx-auto mb-3 text-gray-400" />
+                <FileText className="mx-auto mb-3 h-10 w-10 text-slate-400" />
                 {file ? (
-                  <div>
+                  <>
                     <p className="text-lg font-medium text-blue-600">{file.name}</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {(file.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mt-3"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setFile(null);
-                      }}
-                    >
-                      Chọn file khác
-                    </Button>
-                  </div>
+                    <p className="mt-1 text-sm text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </>
                 ) : (
-                  <div>
+                  <>
                     <p className="text-lg font-medium">Click để chọn file</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Hỗ trợ: PDF, DOC, DOCX (tối đa 10MB)
-                    </p>
-                  </div>
+                    <p className="mt-1 text-sm text-slate-500">Hỗ trợ PDF, DOC, DOCX</p>
+                  </>
                 )}
               </label>
             </div>
 
-            {/* Document Type Selection */}
             <div className="space-y-2">
               <Label>Loại văn bản *</Label>
-              <Select
-                value={documentTypeId?.toString() || ''}
-                onValueChange={(value) => setDocumentTypeId(parseInt(value))}
-              >
+              <Select value={documentTypeId?.toString() || ''} onValueChange={(value) => setDocumentTypeId(Number(value))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Chọn loại văn bản" />
                 </SelectTrigger>
                 <SelectContent>
                   {activeDocumentTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id.toString()}>
+                    <SelectItem key={type.id} value={String(type.id)}>
                       {type.name} ({type.code})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Workflow Mode Indicator */}
-            {selectedDocType && selectedDocType.require_digital_signing && (
-              <div className="mt-3 p-3 bg-purple-50 rounded-lg text-sm text-purple-700">
-                ✍️ Loại văn bản này yêu cầu chữ ký điện tử
-              </div>
-            )}
           </CardContent>
         </Card>
 
-        {/* Step 2: Workflow Selection (if approval required) */}
-        {selectedDocType && selectedDocType.require_approval && workflowMode && (
-          <Card className="mb-6">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold mb-4">
-                Bước 2: Quy trình phê duyệt
-              </h3>
-              
-              {workflowMode === 'strict' && selectedDocType.default_workflow_id && (
-                <div>
-                  <div className="mb-3 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
-                    📋 Loại văn bản này sử dụng quy trình phê duyệt cố định
-                  </div>
-                  <WorkflowPreview workflowId={selectedDocType.default_workflow_id} />
+        {selectedDocType && (
+          <Card>
+            <CardContent className="space-y-5 p-6">
+              <div>
+                <h3 className="text-lg font-semibold">2. Luồng áp dụng</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Workflow có vai trò ký sẽ tự tạo người ký trong editor. Bạn chỉ cần đặt vị trí ký trên tài liệu.
+                </p>
+              </div>
+
+              {workflowMode === 'no_approval' && (
+                <div className="rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
+                  Loại văn bản này không yêu cầu phê duyệt. Nếu có người ký, hệ thống sẽ gửi ký sau khi bạn đặt vị trí trong editor.
                 </div>
               )}
 
+              {workflowMode === 'strict' && selectedWorkflowId && <WorkflowPreview workflowId={selectedWorkflowId} />}
+
               {workflowMode === 'flexible' && (
-                <div>
-                  <div className="mb-4 space-y-2">
+                <div className="space-y-4">
+                  <div className="space-y-2">
                     <Label>Chọn quy trình</Label>
-                    <Select
-                      value={selectedWorkflowId?.toString() || ''}
-                      onValueChange={(value) => setSelectedWorkflowId(parseInt(value))}
-                    >
+                    <Select value={selectedWorkflowId?.toString() || ''} onValueChange={(value) => setSelectedWorkflowId(Number(value))}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Chọn quy trình phê duyệt" />
+                        <SelectValue placeholder="Chọn quy trình" />
                       </SelectTrigger>
                       <SelectContent>
-                        {activeWorkflows.map((wf: any) => (
-                          <SelectItem key={wf.id} value={wf.id.toString()}>
-                            {wf.name}
+                        {activeWorkflows.map((workflow: any) => (
+                          <SelectItem key={workflow.id} value={String(workflow.id)}>
+                            {workflow.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  
-                  {selectedWorkflowId && (
-                    <div className="border-t pt-4">
-                      <h4 className="text-sm font-medium mb-3 text-gray-700">
-                        👥 Danh sách người phê duyệt
-                      </h4>
-                      <WorkflowCustomizer
-                        defaultWorkflowId={selectedWorkflowId}
-                        onCustomize={setCustomizedSteps}
-                      />
-                    </div>
-                  )}
+                  {selectedWorkflowId && <WorkflowCustomizer defaultWorkflowId={selectedWorkflowId} onCustomize={setCustomizedSteps} />}
                 </div>
               )}
 
-              {workflowMode === 'adhoc' && (
-                <div>
-                  <div className="mb-3 p-3 bg-amber-50 rounded-lg text-sm text-amber-700">
-                    💡 Tạo quy trình phê duyệt tùy chỉnh cho tài liệu này
-                  </div>
-                  <AdhocWorkflowBuilder onBuild={setAdhocSteps} />
-                </div>
-              )}
+              {workflowMode === 'adhoc' && <AdhocWorkflowBuilder onBuild={setAdhocSteps} />}
             </CardContent>
           </Card>
         )}
 
-
-
-        {/* Step 3: External Signers, CC, Attachments */}
-        <Card className="mb-6">
-          <CardContent className="p-6 space-y-6">
-            <h3 className="text-lg font-semibold">
-              {selectedDocType?.require_approval ? 'Bước 3: Người ký bên ngoài & Thông tin bổ sung' : 'Bước 2: Người ký bên ngoài & Thông tin bổ sung'}
-            </h3>
-
-            {/* External Signers Section */}
-            {selectedDocType?.require_digital_signing && (
-              <div>
-                <h4 className="text-sm font-medium mb-3 text-gray-700">
-                  ✍️ Người ký bên ngoài (External Signers) - Tùy chọn
-                </h4>
-                <div className="mb-3 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
-                  💡 Người ký nội bộ được quản lý trong quy trình phê duyệt ở trên
-                </div>
-                <SignersSection 
-                  signers={signers}
-                  onChange={setSigners}
-                  externalOrgs={externalOrgs || []}
-                />
-              </div>
-            )}
-
-            {/* CC Emails Section */}
-            <div className="border-t pt-6">
-              <CCEmailsSection 
-                emails={ccEmails}
-                onChange={setCcEmails}
-              />
+        <Card>
+          <CardContent className="space-y-6 p-6">
+            <div>
+              <h3 className="text-lg font-semibold">3. Thông tin bổ sung</h3>
+              <p className="mt-1 text-sm text-slate-500">Người ký ngoài, người nhận CC và file đính kèm là tùy chọn.</p>
             </div>
 
-            {/* Attachments Section */}
-            <div className="border-t pt-6">
-              <AttachmentsSection 
-                files={attachments}
-                onChange={setAttachments}
-              />
+            {selectedDocType?.require_digital_signing && (
+              <SignersSection signers={signers} onChange={setSigners} externalOrgs={externalOrgs || []} />
+            )}
+
+            <div className="border-t pt-5">
+              <CCEmailsSection emails={ccEmails} onChange={setCcEmails} />
+            </div>
+
+            <div className="border-t pt-5">
+              <AttachmentsSection files={attachments} onChange={setAttachments} />
             </div>
           </CardContent>
         </Card>
 
-        {/* Actions */}
         <div className="flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.push('/sign-requests')}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
+          <Button type="button" variant="outline" onClick={() => router.push('/sign-requests')}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Hủy
           </Button>
-          <Button
-            type="submit"
-            disabled={!file || !documentTypeId || uploadMutation.isPending}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {uploadMutation.isPending ? (
-              'Đang xử lý...'
-            ) : (
-              <>
-                Tiếp tục
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </>
-            )}
+          <Button type="submit" disabled={!file || !documentTypeId || createMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
+            {createMutation.isPending ? 'Đang tạo...' : 'Tạo nháp và mở editor'}
+            {!createMutation.isPending && <ArrowRight className="ml-2 h-4 w-4" />}
           </Button>
         </div>
       </form>
     </div>
   );
 }
-
