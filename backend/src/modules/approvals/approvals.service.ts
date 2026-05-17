@@ -94,6 +94,65 @@ class ApprovalsService {
     return approval;
   }
 
+  async listComments(approvalId: number, userId: number, tenantId: number) {
+    const approval = await this.getApprovalById(approvalId, userId, tenantId);
+    const signRequestId = approval.document.sign_request_id;
+    if (!signRequestId) {
+      return [];
+    }
+
+    return prisma.sign_request_comments.findMany({
+      where: {
+        tenant_id: tenantId,
+        sign_request_id: signRequestId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { created_at: 'asc' },
+    });
+  }
+
+  async addComment(approvalId: number, userId: number, tenantId: number, body: string) {
+    const content = body.trim();
+    if (!content) {
+      throw ApiError.badRequest('Comment is required', 'COMMENT_REQUIRED');
+    }
+    if (content.length > 2000) {
+      throw ApiError.badRequest('Comment must be 2000 characters or less', 'COMMENT_TOO_LONG');
+    }
+
+    const approval = await this.getApprovalById(approvalId, userId, tenantId);
+    const signRequestId = approval.document.sign_request_id;
+    if (!signRequestId) {
+      throw ApiError.badRequest('This approval document does not have a signing discussion thread', 'DISCUSSION_NOT_AVAILABLE');
+    }
+
+    return prisma.sign_request_comments.create({
+      data: {
+        tenant_id: tenantId,
+        sign_request_id: signRequestId,
+        user_id: userId,
+        body: content,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+          },
+        },
+      },
+    });
+  }
+
   /**
    * Submit document for approval
    * Creates workflow instance and approval records for first step

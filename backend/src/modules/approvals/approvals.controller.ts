@@ -18,6 +18,9 @@ const actionSchema = z.object({
 const requestInfoSchema = z.object({
   comment: z.string().min(1, 'Comment is required'),
 });
+const commentSchema = z.object({
+  body: z.string().min(1).max(2000),
+});
 
 const idSchema = z.coerce.number().int().positive();
 
@@ -37,6 +40,28 @@ export class ApprovalsController {
       req.auth!.tenantId
     );
     res.json(ok(result));
+  };
+
+  listComments = async (req: Request, res: Response): Promise<void> => {
+    const approvalId = idSchema.parse(req.params.id);
+    const comments = await approvalsService.listComments(
+      approvalId,
+      req.auth!.userId,
+      req.auth!.tenantId
+    );
+    res.json(ok({ comments }));
+  };
+
+  addComment = async (req: Request, res: Response): Promise<void> => {
+    const approvalId = idSchema.parse(req.params.id);
+    const body = commentSchema.parse(req.body);
+    const comment = await approvalsService.addComment(
+      approvalId,
+      req.auth!.userId,
+      req.auth!.tenantId,
+      body.body
+    );
+    res.status(201).json(ok({ comment }));
   };
 
   viewDocument = async (req: Request, res: Response): Promise<void> => {

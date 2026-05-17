@@ -50,6 +50,18 @@ router.post(
 );
 
 // Approval actions
+router.get(
+  '/:id/comments',
+  requirePermission('approvals', 'read'),
+  asyncHandler(approvalsController.listComments)
+);
+
+router.post(
+  '/:id/comments',
+  requirePermission('approvals', 'update'),
+  asyncHandler(approvalsController.addComment)
+);
+
 router.post(
   '/:id/approve',
   requirePermission('approvals', 'update'),
