@@ -1,13 +1,14 @@
-'use client';
+﻿'use client';
 
-import React, { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { X, Users, Plus, Mail, User as UserIcon, GripVertical } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Check, GripVertical, Mail, Plus, Search, User as UserIcon, Users, X } from 'lucide-react';
+import { toast } from 'sonner';
+
 import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { toast } from 'sonner';
 
 interface Signer {
   id: number;
@@ -18,15 +19,25 @@ interface Signer {
   is_internal?: boolean;
 }
 
+interface DirectoryUser {
+  id: number;
+  email: string;
+  full_name?: string | null;
+  department?: { id: number; name: string } | null;
+  position?: { id: number; name: string; code?: string | null } | null;
+}
+
 interface ManageSignersDialogProps {
   signRequestId: number;
   signers: Signer[];
   isOpen: boolean;
   onClose: () => void;
   onUpdate: () => void;
-  fetchJson: any; // Pass from parent
-  allowReorder?: boolean; // ✅ Only allow reorder if document type allows
+  fetchJson: <T = any>(path: string, init?: RequestInit) => Promise<T>;
+  allowReorder?: boolean;
 }
+
+type AddMode = 'internal' | 'external';
 
 export function ManageSignersDialog({
   signRequestId,
@@ -39,16 +50,55 @@ export function ManageSignersDialog({
 }: ManageSignersDialogProps) {
   const [newEmail, setNewEmail] = useState('');
   const [newName, setNewName] = useState('');
-  const [newRole, setNewRole] = useState<string>('signer'); // ✅ Default: Người ký
+  const [newRole, setNewRole] = useState<string>('signer');
+  const [addMode, setAddMode] = useState<AddMode>('internal');
+  const [userSearch, setUserSearch] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [localSigners, setLocalSigners] = useState<Signer[]>(signers);
 
-  // ✅ Update local signers when prop changes
   React.useEffect(() => {
     setLocalSigners(signers);
   }, [signers]);
 
-  // Add signer mutation
+  const { data: directoryUsers = [], isLoading: isLoadingUsers } = useQuery<DirectoryUser[]>({
+    queryKey: ['users-directory'],
+    enabled: isOpen,
+    queryFn: async () => {
+      const data = await fetchJson<{ users: DirectoryUser[] }>('/users/directory');
+      return Array.isArray(data?.users) ? data.users : [];
+    },
+  });
+
+  const existingEmails = useMemo(() => new Set(localSigners.map((signer) => signer.email.toLowerCase())), [localSigners]);
+
+  const filteredUsers = useMemo(() => {
+    const keyword = userSearch.trim().toLowerCase();
+    return directoryUsers
+      .filter((user) => !existingEmails.has(user.email.toLowerCase()))
+      .filter((user) => {
+        if (!keyword) return true;
+        return [user.email, user.full_name, user.department?.name, user.position?.name]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(keyword));
+      })
+      .slice(0, 8);
+  }, [directoryUsers, existingEmails, userSearch]);
+
+  const resetAddForm = () => {
+    setNewEmail('');
+    setNewName('');
+    setNewRole('signer');
+    setSelectedUserId(null);
+    setUserSearch('');
+  };
+
+  const selectInternalUser = (user: DirectoryUser) => {
+    setSelectedUserId(user.id);
+    setNewEmail(user.email);
+    setNewName(user.full_name || user.email);
+  };
+
   const addSignerMutation = useMutation({
     mutationFn: async (signer: { email: string; name: string; role: string }) => {
       return fetchJson(`/sign-requests/${signRequestId}/signers`, {
@@ -57,10 +107,8 @@ export function ManageSignersDialog({
       });
     },
     onSuccess: () => {
-      toast.success('✅ Đã thêm người ký');
-      setNewEmail('');
-      setNewName('');
-      setNewRole('signer');
+      toast.success('Đã thêm người ký');
+      resetAddForm();
       onUpdate();
     },
     onError: (error: any) => {
@@ -68,7 +116,6 @@ export function ManageSignersDialog({
     },
   });
 
-  // Remove signer mutation
   const removeSignerMutation = useMutation({
     mutationFn: async (signerId: number) => {
       return fetchJson(`/sign-requests/${signRequestId}/signers/${signerId}`, {
@@ -76,7 +123,7 @@ export function ManageSignersDialog({
       });
     },
     onSuccess: () => {
-      toast.success('✅ Đã xóa người ký');
+      toast.success('Đã xóa người ký');
       onUpdate();
     },
     onError: (error: any) => {
@@ -84,33 +131,28 @@ export function ManageSignersDialog({
     },
   });
 
-  // ✅ Reorder signers mutation
   const reorderSignersMutation = useMutation({
     mutationFn: async (reorderedSigners: Signer[]) => {
-      // Update signing_order for all signers
       const updates = reorderedSigners.map((signer, index) => ({
         id: signer.id,
         signing_order: index + 1,
       }));
 
-      // Call backend API to update all signers
       return fetchJson(`/sign-requests/${signRequestId}/signers/reorder`, {
         method: 'PUT',
         body: JSON.stringify({ signers: updates }),
       });
     },
     onSuccess: () => {
-      toast.success('✅ Đã cập nhật thứ tự ký');
+      toast.success('Đã cập nhật thứ tự ký');
       onUpdate();
     },
     onError: (error: any) => {
       toast.error(error.message || 'Không thể cập nhật thứ tự');
-      // Revert to original order
       setLocalSigners(signers);
     },
   });
 
-  // ✅ Update signer role mutation
   const updateSignerMutation = useMutation({
     mutationFn: async ({ signerId, role }: { signerId: number; role: string }) => {
       return fetchJson(`/sign-requests/${signRequestId}/signers/${signerId}`, {
@@ -119,7 +161,7 @@ export function ManageSignersDialog({
       });
     },
     onSuccess: () => {
-      toast.success('✅ Đã cập nhật vai trò');
+      toast.success('Đã cập nhật vai trò');
       onUpdate();
     },
     onError: (error: any) => {
@@ -128,87 +170,86 @@ export function ManageSignersDialog({
   });
 
   const handleAddSigner = () => {
-    if (!newEmail || !newName) {
+    const email = newEmail.trim();
+    const name = newName.trim();
+
+    if (addMode === 'internal' && !selectedUserId) {
+      toast.error('Vui lòng chọn người dùng nội bộ');
+      return;
+    }
+    if (!email || !name) {
       toast.error('Vui lòng nhập đầy đủ email và tên');
       return;
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newEmail)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       toast.error('Email không hợp lệ');
       return;
     }
+    if (existingEmails.has(email.toLowerCase())) {
+      toast.error('Người ký này đã có trong danh sách');
+      return;
+    }
 
-    addSignerMutation.mutate({ email: newEmail, name: newName, role: newRole });
+    addSignerMutation.mutate({ email, name, role: newRole });
   };
 
-  // ✅ Drag & Drop handlers
   const handleDragStart = (index: number) => {
     setDraggedIndex(index);
   };
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
+  const handleDragOver = (event: React.DragEvent, index: number) => {
+    event.preventDefault();
     if (draggedIndex === null || draggedIndex === index) return;
 
-    const newSigners = [...localSigners];
-    const draggedItem = newSigners[draggedIndex];
-    newSigners.splice(draggedIndex, 1);
-    newSigners.splice(index, 0, draggedItem);
+    const nextSigners = [...localSigners];
+    const draggedItem = nextSigners[draggedIndex];
+    nextSigners.splice(draggedIndex, 1);
+    nextSigners.splice(index, 0, draggedItem);
 
-    setLocalSigners(newSigners);
+    setLocalSigners(nextSigners);
     setDraggedIndex(index);
   };
 
   const handleDragEnd = () => {
     if (draggedIndex !== null) {
-      // Save new order to backend
       reorderSignersMutation.mutate(localSigners);
     }
     setDraggedIndex(null);
   };
 
-  const handleRoleChange = (signerId: number, newRole: string) => {
-    updateSignerMutation.mutate({ signerId, role: newRole });
+  const handleRoleChange = (signerId: number, role: string) => {
+    updateSignerMutation.mutate({ signerId, role });
   };
 
   const handleRemoveSigner = (signerId: number) => {
-    if (signers.length <= 1) {
+    if (localSigners.length <= 1) {
       toast.error('Phải có ít nhất 1 người ký');
       return;
     }
 
-    if (confirm('Bạn có chắc muốn xóa người ký này?\n\nCác trường chữ ký đã gán cho người này sẽ bị xóa.')) {
+    if (confirm('Bạn có chắc muốn xóa người ký này?\n\nCác vị trí ký đã gán cho người này sẽ bị xóa.')) {
       removeSignerMutation.mutate(signerId);
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
+            <Users className="h-5 w-5" />
             Quản lý người ký
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="font-medium text-sm text-gray-700">
-              Danh sách người ký ({localSigners.length})
-            </h4>
-            {allowReorder && localSigners.length > 1 && (
-              <span className="text-xs text-gray-500">
-                🔄 Kéo thả để sắp xếp lại
-              </span>
-            )}
+            <h4 className="text-sm font-medium text-gray-700">Danh sách người ký ({localSigners.length})</h4>
+            {allowReorder && localSigners.length > 1 && <span className="text-xs text-gray-500">Kéo thả để sắp xếp lại</span>}
           </div>
-          
+
           {localSigners.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              Chưa có người ký nào
-            </div>
+            <div className="py-8 text-center text-gray-500">Chưa có người ký nào</div>
           ) : (
             <div className="space-y-2">
               {localSigners.map((signer, index) => (
@@ -216,55 +257,37 @@ export function ManageSignersDialog({
                   key={signer.id}
                   draggable={allowReorder}
                   onDragStart={() => handleDragStart(index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragOver={(event) => handleDragOver(event, index)}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-3 p-3 border rounded-lg transition-all ${
-                    allowReorder ? 'cursor-move hover:bg-blue-50 hover:border-blue-300' : 'hover:bg-gray-50'
-                  } ${draggedIndex === index ? 'opacity-50 scale-95' : ''}`}
+                  className={`flex items-center gap-3 rounded-lg border p-3 transition-all ${
+                    allowReorder ? 'cursor-move hover:border-blue-300 hover:bg-blue-50' : 'hover:bg-gray-50'
+                  } ${draggedIndex === index ? 'scale-95 opacity-50' : ''}`}
                 >
-                  {/* Drag Handle */}
-                  {allowReorder && (
-                    <div className="flex-shrink-0 text-gray-400 hover:text-gray-600">
-                      <GripVertical className="w-5 h-5" />
-                    </div>
-                  )}
+                  {allowReorder && <GripVertical className="h-5 w-5 flex-shrink-0 text-gray-400" />}
 
-                  {/* Order Badge */}
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-sm">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
                     {index + 1}
                   </div>
 
-                  {/* Signer Info */}
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <div className="font-medium text-sm truncate">
-                        {signer.name}
-                      </div>
-                      {signer.is_internal && (
-                        <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">
-                          Nội bộ
-                        </span>
-                      )}
+                      <div className="truncate text-sm font-medium">{signer.name}</div>
+                      {signer.is_internal && <span className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700">Nội bộ</span>}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">
-                      {signer.email}
-                    </div>
-                    
-                    {/* Role Selector */}
+                    <div className="truncate text-xs text-gray-500">{signer.email}</div>
                     <div className="mt-2">
                       <select
                         value={signer.role || 'signer'}
-                        onChange={(e) => handleRoleChange(signer.id, e.target.value)}
+                        onChange={(event) => handleRoleChange(signer.id, event.target.value)}
                         disabled={updateSignerMutation.isPending}
-                        className="text-xs border rounded px-2 py-1 bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                        className="rounded border bg-white px-2 py-1 text-xs outline-none hover:border-blue-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                       >
-                        <option value="signer">👤 Người ký</option>
-                        <option value="approver">✅ Người phê duyệt</option>
+                        <option value="signer">Người ký</option>
+                        <option value="approver">Người phê duyệt</option>
                       </select>
                     </div>
                   </div>
 
-                  {/* Remove Button */}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -273,7 +296,7 @@ export function ManageSignersDialog({
                     className="flex-shrink-0"
                     title={localSigners.length === 1 ? 'Phải có ít nhất 1 người ký' : 'Xóa người ký'}
                   >
-                    <X className="w-4 h-4" />
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
               ))}
@@ -281,25 +304,105 @@ export function ManageSignersDialog({
           )}
         </div>
 
-        <div className="border-t pt-4 space-y-3">
-          <h4 className="font-medium text-sm text-gray-700 flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Thêm người ký mới
-          </h4>
+        <div className="space-y-4 border-t pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <Plus className="h-4 w-4" />
+              Thêm người ký mới
+            </h4>
+            <div className="flex rounded-lg border bg-gray-50 p-1 text-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setAddMode('internal');
+                  resetAddForm();
+                }}
+                className={`rounded-md px-3 py-1.5 ${addMode === 'internal' ? 'bg-white font-medium text-blue-700 shadow-sm' : 'text-gray-600'}`}
+              >
+                Nội bộ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddMode('external');
+                  resetAddForm();
+                }}
+                className={`rounded-md px-3 py-1.5 ${addMode === 'external' ? 'bg-white font-medium text-blue-700 shadow-sm' : 'text-gray-600'}`}
+              >
+                Bên ngoài
+              </button>
+            </div>
+          </div>
+
+          {addMode === 'internal' && (
+            <div className="space-y-3 rounded-lg border bg-slate-50 p-3">
+              <div>
+                <Label htmlFor="internal-user-search" className="text-xs">Tìm người dùng nội bộ</Label>
+                <div className="relative mt-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    id="internal-user-search"
+                    value={userSearch}
+                    onChange={(event) => setUserSearch(event.target.value)}
+                    placeholder="Tìm theo tên, email, phòng ban hoặc chức danh"
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              <div className="max-h-56 overflow-y-auto rounded-md border bg-white">
+                {isLoadingUsers ? (
+                  <div className="p-3 text-sm text-gray-500">Đang tải danh sách người dùng...</div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="p-3 text-sm text-gray-500">Không tìm thấy người dùng phù hợp.</div>
+                ) : (
+                  filteredUsers.map((user) => {
+                    const selected = selectedUserId === user.id;
+                    return (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => selectInternalUser(user)}
+                        className={`flex w-full items-center gap-3 border-b px-3 py-2 text-left last:border-b-0 hover:bg-blue-50 ${selected ? 'bg-blue-50' : ''}`}
+                      >
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+                          <UserIcon className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium text-gray-900">{user.full_name || user.email}</div>
+                          <div className="truncate text-xs text-gray-500">{user.email}</div>
+                          {(user.department?.name || user.position?.name) && (
+                            <div className="truncate text-xs text-gray-400">
+                              {[user.department?.name, user.position?.name].filter(Boolean).join(' - ')}
+                            </div>
+                          )}
+                        </div>
+                        {selected && <Check className="h-4 w-4 flex-shrink-0 text-blue-600" />}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label htmlFor="new-email" className="text-xs">Email *</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <Input
                   id="new-email"
                   type="email"
                   placeholder="email@example.com"
                   value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
+                  onChange={(event) => {
+                    setNewEmail(event.target.value);
+                    if (addMode === 'internal') setSelectedUserId(null);
+                  }}
                   className="pl-9"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddSigner()}
+                  readOnly={addMode === 'internal'}
+                  onKeyDown={(event) => event.key === 'Enter' && handleAddSigner()}
                 />
               </div>
             </div>
@@ -307,15 +410,16 @@ export function ManageSignersDialog({
             <div>
               <Label htmlFor="new-name" className="text-xs">Họ tên *</Label>
               <div className="relative">
-                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <UserIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <Input
                   id="new-name"
                   type="text"
                   placeholder="Nguyễn Văn A"
                   value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
+                  onChange={(event) => setNewName(event.target.value)}
                   className="pl-9"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddSigner()}
+                  readOnly={addMode === 'internal'}
+                  onKeyDown={(event) => event.key === 'Enter' && handleAddSigner()}
                 />
               </div>
             </div>
@@ -325,42 +429,36 @@ export function ManageSignersDialog({
               <select
                 id="new-role"
                 value={newRole}
-                onChange={(e) => setNewRole(e.target.value)}
-                className="w-full h-10 border rounded-md px-3 text-sm bg-white hover:border-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                onChange={(event) => setNewRole(event.target.value)}
+                className="h-10 w-full rounded-md border bg-white px-3 text-sm outline-none hover:border-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               >
-                <option value="signer">👤 Người ký</option>
-                <option value="approver">✅ Người phê duyệt</option>
+                <option value="signer">Người ký</option>
+                <option value="approver">Người phê duyệt</option>
               </select>
             </div>
           </div>
 
-          <Button
-            onClick={handleAddSigner}
-            disabled={addSignerMutation.isPending || !newEmail || !newName}
-            className="w-full"
-          >
+          <Button onClick={handleAddSigner} disabled={addSignerMutation.isPending || !newEmail || !newName} className="w-full">
             {addSignerMutation.isPending ? (
               <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 Đang thêm...
               </>
             ) : (
               <>
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="mr-2 h-4 w-4" />
                 Thêm người ký
               </>
             )}
           </Button>
 
           <p className="text-xs text-gray-500">
-            💡 Người ký nội bộ sẽ được tự động phát hiện dựa trên email.
+            Người ký nội bộ được chọn từ danh bạ user và sẽ nhận tác vụ ký trong hệ thống. Người ký bên ngoài vẫn dùng email và OTP.
           </p>
         </div>
 
-        <div className="border-t pt-4 flex justify-end">
-          <Button variant="outline" onClick={onClose}>
-            Đóng
-          </Button>
+        <div className="flex justify-end border-t pt-4">
+          <Button variant="outline" onClick={onClose}>Đóng</Button>
         </div>
       </DialogContent>
     </Dialog>

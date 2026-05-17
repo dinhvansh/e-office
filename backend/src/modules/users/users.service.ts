@@ -11,6 +11,17 @@ export const usersService = {
     return usersRepository.findByTenant(tenantId, { status: 'active' });
   },
 
+  async getDirectoryUsers(tenantId: number, search?: string) {
+    const users = await usersRepository.findByTenant(tenantId, { status: 'active', search });
+    return users.map((user: any) => ({
+      id: user.id,
+      email: user.email,
+      full_name: user.full_name,
+      department: user.department ? { id: user.department.id, name: user.department.name } : null,
+      position: user.position ? { id: user.position.id, name: user.position.name, code: user.position.code } : null,
+    }));
+  },
+
   async getUserById(id: number, tenantId: number) {
     const user = await usersRepository.findById(id, tenantId);
     if (!user) {

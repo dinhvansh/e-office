@@ -37,6 +37,17 @@ export const usersController = {
     }
   },
 
+  async getDirectoryUsers(req: Request, res: Response) {
+    try {
+      const tenantId = (req as any).auth.tenantId;
+      const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+      const users = await usersService.getDirectoryUsers(tenantId, search);
+      res.json({ success: true, data: { users } });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
   async getUserById(req: Request, res: Response) {
     try {
       const tenantId = (req as any).auth.tenantId;

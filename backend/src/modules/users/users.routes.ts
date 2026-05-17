@@ -11,6 +11,7 @@ router.use(authGuard);
 // Public routes (authenticated users)
 router.get('/profile', usersController.getProfile);
 router.post('/change-password', usersController.changePassword);
+router.get('/directory', usersController.getDirectoryUsers);
 
 // Admin routes (require permissions)
 router.get('/', requirePermission('users', 'read'), usersController.getUsers);
