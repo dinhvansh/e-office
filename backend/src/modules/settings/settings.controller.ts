@@ -29,22 +29,19 @@ export const settingsController = {
     try {
       const { testEmail } = req.body;
       const tenantId = req.auth!.tenantId;
-      
-      // Get email config
-      const config = await settingsService.getEmailConfig(tenantId);
-      if (!config) {
-        return res.status(400).json({ success: false, error: 'Email config not found' });
+
+      if (!testEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(testEmail))) {
+        return res.status(400).json({ success: false, error: 'Valid testEmail is required' });
       }
 
-      // TODO: Send test email using the config
-      // For now, just return success
-      res.json({ 
-        success: true, 
-        message: `Test email would be sent to ${testEmail}`,
-        note: 'Test email functionality coming soon'
+      await settingsService.sendTestEmail(tenantId, String(testEmail));
+
+      res.json({
+        success: true,
+        message: `Test email sent to ${testEmail}`,
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(400).json({ success: false, error: error.message });
     }
   },
 

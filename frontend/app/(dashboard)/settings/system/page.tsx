@@ -23,6 +23,7 @@ export default function SystemSettingsPage() {
     provider: "gmail",
     smtp_host: "",
     smtp_port: "587",
+    smtp_secure: false,
     smtp_user: "",
     smtp_password: "",
     smtp_from: "",
@@ -42,6 +43,7 @@ export default function SystemSettingsPage() {
     rotation: 45,
     color: "#000000"
   });
+  const [testEmail, setTestEmail] = useState("");
 
   useEffect(() => {
     loadSettings();
@@ -56,7 +58,7 @@ export default function SystemSettingsPage() {
       ]);
 
       if (emailRes.data.success && emailRes.data.data) {
-        setEmailConfig(emailRes.data.data);
+        setEmailConfig((current) => ({ ...current, ...emailRes.data.data }));
       }
 
       if (watermarkRes.data.success && watermarkRes.data.data) {
@@ -85,12 +87,14 @@ export default function SystemSettingsPage() {
   };
 
   const handleTestEmail = async () => {
-    const testEmail = prompt('Nhập email để test:');
-    if (!testEmail) return;
+    if (!testEmail.trim()) {
+      toast.error('Nhập email nhận test trước khi gửi');
+      return;
+    }
 
     try {
       setTesting(true);
-      const res = await api.post('/settings/email/test', { testEmail });
+      const res = await api.post('/settings/email/test', { testEmail: testEmail.trim() });
       if (res.data.success) {
         toast.success(res.data.message || 'Email test đã được gửi');
       }
@@ -207,7 +211,20 @@ export default function SystemSettingsPage() {
                         onChange={(e) => setEmailConfig({ ...emailConfig, smtp_port: e.target.value })}
                         placeholder="587"
                       />
+                  </div>
+                </div>
+
+                  <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                    <div className="space-y-0.5">
+                      <Label>SSL/TLS trực tiếp</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Bật cho port 465. Port 587 thường dùng STARTTLS và để tắt.
+                      </p>
                     </div>
+                    <Switch
+                      checked={Boolean(emailConfig.smtp_secure)}
+                      onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, smtp_secure: checked })}
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -295,15 +312,32 @@ export default function SystemSettingsPage() {
                 </div>
               </div>
 
+              <div className="space-y-2 rounded-lg border bg-slate-50 p-4">
+                <Label htmlFor="test_email">Email nhận test</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    id="test_email"
+                    type="email"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                    placeholder="admin@company.com"
+                    className="bg-white"
+                  />
+                  <Button variant="outline" onClick={handleTestEmail} disabled={testing || saving || !testEmail.trim()}>
+                    {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <TestTube className="w-4 h-4 mr-2" />}
+                    {testing ? "Đang gửi..." : "Gửi test"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Lưu cấu hình trước, sau đó gửi email test để xác nhận SMTP hoạt động.
+                </p>
+              </div>
+
               {/* Actions */}
               <div className="flex gap-2 pt-4">
                 <Button onClick={handleSaveEmail} disabled={saving}>
                   {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                   {saving ? "Đang lưu..." : "Lưu cấu hình"}
-                </Button>
-                <Button variant="outline" onClick={handleTestEmail} disabled={testing || saving}>
-                  {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <TestTube className="w-4 h-4 mr-2" />}
-                  {testing ? "Đang gửi..." : "Test gửi email"}
                 </Button>
               </div>
 
