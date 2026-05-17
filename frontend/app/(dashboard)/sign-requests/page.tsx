@@ -128,9 +128,9 @@ export default function SignRequestsPage() {
       });
       const flow = res?.sign_request?.flow_state;
       if (flow === 'AWAITING_APPROVAL') {
-        toast.success('?? g?i l?i v? chuy?n v? b??c ch? duy?t.');
+        toast.success('Đã gửi lại và chuyển về bước chờ duyệt.');
       } else {
-        toast.success('?? g?i l?i email th?nh c?ng!');
+        toast.success('Đã gửi lại email thành công!');
       }
     } catch (error: any) {
       console.error('Resend email error:', error);
@@ -286,21 +286,21 @@ export default function SignRequestsPage() {
 
   const getStatusBadge = (request: SignRequest) => {
     if (request.flow_state === 'CANCELLED' || request.status === 'cancelled') {
-      return <Badge variant="secondary" className="bg-gray-500 text-white">?? h?y</Badge>;
+      return <Badge variant="secondary" className="bg-gray-500 text-white">Đã hủy</Badge>;
     }
     if (request.flow_state === 'REJECTED' || request.progress.rejected > 0) {
-      return <Badge variant="destructive">?? t? ch?i</Badge>;
+      return <Badge variant="destructive">Đã từ chối</Badge>;
     }
     if (request.flow_state === 'COMPLETED' || request.status === 'completed' || request.progress.percentage === 100) {
-      return <Badge className="bg-green-500 hover:bg-green-600">?? ho?n th?nh</Badge>;
+      return <Badge className="bg-green-500 hover:bg-green-600">Đã hoàn thành</Badge>;
     }
     if (request.flow_state === 'AWAITING_APPROVAL' || request.status === 'pending_approval') {
-      return <Badge className="bg-amber-500 hover:bg-amber-600">Ch? duy?t</Badge>;
+      return <Badge className="bg-amber-500 hover:bg-amber-600">Chờ duyệt</Badge>;
     }
     if (request.flow_state === 'AWAITING_SIGNATURES' || request.status === 'pending' || request.status === 'in_progress') {
-      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Ch? k?</Badge>;
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Chờ ký</Badge>;
     }
-    return <Badge variant="secondary">Nh?p</Badge>;
+    return <Badge variant="secondary">Nháp</Badge>;
   };
 
   const getProgressColor = (percentage: number, rejected: number, status: string) => {
