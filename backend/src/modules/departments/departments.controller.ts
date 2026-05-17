@@ -1,5 +1,24 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 import { departmentsService } from './departments.service';
+
+const idSchema = z.coerce.number().int().positive();
+const departmentPayloadSchema = z.object({
+  code: z.string().trim().max(50).optional(),
+  name: z.string().trim().min(1, 'Department name is required'),
+  parent_id: z.number().int().positive().nullable().optional(),
+  manager_id: z.number().int().positive().nullable().optional(),
+  description: z.string().trim().max(500).nullable().optional(),
+});
+
+const updateDepartmentPayloadSchema = departmentPayloadSchema.partial();
+type CreateDepartmentInput = {
+  name: string;
+  code?: string;
+  parent_id?: number | null;
+  manager_id?: number | null;
+  description?: string | null;
+};
 
 export const departmentsController = {
   async getDepartments(req: Request, res: Response) {
@@ -25,8 +44,8 @@ export const departmentsController = {
   async getDepartmentById(req: Request, res: Response) {
     try {
       const tenantId = (req as any).auth.tenantId;
-      const { id } = req.params;
-      const department = await departmentsService.getDepartmentById(parseInt(id), tenantId);
+      const id = idSchema.parse(req.params.id);
+      const department = await departmentsService.getDepartmentById(id, tenantId);
       res.json({ success: true, data: department });
     } catch (error: any) {
       res.status(404).json({ success: false, error: error.message });
@@ -36,7 +55,8 @@ export const departmentsController = {
   async createDepartment(req: Request, res: Response) {
     try {
       const tenantId = (req as any).auth.tenantId;
-      const department = await departmentsService.createDepartment(tenantId, req.body);
+      const payload = departmentPayloadSchema.parse(req.body) as CreateDepartmentInput;
+      const department = await departmentsService.createDepartment(tenantId, payload);
       res.status(201).json({ success: true, data: department });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
@@ -46,8 +66,9 @@ export const departmentsController = {
   async updateDepartment(req: Request, res: Response) {
     try {
       const tenantId = (req as any).auth.tenantId;
-      const { id } = req.params;
-      const department = await departmentsService.updateDepartment(parseInt(id), tenantId, req.body);
+      const id = idSchema.parse(req.params.id);
+      const payload = updateDepartmentPayloadSchema.parse(req.body);
+      const department = await departmentsService.updateDepartment(id, tenantId, payload);
       res.json({ success: true, data: department });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
@@ -57,8 +78,8 @@ export const departmentsController = {
   async deleteDepartment(req: Request, res: Response) {
     try {
       const tenantId = (req as any).auth.tenantId;
-      const { id } = req.params;
-      await departmentsService.deleteDepartment(parseInt(id), tenantId);
+      const id = idSchema.parse(req.params.id);
+      await departmentsService.deleteDepartment(id, tenantId);
       res.json({ success: true, message: 'Department deleted' });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });

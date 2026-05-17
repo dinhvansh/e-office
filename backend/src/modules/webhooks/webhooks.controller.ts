@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { z } from "zod";
+import { ApiError } from "../../core/errors/api-error";
 import { ok } from "../../core/utils/response";
 import { webhooksRepository } from "./webhooks.repository";
 
@@ -17,6 +18,16 @@ const updateWebhookSchema = z.object({
   active: z.boolean().optional(),
 });
 
+const idSchema = z.coerce.number().int().positive();
+const limitSchema = z.coerce.number().int().positive().max(500).optional();
+
+const parseOrBadRequest = <T>(result: z.SafeParseReturnType<unknown, T>, message: string): T => {
+  if (!result.success) {
+    throw ApiError.badRequest(message, "VALIDATION_ERROR", result.error.flatten());
+  }
+  return result.data;
+};
+
 export class WebhooksController {
   list = async (req: Request, res: Response): Promise<void> => {
     const webhooks = await webhooksRepository.findByTenantId(req.auth!.tenantId);
@@ -24,7 +35,7 @@ export class WebhooksController {
   };
 
   create = async (req: Request, res: Response): Promise<void> => {
-    const body = createWebhookSchema.parse(req.body);
+    const body = parseOrBadRequest(createWebhookSchema.safeParse(req.body), "Invalid webhook payload");
     const webhook = await webhooksRepository.create({
       tenant_id: req.auth!.tenantId,
       url: body.url,
@@ -36,25 +47,23 @@ export class WebhooksController {
   };
 
   getById = async (req: Request, res: Response): Promise<void> => {
-    const id = parseInt(req.params.id);
+    const id = parseOrBadRequest(idSchema.safeParse(req.params.id), "Invalid webhook id");
     const webhook = await webhooksRepository.findById(id, req.auth!.tenantId);
     
     if (!webhook) {
-      res.status(404).json({ error: "Webhook not found" });
-      return;
+      throw ApiError.notFound("Webhook not found", "WEBHOOK_NOT_FOUND");
     }
 
     res.json(ok(webhook));
   };
 
   update = async (req: Request, res: Response): Promise<void> => {
-    const id = parseInt(req.params.id);
-    const body = updateWebhookSchema.parse(req.body);
+    const id = parseOrBadRequest(idSchema.safeParse(req.params.id), "Invalid webhook id");
+    const body = parseOrBadRequest(updateWebhookSchema.safeParse(req.body), "Invalid webhook payload");
 
     const existing = await webhooksRepository.findById(id, req.auth!.tenantId);
     if (!existing) {
-      res.status(404).json({ error: "Webhook not found" });
-      return;
+      throw ApiError.notFound("Webhook not found", "WEBHOOK_NOT_FOUND");
     }
 
     const webhook = await webhooksRepository.update(id, req.auth!.tenantId, body);
@@ -62,12 +71,11 @@ export class WebhooksController {
   };
 
   delete = async (req: Request, res: Response): Promise<void> => {
-    const id = parseInt(req.params.id);
+    const id = parseOrBadRequest(idSchema.safeParse(req.params.id), "Invalid webhook id");
 
     const existing = await webhooksRepository.findById(id, req.auth!.tenantId);
     if (!existing) {
-      res.status(404).json({ error: "Webhook not found" });
-      return;
+      throw ApiError.notFound("Webhook not found", "WEBHOOK_NOT_FOUND");
     }
 
     await webhooksRepository.delete(id, req.auth!.tenantId);
@@ -75,13 +83,12 @@ export class WebhooksController {
   };
 
   getLogs = async (req: Request, res: Response): Promise<void> => {
-    const id = parseInt(req.params.id);
-    const limit = parseInt(req.query.limit as string) || 100;
+    const id = parseOrBadRequest(idSchema.safeParse(req.params.id), "Invalid webhook id");
+    const limit = parseOrBadRequest(limitSchema.safeParse(req.query.limit), "Invalid logs limit") ?? 100;
 
     const webhook = await webhooksRepository.findById(id, req.auth!.tenantId);
     if (!webhook) {
-      res.status(404).json({ error: "Webhook not found" });
-      return;
+      throw ApiError.notFound("Webhook not found", "WEBHOOK_NOT_FOUND");
     }
 
     const logs = await webhooksRepository.findLogsByWebhookId(id, limit);

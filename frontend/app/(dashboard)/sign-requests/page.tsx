@@ -25,6 +25,8 @@ import { toast } from 'sonner';
 interface SignRequest {
   id: number;
   status: string;
+  flow_state?: string;
+  next_action?: string;
   created_at: string;
   document: {
     id: number;
@@ -121,10 +123,15 @@ export default function SignRequestsPage() {
     if (!confirm('Gửi lại email cho người ký bên ngoài?')) return;
     
     try {
-      await fetchJson(`/sign-requests/${signRequestId}/send`, {
+      const res = await fetchJson<{ sign_request?: { flow_state?: string } }>(`/sign-requests/${signRequestId}/send`, {
         method: 'POST',
       });
-      toast.success('Đã gửi lại email thành công!');
+      const flow = res?.sign_request?.flow_state;
+      if (flow === 'AWAITING_APPROVAL') {
+        toast.success('?? g?i l?i v? chuy?n v? b??c ch? duy?t.');
+      } else {
+        toast.success('?? g?i l?i email th?nh c?ng!');
+      }
     } catch (error: any) {
       console.error('Resend email error:', error);
       toast.error('Lỗi: ' + (error.message || 'Không thể gửi email'));
@@ -277,23 +284,23 @@ export default function SignRequestsPage() {
   const data = response?.sign_requests;
   const pagination = response?.pagination;
 
-  const getStatusBadge = (progress: SignRequest['progress'], status: string) => {
-    if (status === 'cancelled') {
-      return <Badge variant="secondary" className="bg-gray-500 text-white">Đã hủy</Badge>;
+  const getStatusBadge = (request: SignRequest) => {
+    if (request.flow_state === 'CANCELLED' || request.status === 'cancelled') {
+      return <Badge variant="secondary" className="bg-gray-500 text-white">?? h?y</Badge>;
     }
-    if (progress.rejected > 0) {
-      return <Badge variant="destructive">Đã từ chối</Badge>;
+    if (request.flow_state === 'REJECTED' || request.progress.rejected > 0) {
+      return <Badge variant="destructive">?? t? ch?i</Badge>;
     }
-    if (progress.percentage === 100 || status === 'completed') {
-      return <Badge className="bg-green-500 hover:bg-green-600">Đã hoàn thành</Badge>;
+    if (request.flow_state === 'COMPLETED' || request.status === 'completed' || request.progress.percentage === 100) {
+      return <Badge className="bg-green-500 hover:bg-green-600">?? ho?n th?nh</Badge>;
     }
-    if (status === 'pending_approval') {
-      return <Badge className="bg-amber-500 hover:bg-amber-600">Chờ duyệt</Badge>;
+    if (request.flow_state === 'AWAITING_APPROVAL' || request.status === 'pending_approval') {
+      return <Badge className="bg-amber-500 hover:bg-amber-600">Ch? duy?t</Badge>;
     }
-    if (status === 'pending' || status === 'in_progress') {
-      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Chờ ký</Badge>;
+    if (request.flow_state === 'AWAITING_SIGNATURES' || request.status === 'pending' || request.status === 'in_progress') {
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Ch? k?</Badge>;
     }
-    return <Badge variant="secondary">Nháp</Badge>;
+    return <Badge variant="secondary">Nh?p</Badge>;
   };
 
   const getProgressColor = (percentage: number, rejected: number, status: string) => {
@@ -473,12 +480,12 @@ export default function SignRequestsPage() {
                         </div>
                       </td>
                       <td className="px-2 py-3">
-                        {getStatusBadge(request.progress, request.status)}
+                        {getStatusBadge(request)}
                       </td>
                       <td className="px-2 py-3">
                         <div className="flex items-center gap-1 justify-center" onClick={(e) => e.stopPropagation()}>
                           {/* Edit Workflow Button - Show for draft documents */}
-                          {request.status === 'draft' && (
+                          {(request.flow_state === 'DRAFT' || request.status === 'draft') && (
                             <Button
                               size="sm"
                               onClick={() => router.push(`/sign-requests/${request.id}/editor`)}
@@ -526,7 +533,7 @@ export default function SignRequestsPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
                               {/* Delete - Draft only */}
-                              {request.status === 'draft' && (
+                              {(request.flow_state === 'DRAFT' || request.status === 'draft') && (
                                 <>
                                   <DropdownMenuItem
                                     onClick={() => handleDelete(request.id, request.document.id)}
@@ -541,7 +548,7 @@ export default function SignRequestsPage() {
                               )}
 
                               {/* Cancel - Pending/In Progress only */}
-                              {(request.status === 'pending' || request.status === 'in_progress') && (
+                              {(request.flow_state === 'AWAITING_SIGNATURES' || request.status === 'pending' || request.status === 'in_progress') && (
                                 <>
                                   <DropdownMenuItem
                                     onClick={() => handleCancel(request.id)}
@@ -556,7 +563,7 @@ export default function SignRequestsPage() {
                               )}
 
                               {/* Revoke - Completed internal documents only */}
-                              {(request.status === 'completed' || request.progress.percentage === 100) && 
+                              {(request.flow_state === 'COMPLETED' || request.status === 'completed' || request.progress.percentage === 100) && 
                                request.signers.every(s => s.is_internal) && (
                                 <>
                                   <DropdownMenuItem
@@ -692,7 +699,7 @@ export default function SignRequestsPage() {
                       </p>
                     </div>
                     <div onClick={(e) => e.stopPropagation()}>
-                      {getStatusBadge(request.progress, request.status)}
+                      {getStatusBadge(request)}
                     </div>
                   </div>
 
@@ -721,7 +728,7 @@ export default function SignRequestsPage() {
                   </div>
 
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    {request.status === 'draft' && (
+                    {(request.flow_state === 'DRAFT' || request.status === 'draft') && (
                       <Button size="sm" onClick={() => router.push(`/sign-requests/${request.id}/editor`)} className="flex-1 bg-blue-600 text-white text-xs h-8">
                         <Edit className="w-3.5 h-3.5 mr-1" />Chỉnh sửa
                       </Button>
@@ -741,12 +748,12 @@ export default function SignRequestsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
-                        {request.status === 'draft' && (
+                        {(request.flow_state === 'DRAFT' || request.status === 'draft') && (
                           <DropdownMenuItem onClick={() => handleDelete(request.id, request.document.id)} className="text-red-600">
                             <Trash2 className="w-4 h-4 mr-2" />Xóa
                           </DropdownMenuItem>
                         )}
-                        {(request.status === 'pending' || request.status === 'in_progress') && (
+                        {(request.flow_state === 'AWAITING_SIGNATURES' || request.status === 'pending' || request.status === 'in_progress') && (
                           <DropdownMenuItem onClick={() => handleCancel(request.id)} className="text-orange-600">
                             <XCircle className="w-4 h-4 mr-2" />Hủy
                           </DropdownMenuItem>

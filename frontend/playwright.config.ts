@@ -6,6 +6,7 @@ if (!process.env.PLAYWRIGHT_BASE_URL) {
 }
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL;
+const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL || undefined;
 
 export default defineConfig({
   testDir: "./tests",
@@ -25,7 +26,7 @@ export default defineConfig({
       name: "chromium",
       use: { 
         ...devices["Desktop Chrome"],
-        channel: 'chrome', // Use system Chrome instead of downloading Chromium
+        ...(browserChannel ? { channel: browserChannel } : {}),
       },
     },
   ],

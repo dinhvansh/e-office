@@ -19,7 +19,7 @@ type TenantProfile = {
 
 type Tokens = {
   accessToken: string;
-  refreshToken: string;
+  refreshToken?: string;
 };
 
 type AuthContextValue = {
@@ -41,6 +41,12 @@ type StoredSession = {
   user?: AuthUser;
   tenant?: TenantProfile;
   tokens?: Tokens;
+};
+
+type ApiEnvelope<T> = {
+  success?: boolean;
+  data?: T;
+  error?: string | { message?: string };
 };
 
 const readStoredSession = (): StoredSession | undefined => {
@@ -66,7 +72,12 @@ const writeStoredSession = (session?: StoredSession) => {
     window.localStorage.removeItem(STORAGE_KEY);
     return;
   }
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  const safeSession: StoredSession = {
+    user: session.user,
+    tenant: session.tenant,
+    tokens: session.tokens?.accessToken ? { accessToken: session.tokens.accessToken } : undefined,
+  };
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(safeSession));
 };
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -93,6 +104,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const apiBaseUrl = getApiBaseUrl();
     const res = await fetch(`${apiBaseUrl}/auth/login`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
@@ -124,6 +136,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const logout = useCallback(() => {
+    const apiBaseUrl = getApiBaseUrl();
+    fetch(`${apiBaseUrl}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => undefined);
     setTokens(undefined);
     setUser(undefined);
     setTenant(undefined);
@@ -131,41 +145,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const refreshTokens = useCallback(async () => {
-    if (!tokens?.refreshToken) {
-      return false;
-    }
     try {
       const apiBaseUrl = getApiBaseUrl();
       const res = await fetch(`${apiBaseUrl}/auth/refresh`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: tokens.refreshToken }),
+        body: JSON.stringify({}),
       });
       if (!res.ok) {
-        console.error('[Auth] Refresh failed with status:', res.status);
         logout();
         return false;
       }
       const payload = await res.json();
       if (!payload.success) {
-        console.error('[Auth] Refresh failed:', payload.error);
         logout();
         return false;
       }
-      console.log('[Auth] Token refreshed successfully');
       setTokens(payload.data.tokens);
       setUser(payload.data.user);
       setTenant(payload.data.tenant);
       return true;
     } catch (error) {
-      console.error('[Auth] Refresh error:', error);
       // Only logout if it's an auth error, not network error
       if (error instanceof Error && !error.message.includes('fetch')) {
         logout();
       }
       return false;
     }
-  }, [logout, tokens?.refreshToken]);
+  }, [logout]);
 
   const fetchJson = useCallback(
     async <T,>(path: string, init?: RequestInit): Promise<T> => {
@@ -173,6 +181,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const apiBaseUrl = getApiBaseUrl();
         const res = await fetch(`${apiBaseUrl}${path}`, {
           ...init,
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
             ...(init?.headers ?? {}),
@@ -180,43 +189,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           },
         });
         if (res.status === 401 && !retry) {
-          console.log('[Auth] Got 401, attempting token refresh...');
           const refreshed = await refreshTokens();
           if (refreshed) {
-            console.log('[Auth] Retry request after refresh');
             return attempt(true);
           }
-          console.error('[Auth] Refresh failed, logging out...');
           logout();
           throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
         }
         // Handle non-JSON responses
-        let json;
+        let json: ApiEnvelope<T> | T;
         try {
           json = await res.json();
-        } catch (parseError) {
-          console.error('[Auth] Failed to parse JSON response:', parseError);
+        } catch {
           throw new Error(`Request failed with status ${res.status}`);
         }
 
-        // Check if response has success field
-        if (json.success === false) {
-          console.error('[Auth] Request failed:', json.error);
-          // Backend returns error as string directly, not as object
-          const errorMessage = typeof json.error === 'string' 
-            ? json.error 
-            : json.error?.message ?? `Request failed with status ${res.status}`;
+        const envelope = json as ApiEnvelope<T>;
+
+        if (!res.ok || envelope.success === false) {
+          const errorMessage = typeof envelope.error === 'string'
+            ? envelope.error
+            : envelope.error?.message ?? `Request failed with status ${res.status}`;
           throw new Error(errorMessage);
         }
 
-        // If no success field but has data, return data
-        if (json.data !== undefined) {
-          return json.data as T;
-        }
-
-        // If success is true, return data
-        if (json.success === true) {
-          return json.data as T;
+        if (envelope.data !== undefined) {
+          return envelope.data as T;
         }
 
         // Otherwise return the whole response

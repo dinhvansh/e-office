@@ -49,33 +49,20 @@ export default function WebhooksPage() {
   const [active, setActive] = useState(true);
 
   // Fetch webhooks
-  const { data: webhooks = [], isLoading, error } = useQuery<Webhook[]>({
+  const { data: webhooks = [], isLoading } = useQuery<Webhook[]>({
     queryKey: ["webhooks"],
     queryFn: async () => {
-      console.log('🔍 Fetching webhooks...');
-      try {
-        const response = await fetchJson("/webhooks");
-        console.log('📦 Webhooks response:', response);
-        
-        // Handle different response formats
-        if (Array.isArray(response)) {
-          console.log('✅ Got array directly:', response.length, 'webhooks');
-          return response;
-        }
-        if (response && typeof response === 'object' && 'data' in response) {
-          console.log('✅ Got data field:', response.data?.length || 0, 'webhooks');
-          return response.data || [];
-        }
-        console.log('⚠️ Unexpected response format:', response);
-        return [];
-      } catch (err) {
-        console.error('❌ Error fetching webhooks:', err);
-        throw err;
+      const response = await fetchJson("/webhooks");
+
+      if (Array.isArray(response)) {
+        return response;
       }
+      if (response && typeof response === 'object' && 'data' in response) {
+        return response.data || [];
+      }
+      return [];
     },
   });
-
-  console.log('🎯 Webhooks state:', { count: webhooks.length, isLoading, error });
 
   const createMutation = useMutation({
     mutationFn: async (data: { url: string; events: string[]; secret?: string; active: boolean }) => {
@@ -387,3 +374,4 @@ export default function WebhooksPage() {
     </div>
   );
 }
+

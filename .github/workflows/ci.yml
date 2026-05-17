@@ -9,6 +9,89 @@ on:
   workflow_dispatch:
 
 jobs:
+  auth-matrix:
+    name: Authorization Matrix
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: eoffice_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d eoffice_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/eoffice_test?schema=public
+      JWT_SECRET: ci-jwt-secret-at-least-32-chars-long
+      REDIS_URL: redis://localhost:6379
+      NODE_ENV: test
+      PORT: 4000
+      E2E_API_BASE: http://localhost:4000/api/v1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Prepare database
+        run: |
+          npx prisma db push
+          node scripts/seed.js
+          node scripts/seed-rbac.js
+          node scripts/seed-document-types.js
+          node scripts/seed-workflows-simple.js
+
+      - name: Start backend
+        run: |
+          npm run build
+          nohup npm run start > /tmp/backend.log 2>&1 &
+
+      - name: Wait for backend health
+        run: |
+          for i in {1..30}; do
+            curl -fsS http://localhost:4000/health && exit 0
+            sleep 2
+          done
+          echo "Backend did not become healthy in time"
+          cat /tmp/backend.log
+          exit 1
+
+      - name: Run authorization matrix
+        run: npm run test:auth-matrix
+
+      - name: Show backend log on failure
+        if: failure()
+        run: cat /tmp/backend.log
+
   build:
     name: Build (${{ matrix.service.name }})
     runs-on: ubuntu-latest

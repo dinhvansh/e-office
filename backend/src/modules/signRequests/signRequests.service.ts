@@ -11,6 +11,7 @@ import { signRequestsRepository } from "./signRequests.repository";
 import { signRequestFieldsService } from "./signRequestFields.service";
 import { notificationsService } from "../notifications/notifications.service";
 import { NotificationType } from "../notifications/notifications.types";
+import { authorizationService } from "../authorization/authorization.service";
 
 export interface SignerInput {
   email: string;
@@ -29,6 +30,61 @@ export interface CreateSignRequestInput {
 }
 
 class SignRequestsService {
+  private async ensureCanManageSignRequest(signRequestId: number, tenantId: number, userId: number) {
+    const signRequest = await this.getSignRequest(signRequestId, tenantId);
+    const decision = await authorizationService.canAccessDocument(
+      userId,
+      tenantId,
+      signRequest.document_id,
+      "edit"
+    );
+    if (!decision.allowed) {
+      throw ApiError.forbidden("Permission denied to manage sign request", "SIGN_REQUEST_EDIT_DENIED");
+    }
+    return signRequest;
+  }
+
+  private buildFlowHints(signRequest: any) {
+    const signers = Array.isArray(signRequest?.signers) ? signRequest.signers : [];
+    const status = signRequest?.status || "draft";
+    const pendingCount = signers.filter((s: any) => ["pending", "otp_sent"].includes(s.status)).length;
+    const waitingApprovalCount = signers.filter((s: any) => s.status === "waiting_approval").length;
+    const waitingSigningCount = signers.filter((s: any) => s.status === "waiting_signing").length;
+    const signedCount = signers.filter((s: any) => ["signed", "completed"].includes(s.status)).length;
+
+    let flowState = "DRAFT";
+    let nextAction = "EDIT_AND_SEND";
+
+    if (status === "completed") {
+      flowState = "COMPLETED";
+      nextAction = "VIEW_COMPLETED";
+    } else if (status === "cancelled") {
+      flowState = "CANCELLED";
+      nextAction = "REVIEW_STATUS";
+    } else if (status === "rejected") {
+      flowState = "REJECTED";
+      nextAction = "REVIEW_STATUS";
+    } else if (status === "pending_approval" || waitingApprovalCount > 0) {
+      flowState = "AWAITING_APPROVAL";
+      nextAction = "WAIT_FOR_APPROVAL";
+    } else if (status === "pending" || status === "in_progress" || pendingCount > 0 || waitingSigningCount > 0) {
+      flowState = "AWAITING_SIGNATURES";
+      nextAction = "WAIT_FOR_SIGNING";
+    }
+
+    return {
+      flow_state: flowState,
+      next_action: nextAction,
+      flow_counters: {
+        total_signers: signers.length,
+        pending: pendingCount,
+        waiting_approval: waitingApprovalCount,
+        waiting_signing: waitingSigningCount,
+        signed: signedCount,
+      },
+    };
+  }
+
   async listSignRequests(tenantId: number) {
     return signRequestsRepository.listByTenant(tenantId);
   }
@@ -41,7 +97,10 @@ class SignRequestsService {
     if (!signRequest) {
       throw ApiError.notFound("Sign request not found", "SIGN_REQUEST_NOT_FOUND");
     }
-    return signRequest;
+    return {
+      ...signRequest,
+      ...this.buildFlowHints(signRequest),
+    };
   }
 
   /**
@@ -115,7 +174,10 @@ class SignRequestsService {
     });
 
     return {
-      data: signRequests,
+      data: signRequests.map((request) => ({
+        ...request,
+        ...this.buildFlowHints(request),
+      })),
       pagination: {
         page,
         limit,
@@ -303,10 +365,11 @@ class SignRequestsService {
   async addSigner(
     signRequestId: number,
     tenantId: number,
+    userId: number,
     signerData: SignerInput & { signing_order?: number }
   ) {
     // Verify sign request exists and belongs to tenant
-    const signRequest = await this.getSignRequest(signRequestId, tenantId);
+    const signRequest = await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
 
     // Only allow adding signers when status = 'draft'
     if (signRequest.status !== 'draft') {
@@ -346,205 +409,34 @@ class SignRequestsService {
   }
 
   async sendSignRequest(id: number, tenantId: number, userId: number) {
-    const signRequest = await this.getSignRequest(id, tenantId);
+    const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
 
-    // ✅ Allow resend: Only block if completed or cancelled
-    if (
-      signRequest.status === "completed" ||
-      signRequest.status === "cancelled" ||
-      signRequest.status === "rejected"
-    ) {
-      throw ApiError.badRequest(
-        `Cannot send sign request with status: ${signRequest.status}`, 
-        "SIGN_REQUEST_INVALID_STATUS"
-      );
-    }
+    this.ensureSendableStatus(signRequest.status || "");
+    await this.validateSignFieldsIfNeeded(id);
 
-    // Validate fields (if any exist)
-    const fieldCount = await signRequestsRepository.countFields(id);
-    if (fieldCount > 0) {
-      const validation = await signRequestFieldsService.validateFieldsBeforeSend(id);
-      if (!validation.valid) {
-        throw ApiError.badRequest(validation.message || "Field validation failed");
+    if (signRequest.status === "draft") {
+      const movedToApproval = await this.submitDraftToApprovalIfRequired(signRequest, tenantId, userId);
+      if (movedToApproval) {
+        return this.getSignRequestWithFlowHints(id, tenantId);
       }
-    }
 
-    if (signRequest.status === "pending_approval") {
+      await this.submitDraftToSigning(signRequest, tenantId);
+    } else if (signRequest.status === "pending_approval") {
       await signRequestsRepository.updateStatus(id, tenantId, "pending");
     }
 
-    if (signRequest.status === "draft") {
-      const documentType = signRequest.document?.document_type_id
-        ? await prisma.document_types.findUnique({
-            where: { id: signRequest.document.document_type_id },
-          })
-        : null;
-
-      if (documentType?.require_approval) {
-        const draftSigners = await signersRepository.findBySignRequest(id);
-        for (const signer of draftSigners) {
-          await signersRepository.update(signer.id, {
-            status: "waiting_approval",
-          });
-        }
-
-        await signRequestsRepository.updateStatus(id, tenantId, "pending_approval");
-
-        const documentWorkflow = await prisma.workflows.findFirst({
-          where: {
-            tenant_id: tenantId,
-            created_for_doc: signRequest.document_id,
-            is_active: true,
-          },
-          orderBy: { id: "desc" },
-        });
-
-        const workflowId = documentWorkflow?.id || documentType.default_workflow_id;
-        if (!workflowId) {
-          throw ApiError.badRequest("Workflow is required for approval flow", "WORKFLOW_REQUIRED");
-        }
-
-        const { approvalsService } = await import("../approvals/approvals.service");
-        await approvalsService.submitForApproval(signRequest.document_id, workflowId, tenantId, userId);
-
-        await auditService.record({
-          tenantId,
-          documentId: signRequest.document_id,
-          event: "sign.submitted_for_approval",
-          userId,
-        });
-
-        return this.getSignRequest(id, tenantId);
-      }
-
-      const orderedSigners = (await signersRepository.findBySignRequest(id)).sort(
-        (a, b) => (a.signing_order || 0) - (b.signing_order || 0)
-      );
-
-      for (let index = 0; index < orderedSigners.length; index += 1) {
-        const signer = orderedSigners[index];
-        await signersRepository.update(signer.id, {
-          status: index === 0 ? "pending" : "waiting_signing",
-        });
-      }
-
-      if (signRequest.document_id) {
-        await documentsRepository.update(signRequest.document_id, {
-          status: "pending_signature",
-        });
-      }
-    }
-
-    // ✅ Generate/regenerate signing tokens for all signers (including those without tokens)
-    const signers = await signersRepository.findBySignRequest(id);
-    for (const signer of signers) {
-      // Generate new token if missing or regenerate for resend
-      if (!signer.signing_token || signRequest.status !== "draft") {
-        const token = crypto.randomBytes(32).toString("hex");
-        await signersRepository.update(signer.id, { 
-          signing_token: token
-        });
-      }
-    }
-
-    // Update status to pending (or keep current if already sent)
-    if (signRequest.status === "draft") {
-      await signRequestsRepository.updateStatus(id, tenantId, "pending");
-    }
-
-    // Reload signers with updated tokens
+    await this.generateSignerTokens(id, signRequest.status === "draft");
     const signersWithTokens = await signersRepository.findBySignRequest(id);
 
-    // Send email notifications with signing links
-    const { emailService } = await import('../common/email.service');
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    
-    // Get sender info
-    const sender = await prisma.users.findUnique({
-      where: { id: userId },
-      select: { full_name: true, email: true }
-    });
-    
-    // ✅ Check if there are signers waiting for approval
-    const waitingForApproval = signersWithTokens.some(s => s.status === 'waiting_approval');
-    
-    if (waitingForApproval) {
-      console.log(`⏳ Sign request ${id} has signers waiting for approval. Emails will be sent after approvals complete.`);
-      // Don't send emails yet - they will be sent by autoSendSignRequest after approvals
-      return this.getSignRequest(id, tenantId);
+    if (signersWithTokens.some((s) => s.status === "waiting_approval")) {
+      return this.getSignRequestWithFlowHints(id, tenantId);
     }
-    
-    // ⭐ SEQUENTIAL SIGNING: Only send emails to signers with status 'pending'
-    // Signers with 'waiting_signing' will receive emails after previous signer completes
-    const pendingSigners = signersWithTokens.filter(s => s.status === 'pending');
-    const waitingSigners = signersWithTokens.filter(s => s.status === 'waiting_signing');
-    
-    console.log(`📧 Sending emails to ${pendingSigners.length} pending signers (${waitingSigners.length} waiting)...`);
-    
-    for (const signer of pendingSigners) {
-      if (signer.is_internal && signer.user_id) {
-        await notificationsService.createNotification({
-          tenantId,
-          userId: signer.user_id,
-          type: NotificationType.SIGN_REQUEST,
-          title: 'Yeu cau ky moi',
-          message: `Ban co yeu cau ky cho tai lieu "${signRequest.title || signRequest.document?.title || 'Document'}"`,
-          link: `/sign-requests/${signRequest.id}/internal-sign`,
-        }).catch(err => console.error(`Failed to create notification for user ${signer.user_id}:`, err));
-        continue;
-      }
 
-      if (!signer.is_internal && signer.signing_token) {
-        const signUrl = `${frontendUrl}/sign/${signer.signing_token}`;
-        
-        // Generate OTP immediately
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const bcrypt = require('bcrypt');
-        const otpHash = await bcrypt.hash(otp, 10);
-        const otpExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-        
-        // Save OTP to database
-        await signersRepository.update(signer.id, {
-          otp: otpHash,
-          otp_expire: otpExpire,
-          status: 'otp_sent'
-        });
-        
-        try {
-          // Send email with both signing URL and OTP
-          await emailService.sendSignRequestWithOTP({
-            recipientEmail: signer.email,
-            recipientName: signer.name,
-            documentTitle: signRequest.title || signRequest.document?.title || 'Document',
-            documentNumber: signRequest.document?.document_number, // ✅ Add document number
-            senderName: sender?.full_name || sender?.email || 'System',
-            message: signRequest.message,
-            signUrl: signUrl,
-            otp: otp,
-            expiryMinutes: 10
-          });
-          console.log(`📧 Sign request email (with OTP) sent to: ${signer.email} (order: ${signer.signing_order})`);
+    if (signRequest.status === "draft") {
+      await signRequestsRepository.updateStatus(id, tenantId, "pending");
+    }
 
-          // Create in-app notification for internal signers
-          if (signer.is_internal && signer.user_id) {
-            await notificationsService.createNotification({
-              tenantId,
-              userId: signer.user_id,
-              type: NotificationType.SIGN_REQUEST,
-              title: 'Yêu cầu ký mới',
-              message: `Bạn có yêu cầu ký cho tài liệu "${signRequest.title || signRequest.document?.title || 'Document'}"`,
-              link: `/sign-requests/${signRequest.id}/internal-sign`,
-            }).catch(err => console.error(`Failed to create notification for user ${signer.user_id}:`, err));
-          }
-        } catch (error) {
-          console.error(`❌ Failed to send email to ${signer.email}:`, error.message);
-        }
-      }
-    }
-    
-    if (waitingSigners.length > 0) {
-      console.log(`⏳ ${waitingSigners.length} signers waiting for previous signers to complete`);
-    }
+    await this.notifyPendingSigners(signRequest, signersWithTokens, tenantId, userId);
 
     await auditService.record({
       tenantId,
@@ -553,14 +445,180 @@ class SignRequestsService {
       userId,
     });
 
-    return this.getSignRequest(id, tenantId);
+    return this.getSignRequestWithFlowHints(id, tenantId);
+  }
+
+  private async getSignRequestWithFlowHints(id: number, tenantId: number) {
+    const signRequest: any = await this.getSignRequest(id, tenantId);
+    return {
+      ...signRequest,
+      ...this.buildFlowHints(signRequest),
+    };
+  }
+
+  private ensureSendableStatus(status: string) {
+    if (status === "completed" || status === "cancelled" || status === "rejected") {
+      throw ApiError.badRequest(
+        `Cannot send sign request with status: ${status}`,
+        "SIGN_REQUEST_INVALID_STATUS"
+      );
+    }
+  }
+
+  private async validateSignFieldsIfNeeded(signRequestId: number) {
+    const fieldCount = await signRequestsRepository.countFields(signRequestId);
+    if (fieldCount === 0) return;
+
+    const validation = await signRequestFieldsService.validateFieldsBeforeSend(signRequestId);
+    if (!validation.valid) {
+      throw ApiError.badRequest(validation.message || "Field validation failed");
+    }
+  }
+
+  private async submitDraftToApprovalIfRequired(signRequest: any, tenantId: number, userId: number) {
+    const documentType = signRequest.document?.document_type_id
+      ? await prisma.document_types.findUnique({
+          where: { id: signRequest.document.document_type_id },
+        })
+      : null;
+
+    if (!documentType?.require_approval) return false;
+
+    const draftSigners = await signersRepository.findBySignRequest(signRequest.id);
+    for (const signer of draftSigners) {
+      await signersRepository.update(signer.id, { status: "waiting_approval" });
+    }
+
+    await signRequestsRepository.updateStatus(signRequest.id, tenantId, "pending_approval");
+
+    const documentWorkflow = await prisma.workflows.findFirst({
+      where: {
+        tenant_id: tenantId,
+        created_for_doc: signRequest.document_id,
+        is_active: true,
+      },
+      orderBy: { id: "desc" },
+    });
+
+    const workflowId = documentWorkflow?.id || documentType.default_workflow_id;
+    if (!workflowId) {
+      throw ApiError.badRequest("Workflow is required for approval flow", "WORKFLOW_REQUIRED");
+    }
+
+    const { approvalsService } = await import("../approvals/approvals.service");
+    await approvalsService.submitForApproval(signRequest.document_id, workflowId, tenantId, userId);
+
+    await auditService.record({
+      tenantId,
+      documentId: signRequest.document_id,
+      event: "sign.submitted_for_approval",
+      userId,
+    });
+
+    return true;
+  }
+
+  private async submitDraftToSigning(signRequest: any, tenantId: number) {
+    const orderedSigners = (await signersRepository.findBySignRequest(signRequest.id)).sort(
+      (a, b) => (a.signing_order || 0) - (b.signing_order || 0)
+    );
+
+    if (orderedSigners.length === 0) {
+      throw ApiError.badRequest(
+        "Sign request must have at least one signer before sending",
+        "SIGNERS_REQUIRED"
+      );
+    }
+
+    for (let index = 0; index < orderedSigners.length; index += 1) {
+      const signer = orderedSigners[index];
+      await signersRepository.update(signer.id, {
+        status: index === 0 ? "pending" : "waiting_signing",
+      });
+    }
+
+    if (signRequest.document_id) {
+      await documentsRepository.update(signRequest.document_id, {
+        status: "pending_signature",
+      });
+    }
+  }
+
+  private async generateSignerTokens(signRequestId: number, fromDraft: boolean) {
+    const signers = await signersRepository.findBySignRequest(signRequestId);
+    for (const signer of signers) {
+      if (!signer.signing_token || !fromDraft) {
+        const token = crypto.randomBytes(32).toString("hex");
+        await signersRepository.update(signer.id, { signing_token: token });
+      }
+    }
+  }
+
+  private async notifyPendingSigners(
+    signRequest: any,
+    signersWithTokens: any[],
+    tenantId: number,
+    userId: number
+  ) {
+    const { emailService } = await import("../common/email.service");
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const pendingSigners = signersWithTokens.filter((s) => s.status === "pending");
+
+    const sender = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { full_name: true, email: true }
+    });
+
+    for (const signer of pendingSigners) {
+      if (signer.is_internal && signer.user_id) {
+        await notificationsService.createNotification({
+          tenantId,
+          userId: signer.user_id,
+          type: NotificationType.SIGN_REQUEST,
+          title: "Yeu cau ky moi",
+          message: `Ban co yeu cau ky cho tai lieu "${signRequest.title || signRequest.document?.title || "Document"}"`,
+          link: `/sign-requests/${signRequest.id}/internal-sign`,
+        }).catch(err => console.error(`Failed to create notification for user ${signer.user_id}:`, err));
+        continue;
+      }
+
+      if (!signer.is_internal && signer.signing_token) {
+        const signUrl = `${frontendUrl}/sign/${signer.signing_token}`;
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const bcrypt = require("bcrypt");
+        const otpHash = await bcrypt.hash(otp, 10);
+        const otpExpire = new Date(Date.now() + 10 * 60 * 1000);
+
+        await signersRepository.update(signer.id, {
+          otp: otpHash,
+          otp_expire: otpExpire,
+          status: "otp_sent"
+        });
+
+        try {
+          await emailService.sendSignRequestWithOTP({
+            recipientEmail: signer.email,
+            recipientName: signer.name,
+            documentTitle: signRequest.title || signRequest.document?.title || "Document",
+            documentNumber: signRequest.document?.document_number,
+            senderName: sender?.full_name || sender?.email || "System",
+            message: signRequest.message,
+            signUrl,
+            otp,
+            expiryMinutes: 10
+          });
+        } catch (error: any) {
+          console.error(`Failed to send email to ${signer.email}:`, error?.message || error);
+        }
+      }
+    }
   }
 
   /**
    * Cancel sign request and notify all signers
    */
   async cancelSignRequest(id: number, tenantId: number, userId: number, reason?: string) {
-    const signRequest = await this.getSignRequest(id, tenantId);
+    const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
 
     // Only allow canceling pending or in-progress sign requests
     if (signRequest.status === "completed" || signRequest.status === "cancelled") {
@@ -800,9 +858,8 @@ class SignRequestsService {
   }
 
   // ✅ Phase 2: Remove Signer
-  async removeSignerFromRequest(signRequestId: number, signerId: number, tenantId: number) {
-    // Verify sign request belongs to tenant
-    await this.getSignRequest(signRequestId, tenantId);
+  async removeSignerFromRequest(signRequestId: number, signerId: number, tenantId: number, userId: number) {
+    await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
 
     // Remove fields assigned to this signer
     await prisma.sign_request_fields.deleteMany({
@@ -837,7 +894,12 @@ class SignRequestsService {
   }
 
   // ✅ Phase 2: Update Signer
-  async updateSigner(signerId: number, updates: Partial<SignerInput & { signing_order?: number }>, tenantId: number) {
+  async updateSigner(
+    signerId: number,
+    updates: Partial<SignerInput & { signing_order?: number }>,
+    tenantId: number,
+    userId: number
+  ) {
     // Get signer to verify tenant
     const signer = await signersRepository.findById(signerId);
     if (!signer) {
@@ -845,7 +907,7 @@ class SignRequestsService {
     }
 
     // Verify sign request belongs to tenant
-    await this.getSignRequest(signer.sign_request_id, tenantId);
+    await this.ensureCanManageSignRequest(signer.sign_request_id, tenantId, userId);
 
     // If email changed, check if new email is internal user
     if (updates.email && updates.email !== signer.email) {
@@ -896,10 +958,11 @@ class SignRequestsService {
   async reorderSigners(
     signRequestId: number,
     tenantId: number,
+    userId: number,
     signers: Array<{ id: number; signing_order: number }>
   ) {
     // Verify sign request belongs to tenant
-    await this.getSignRequest(signRequestId, tenantId);
+    await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
 
     // Update signing_order for each signer
     for (const signer of signers) {
@@ -926,7 +989,7 @@ class SignRequestsService {
    * Delete sign request (draft only)
    */
   async deleteSignRequest(id: number, tenantId: number, userId: number) {
-    const signRequest = await this.getSignRequest(id, tenantId);
+    const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
 
     // Only allow deleting draft sign requests
     if (signRequest.status !== 'draft') {
@@ -968,7 +1031,7 @@ class SignRequestsService {
    * Reset to draft status for re-signing
    */
   async revokeSignRequest(id: number, tenantId: number, userId: number) {
-    const signRequest = await this.getSignRequest(id, tenantId);
+    const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
 
     // Only allow revoking completed sign requests
     if (signRequest.status !== 'completed') {

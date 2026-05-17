@@ -1,5 +1,24 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 import { positionsService } from './positions.service';
+
+const idSchema = z.coerce.number().int().positive();
+const createPositionSchema = z.object({
+  code: z.string().trim().min(1).max(50),
+  name: z.string().trim().min(1).max(255),
+  description: z.string().trim().max(500).nullable().optional(),
+  level: z.coerce.number().int().min(0).nullable().optional(),
+  is_active: z.boolean().optional(),
+});
+
+const updatePositionSchema = createPositionSchema.partial();
+type CreatePositionInput = {
+  code: string;
+  name: string;
+  description?: string | null;
+  level?: number | null;
+  is_active?: boolean;
+};
 
 export const positionsController = {
   async getPositions(req: Request, res: Response) {
@@ -37,8 +56,8 @@ export const positionsController = {
   async getPositionById(req: Request, res: Response) {
     try {
       const tenantId = (req as any).auth.tenantId;
-      const { id } = req.params;
-      const position = await positionsService.getPositionById(parseInt(id), tenantId);
+      const id = idSchema.parse(req.params.id);
+      const position = await positionsService.getPositionById(id, tenantId);
       res.json({ success: true, data: { position } });
     } catch (error: any) {
       res.status(404).json({ success: false, error: { message: error.message } });
@@ -48,7 +67,8 @@ export const positionsController = {
   async createPosition(req: Request, res: Response) {
     try {
       const tenantId = (req as any).auth.tenantId;
-      const position = await positionsService.createPosition(tenantId, req.body);
+      const payload = createPositionSchema.parse(req.body) as CreatePositionInput;
+      const position = await positionsService.createPosition(tenantId, payload);
       res.status(201).json({ success: true, data: { position } });
     } catch (error: any) {
       res.status(400).json({ success: false, error: { message: error.message } });
@@ -58,8 +78,9 @@ export const positionsController = {
   async updatePosition(req: Request, res: Response) {
     try {
       const tenantId = (req as any).auth.tenantId;
-      const { id } = req.params;
-      const position = await positionsService.updatePosition(parseInt(id), tenantId, req.body);
+      const id = idSchema.parse(req.params.id);
+      const payload = updatePositionSchema.parse(req.body);
+      const position = await positionsService.updatePosition(id, tenantId, payload);
       res.json({ success: true, data: { position } });
     } catch (error: any) {
       res.status(400).json({ success: false, error: { message: error.message } });
@@ -69,8 +90,8 @@ export const positionsController = {
   async deletePosition(req: Request, res: Response) {
     try {
       const tenantId = (req as any).auth.tenantId;
-      const { id } = req.params;
-      await positionsService.deletePosition(parseInt(id), tenantId);
+      const id = idSchema.parse(req.params.id);
+      await positionsService.deletePosition(id, tenantId);
       res.json({ success: true, data: { deleted: true } });
     } catch (error: any) {
       res.status(400).json({ success: false, error: { message: error.message } });

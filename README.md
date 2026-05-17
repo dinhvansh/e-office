@@ -53,10 +53,11 @@ cp .env.compose.example .env
 docker compose up -d --build
 ```
 
-4. Seed dữ liệu:
+4. Backend sẽ tự động khởi tạo DB khi container start (`prisma db push` + seed mặc định).
+
+Nếu cần chạy lại seed thủ công:
 
 ```bash
-docker exec eoffice-backend npx prisma migrate deploy
 docker exec eoffice-backend node scripts/seed.js
 docker exec eoffice-backend node scripts/seed-rbac.js
 docker exec eoffice-backend node scripts/seed-document-types.js
@@ -96,6 +97,29 @@ cd license-server && npm run build
 - [docs/README.md](docs/README.md)
 - [docs/DEPLOYMENT-GUIDE.md](docs/DEPLOYMENT-GUIDE.md)
 - [docs/testing-guide.md](docs/testing-guide.md)
+- [docs/dev/AUTHORIZATION-MODEL.md](docs/dev/AUTHORIZATION-MODEL.md)
+- [docs/dev/API-RESPONSE-GUIDELINE.md](docs/dev/API-RESPONSE-GUIDELINE.md)
+- [docs/dev/BUSINESS-PROCESS.md](docs/dev/BUSINESS-PROCESS.md)
+- [docs/dev/USER-GUIDE.md](docs/dev/USER-GUIDE.md)
+- [docs/dev/E2E-TEST-MATRIX.md](docs/dev/E2E-TEST-MATRIX.md)
+- [docs/dev/PROJECT-CLEANUP.md](docs/dev/PROJECT-CLEANUP.md)
+
+## Kiểm tra phân quyền trước khi merge
+
+```bash
+cd backend
+npm run test:auth-matrix
+```
+
+Lệnh trên kiểm tra tenant isolation, RBAC module-level và resource-level authorization cho các luồng chính.
+
+Các lệnh E2E chuẩn ở root:
+
+```bash
+npm run e2e:auth
+npm run e2e:workflow
+npm run e2e:smoke
+```
 
 ## Lưu ý quan trọng
 

@@ -47,7 +47,7 @@ export default function LoginPage() {
           </div>
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-semibold text-slate-900">Đăng nhập Workspace</h1>
-            <p className="text-sm text-slate-500">Quản lý tài liệu, luồng ký và license trong một màn hình.</p>
+            <p className="text-sm text-slate-500">Quản lý tài liệu và luồng ký trong một màn hình.</p>
           </div>
         </div>
         {error && (
@@ -87,7 +87,7 @@ export default function LoginPage() {
             </a>
           </p>
         </div>
-        <p className="mt-4 text-center text-xs text-slate-400">Được bảo vệ bởi hệ thống license WP Sign.</p>
+        <p className="mt-4 text-center text-xs text-slate-400">Nền tảng E-Office nội bộ.</p>
       </form>
     </div>
   );

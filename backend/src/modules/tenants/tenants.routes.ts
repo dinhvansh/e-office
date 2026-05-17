@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../core/utils/asyncHandler";
+import { strictLimiter } from "../../middleware/rate-limiter";
 import { authGuard } from "../auth/auth.middleware";
 import { TenantsController } from "./tenants.controller";
 
@@ -12,4 +13,4 @@ tenantsRouter.get("/me", authGuard, asyncHandler(controller.me));
 tenantsRouter.get("/me/stats", authGuard, asyncHandler(controller.stats));
 
 // Public route for SaaS onboarding
-tenantsRouter.post("/create-with-admin", asyncHandler(controller.createWithAdmin));
+tenantsRouter.post("/create-with-admin", strictLimiter, asyncHandler(controller.createWithAdmin));

@@ -22,6 +22,7 @@ dayjs.extend(relativeTime);
 dayjs.locale('vi');
 
 export default function TenantSettingsPage() {
+  const showLicenseSection = false;
   const { fetchJson } = useAuth();
   const queryClient = useQueryClient();
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -199,7 +200,7 @@ export default function TenantSettingsPage() {
       </Card>
 
       {/* License Card */}
-      <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white">
+      {showLicenseSection && <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -243,7 +244,7 @@ export default function TenantSettingsPage() {
             </p>
           </div>
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
@@ -286,7 +287,7 @@ export default function TenantSettingsPage() {
       </Dialog>
 
       {/* License Activation Dialog */}
-      <Dialog open={showLicenseDialog} onOpenChange={setShowLicenseDialog}>
+      {showLicenseSection && <Dialog open={showLicenseDialog} onOpenChange={setShowLicenseDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Kích hoạt License Offline</DialogTitle>
@@ -318,7 +319,7 @@ export default function TenantSettingsPage() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog>}
     </div>
   );
 }

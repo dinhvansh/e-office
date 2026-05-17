@@ -1,4 +1,5 @@
 import { request } from "undici";
+import crypto from "crypto";
 import { webhooksRepository } from "./webhooks.repository";
 
 class WebhookService {
@@ -17,17 +18,22 @@ class WebhookService {
         let error: string | undefined;
 
         try {
+          const body = JSON.stringify({
+            event,
+            payload,
+            emitted_at: new Date().toISOString(),
+          });
+          const signature = webhook.secret
+            ? crypto.createHmac("sha256", webhook.secret).update(body).digest("hex")
+            : undefined;
+
           const res = await request(webhook.url, {
             method: "POST",
-            body: JSON.stringify({
-              event,
-              payload,
-              emitted_at: new Date().toISOString(),
-            }),
+            body,
             headers: {
               "Content-Type": "application/json",
               "X-Esign-Event": event,
-              ...(webhook.secret ? { "X-Esign-Signature": webhook.secret } : {}),
+              ...(signature ? { "X-Esign-Signature": signature } : {}),
             },
           });
 

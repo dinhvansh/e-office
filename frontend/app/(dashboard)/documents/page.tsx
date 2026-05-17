@@ -253,8 +253,7 @@ export default function DocumentsPage() {
       return response.document;
     },
     onSuccess: (document) => {
-      console.log("📄 Upload success, document:", document);
-      console.log("🔍 sign_request_id:", document.sign_request_id);
+
       
       setSelectedFile(null);
       setFileName("");
@@ -270,13 +269,11 @@ export default function DocumentsPage() {
       
       // ✨ Auto-redirect to editor if document requires signing
       if (document.sign_request_id) {
-        console.log("✅ Has sign_request_id, redirecting to editor");
         toast.info("Đang chuyển đến màn hình thêm chữ ký...");
         setTimeout(() => {
           router.push(`/sign-requests/${document.sign_request_id}/editor`);
         }, 1000);
       } else {
-        console.log("❌ No sign_request_id, staying on page");
       }
     },
     onError: (error: any) => {
@@ -358,22 +355,17 @@ export default function DocumentsPage() {
       const endpoint = useSigned ? 'download-signed' : 'download';
       const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${id}/${endpoint}`;
       
-      console.log('Downloading document:', { id, url, hasToken: !!token, useSigned });
-      
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
       
-      console.log('Download response:', { status: response.status, ok: response.ok });
-      
       if (!response.ok) {
         // Try to get error message from response
         const contentType = response.headers.get('content-type');
         if (contentType?.includes('application/json')) {
           const errorData = await response.json();
-          console.error('Download error data:', errorData);
           const errorMsg = errorData.error?.message || 'Failed to download document';
           
           // User-friendly message for seed data
@@ -387,7 +379,6 @@ export default function DocumentsPage() {
       }
       
       const blob = await response.blob();
-      console.log('Blob created:', { size: blob.size, type: blob.type });
       
       const blobUrl = URL.createObjectURL(blob);
       
@@ -404,7 +395,6 @@ export default function DocumentsPage() {
     } catch (error: any) {
       const message = error?.message || 'Không thể tải tài liệu';
       toast.error(message);
-      console.error('Download error:', error);
     }
   };
 
@@ -1438,3 +1428,4 @@ const fileToBase64 = (file: File): Promise<string> => {
     reader.readAsDataURL(file);
   });
 };
+

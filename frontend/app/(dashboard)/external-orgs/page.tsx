@@ -95,22 +95,18 @@ export default function ExternalOrgsPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: Partial<ExternalOrg>) => {
-      console.log('Creating external org:', data);
       return fetchJson('/external-orgs', { method: 'POST', body: JSON.stringify(data) });
     },
     onSuccess: async () => {
-      console.log('External org created successfully');
       setShowModal(false);
       toast.success('Tạo tổ chức thành công!');
       setCurrentPage(1); // Reset to first page
       // Small delay to ensure backend has saved
       setTimeout(async () => {
         await queryClient.refetchQueries({ queryKey: ['external-orgs'] });
-        console.log('Refetched external orgs');
       }, 300);
     },
     onError: (error: any) => {
-      console.error('Mutation error:', error);
       const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
       toast.error(`Lỗi: ${message}`);
     },
@@ -495,3 +491,4 @@ export default function ExternalOrgsPage() {
     </div>
   );
 }
+

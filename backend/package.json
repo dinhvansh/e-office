@@ -3,13 +3,16 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
+    "prebuild": "prisma generate",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "build:skip-check": "tsc --noEmit false --skipLibCheck",
     "start": "node dist/server.js",
     "start:dev": "ts-node-dev --transpile-only src/server.ts",
     "prisma": "prisma",
-    "lint": "eslint --ext .ts src"
+    "lint": "eslint --ext .ts src",
+    "test:e2e:workflow": "node scripts/e2e-workflow-refactor.js",
+    "test:auth-matrix": "node scripts/test-authorization-matrix.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

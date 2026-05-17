@@ -1,6 +1,7 @@
 import { signRequestFieldsRepository, CreateFieldData } from './signRequestFields.repository';
 import { signRequestsRepository } from './signRequests.repository';
 import { ApiError } from '../../core/errors/api-error';
+import { authorizationService } from '../authorization/authorization.service';
 
 export interface FieldInput {
   id?: number;
@@ -39,9 +40,15 @@ export class SignRequestFieldsService {
       throw ApiError.forbidden('Access denied');
     }
 
-    // Check permissions (owner or admin)
-    // TODO: Add proper permission check with user roles
-    // For now, just check if user exists in tenant
+    const decision = await authorizationService.canAccessDocument(
+      userId,
+      tenantId,
+      signRequest.document_id,
+      'edit'
+    );
+    if (!decision.allowed) {
+      throw ApiError.forbidden('Permission denied for sign request editor');
+    }
 
     // Get fields
     const fields = await signRequestFieldsRepository.findBySignRequest(signRequestId);
@@ -71,6 +78,15 @@ export class SignRequestFieldsService {
     // Check tenant isolation
     if (signRequest.tenant_id !== tenantId) {
       throw ApiError.forbidden('Access denied');
+    }
+    const decision = await authorizationService.canAccessDocument(
+      userId,
+      tenantId,
+      signRequest.document_id,
+      'edit'
+    );
+    if (!decision.allowed) {
+      throw ApiError.forbidden('Permission denied to edit fields');
     }
 
     // Only allow editing when status = 'draft'
@@ -110,11 +126,24 @@ export class SignRequestFieldsService {
       throw ApiError.notFound('Field not found');
     }
 
-    // Check tenant isolation
-    // Tenant check removed (not in field type)
+    const signRequest = await signRequestsRepository.findById(field.sign_request_id, tenantId);
+    if (!signRequest) {
+      throw ApiError.forbidden('Access denied');
+    }
+    const decision = await authorizationService.canAccessDocument(
+      userId,
+      tenantId,
+      signRequest.document_id,
+      'edit'
+    );
+    if (!decision.allowed) {
+      throw ApiError.forbidden('Permission denied to delete field');
+    }
 
     // Only allow deleting when status = 'draft'
-    // Status check removed (not in field type)
+    if (signRequest.status !== 'draft') {
+      throw ApiError.badRequest('Cannot delete fields after sign request is sent');
+    }
 
     // Delete field
     await signRequestFieldsRepository.delete(fieldId);

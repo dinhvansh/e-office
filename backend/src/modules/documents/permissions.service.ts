@@ -111,6 +111,11 @@ export class PermissionsService {
     });
 
     if (!user) return false;
+    const userRoles = await prisma.user_roles.findMany({
+      where: { user_id: userId },
+      select: { role_id: true },
+    });
+    const roleIds = userRoles.map((r) => r.role_id);
 
     // Check permissions for user, role, or department
     const permissions = await prisma.document_permissions.findMany({
@@ -118,14 +123,16 @@ export class PermissionsService {
         document_id: documentId,
         OR: [
           { subject_type: "user", subject_id: userId },
-          { subject_type: "role", subject_id: userId }, // Simplified: role as string
+          ...(roleIds.length ? [{ subject_type: "role", subject_id: { in: roleIds } as any }] : []),
           { subject_type: "department", subject_id: user.department_id || 0 },
         ],
       },
     });
 
-    // Check if any permission grants the requested action
+    // Explicit deny has precedence over allow
     const permissionField = `can_${permission}` as keyof typeof permissions[0];
+    const hasDeny = permissions.some((p) => p[permissionField] === false);
+    if (hasDeny) return false;
     return permissions.some((p) => p[permissionField] === true);
   }
 }

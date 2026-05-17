@@ -69,7 +69,6 @@ function PDFViewer({ documentId, signRequestStatus, signedFilePath, accessToken 
       
       setPdfUrl(url);
     } catch (err: any) {
-      console.error('PDF load error:', err);
       setError(err.message || 'Không thể tải PDF');
     } finally {
       setLoading(false);
@@ -252,9 +251,8 @@ export default function InternalSigningPage() {
       const fieldsForMe = result.sign_request.fields?.filter(
         (f: SignatureField) => f.assigned_signer_id === currentSigner.id
       ) || [];
-      console.log('📝 Total fields:', result.sign_request.fields?.length);
-      console.log('📝 My fields:', fieldsForMe.length, fieldsForMe);
-      console.log('👤 Current signer ID:', currentSigner.id);
+
+
       setMyFields(fieldsForMe);
 
       // Load PDF - use signed version if available
@@ -293,7 +291,6 @@ export default function InternalSigningPage() {
             setPdfUrl(url);
           }
         } catch (err) {
-          console.error('PDF load error:', err);
         } finally {
           setPdfLoading(false);
         }
@@ -349,7 +346,6 @@ export default function InternalSigningPage() {
       }, 1500);
       
     } catch (error: any) {
-      console.error('❌ Submit failed:', error);
       toast.error(error.message || 'Không thể ký tài liệu');
     } finally {
       setSubmitting(false);
@@ -452,14 +448,12 @@ export default function InternalSigningPage() {
                     fields={alreadySigned ? [] : myFields}
                     signerId={mySigner.id}
                     onFieldClick={(field) => {
-                      console.log('Field clicked:', field);
                     }}
                     guidedMode={false}
                     currentFieldId={undefined}
                     completedFieldIds={completedFields}
                     existingFieldValues={fieldSignatures}
                     onFieldComplete={(fieldId, signature) => {
-                      console.log('Field completed:', fieldId);
                       setFieldSignatures(prev => ({ ...prev, [fieldId]: signature }));
                       setCompletedFields(prev => [...prev, fieldId]);
                       
@@ -648,3 +642,4 @@ export default function InternalSigningPage() {
     </div>
   );
 }
+

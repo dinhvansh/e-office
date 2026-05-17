@@ -79,5 +79,40 @@ export const settingsController = {
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
+  },
+
+  async getDocumentTypePolicy(req: Request, res: Response) {
+    try {
+      const tenantId = req.auth!.tenantId;
+      const documentTypeId = Number(req.params.documentTypeId);
+      const data = await settingsService.getDocumentTypePolicy(tenantId, documentTypeId);
+      res.json({ success: true, data });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
+  async saveDocumentTypePolicy(req: Request, res: Response) {
+    try {
+      const tenantId = req.auth!.tenantId;
+      const userId = req.auth!.userId;
+      const documentTypeId = Number(req.params.documentTypeId);
+      const policy = req.body;
+      await settingsService.saveDocumentTypePolicy(tenantId, documentTypeId, policy, userId);
+      res.json({ success: true, message: "Document type policy saved" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
+  async deleteDocumentTypePolicy(req: Request, res: Response) {
+    try {
+      const tenantId = req.auth!.tenantId;
+      const documentTypeId = Number(req.params.documentTypeId);
+      await settingsService.deleteDocumentTypePolicy(tenantId, documentTypeId);
+      res.json({ success: true, message: "Document type policy deleted" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
   }
 };

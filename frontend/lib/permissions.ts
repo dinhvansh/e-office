@@ -11,8 +11,11 @@ export function hasRequiredRole(userRole: string | null | undefined, requiredRol
   if (!userRole) {
     return false; // User has no role
   }
-  
-  return requiredRoles.includes(userRole);
+
+  const normalizedUserRole = userRole.toLowerCase() === 'super_admin' ? 'admin' : userRole.toLowerCase();
+  const normalizedRequiredRoles = requiredRoles.map((role) => role.toLowerCase());
+
+  return normalizedRequiredRoles.includes(normalizedUserRole);
 }
 
 /**

@@ -42,6 +42,30 @@ export class AuditService {
       orderBy: { created_at: "desc" },
     });
   }
+
+  async listAuthorizationDecisions(
+    tenantId: number,
+    params?: {
+      userId?: number;
+      documentId?: number;
+      action?: string;
+      limit?: number;
+    }
+  ): Promise<audit_logs[]> {
+    const where: any = {
+      event: { startsWith: "authz.document." },
+      document: { tenant_id: tenantId },
+    };
+    if (params?.userId) where.user_id = params.userId;
+    if (params?.documentId) where.document_id = params.documentId;
+    if (params?.action) where.event = { startsWith: `authz.document.${params.action}.` };
+
+    return prisma.audit_logs.findMany({
+      where,
+      orderBy: { created_at: "desc" },
+      take: params?.limit && params.limit > 0 ? Math.min(params.limit, 500) : 100,
+    });
+  }
 }
 
 export const auditService = new AuditService();

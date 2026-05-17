@@ -8,7 +8,7 @@ import { licenseService } from "../licenses/license.service";
 import { numberingService } from "../numbering/numbering.service";
 import { prisma } from "../../config/prisma";
 import { CreateDocumentData, documentsRepository } from "./documents.repository";
-import { canViewDocument, filterViewableDocuments } from "./documents.access";
+import { authorizationService } from "../authorization/authorization.service";
 
 export interface CreateDocumentInput {
   fileName: string;
@@ -56,8 +56,12 @@ class DocumentsService {
       throw ApiError.notFound("User not found", "USER_NOT_FOUND");
     }
     
-    // Filter documents based on user permissions
-    return await filterViewableDocuments(user, documents);
+    const visible: documents[] = [];
+    for (const doc of documents) {
+      const decision = await authorizationService.canAccessDocument(userId, tenantId, doc.id, "read");
+      if (decision.allowed) visible.push(doc);
+    }
+    return visible;
   }
 
   async listDocumentsPaginated(
@@ -95,8 +99,11 @@ class DocumentsService {
       throw ApiError.notFound("User not found", "USER_NOT_FOUND");
     }
     
-    // Filter documents based on user permissions
-    const filteredData = await filterViewableDocuments(user, result.data);
+    const filteredData: documents[] = [];
+    for (const doc of result.data) {
+      const decision = await authorizationService.canAccessDocument(userId, tenantId, doc.id, "read");
+      if (decision.allowed) filteredData.push(doc);
+    }
     
     return {
       data: filteredData,
@@ -124,9 +131,8 @@ class DocumentsService {
       throw ApiError.notFound("User not found", "USER_NOT_FOUND");
     }
     
-    // Check if user can view this document
-    const canView = await canViewDocument(user, document);
-    if (!canView) {
+    const decision = await authorizationService.canAccessDocument(userId, tenantId, documentId, "read");
+    if (!decision.allowed) {
       throw ApiError.forbidden("You do not have access to this document", "DOCUMENT_ACCESS_DENIED");
     }
     
@@ -245,67 +251,63 @@ class DocumentsService {
     };
     const document = await documentsRepository.create(payload);
     
-    // Auto-create sign request for digital-sign document types or inline signer flows
+    // Auto-create draft sign request for digital-sign document types or inline signer flows.
+    // IMPORTANT: At create stage we only keep draft state. Approval/signing activation happens on "send".
     if (shouldCreateSignRequest) {
       const { signRequestsService } = await import('../signRequests/signRequests.service');
+      const { signersRepository } = await import('../signers/signers.repository');
+
       const signRequest = await signRequestsService.createDraftSignRequest({
         document_id: document.id,
         tenant_id: tenantId,
         title: document.title || `Sign Request for ${document.original_file_name}`,
         auto_created: true,
       });
-      
-      // Link sign request to document
+
       await documentsRepository.update(document.id, {
         sign_request_id: signRequest.id,
       });
-      
-      // ✅ STEP 1: DETERMINE WORKFLOW FIRST (before creating signers/approvals)
+
       let workflow: any = null;
-      let hasApprovals = false;
-      
-      // Priority 1: Customized workflow (create immediately if provided)
+
       if (input.customizedSteps && input.customizedSteps.length > 0) {
-        console.log(`[Workflow] Creating customized workflow with ${input.customizedSteps.length} steps`);
+        const sourceWorkflowId = input.workflowId || documentType?.default_workflow_id;
+        if (!sourceWorkflowId) {
+          throw ApiError.badRequest(
+            "Customized workflow requires a source workflow template",
+            "WORKFLOW_TEMPLATE_REQUIRED"
+          );
+        }
         workflow = await this.createCustomizedWorkflow(
-          input.workflowId || documentType.default_workflow_id!,
+          sourceWorkflowId,
           input.customizedSteps,
           document.id,
           tenantId,
           ownerId
         );
-        console.log(`[Workflow] Customized workflow created: ID ${workflow.id}`);
-      }
-      // Priority 2: Specific workflow ID
-      else if (input.adhocSteps && input.adhocSteps.length > 0) {
+      } else if (input.adhocSteps && input.adhocSteps.length > 0) {
         workflow = await this.createAdhocWorkflow(
           input.adhocSteps,
           document.id,
           tenantId,
           ownerId
         );
-      }
-      else if (input.workflowId && documentType?.require_approval) {
+      } else if (input.workflowId && documentType?.require_approval) {
         workflow = await this.cloneWorkflowForDocument(
           input.workflowId,
           document.id,
           tenantId,
           ownerId
         );
-      }
-      // Priority 3: Default workflow from document type
-      else if (documentType.default_workflow_id) {
-        console.log(`[Workflow] Loading default workflow ID: ${documentType.default_workflow_id}`);
+      } else if (documentType?.default_workflow_id) {
         workflow = await prisma.workflows.findUnique({
           where: { id: documentType.default_workflow_id },
           include: { steps: { orderBy: { step_order: 'asc' } } }
         });
       }
 
-      const draftSignerStatus = documentType?.require_approval ? 'waiting_approval' : 'draft';
-
+      // Pre-fill signer list from workflow signer steps (draft only).
       if (workflow?.steps) {
-        const { signersRepository } = await import('../signers/signers.repository');
         const signerSteps = workflow.steps.filter((step: any) => step.participant_role === 'signer');
 
         for (const step of signerSteps) {
@@ -350,9 +352,7 @@ class DocumentsService {
             }
           }
 
-          if (!email) {
-            continue;
-          }
+          if (!email) continue;
 
           const internalUser = await prisma.users.findFirst({
             where: {
@@ -369,7 +369,7 @@ class DocumentsService {
             name,
             role: 'signer',
             signing_order: step.step_order,
-            status: draftSignerStatus,
+            status: 'draft',
             is_internal: !!internalUser,
           };
 
@@ -381,8 +381,8 @@ class DocumentsService {
         }
       }
 
+      // Add manual signers from create form (draft only).
       if (input.signers && input.signers.length > 0) {
-        const { signersRepository } = await import('../signers/signers.repository');
         const signerEmails = input.signers.map(s => s.email);
         const internalUsers = await prisma.users.findMany({
           where: {
@@ -403,7 +403,7 @@ class DocumentsService {
             name: signer.name,
             role: 'signer',
             signing_order: signer.order,
-            status: draftSignerStatus,
+            status: 'draft',
             is_internal: !!userId,
           };
 
@@ -413,297 +413,6 @@ class DocumentsService {
 
           await signersRepository.create(signerData);
         }
-      }
-
-      const draftUpdatedDoc = await documentsRepository.findById(document.id, tenantId);
-      if (draftUpdatedDoc) {
-        return draftUpdatedDoc;
-      }
-      
-      // ✅ STEP 2: CREATE APPROVALS (if document requires approval and workflow exists)
-      if (documentType?.require_approval && workflow?.steps) {
-        console.log(`[Workflow Instance] Creating workflow instance for document ${document.id}`);
-        
-        // Create workflow instance
-        const instance = await prisma.workflow_instances.create({
-          data: {
-            document_id: document.id,
-            workflow_id: workflow.id,
-            current_step_id: workflow.steps[0]?.id,
-            status: 'in_progress',
-            started_at: new Date()
-          }
-        });
-        
-        console.log(`[Workflow Instance] Created instance ID: ${instance.id}`);
-        
-        // ✅ Create approvals for ALL approver steps (not signer steps)
-        // ⭐ SEQUENTIAL APPROVAL: Only first step gets 'pending', others get 'waiting'
-        let hasValidApprovals = false;
-        
-        // Filter approver steps only
-        const approverSteps = workflow.steps.filter(s => s.participant_role !== 'signer');
-        
-        for (const step of approverSteps) {
-          // Get approver user ID based on step type
-          let approverUserId: number | null = null;
-          
-          if (step.approver_type === 'user' && step.approver_id) {
-            approverUserId = step.approver_id;
-          } else if (step.approver_type === 'role' && step.approver_id) {
-            const userRole = await prisma.user_roles.findFirst({
-              where: { role_id: step.approver_id }
-            });
-            approverUserId = userRole?.user_id || null;
-          } else if (step.approver_type === 'department') {
-            let deptId = step.approver_id;
-            
-            if (!deptId) {
-              const owner = await prisma.users.findUnique({
-                where: { id: ownerId },
-                select: { department_id: true }
-              });
-              deptId = owner?.department_id || null;
-              console.log(`[Workflow Step ${step.step_order}] No department specified, using owner's department: ${deptId}`);
-            }
-            
-            if (deptId) {
-              const dept = await prisma.departments.findUnique({
-                where: { id: deptId }
-              });
-              approverUserId = dept?.manager_id || null;
-              console.log(`[Workflow Step ${step.step_order}] Department ${deptId} manager: ${approverUserId}`);
-            }
-          } else if (step.approver_type === 'manager') {
-            const owner = await prisma.users.findUnique({
-              where: { id: ownerId }
-            });
-            approverUserId = owner?.manager_id || null;
-          }
-          
-          if (approverUserId) {
-            const dueDate = new Date();
-            dueDate.setDate(dueDate.getDate() + (step.due_in_days || 7));
-            
-            // ⭐ SEQUENTIAL: First approver step = 'pending', others = 'waiting'
-            const isFirstStep = step.step_order === approverSteps[0].step_order;
-            const approvalStatus = isFirstStep ? 'pending' : 'waiting';
-            
-            await prisma.document_approvals.create({
-              data: {
-                document_id: document.id,
-                workflow_id: workflow.id,
-                workflow_step_id: step.id,
-                approver_user_id: approverUserId,
-                action: approvalStatus,
-                due_date: dueDate
-              }
-            });
-            
-            console.log(`[Workflow Step ${step.step_order}] Created approval for user ${approverUserId} with status: ${approvalStatus}`);
-            hasValidApprovals = true;
-          } else {
-            console.warn(`[Workflow Step ${step.step_order}] Could not determine approver for step: ${step.step_name}`);
-          }
-        }
-        
-        // Update document status if we have valid approvals
-        if (hasValidApprovals) {
-          hasApprovals = true;
-          await documentsRepository.update(document.id, {
-            status: 'pending_approval'
-          });
-          console.log(`[Workflow Instance] Document status updated to pending_approval`);
-        } else {
-          console.log(`[Workflow Instance] ⚠️ Could not create any approvals - no valid approvers found`);
-        }
-      }
-      
-      // ✅ STEP 3: CREATE SIGNERS (with appropriate status based on approvals and signing order)
-      // Determine signer status:
-      // - 'waiting_approval' if has approvals
-      // - 'pending' for first signer (if no approvals)
-      // - 'waiting_signing' for subsequent signers (sequential signing)
-      const baseSignerStatus = hasApprovals ? 'waiting_approval' : 'pending';
-      console.log(`[Signers] Base signer status: ${baseSignerStatus} (hasApprovals: ${hasApprovals})`);
-      
-      if (workflow?.steps) {
-        const { signersRepository } = await import('../signers/signers.repository');
-        
-        // ✅ Only create signers for steps with participant_role = 'signer'
-        // ⚠️ Note: Old workflows may not have participant_role field, so this may return empty array
-        const signerSteps = workflow.steps.filter(s => s.participant_role === 'signer');
-        
-        console.log(`[Workflow Signers] Found ${signerSteps.length} signer steps (out of ${workflow.steps.length} total steps)`);
-        
-        if (signerSteps.length === 0) {
-          console.log(`[Workflow Signers] ⚠️ No signer steps found in workflow. Signers must be added manually.`);
-        }
-        
-        for (let i = 0; i < signerSteps.length; i++) {
-          const step = signerSteps[i];
-          const isFirstSigner = i === 0;
-          
-          // ⭐ SEQUENTIAL SIGNING: First signer gets base status, others get 'waiting_signing'
-          let signerStatus = baseSignerStatus;
-          if (!isFirstSigner && baseSignerStatus === 'pending') {
-            signerStatus = 'waiting_signing'; // Wait for previous signer
-          }
-          
-          // Get approver info based on type
-          let email = '';
-          let name = '';
-          
-          console.log(`[Step ${step.step_order}] Type: ${step.approver_type}, ID: ${step.approver_id}`);
-          
-          if (step.approver_type === 'user' && step.approver_id) {
-            const user = await prisma.users.findUnique({
-              where: { id: step.approver_id },
-              select: { email: true, full_name: true }
-            });
-            if (user) {
-              email = user.email;
-              name = user.full_name || user.email;
-              console.log(`  ✓ Found user: ${email}`);
-            } else {
-              console.log(`  ✗ User not found`);
-            }
-          } else if (step.approver_type === 'role' && step.approver_id) {
-            // For role, get first user with that role
-            const userRole = await prisma.user_roles.findFirst({
-              where: { role_id: step.approver_id },
-              include: { user: { select: { email: true, full_name: true } } }
-            });
-            if (userRole?.user) {
-              email = userRole.user.email;
-              name = userRole.user.full_name || userRole.user.email;
-              console.log(`  ✓ Found role user: ${email}`);
-            } else {
-              console.log(`  ✗ No user with this role`);
-            }
-          } else if (step.approver_type === 'department' && step.approver_id) {
-            // For department, get department manager
-            const dept = await prisma.departments.findUnique({
-              where: { id: step.approver_id },
-              include: { manager: { select: { email: true, full_name: true } } }
-            });
-            if (dept?.manager) {
-              email = dept.manager.email;
-              name = dept.manager.full_name || dept.manager.email;
-              console.log(`  ✓ Found dept manager: ${email}`);
-            } else {
-              console.log(`  ✗ Department has no manager`);
-            }
-          } else if (step.approver_type === 'manager') {
-            // For manager type, use document owner's manager
-            const owner = await prisma.users.findUnique({
-              where: { id: ownerId },
-              include: { manager: { select: { email: true, full_name: true } } }
-            });
-            if (owner?.manager) {
-              email = owner.manager.email;
-              name = owner.manager.full_name || owner.manager.email;
-              console.log(`  ✓ Found owner's manager: ${email}`);
-            } else {
-              console.log(`  ✗ Owner has no manager`);
-            }
-          }
-          
-          // Create signer if we found user info
-          if (email) {
-            // Check if this is an internal user
-            const internalUser = await prisma.users.findFirst({
-              where: {
-                tenant_id: tenantId,
-                email: email,
-                status: 'active'
-              },
-              select: { id: true }
-            });
-            
-            const signerData: any = {
-              sign_request: { connect: { id: signRequest.id } },
-              email,
-              name,
-              role: 'signer',
-              signing_order: step.step_order,
-              status: signerStatus, // ⭐ Sequential status
-              is_internal: !!internalUser,
-            };
-            
-            // Add user relation if internal
-            if (internalUser) {
-              signerData.user = { connect: { id: internalUser.id } };
-            }
-            
-            await signersRepository.create(signerData);
-            console.log(`  ✓ Signer created: ${email} (internal: ${!!internalUser}, status: ${signerStatus}, order: ${step.step_order})`);
-          } else {
-            console.log(`  ✗ Skipped: no email found`);
-          }
-        }
-        
-        console.log(`[Workflow Signers] Completed`);
-      }
-      
-      // ✅ Create manual signers if provided (with appropriate status)
-      console.log(`[Manual Signers] Checking input.signers:`, input.signers?.length || 0);
-      
-      if (input.signers && input.signers.length > 0) {
-        console.log(`[Manual Signers] Creating ${input.signers.length} manual signers`);
-        const { signersRepository } = await import('../signers/signers.repository');
-        
-        // Check which signers are internal users
-        const signerEmails = input.signers.map(s => s.email);
-        const internalUsers = await prisma.users.findMany({
-          where: {
-            tenant_id: tenantId,
-            email: { in: signerEmails },
-            status: 'active'
-          },
-          select: { id: true, email: true }
-        });
-        const internalEmailMap = new Map(internalUsers.map(u => [u.email, u.id]));
-        
-        // Sort signers by order to determine first signer
-        const sortedSigners = [...input.signers].sort((a, b) => a.order - b.order);
-        
-        for (let i = 0; i < sortedSigners.length; i++) {
-          const signer = sortedSigners[i];
-          const isFirstSigner = i === 0;
-          const userId = internalEmailMap.get(signer.email);
-          const isInternal = !!userId;
-          
-          // ⭐ SEQUENTIAL SIGNING: First signer gets base status, others get 'waiting_signing'
-          let signerStatus = baseSignerStatus;
-          if (!isFirstSigner && baseSignerStatus === 'pending') {
-            signerStatus = 'waiting_signing'; // Wait for previous signer
-          }
-          
-          const signerData: any = {
-            sign_request: { connect: { id: signRequest.id } },
-            email: signer.email,
-            name: signer.name,
-            role: 'signer',
-            signing_order: signer.order,
-            status: signerStatus, // ⭐ Sequential status
-            is_internal: isInternal,
-          };
-          
-          // Add user relation if internal
-          if (userId) {
-            signerData.user = { connect: { id: userId } };
-          }
-          
-          await signersRepository.create(signerData);
-          console.log(`  ✓ Manual signer created: ${signer.email} (status: ${signerStatus}, order: ${signer.order})`);
-        }
-      }
-      
-      // ✅ Refresh document from DB to get updated sign_request_id
-      const updatedDoc = await documentsRepository.findById(document.id, tenantId);
-      if (updatedDoc) {
-        return updatedDoc;
       }
     }
     
@@ -880,33 +589,11 @@ class DocumentsService {
       }
     }
     
-    // Ownership check: Only owner or admin can delete
+    // Authorization check: owner/admin/explicit policy with deny precedence
     if (userId) {
-      const user = await prisma.users.findUnique({
-        where: { id: userId },
-        include: {
-          user_roles: {
-            include: {
-              role: true
-            }
-          }
-        }
-      });
-      
-      if (!user || user.tenant_id !== tenantId) {
-        throw ApiError.notFound("User not found", "USER_NOT_FOUND");
-      }
-      
-      // Check if user is admin
-      const isAdmin = user.user_roles.some(ur => 
-        ur.role.name === 'Admin' || ur.role.name === 'admin'
-      );
-      
-      // Check if user is owner
-      const isOwner = document.owner_id === userId;
-      
-      if (!isAdmin && !isOwner) {
-        throw ApiError.forbidden("You can only delete your own documents", "DOCUMENT_DELETE_DENIED");
+      const decision = await authorizationService.canAccessDocument(userId, tenantId, documentId, "delete");
+      if (!decision.allowed) {
+        throw ApiError.forbidden("You can only delete allowed documents", "DOCUMENT_DELETE_DENIED");
       }
     }
     

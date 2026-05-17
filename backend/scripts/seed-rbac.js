@@ -280,7 +280,7 @@ async function seedRBAC() {
       managed_departments: {
         select: { id: true },
       },
-      direct_reports: {
+      subordinates: {
         select: { id: true },
       },
       user_roles: {
@@ -298,7 +298,7 @@ async function seedRBAC() {
     const isManagerLike =
       user.role === 'manager' ||
       user.managed_departments.length > 0 ||
-      user.direct_reports.length > 0;
+      user.subordinates.length > 0;
 
     if (isAdminLike && !existingRoleIds.has(adminRole.id)) {
       await prisma.user_roles.upsert({

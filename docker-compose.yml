@@ -43,6 +43,7 @@ services:
   backend:
     build: ./backend
     container_name: eoffice-backend
+    command: sh -c "node scripts/init-db.js && node dist/server.js"
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://eoffice:change-me-db-password@db:5432/eoffice_db}
       PORT: 4000
@@ -61,6 +62,8 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@example.local}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-E-Office}
+      AUTO_INIT_DB: ${AUTO_INIT_DB:-true}
+      DISABLE_LICENSE_CHECK: ${DISABLE_LICENSE_CHECK:-true}
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     volumes:

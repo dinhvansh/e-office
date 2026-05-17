@@ -34,5 +34,21 @@ export const settingsService = {
       result[s.setting_key] = s.setting_value;
     });
     return result;
+  },
+
+  async getDocumentTypePolicy(tenantId: number, documentTypeId: number) {
+    const key = `doc_type_policy:${documentTypeId}`;
+    const setting = await settingsRepository.getSetting(tenantId, key);
+    return setting?.setting_value || null;
+  },
+
+  async saveDocumentTypePolicy(tenantId: number, documentTypeId: number, policy: any, userId?: number) {
+    const key = `doc_type_policy:${documentTypeId}`;
+    return settingsRepository.upsertSetting(tenantId, key, policy, userId);
+  },
+
+  async deleteDocumentTypePolicy(tenantId: number, documentTypeId: number) {
+    const key = `doc_type_policy:${documentTypeId}`;
+    return settingsRepository.deleteSetting(tenantId, key);
   }
 };

@@ -17,6 +17,11 @@ router.post('/email/test', requirePermission('settings', 'manage'), settingsCont
 router.get('/watermark', requirePermission('settings', 'manage'), settingsController.getWatermarkConfig);
 router.post('/watermark', requirePermission('settings', 'manage'), settingsController.saveWatermarkConfig);
 
+// Document type policy routes
+router.get('/document-type-policy/:documentTypeId', requirePermission('settings', 'manage'), settingsController.getDocumentTypePolicy);
+router.post('/document-type-policy/:documentTypeId', requirePermission('settings', 'manage'), settingsController.saveDocumentTypePolicy);
+router.delete('/document-type-policy/:documentTypeId', requirePermission('settings', 'manage'), settingsController.deleteDocumentTypePolicy);
+
 // Get all settings
 router.get('/', requirePermission('settings', 'manage'), settingsController.getAllSettings);
 

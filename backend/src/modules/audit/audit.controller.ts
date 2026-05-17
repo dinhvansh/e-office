@@ -13,4 +13,20 @@ export class AuditController {
     const logs = await auditService.listDocumentLogs(documentId, tenantId);
     res.json(ok({ logs }));
   };
+
+  getAuthorizationDecisions = async (req: Request, res: Response): Promise<void> => {
+    const tenantId = req.auth!.tenantId;
+    const userId = req.query.user_id ? Number(req.query.user_id) : undefined;
+    const documentId = req.query.document_id ? Number(req.query.document_id) : undefined;
+    const action = (req.query.action as string | undefined)?.trim();
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+
+    const logs = await auditService.listAuthorizationDecisions(tenantId, {
+      userId: Number.isFinite(userId as number) ? userId : undefined,
+      documentId: Number.isFinite(documentId as number) ? documentId : undefined,
+      action: action || undefined,
+      limit: Number.isFinite(limit as number) ? limit : undefined,
+    });
+    res.json(ok({ logs }));
+  };
 }

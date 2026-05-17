@@ -105,6 +105,7 @@ export class SignRequestsController {
     const signer = await signRequestsService.addSigner(
       signRequestId,
       req.auth!.tenantId,
+      req.auth!.userId,
       signerData as any
     );
     
@@ -140,7 +141,8 @@ export class SignRequestsController {
     await signRequestsService.removeSignerFromRequest(
       signRequestId,
       signerId,
-      req.auth!.tenantId
+      req.auth!.tenantId,
+      req.auth!.userId
     );
 
     res.json(ok({ removed: true }));
@@ -171,7 +173,8 @@ export class SignRequestsController {
     const signer = await signRequestsService.updateSigner(
       signerId,
       updates,
-      req.auth!.tenantId
+      req.auth!.tenantId,
+      req.auth!.userId
     );
 
     res.json(ok({ signer }));
@@ -198,7 +201,12 @@ export class SignRequestsController {
     }
 
     // Update signing_order for all signers
-    await signRequestsService.reorderSigners(signRequestId, req.auth!.tenantId, signers as any);
+    await signRequestsService.reorderSigners(
+      signRequestId,
+      req.auth!.tenantId,
+      req.auth!.userId,
+      signers as any
+    );
 
     res.json(ok({ message: 'Đã cập nhật thứ tự ký' }));
   };

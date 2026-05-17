@@ -1,5 +1,30 @@
 import { Request, Response } from "express";
+import { z } from "zod";
 import { externalOrgsService } from "./external-orgs.service";
+
+const idSchema = z.coerce.number().int().positive();
+const externalOrgPayloadSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  code: z.string().trim().max(50).nullable().optional(),
+  category: z.string().trim().max(50).nullable().optional(),
+  address: z.string().trim().max(500).nullable().optional(),
+  phone: z.string().trim().max(50).nullable().optional(),
+  email: z.string().trim().email().nullable().optional(),
+  contact_person: z.string().trim().max(255).nullable().optional(),
+  is_active: z.boolean().optional(),
+});
+
+const updateExternalOrgPayloadSchema = externalOrgPayloadSchema.partial();
+type CreateExternalOrgInput = {
+  name: string;
+  code?: string | null;
+  category?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  contact_person?: string | null;
+  is_active?: boolean;
+};
 
 export class ExternalOrgsController {
   async getAll(req: Request, res: Response) {
@@ -33,27 +58,29 @@ export class ExternalOrgsController {
 
   async getById(req: Request, res: Response) {
     const tenantId = req.auth!.tenantId;
-    const id = parseInt(req.params.id);
+    const id = idSchema.parse(req.params.id);
     const org = await externalOrgsService.getById(id, tenantId);
     res.json({ success: true, data: org });
   }
 
   async create(req: Request, res: Response) {
     const tenantId = req.auth!.tenantId;
-    const org = await externalOrgsService.create(tenantId, req.body);
+    const payload = externalOrgPayloadSchema.parse(req.body) as CreateExternalOrgInput;
+    const org = await externalOrgsService.create(tenantId, payload);
     res.status(201).json({ success: true, data: org });
   }
 
   async update(req: Request, res: Response) {
     const tenantId = req.auth!.tenantId;
-    const id = parseInt(req.params.id);
-    const org = await externalOrgsService.update(id, tenantId, req.body);
+    const id = idSchema.parse(req.params.id);
+    const payload = updateExternalOrgPayloadSchema.parse(req.body);
+    const org = await externalOrgsService.update(id, tenantId, payload);
     res.json({ success: true, data: org });
   }
 
   async delete(req: Request, res: Response) {
     const tenantId = req.auth!.tenantId;
-    const id = parseInt(req.params.id);
+    const id = idSchema.parse(req.params.id);
     await externalOrgsService.delete(id, tenantId);
     res.json({ success: true, data: null });
   }

@@ -24,6 +24,11 @@ const envSchema = z.object({
   SMTP_PASSWORD: z.string().optional(),
   EMAIL_FROM: z.string().default("noreply@wpsign.local"),
   EMAIL_FROM_NAME: z.string().default("WP Sign"),
+  AUTH_COOKIE_NAME: z.string().default("esign_rt"),
+  AUTH_COOKIE_SECURE: z.string().default("false"),
+  AUTH_COOKIE_SAME_SITE: z.enum(["lax", "strict", "none"]).default("lax"),
+  AUTH_COOKIE_DOMAIN: z.string().optional(),
+  DISABLE_LICENSE_CHECK: z.string().default("true"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

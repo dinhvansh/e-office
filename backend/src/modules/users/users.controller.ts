@@ -8,7 +8,7 @@ export const usersController = {
       const tenantId = (req as any).auth.tenantId;
       
       // Check if user is super admin
-      const isSuperAdmin = user?.role === 'super_admin' || user?.email === 'admin@acme.local';
+      const isSuperAdmin = user?.role === 'super_admin';
       
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
@@ -64,7 +64,7 @@ export const usersController = {
       const tenantId = (req as any).auth.tenantId;
       
       // Check if user is super admin
-      const isSuperAdmin = user?.role === 'super_admin' || user?.email === 'admin@acme.local';
+      const isSuperAdmin = user?.role === 'super_admin';
       
       const { id } = req.params;
       const updatedUser = await usersService.updateUser(parseInt(id), isSuperAdmin ? null : tenantId, req.body);
@@ -80,7 +80,7 @@ export const usersController = {
       const tenantId = (req as any).auth.tenantId;
       
       // Check if user is super admin (can delete from any tenant)
-      const isSuperAdmin = user?.role === 'super_admin' || user?.email === 'admin@acme.local';
+      const isSuperAdmin = user?.role === 'super_admin';
       
       const { id } = req.params;
       await usersService.deleteUser(parseInt(id), isSuperAdmin ? null : tenantId);

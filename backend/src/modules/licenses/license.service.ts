@@ -4,6 +4,9 @@ import { ApiError } from "../../core/errors/api-error";
 
 class LicenseService {
   async ensureLicenseForTenant(tenantId: number): Promise<license | null> {
+    if (process.env.DISABLE_LICENSE_CHECK === "true") {
+      return null;
+    }
     const tenant = await this.getTenant(tenantId);
     if (!tenant) {
       throw ApiError.notFound("Tenant not found", "TENANT_NOT_FOUND");
@@ -22,6 +25,9 @@ class LicenseService {
   }
 
   async enforceDocumentLimit(tenantId: number): Promise<void> {
+    if (process.env.DISABLE_LICENSE_CHECK === "true") {
+      return;
+    }
     const licenseRecord = await this.ensureLicenseForTenant(tenantId);
     if (!licenseRecord || !licenseRecord.limit_docs) {
       return;
@@ -33,6 +39,9 @@ class LicenseService {
   }
 
   async enforceUserLimit(tenantId: number): Promise<void> {
+    if (process.env.DISABLE_LICENSE_CHECK === "true") {
+      return;
+    }
     const licenseRecord = await this.ensureLicenseForTenant(tenantId);
     if (!licenseRecord || !licenseRecord.limit_user) {
       return;

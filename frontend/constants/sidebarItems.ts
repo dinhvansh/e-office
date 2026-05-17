@@ -6,9 +6,7 @@ import {
   Building, 
   Shield, 
   FileType, 
-  Settings, 
-  CreditCard, 
-  Webhook,
+  Settings,  Webhook,
   Building2,
   Workflow,
   CheckSquare,
@@ -137,15 +135,7 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         color: "text-slate-600",
         requiredRoles: ["Admin"]
       },
-      { 
-        label: "Gói dịch vụ", 
-        href: "/settings/billing", 
-        icon: CreditCard,
-        caption: "License & usage",
-        color: "text-emerald-600",
-        requiredRoles: ["Admin"]
-      },
-      { 
+            { 
         label: "Webhooks", 
         href: "/webhooks", 
         icon: Webhook,

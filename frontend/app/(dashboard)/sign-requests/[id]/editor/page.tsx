@@ -68,7 +68,7 @@ export default function SignRequestEditorPage() {
   });
 
   // Check if document is in draft status (editable)
-  const isDraft = editorData?.signRequest?.status === 'draft';
+  const isDraft = editorData?.signRequest?.flow_state === 'DRAFT' || editorData?.signRequest?.status === 'draft';
   const isReadOnly = !isDraft;
 
   // Update fields when data loads

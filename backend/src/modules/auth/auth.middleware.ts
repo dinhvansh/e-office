@@ -5,17 +5,14 @@ import { authService } from "./auth.service";
 
 export const authGuard = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
   try {
-    // Try to get token from header first, then from query string
+    // Only accept bearer token from Authorization header to avoid token leakage in URLs/logs
     let token: string | undefined;
-    
+
     const header = req.headers.authorization;
     if (header && header.startsWith("Bearer ")) {
       token = header.replace("Bearer ", "").trim();
-    } else if (req.query.token && typeof req.query.token === 'string') {
-      // Support token in query string for iframe/embed scenarios
-      token = req.query.token.trim();
     }
-    
+
     if (!token || token === "null" || token === "undefined") {
       throw ApiError.unauthorized("Missing token", "TOKEN_REQUIRED");
     }

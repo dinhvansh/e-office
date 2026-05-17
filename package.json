@@ -6,7 +6,14 @@
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
-    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../license-server && npm install"
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../license-server && npm install",
+    "ci:build": "cd backend && npm run build && cd ../frontend && npm run build",
+    "e2e:auth": "cd backend && npm run test:auth-matrix",
+    "e2e:workflow": "cd backend && npm run test:e2e:workflow",
+    "e2e:ui:smoke": "cd frontend && npm run test:e2e -- tests/ui-simple.spec.ts",
+    "e2e:api:smoke": "cd frontend && npm run test:e2e -- tests/e2e.spec.ts --grep \"API can upload a document and create sign request\"",
+    "e2e:smoke": "npm run e2e:auth && npm run e2e:workflow",
+    "ci:smoke:e2e": "npm run e2e:smoke"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

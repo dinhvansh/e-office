@@ -60,7 +60,7 @@ export class RegistrationController {
       const tenantId = user?.tenant_id || 1;
       
       // Check if user is super admin (can see all tenants)
-      const isSuperAdmin = user?.role === 'super_admin' || user?.email === 'admin@acme.local';
+      const isSuperAdmin = user?.role === 'super_admin';
 
       const users = await registrationService.getPendingUsers(isSuperAdmin ? null : tenantId);
 
