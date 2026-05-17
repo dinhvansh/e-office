@@ -139,6 +139,125 @@ class DocumentsService {
     return await documentsRepository.findById(document.id, tenantId) || document;
   }
 
+  async listAttachments(documentId: number, tenantId: number, userId: number) {
+    await this.getDocument(documentId, tenantId, userId);
+
+    return prisma.document_attachments.findMany({
+      where: {
+        document_id: documentId,
+        document: { tenant_id: tenantId },
+      },
+      orderBy: { uploaded_at: "desc" },
+    });
+  }
+
+  async addAttachment(
+    documentId: number,
+    tenantId: number,
+    userId: number,
+    input: { file_name: string; file_base64: string; file_type?: string | null },
+  ) {
+    const document = await documentsRepository.findById(documentId, tenantId);
+    if (!document) {
+      throw ApiError.notFound("Document not found", "DOCUMENT_NOT_FOUND");
+    }
+
+    const readDecision = await authorizationService.canAccessDocument(userId, tenantId, documentId, "read");
+    if (!readDecision.allowed) {
+      throw ApiError.forbidden("You do not have access to this document", "DOCUMENT_ACCESS_DENIED");
+    }
+
+    const editDecision = await authorizationService.canAccessDocument(userId, tenantId, documentId, "edit");
+    const participant = await prisma.users.findFirst({
+      where: { id: userId, tenant_id: tenantId },
+      select: { email: true },
+    }).then(async (user) => {
+      if (!user) return false;
+      const [approval, signer] = await Promise.all([
+        prisma.document_approvals.findFirst({
+          where: { document_id: documentId, approver_user_id: userId },
+          select: { id: true },
+        }),
+        prisma.signers.findFirst({
+          where: {
+            sign_request: { document_id: documentId },
+            OR: [{ user_id: userId }, { email: user.email }],
+          },
+          select: { id: true },
+        }),
+      ]);
+      return !!approval || !!signer;
+    });
+
+    if (!editDecision.allowed && document.owner_id !== userId && !participant) {
+      throw ApiError.forbidden("You do not have permission to add attachments", "DOCUMENT_ATTACHMENT_DENIED");
+    }
+
+    const buffer = Buffer.from(input.file_base64, "base64");
+    if (buffer.length === 0) {
+      throw ApiError.badRequest("Attachment file is empty", "ATTACHMENT_EMPTY");
+    }
+    if (buffer.length > 10 * 1024 * 1024) {
+      throw ApiError.badRequest("Attachment must be 10MB or less", "ATTACHMENT_TOO_LARGE");
+    }
+
+    const attachmentPath = await saveBase64Document(tenantId, input.file_name, input.file_base64);
+    const attachment = await prisma.document_attachments.create({
+      data: {
+        document_id: documentId,
+        file_name: input.file_name,
+        file_path: attachmentPath,
+        file_size: BigInt(buffer.length),
+        file_type: input.file_type || null,
+      },
+    });
+
+    await auditService.record({
+      tenantId,
+      documentId,
+      event: "document.attachment_added",
+      userId,
+    });
+
+    return attachment;
+  }
+
+  async getAttachmentFile(attachmentId: number, tenantId: number, userId: number) {
+    const attachment = await prisma.document_attachments.findFirst({
+      where: {
+        id: attachmentId,
+        document: { tenant_id: tenantId },
+      },
+      include: { document: { select: { id: true } } },
+    });
+
+    if (!attachment) {
+      throw ApiError.notFound("Attachment not found", "ATTACHMENT_NOT_FOUND");
+    }
+
+    const decision = await authorizationService.canAccessDocument(userId, tenantId, attachment.document.id, "read");
+    if (!decision.allowed) {
+      throw ApiError.forbidden("You do not have access to this attachment", "ATTACHMENT_ACCESS_DENIED");
+    }
+
+    const path = require("path");
+    const filePath = path.isAbsolute(attachment.file_path)
+      ? attachment.file_path
+      : path.resolve(process.cwd(), attachment.file_path);
+
+    try {
+      await fs.access(filePath);
+    } catch {
+      throw ApiError.notFound("Attachment file not found on disk", "ATTACHMENT_FILE_NOT_FOUND");
+    }
+
+    return {
+      filePath,
+      fileName: attachment.file_name,
+      mimeType: attachment.file_type,
+    };
+  }
+
   async createDocument(input: CreateDocumentInput & {
     adhocSteps?: Array<{ approver_user_id: number; due_in_days: number }>;
     customizedSteps?: Array<{

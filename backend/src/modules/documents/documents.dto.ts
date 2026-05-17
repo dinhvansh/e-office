@@ -27,6 +27,29 @@ export interface DocumentResponseDTO {
   issued_date: Date | null;
   sign_request_id: number | null;
   created_at: Date;
+  attachments?: DocumentAttachmentDTO[];
+}
+
+export interface DocumentAttachmentDTO {
+  id: number;
+  file_name: string;
+  file_size: string | null;
+  file_type: string | null;
+  uploaded_at: Date;
+}
+
+export function toDocumentAttachmentDTO(attachment: any): DocumentAttachmentDTO {
+  return {
+    id: attachment.id,
+    file_name: attachment.file_name,
+    file_size: attachment.file_size == null ? null : attachment.file_size.toString(),
+    file_type: attachment.file_type || null,
+    uploaded_at: attachment.uploaded_at,
+  };
+}
+
+export function toDocumentAttachmentDTOs(attachments: any[] = []): DocumentAttachmentDTO[] {
+  return attachments.map(toDocumentAttachmentDTO);
 }
 
 /**
@@ -57,6 +80,7 @@ export function toDocumentDTO(doc: any): DocumentResponseDTO {
     issued_date: doc.issued_date || null,
     sign_request_id: doc.sign_request_id ?? null,
     created_at: doc.created_at,
+    attachments: Array.isArray(doc.attachments) ? toDocumentAttachmentDTOs(doc.attachments) : undefined,
   };
 }
 

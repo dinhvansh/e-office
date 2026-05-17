@@ -134,7 +134,7 @@ class ApprovalsService {
       throw ApiError.badRequest('This approval document does not have a signing discussion thread', 'DISCUSSION_NOT_AVAILABLE');
     }
 
-    return prisma.sign_request_comments.create({
+    const comment = await prisma.sign_request_comments.create({
       data: {
         tenant_id: tenantId,
         sign_request_id: signRequestId,
@@ -151,6 +151,21 @@ class ApprovalsService {
         },
       },
     });
+
+    const ownerId = approval.document.owner_id;
+    if (ownerId && ownerId !== userId) {
+      const commenter = comment.user?.full_name || comment.user?.email || 'Người dùng';
+      await notificationsService.createNotification({
+        tenantId,
+        userId: ownerId,
+        type: NotificationType.DOCUMENT_COMMENTED,
+        title: 'Có bình luận mới trong luồng phê duyệt',
+        message: `${commenter} đã bình luận trên tài liệu "${approval.document.title || approval.document.original_file_name || 'Untitled'}"`,
+        link: `/sign-requests/${signRequestId}/editor`,
+      });
+    }
+
+    return comment;
   }
 
   /**

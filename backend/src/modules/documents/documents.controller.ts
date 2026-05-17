@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { ok } from "../../core/utils/response";
 import { documentsService } from "./documents.service";
-import { toDocumentDTO, toDocumentDTOs } from "./documents.dto";
+import { toDocumentAttachmentDTO, toDocumentAttachmentDTOs, toDocumentDTO, toDocumentDTOs } from "./documents.dto";
 
 const createSchema = z
   .object({
@@ -59,6 +59,11 @@ const createSchema = z
   });
 
 const idSchema = z.coerce.number().int().positive();
+const attachmentSchema = z.object({
+  file_name: z.string().min(1),
+  file_base64: z.string().min(1),
+  file_type: z.string().optional(),
+});
 
 export class DocumentsController {
   list = async (req: Request, res: Response): Promise<void> => {
@@ -137,6 +142,52 @@ export class DocumentsController {
     const documentId = idSchema.parse(req.params.id);
     await documentsService.deleteDocument(documentId, req.auth!.tenantId, req.auth!.userId);
     res.json(ok({ deleted: true }));
+  };
+
+  listAttachments = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    const attachments = await documentsService.listAttachments(
+      documentId,
+      req.auth!.tenantId,
+      req.auth!.userId
+    );
+    res.json(ok({ attachments: toDocumentAttachmentDTOs(attachments) }));
+  };
+
+  addAttachment = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    const body = attachmentSchema.parse(req.body);
+    const attachment = await documentsService.addAttachment(
+      documentId,
+      req.auth!.tenantId,
+      req.auth!.userId,
+      {
+        file_name: body.file_name,
+        file_base64: body.file_base64,
+        file_type: body.file_type,
+      }
+    );
+    res.status(201).json(ok({ attachment: toDocumentAttachmentDTO(attachment) }));
+  };
+
+  downloadAttachment = async (req: Request, res: Response): Promise<void> => {
+    const attachmentId = idSchema.parse(req.params.attachmentId);
+    const { filePath, fileName, mimeType } = await documentsService.getAttachmentFile(
+      attachmentId,
+      req.auth!.tenantId,
+      req.auth!.userId
+    );
+
+    res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error('Error sending attachment file:', err);
+        if (!res.headersSent) {
+          res.status(404).json({ success: false, error: { message: 'File not found' } });
+        }
+      }
+    });
   };
 
   // Tags endpoints

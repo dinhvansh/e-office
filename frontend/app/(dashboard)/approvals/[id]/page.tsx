@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle, Download, FileText, MessageSquare, RefreshCw, Send, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Download, FileText, MessageSquare, Paperclip, RefreshCw, Send, Upload, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/components/providers/auth-provider';
@@ -62,13 +62,20 @@ interface DiscussionComment {
   } | null;
 }
 
-type ApprovalAction = 'approve' | 'reject' | 'request_info';
+type ApprovalAction = 'approve' | 'reject';
 
 const actionLabels: Record<ApprovalAction, string> = {
   approve: 'Phê duyệt',
   reject: 'Từ chối',
-  request_info: 'Yêu cầu bổ sung',
 };
+
+interface DocumentAttachment {
+  id: number;
+  file_name: string;
+  file_size: string | null;
+  file_type: string | null;
+  uploaded_at: string;
+}
 
 export default function ApprovalDetailPage() {
   const params = useParams();
@@ -87,6 +94,8 @@ export default function ApprovalDetailPage() {
   const [comments, setComments] = useState<DiscussionComment[]>([]);
   const [commentBody, setCommentBody] = useState('');
   const [postingComment, setPostingComment] = useState(false);
+  const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   const fileUrl = useMemo(() => `${getApiBaseUrl()}/approvals/${approvalId}/document/view`, [approvalId]);
   const isProcessed = approval ? approval.action !== 'pending' : false;
@@ -99,6 +108,7 @@ export default function ApprovalDetailPage() {
   useEffect(() => {
     if (approval) {
       fetchComments();
+      fetchAttachments();
     }
   }, [approval?.id, approval?.document.sign_request_id]);
 
@@ -124,6 +134,87 @@ export default function ApprovalDetailPage() {
     }
   };
 
+  const fetchAttachments = async () => {
+    if (!approval?.document.id) return;
+    try {
+      const data = await fetchJson<{ attachments: DocumentAttachment[] }>(`/documents/${approval.document.id}/attachments`);
+      setAttachments(data.attachments || []);
+    } catch {
+      setAttachments([]);
+    }
+  };
+
+  const fileToBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleAttachmentUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !approval?.document.id) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File đính kèm tối đa 10MB');
+      return;
+    }
+
+    setUploadingAttachment(true);
+    try {
+      await fetchJson(`/documents/${approval.document.id}/attachments`, {
+        method: 'POST',
+        body: JSON.stringify({
+          file_name: file.name,
+          file_base64: await fileToBase64(file),
+          file_type: file.type || 'application/octet-stream',
+        }),
+      });
+      await fetchAttachments();
+      toast.success('Đã thêm file đính kèm');
+    } catch (error: any) {
+      toast.error(error.message || 'Không thể tải file đính kèm');
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
+
+  const handleDownloadAttachment = async (attachment: DocumentAttachment) => {
+    if (!approval?.document.id) return;
+    try {
+      const token = tokens?.accessToken;
+      if (!token) throw new Error('No token');
+
+      const response = await fetch(`${getApiBaseUrl()}/documents/${approval.document.id}/attachments/${attachment.id}/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Download failed');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = attachment.file_name;
+      document.body.appendChild(anchor);
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(anchor);
+    } catch {
+      toast.error('Không thể tải file đính kèm');
+    }
+  };
+
+  const formatAttachmentSize = (size: string | null) => {
+    if (!size) return '';
+    const bytes = Number(size);
+    if (!Number.isFinite(bytes)) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const handleActionClick = (actionType: ApprovalAction) => {
     setSelectedAction(actionType);
     if (actionType === 'approve') {
@@ -147,7 +238,7 @@ export default function ApprovalDetailPage() {
       return;
     }
 
-    if ((selectedAction === 'reject' || selectedAction === 'request_info') && !actionComment.trim()) {
+    if (selectedAction === 'reject' && !actionComment.trim()) {
       toast.error('Vui lòng nhập lý do');
       return;
     }
@@ -326,10 +417,6 @@ export default function ApprovalDetailPage() {
                   <XCircle className="mr-2 h-4 w-4" />
                   Từ chối
                 </Button>
-                <Button onClick={() => handleActionClick('request_info')} variant="outline" className="h-11 w-full">
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Yêu cầu bổ sung
-                </Button>
               </div>
             )}
 
@@ -378,10 +465,55 @@ export default function ApprovalDetailPage() {
 
             {isProcessed && (
               <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
-                <div>Trạng thái: <strong>{approval.action === 'approved' ? 'Đã phê duyệt' : approval.action === 'rejected' ? 'Đã từ chối' : 'Yêu cầu bổ sung'}</strong></div>
+                <div>Trạng thái: <strong>{approval.action === 'approved' ? 'Đã phê duyệt' : approval.action === 'rejected' ? 'Đã từ chối' : 'Đã xử lý'}</strong></div>
                 {approval.comment && <div className="mt-2">Nhận xét: {approval.comment}</div>}
               </div>
             )}
+          </section>
+
+          <section className="rounded-2xl border bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 font-semibold text-slate-950">
+                <Paperclip className="h-4 w-4" />
+                Tài liệu đính kèm
+              </h2>
+              <Label className="inline-flex cursor-pointer items-center rounded-lg border px-3 py-2 text-xs font-medium hover:bg-slate-50">
+                <Upload className="mr-2 h-4 w-4" />
+                {uploadingAttachment ? 'Đang tải...' : 'Thêm file'}
+                <input
+                  type="file"
+                  className="hidden"
+                  onChange={handleAttachmentUpload}
+                  disabled={uploadingAttachment}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                />
+              </Label>
+            </div>
+
+            <p className="mb-3 text-xs text-slate-500">
+              File đính kèm chỉ được thêm mới để bổ sung hồ sơ, không thay thế hoặc xóa tài liệu gốc.
+            </p>
+
+            <div className="space-y-2">
+              {attachments.length === 0 ? (
+                <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Chưa có file đính kèm.</div>
+              ) : (
+                attachments.map((attachment) => (
+                  <button
+                    key={attachment.id}
+                    type="button"
+                    onClick={() => handleDownloadAttachment(attachment)}
+                    className="flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left hover:bg-slate-50"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-slate-800">{attachment.file_name}</span>
+                      <span className="text-xs text-slate-500">{formatAttachmentSize(attachment.file_size)}</span>
+                    </span>
+                    <Download className="h-4 w-4 shrink-0 text-slate-400" />
+                  </button>
+                ))
+              )}
+            </div>
           </section>
 
           <section className="rounded-2xl border bg-white p-5 shadow-sm">

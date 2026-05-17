@@ -160,6 +160,27 @@ class SignRequestsService {
       userId,
     });
 
+    const document = await prisma.documents.findFirst({
+      where: { id: signRequest.document_id, tenant_id: tenantId },
+      select: {
+        owner_id: true,
+        title: true,
+        original_file_name: true,
+      },
+    });
+
+    if (document?.owner_id && document.owner_id !== userId) {
+      const commenter = comment.user?.full_name || comment.user?.email || "Người dùng";
+      await notificationsService.createNotification({
+        tenantId,
+        userId: document.owner_id,
+        type: NotificationType.DOCUMENT_COMMENTED,
+        title: "Có bình luận mới trong luồng ký",
+        message: `${commenter} đã bình luận trên tài liệu "${document.title || document.original_file_name || "Untitled"}"`,
+        link: `/sign-requests/${signRequestId}/editor`,
+      });
+    }
+
     return comment;
   }
 

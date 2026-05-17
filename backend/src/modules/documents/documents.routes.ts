@@ -19,6 +19,8 @@ documentsRouter.get("/:id/download", requirePermission('documents', 'read'), req
 documentsRouter.get("/:id/download-signed", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.downloadSigned));
 documentsRouter.get("/:id/view", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.view));
 documentsRouter.get("/:id/view-signed", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.viewSigned));
+documentsRouter.get("/:id/attachments", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.listAttachments));
+documentsRouter.get("/:id/attachments/:attachmentId/download", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.downloadAttachment));
 documentsRouter.get("/:id/tags", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.getTags));
 documentsRouter.get("/:id", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.getById));
 documentsRouter.get("/:id/permissions", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.getPermissions));
@@ -30,6 +32,7 @@ documentsRouter.post("/", requirePermission('documents', 'create'), asyncHandler
 
 // Update operations - require 'documents:update' permission
 documentsRouter.post("/:id/tags", requirePermission('documents', 'update'), requireDocumentAccess("edit"), asyncHandler(controller.addTag));
+documentsRouter.post("/:id/attachments", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.addAttachment));
 documentsRouter.post("/:id/permissions", requirePermission('documents', 'update'), requireDocumentAccess("share"), asyncHandler(controller.grantPermission));
 documentsRouter.post("/:id/versions", requirePermission('documents', 'update'), requireDocumentAccess("edit"), asyncHandler(controller.createVersion));
 documentsRouter.post("/:id/submit-for-approval", requirePermission('documents', 'update'), requireDocumentAccess("approve"), asyncHandler(controller.submitForApproval));
