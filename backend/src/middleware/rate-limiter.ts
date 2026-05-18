@@ -1,7 +1,30 @@
 import rateLimit from 'express-rate-limit';
+import { Request } from 'express';
+import { env } from '../config/env';
+
+const authRateLimitBypassEmails = new Set(
+  (env.RATE_LIMIT_BYPASS_EMAILS ?? '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+const shouldSkipAuthRateLimit = (req: Request): boolean => {
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  return email !== '' && authRateLimitBypassEmails.has(email);
+};
+
+const getNormalizedEmail = (req: Request): string => {
+  return typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+};
+
+const authKeyGenerator = (req: Request): string => {
+  const email = getNormalizedEmail(req);
+  return email ? `${req.ip}:${email}` : req.ip || 'unknown';
+};
 
 // Rate limiter for authentication endpoints
-export const authLimiter = rateLimit({
+export const authLoginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // 5 attempts per window
   message: {
@@ -13,7 +36,25 @@ export const authLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: false, // Count successful requests too
+  skipSuccessfulRequests: true,
+  keyGenerator: authKeyGenerator,
+  skip: shouldSkipAuthRateLimit,
+});
+
+export const authRefreshLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 30,
+  message: {
+    success: false,
+    error: {
+      message: 'Quá nhiều lần làm mới phiên đăng nhập. Vui lòng thử lại sau.',
+      code: 'TOO_MANY_REQUESTS',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req: Request) => req.ip || 'unknown',
 });
 
 // Rate limiter for general API endpoints

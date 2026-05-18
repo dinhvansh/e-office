@@ -35,7 +35,7 @@ export function AdhocWorkflowBuilder({ onBuild }: AdhocWorkflowBuilderProps) {
     setSteps([
       ...steps,
       {
-        approver_user_id: users[0]?.id || '',
+        approver_user_id: '',
         due_in_days: 3,
       },
     ]);

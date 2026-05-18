@@ -3,10 +3,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { ApiError } from '../../core/errors/api-error';
+import { normalizeStoredFieldBox, pctToPdfBox } from '../signRequests/coordinate.helper';
 
 const prisma = new PrismaClient();
 
 export class PdfSigningService {
+  private readonly fieldPaddingPt = 2;
   /**
    * Generate signed PDF with signatures embedded
    */
@@ -65,11 +67,11 @@ export class PdfSigningService {
 
         const { width: pageWidth, height: pageHeight } = page.getSize();
 
-        // Convert percentage to actual coordinates
-        const x = (field.x / 100) * pageWidth;
-        const y = pageHeight - ((field.y / 100) * pageHeight) - ((field.height / 100) * pageHeight);
-        const width = (field.width / 100) * pageWidth;
-        const height = (field.height / 100) * pageHeight;
+        const pdfBox = pctToPdfBox(normalizeStoredFieldBox(field), pageWidth, pageHeight);
+        const x = pdfBox.x;
+        const y = pdfBox.y;
+        const width = pdfBox.width;
+        const height = pdfBox.height;
 
         // Draw signature box with white background
         page.drawRectangle({
@@ -103,17 +105,17 @@ export class PdfSigningService {
             const imgHeight = Math.min(imgDims.height, height - 20);
 
             page.drawImage(image, {
-              x: x + (width - imgWidth) / 2,
-              y: y + 18,
+              x: x + this.fieldPaddingPt + Math.max(0, (width - this.fieldPaddingPt * 2 - imgWidth) / 2),
+              y: y + this.fieldPaddingPt,
               width: imgWidth,
-              height: imgHeight,
+              height: Math.min(imgHeight, Math.max(0, height - this.fieldPaddingPt * 2)),
             });
           } catch (error) {
             console.error('Failed to embed signature image:', error);
             // Fallback to text
             page.drawText('SIGNED', {
-              x: x + 5,
-              y: y + height / 2,
+              x: x + this.fieldPaddingPt,
+              y: y + Math.max(this.fieldPaddingPt, height / 2 - 5),
               size: 10,
               font: boldFont,
               color: rgb(0, 0.53, 0.71),
@@ -128,16 +130,16 @@ export class PdfSigningService {
           : new Date().toLocaleDateString('vi-VN');
 
         page.drawText(signerName, {
-          x: x + 5,
-          y: y + 5,
+          x: x + this.fieldPaddingPt,
+          y: y + this.fieldPaddingPt,
           size: 8,
           font,
           color: rgb(0, 0, 0),
         });
 
         page.drawText(signedDate, {
-          x: x + width - 60,
-          y: y + 5,
+          x: x + Math.max(this.fieldPaddingPt, width - 60),
+          y: y + this.fieldPaddingPt,
           size: 7,
           font,
           color: rgb(0.5, 0.5, 0.5),
@@ -159,10 +161,11 @@ export class PdfSigningService {
         if (!page) continue;
 
         const { width: pageWidth, height: pageHeight } = page.getSize();
-        const x = (field.x / 100) * pageWidth;
-        const y = pageHeight - ((field.y / 100) * pageHeight) - ((field.height / 100) * pageHeight);
-        const width = (field.width / 100) * pageWidth;
-        const height = (field.height / 100) * pageHeight;
+        const pdfBox = pctToPdfBox(normalizeStoredFieldBox(field), pageWidth, pageHeight);
+        const x = pdfBox.x;
+        const y = pdfBox.y;
+        const width = pdfBox.width;
+        const height = pdfBox.height;
 
         // Draw date box
         page.drawRectangle({
@@ -176,9 +179,9 @@ export class PdfSigningService {
 
         // Draw date value
         page.drawText(String(fieldValue.value), {
-          x: x + 5,
-          y: y + height / 2 - 4,
-          size: 10,
+          x: x + this.fieldPaddingPt,
+          y: y + Math.max(this.fieldPaddingPt, height / 2 - 5),
+          size: Math.min(10, Math.max(8, height * 0.45)),
           font,
           color: rgb(0, 0, 0),
         });

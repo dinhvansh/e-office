@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { KeyboardEvent, MouseEvent, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
 import { FileText, User, Clock, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CheckCircle, PenTool } from 'lucide-react';
@@ -79,8 +79,21 @@ export default function MyTasksPage() {
     if (task.task_type === 'approval') {
       router.push(`/approvals/${task.task_id}`);
     } else {
-      router.push(`/sign-requests/${task.sign_request_id}/sign`);
+      router.push(`/sign-requests/${task.sign_request_id}/internal-sign`);
     }
+  };
+
+  const stopRowNavigation = (event: MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+  };
+
+  const handleRowKeyDown = (event: KeyboardEvent<HTMLElement>, task: Task) => {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    event.preventDefault();
+    handleTaskClick(task);
   };
 
   const getStatusBadge = (task: Task) => {
@@ -267,7 +280,13 @@ export default function MyTasksPage() {
               </thead>
               <tbody className="divide-y">
                 {tasks.map((task: Task) => (
-                  <tr key={`${task.task_type}-${task.task_id}`} className="hover:bg-gray-50">
+                  <tr
+                    key={`${task.task_type}-${task.task_id}`}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleTaskClick(task)}
+                    onKeyDown={(event) => handleRowKeyDown(event, task)}
+                    tabIndex={0}
+                  >
                     <td className="px-2 py-3">
                       <div className="flex items-center gap-1.5">
                         <FileText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
@@ -309,7 +328,9 @@ export default function MyTasksPage() {
                       {getStatusBadge(task)}
                     </td>
                     <td className="px-2 py-3">
-                      {getActionButton(task)}
+                      <div onClick={stopRowNavigation}>
+                        {getActionButton(task)}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -320,7 +341,13 @@ export default function MyTasksPage() {
           {/* Mobile Card View */}
           <div className="md:hidden space-y-3 p-3">
             {tasks.map((task: Task) => (
-              <div key={`${task.task_type}-${task.task_id}`} className="rounded-lg border bg-card p-3 space-y-3">
+              <div
+                key={`${task.task_type}-${task.task_id}`}
+                className="rounded-lg border bg-card p-3 space-y-3 cursor-pointer transition-shadow hover:shadow-md"
+                onClick={() => handleTaskClick(task)}
+                onKeyDown={(event) => handleRowKeyDown(event, task)}
+                tabIndex={0}
+              >
                 {/* Header */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -360,7 +387,7 @@ export default function MyTasksPage() {
                 </div>
 
                 {/* Action Button */}
-                <div className="pt-2 border-t">
+                <div className="pt-2 border-t" onClick={stopRowNavigation}>
                   {getActionButton(task, true)}
                 </div>
               </div>

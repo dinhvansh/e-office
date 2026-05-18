@@ -33,6 +33,7 @@ documentsRouter.post("/", requirePermission('documents', 'create'), asyncHandler
 // Update operations - require 'documents:update' permission
 documentsRouter.post("/:id/tags", requirePermission('documents', 'update'), requireDocumentAccess("edit"), asyncHandler(controller.addTag));
 documentsRouter.post("/:id/attachments", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.addAttachment));
+documentsRouter.put("/:id/cc-emails", requirePermission('documents', 'update'), requireDocumentAccess("edit"), asyncHandler(controller.syncCCEmails));
 documentsRouter.post("/:id/permissions", requirePermission('documents', 'update'), requireDocumentAccess("share"), asyncHandler(controller.grantPermission));
 documentsRouter.post("/:id/versions", requirePermission('documents', 'update'), requireDocumentAccess("edit"), asyncHandler(controller.createVersion));
 documentsRouter.post("/:id/submit-for-approval", requirePermission('documents', 'update'), requireDocumentAccess("approve"), asyncHandler(controller.submitForApproval));

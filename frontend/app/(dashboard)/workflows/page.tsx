@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { KeyboardEvent, MouseEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Workflow, Plus, Edit, Trash2, ArrowUp, ArrowDown, Users, User, Building2, UserCog, Settings, FileText, Clock, Search } from 'lucide-react';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -302,6 +302,19 @@ export default function WorkflowsPage() {
     setManagingWorkflow(workflow);
   };
 
+  const stopCardNavigation = (event: MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+  };
+
+  const handleWorkflowCardKeyDown = (event: KeyboardEvent<HTMLElement>, workflow: WorkflowData) => {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    event.preventDefault();
+    handleManageSteps(workflow);
+  };
+
   const handleAddStep = () => {
     setEditingStep(null);
     setStepFormData({
@@ -481,7 +494,10 @@ export default function WorkflowsPage() {
                 workflow.is_active 
                   ? 'border-l-green-500 bg-white' 
                   : 'border-l-gray-400 bg-gray-50'
-              }`}
+              } cursor-pointer`}
+              onClick={() => handleManageSteps(workflow)}
+              onKeyDown={(event) => handleWorkflowCardKeyDown(event, workflow)}
+              tabIndex={0}
             >
               <CardContent className="p-6 space-y-4">
                 {/* Header */}
@@ -520,7 +536,7 @@ export default function WorkflowsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between pt-4 border-t border-gray-200" onClick={stopCardNavigation}>
                   <div className="flex gap-1">
                     <Button
                       size="sm"
@@ -550,11 +566,13 @@ export default function WorkflowsPage() {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  <Switch 
-                    checked={workflow.is_active}
-                    onCheckedChange={() => handleToggleWorkflow(workflow.id, workflow.is_active)}
-                    disabled={toggleWorkflowMutation.isPending}
-                  />
+                  <div onClick={stopCardNavigation}>
+                    <Switch 
+                      checked={workflow.is_active}
+                      onCheckedChange={() => handleToggleWorkflow(workflow.id, workflow.is_active)}
+                      disabled={toggleWorkflowMutation.isPending}
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>

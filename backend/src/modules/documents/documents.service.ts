@@ -9,6 +9,7 @@ import { numberingService } from "../numbering/numbering.service";
 import { prisma } from "../../config/prisma";
 import { CreateDocumentData, documentsRepository } from "./documents.repository";
 import { authorizationService } from "../authorization/authorization.service";
+import { documentWorkflowOrchestratorService } from "./documentWorkflowOrchestrator.service";
 
 export interface CreateDocumentInput {
   fileName: string;
@@ -222,6 +223,82 @@ class DocumentsService {
     return attachment;
   }
 
+  async syncCCEmails(documentId: number, tenantId: number, userId: number, emails: string[]) {
+    const document = await documentsRepository.findById(documentId, tenantId);
+    if (!document) {
+      throw ApiError.notFound("Document not found", "DOCUMENT_NOT_FOUND");
+    }
+
+    const editDecision = await authorizationService.canAccessDocument(userId, tenantId, documentId, "edit");
+    if (!editDecision.allowed && document.owner_id !== userId) {
+      throw ApiError.forbidden("You do not have permission to update CC emails", "DOCUMENT_CC_EDIT_DENIED");
+    }
+
+    const normalizedEmails = Array.from(
+      new Set(
+        emails
+          .map((email) => email.trim().toLowerCase())
+          .filter(Boolean)
+      )
+    );
+
+    const existingEntries = await prisma.document_cc_emails.findMany({
+      where: { document_id: documentId },
+      orderBy: { created_at: "asc" },
+    });
+    const existingSet = new Set(existingEntries.map((entry) => entry.email.toLowerCase()));
+    const targetSet = new Set(normalizedEmails);
+
+    const toDelete = existingEntries.filter((entry) => !targetSet.has(entry.email.toLowerCase()));
+    if (toDelete.length > 0) {
+      await prisma.document_cc_emails.deleteMany({
+        where: { id: { in: toDelete.map((entry) => entry.id) } },
+      });
+    }
+
+    const owner = await prisma.users.findUnique({
+      where: { id: document.owner_id || userId },
+      select: { full_name: true, email: true },
+    });
+
+    for (const email of normalizedEmails) {
+      if (existingSet.has(email)) continue;
+
+      await prisma.document_cc_emails.create({
+        data: {
+          document_id: documentId,
+          email,
+          sent_at: new Date(),
+        },
+      });
+
+      try {
+        const { emailService } = await import('../common/email.service');
+        await emailService.sendDocumentSharedEmail({
+          recipientEmail: email,
+          documentTitle: document.title || document.original_file_name || 'Untitled',
+          documentNumber: document.document_number || undefined,
+          senderName: owner?.full_name || owner?.email || 'System',
+          documentUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/documents/${document.id}`,
+        });
+      } catch (error) {
+        console.error(`Failed to send CC email to ${email}:`, error);
+      }
+    }
+
+    await auditService.record({
+      tenantId,
+      documentId,
+      event: "document.cc_updated",
+      userId,
+    });
+
+    return prisma.document_cc_emails.findMany({
+      where: { document_id: documentId },
+      orderBy: { created_at: "asc" },
+    });
+  }
+
   async getAttachmentFile(attachmentId: number, tenantId: number, userId: number) {
     const attachment = await prisma.document_attachments.findFirst({
       where: {
@@ -370,169 +447,24 @@ class DocumentsService {
     };
     const document = await documentsRepository.create(payload);
     
-    // Auto-create draft sign request for digital-sign document types or inline signer flows.
-    // IMPORTANT: At create stage we only keep draft state. Approval/signing activation happens on "send".
     if (shouldCreateSignRequest) {
-      const { signRequestsService } = await import('../signRequests/signRequests.service');
-      const { signersRepository } = await import('../signers/signers.repository');
-
-      const signRequest = await signRequestsService.createDraftSignRequest({
-        document_id: document.id,
-        tenant_id: tenantId,
-        title: document.title || `Sign Request for ${document.original_file_name}`,
-        auto_created: true,
+      await documentWorkflowOrchestratorService.prepareDraftPackage({
+        documentId: document.id,
+        tenantId,
+        ownerId,
+        documentTitle: document.title,
+        documentFileName: document.original_file_name,
+        workflowId: input.workflowId,
+        signers: input.signers,
+        customizedSteps: input.customizedSteps,
+        adhocSteps: input.adhocSteps,
+        documentType: documentType
+          ? {
+              default_workflow_id: documentType.default_workflow_id,
+              require_approval: documentType.require_approval,
+            }
+          : null,
       });
-
-      await documentsRepository.update(document.id, {
-        sign_request_id: signRequest.id,
-      });
-
-      let workflow: any = null;
-
-      if (input.customizedSteps && input.customizedSteps.length > 0) {
-        const sourceWorkflowId = input.workflowId || documentType?.default_workflow_id;
-        if (!sourceWorkflowId) {
-          throw ApiError.badRequest(
-            "Customized workflow requires a source workflow template",
-            "WORKFLOW_TEMPLATE_REQUIRED"
-          );
-        }
-        workflow = await this.createCustomizedWorkflow(
-          sourceWorkflowId,
-          input.customizedSteps,
-          document.id,
-          tenantId,
-          ownerId
-        );
-      } else if (input.adhocSteps && input.adhocSteps.length > 0) {
-        workflow = await this.createAdhocWorkflow(
-          input.adhocSteps,
-          document.id,
-          tenantId,
-          ownerId
-        );
-      } else if (input.workflowId && documentType?.require_approval) {
-        workflow = await this.cloneWorkflowForDocument(
-          input.workflowId,
-          document.id,
-          tenantId,
-          ownerId
-        );
-      } else if (documentType?.default_workflow_id) {
-        workflow = await prisma.workflows.findUnique({
-          where: { id: documentType.default_workflow_id },
-          include: { steps: { orderBy: { step_order: 'asc' } } }
-        });
-      }
-
-      // Pre-fill signer list from workflow signer steps (draft only).
-      if (workflow?.steps) {
-        const signerSteps = workflow.steps.filter((step: any) => step.participant_role === 'signer');
-
-        for (const step of signerSteps) {
-          let email = '';
-          let name = '';
-
-          if (step.approver_type === 'user' && step.approver_id) {
-            const user = await prisma.users.findUnique({
-              where: { id: step.approver_id },
-              select: { email: true, full_name: true }
-            });
-            if (user) {
-              email = user.email;
-              name = user.full_name || user.email;
-            }
-          } else if (step.approver_type === 'role' && step.approver_id) {
-            const userRole = await prisma.user_roles.findFirst({
-              where: { role_id: step.approver_id },
-              include: { user: { select: { email: true, full_name: true } } }
-            });
-            if (userRole?.user) {
-              email = userRole.user.email;
-              name = userRole.user.full_name || userRole.user.email;
-            }
-          } else if (step.approver_type === 'department' && step.approver_id) {
-            const dept = await prisma.departments.findUnique({
-              where: { id: step.approver_id },
-              include: { manager: { select: { email: true, full_name: true } } }
-            });
-            if (dept?.manager) {
-              email = dept.manager.email;
-              name = dept.manager.full_name || dept.manager.email;
-            }
-          } else if (step.approver_type === 'manager') {
-            const owner = await prisma.users.findUnique({
-              where: { id: ownerId },
-              include: { manager: { select: { email: true, full_name: true } } }
-            });
-            if (owner?.manager) {
-              email = owner.manager.email;
-              name = owner.manager.full_name || owner.manager.email;
-            }
-          }
-
-          if (!email) continue;
-
-          const internalUser = await prisma.users.findFirst({
-            where: {
-              tenant_id: tenantId,
-              email,
-              status: 'active'
-            },
-            select: { id: true }
-          });
-
-          const signerData: any = {
-            sign_request: { connect: { id: signRequest.id } },
-            email,
-            name,
-            role: 'signer',
-            signing_order: step.step_order,
-            status: 'draft',
-            is_internal: !!internalUser,
-          };
-
-          if (internalUser) {
-            signerData.user = { connect: { id: internalUser.id } };
-          }
-
-          await signersRepository.create(signerData);
-        }
-      }
-
-      // Add manual signers from create form (draft only).
-      if (input.signers && input.signers.length > 0) {
-        const signerEmails = input.signers.map(s => s.email);
-        const internalUsers = await prisma.users.findMany({
-          where: {
-            tenant_id: tenantId,
-            email: { in: signerEmails },
-            status: 'active'
-          },
-          select: { id: true, email: true }
-        });
-        const internalEmailMap = new Map(internalUsers.map(u => [u.email, u.id]));
-        const sortedSigners = [...input.signers].sort((a, b) => a.order - b.order);
-
-        for (const signer of sortedSigners) {
-          const userId = internalEmailMap.get(signer.email);
-          const signerData: any = {
-            sign_request: { connect: { id: signRequest.id } },
-            email: signer.email,
-            name: signer.name,
-            role: 'signer',
-            signing_order: signer.order,
-            status: 'draft',
-            is_internal: !!userId,
-          };
-
-          if (userId) {
-            signerData.user = { connect: { id: userId } };
-          }
-
-          await signersRepository.create(signerData);
-        }
-      }
     }
     
     // ✅ Save CC emails if provided

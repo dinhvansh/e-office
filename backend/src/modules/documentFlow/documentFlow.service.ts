@@ -6,6 +6,7 @@ interface FlowStep {
   id: string;
   type: 'approval' | 'signing';
   order: number;
+  sign_request_id?: number;
   user: {
     id: number;
     name: string;
@@ -38,6 +39,16 @@ export class DocumentFlowService {
    * Combines workflow approval steps and signing steps
    */
   async getDocumentFlow(documentId: number, tenantId: number, userId: number) {
+    const currentUser = await prisma.users.findFirst({
+      where: {
+        id: userId,
+        tenant_id: tenantId,
+      },
+      select: {
+        email: true,
+      },
+    });
+
     // 1. Get document with all relations
     const document = await prisma.documents.findFirst({
       where: {
@@ -172,6 +183,7 @@ export class DocumentFlowService {
           id: `signing-${signer.id}`,
           type: 'signing',
           order: orderCounter++,
+          sign_request_id: document.sign_request.id,
           user: signer.user ? {
             id: signer.user.id,
             name: signer.user.full_name || signer.user.email,
@@ -245,21 +257,12 @@ export class DocumentFlowService {
     );
 
     // 5. Determine overall status
-    let overallStatus = 'draft';
-    if (phases.some(p => p.status === 'rejected')) {
-      overallStatus = 'rejected';
-    } else if (phases.every(p => p.status === 'completed')) {
-      overallStatus = 'completed';
-    } else if (phases.some(p => p.status === 'in_progress' || p.status === 'completed')) {
-      overallStatus = 'in_progress';
-    }
-
     return {
       document: {
         id: document.id,
         title: document.title,
         document_number: document.document_number,
-        status: overallStatus,
+        status: document.status,
         document_type: document.document_type?.name,
         created_at: document.created_at.toISOString(),
         signed_file_path: document.signed_file_path, // ✅ Include signed file path for progressive PDF
@@ -274,7 +277,7 @@ export class DocumentFlowService {
       activities,
       // User permissions for actions
       can_approve: this.canUserApprove(document, userId),
-      can_sign: this.canUserSign(document, userId),
+      can_sign: this.canUserSign(document, userId, currentUser?.email || null),
     };
   }
 
@@ -329,12 +332,14 @@ export class DocumentFlowService {
     return !!pendingApproval;
   }
 
-  private canUserSign(document: any, userId: number): boolean {
+  private canUserSign(document: any, userId: number, userEmail: string | null): boolean {
     if (!document.sign_request) return false;
     
     // Check if user is pending signer
     const pendingSigner = document.sign_request.signers.find(
-      (s: any) => s.user_id === userId && s.status === 'pending'
+      (s: any) =>
+        s.status === 'pending' &&
+        (s.user_id === userId || (!!userEmail && s.email?.toLowerCase() === userEmail.toLowerCase()))
     );
     
     return !!pendingSigner;

@@ -64,6 +64,9 @@ const attachmentSchema = z.object({
   file_base64: z.string().min(1),
   file_type: z.string().optional(),
 });
+const ccEmailsSchema = z.object({
+  emails: z.array(z.string().email()),
+});
 
 export class DocumentsController {
   list = async (req: Request, res: Response): Promise<void> => {
@@ -168,6 +171,18 @@ export class DocumentsController {
       }
     );
     res.status(201).json(ok({ attachment: toDocumentAttachmentDTO(attachment) }));
+  };
+
+  syncCCEmails = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    const body = ccEmailsSchema.parse(req.body);
+    const ccEmails = await documentsService.syncCCEmails(
+      documentId,
+      req.auth!.tenantId,
+      req.auth!.userId,
+      body.emails
+    );
+    res.json(ok({ cc_emails: ccEmails.map((item) => item.email) }));
   };
 
   downloadAttachment = async (req: Request, res: Response): Promise<void> => {

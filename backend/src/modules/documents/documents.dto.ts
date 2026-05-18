@@ -27,6 +27,7 @@ export interface DocumentResponseDTO {
   issued_date: Date | null;
   sign_request_id: number | null;
   created_at: Date;
+  cc_emails?: string[];
   attachments?: DocumentAttachmentDTO[];
 }
 
@@ -80,6 +81,7 @@ export function toDocumentDTO(doc: any): DocumentResponseDTO {
     issued_date: doc.issued_date || null,
     sign_request_id: doc.sign_request_id ?? null,
     created_at: doc.created_at,
+    cc_emails: Array.isArray(doc.cc_emails) ? doc.cc_emails.map((item: any) => item.email).filter(Boolean) : undefined,
     attachments: Array.isArray(doc.attachments) ? toDocumentAttachmentDTOs(doc.attachments) : undefined,
   };
 }

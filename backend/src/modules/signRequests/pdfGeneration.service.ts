@@ -2,10 +2,12 @@ import { PDFDocument, rgb, StandardFonts, PDFPage } from 'pdf-lib';
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
+import { normalizeStoredFieldBox, pctToPdfBox } from './coordinate.helper';
 
 const prisma = new PrismaClient();
 
 export class PdfGenerationService {
+  private readonly fieldPaddingPt = 2;
   /**
    * Sanitize text to remove Vietnamese diacritics for StandardFonts
    */
@@ -423,12 +425,11 @@ export class PdfGenerationService {
     }
 
     const { width: pageWidth, height: pageHeight } = page.getSize();
-
-    // Convert percentage to actual coordinates
-    const x = (field.x / 100) * pageWidth;
-    const y = pageHeight - ((field.y / 100) * pageHeight);
-    const fieldWidth = field.width ? (field.width / 100) * pageWidth : 200;
-    const fieldHeight = field.height ? (field.height / 100) * pageHeight : 50;
+    const pdfBox = pctToPdfBox(normalizeStoredFieldBox(field), pageWidth, pageHeight);
+    const x = pdfBox.x;
+    const y = pdfBox.y;
+    const fieldWidth = pdfBox.width;
+    const fieldHeight = pdfBox.height;
 
     if (field.type === 'signature' && fieldValue.value) {
       try {
@@ -446,10 +447,10 @@ export class PdfGenerationService {
 
         // Draw image
         page.drawImage(image, {
-          x: x,
-          y: y - fieldHeight,
-          width: fieldWidth,
-          height: fieldHeight,
+          x: x + this.fieldPaddingPt,
+          y: y + this.fieldPaddingPt,
+          width: Math.max(0, fieldWidth - this.fieldPaddingPt * 2),
+          height: Math.max(0, fieldHeight - this.fieldPaddingPt * 2),
         });
 
         console.log(`[PDF Generation] Drew signature for ${fieldValue.signer.name} on page ${field.page}`);
@@ -461,9 +462,9 @@ export class PdfGenerationService {
       const text = String(fieldValue.value || '');
       const sanitizedText = this.sanitizeText(text);
       page.drawText(sanitizedText, {
-        x: x + 5,
-        y: y - fieldHeight + 15,
-        size: 12,
+        x: x + this.fieldPaddingPt,
+        y: y + Math.max(this.fieldPaddingPt, fieldHeight / 2 - 6),
+        size: Math.min(12, Math.max(8, fieldHeight * 0.45)),
         font: font,
         color: rgb(0, 0, 0),
       });

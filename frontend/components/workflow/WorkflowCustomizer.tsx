@@ -1,326 +1,281 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Clock, Plus, Trash2, User } from 'lucide-react';
+
 import { useAuth } from '@/components/providers/auth-provider';
-import { Plus, Trash2, Clock, User, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 
-interface WorkflowCustomizerProps {
-  defaultWorkflowId: number;
-  onCustomize: (steps: any[] | null) => void;
+interface WorkflowStepInput {
+  step_name: string;
+  approver_type: string;
+  approver_id: number | null;
+  participant_role: 'approver' | 'signer';
+  due_in_days: number;
+  order: number;
 }
 
-export function WorkflowCustomizer({ defaultWorkflowId, onCustomize }: WorkflowCustomizerProps) {
-  const { fetchJson } = useAuth();
-  const [useDefault, setUseDefault] = useState(true);
-  const [customSteps, setCustomSteps] = useState<any[]>([]);
+interface WorkflowCustomizerProps {
+  defaultWorkflowId?: number | null;
+  initialSteps?: WorkflowStepInput[] | null;
+  onCustomize: (steps: WorkflowStepInput[] | null) => void;
+}
 
-  const { data: workflowData } = useQuery({
-    queryKey: ['workflow', defaultWorkflowId],
+function normalizeTemplateStep(step: any, index: number): WorkflowStepInput {
+  return {
+    step_name: step.step_name || `Bước ${index + 1}`,
+    approver_type: 'user',
+    approver_id: step.approver_type === 'user' ? step.approver_id || null : null,
+    participant_role: step.participant_role === 'signer' ? 'signer' : 'approver',
+    due_in_days: step.due_in_days || 3,
+    order: index + 1,
+  };
+}
+
+function normalizeStep(step: Partial<WorkflowStepInput>, index: number): WorkflowStepInput {
+  return {
+    step_name: step.step_name || `Bước ${index + 1}`,
+    approver_type: 'user',
+    approver_id: typeof step.approver_id === 'number' && step.approver_id > 0 ? step.approver_id : null,
+    participant_role: step.participant_role === 'signer' ? 'signer' : 'approver',
+    due_in_days: typeof step.due_in_days === 'number' && step.due_in_days > 0 ? step.due_in_days : 3,
+    order: typeof step.order === 'number' && step.order > 0 ? step.order : index + 1,
+  };
+}
+
+function areStepsEqual(left: WorkflowStepInput[] | null | undefined, right: WorkflowStepInput[] | null | undefined) {
+  return JSON.stringify(left || []) === JSON.stringify(right || []);
+}
+
+export function WorkflowCustomizer({ defaultWorkflowId, initialSteps, onCustomize }: WorkflowCustomizerProps) {
+  const { fetchJson } = useAuth();
+  const [steps, setSteps] = useState<WorkflowStepInput[]>([]);
+  const stepsRef = useRef<WorkflowStepInput[]>([]);
+
+  const syncSteps = (nextSteps: WorkflowStepInput[] | null, emit = true) => {
+    const normalized = (nextSteps || []).map((step, index) => normalizeStep(step, index));
+    stepsRef.current = normalized;
+    setSteps(normalized);
+    if (emit) {
+      onCustomize(normalized.length ? normalized : null);
+    }
+  };
+
+  const updateSteps = (updater: (current: WorkflowStepInput[]) => WorkflowStepInput[] | null) => {
+    const nextSteps = updater(stepsRef.current);
+    syncSteps(nextSteps);
+  };
+
+  const { data: workflowData, isLoading: isLoadingWorkflow } = useQuery({
+    queryKey: ['workflow', defaultWorkflowId, 'customizer'],
+    enabled: !!defaultWorkflowId,
     queryFn: async () => {
       const data: any = await fetchJson(`/workflows/${defaultWorkflowId}`);
-      // Handle nested response structure
       return data?.workflow || data;
     },
   });
 
-  // ✅ Fetch only active users for selection
   const { data: usersData } = useQuery({
     queryKey: ['users', 'active'],
     queryFn: () => fetchJson<any>('/users/active'),
   });
 
-  const users = (usersData as any) || [];
-  const defaultSteps = workflowData?.steps || [];
+  const users = (usersData as any[]) || [];
+  const templateSteps = useMemo(
+    () => ((workflowData?.steps || []) as any[]).map((step, index) => normalizeTemplateStep(step, index)),
+    [workflowData]
+  );
+  const restoredSteps = useMemo(
+    () => (initialSteps?.length ? initialSteps.map((step, index) => normalizeStep(step, index)) : null),
+    [initialSteps]
+  );
 
   useEffect(() => {
-    if (useDefault) {
-      onCustomize(null);
-    } else {
-      onCustomize(customSteps.length > 0 ? customSteps : null);
+    if (restoredSteps?.length) {
+      if (!areStepsEqual(stepsRef.current, restoredSteps)) {
+        syncSteps(restoredSteps, false);
+      }
+      return;
     }
-  }, [useDefault, customSteps]);
+
+    if (!templateSteps.length) {
+      if (stepsRef.current.length > 0) {
+        syncSteps(null);
+      }
+      return;
+    }
+
+    if (!areStepsEqual(stepsRef.current, templateSteps)) {
+      syncSteps(templateSteps);
+    }
+  }, [restoredSteps, templateSteps]);
 
   const handleAddStep = () => {
-    setCustomSteps([
-      ...customSteps,
+    updateSteps((current) => [
+      ...current,
       {
-        step_name: `Bước ${customSteps.length + 1}`,
+        step_name: `Bước ${current.length + 1}`,
         approver_type: 'user',
-        approver_id: users[0]?.id || '',
-        participant_role: 'approver', // ✅ Default to approver
+        approver_id: null,
+        participant_role: 'approver',
         due_in_days: 3,
-        order: customSteps.length + 1, // ✅ Add order field
+        order: current.length + 1,
       },
     ]);
   };
 
   const handleRemoveStep = (index: number) => {
-    setCustomSteps(customSteps.filter((_, i) => i !== index));
+    updateSteps((current) =>
+      current
+        .filter((_, currentIndex) => currentIndex !== index)
+        .map((step, currentIndex) => ({
+          ...step,
+          order: currentIndex + 1,
+        }))
+    );
   };
 
-  const handleUpdateStep = (index: number, field: string, value: any) => {
-    const updated = [...customSteps];
-    updated[index] = { ...updated[index], [field]: value };
-    setCustomSteps(updated);
+  const handleUpdateStep = (index: number, field: keyof WorkflowStepInput, value: any) => {
+    updateSteps((current) =>
+      current.map((step, currentIndex) =>
+        currentIndex === index
+          ? {
+              ...step,
+              [field]: field === 'approver_id' ? (typeof value === 'number' && value > 0 ? value : null) : value,
+            }
+          : step
+      )
+    );
   };
 
   const handleReset = () => {
-    setUseDefault(true);
-    setCustomSteps([]);
+    if (templateSteps.length) {
+      syncSteps(templateSteps);
+      return;
+    }
+    syncSteps(restoredSteps, false);
   };
 
+  if (isLoadingWorkflow && !restoredSteps?.length) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+        Đang tải workflow mặc định...
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-gray-700">
-          🔧 Quy trình phê duyệt (Chế độ: Flexible)
-        </h4>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleReset}
-          disabled={useDefault}
-        >
-          <RotateCcw className="w-3 h-3 mr-1" />
-          Dùng mặc định
+    <div className="space-y-4">
+      <div className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+        <div>
+          <h4 className="text-sm font-semibold text-slate-900">Quy trình đang áp dụng</h4>
+          <p className="mt-1 text-xs text-slate-600">
+            Đây là workflow đang được áp vào tài liệu này. Nếu loại văn bản cho phép tùy chỉnh, anh sửa trực tiếp ngay trên danh sách bước bên dưới.
+          </p>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={handleReset}>
+          Dùng lại mặc định
         </Button>
       </div>
 
-      <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-        <p className="text-xs text-green-700 font-medium">
-          ✅ Bạn có thể tùy chỉnh quy trình hoặc dùng mặc định
-        </p>
-      </div>
+      {steps.some((step) => !step.approver_id) && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+          Còn bước chưa chọn người phụ trách. Vui lòng chọn đủ người phê duyệt hoặc người ký trước khi sang editor.
+        </div>
+      )}
 
-      {/* Toggle */}
-      <div className="flex items-center gap-2">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="radio"
-            checked={useDefault}
-            onChange={() => setUseDefault(true)}
-            className="w-4 h-4"
-          />
-          <span className="text-sm text-gray-700">Dùng quy trình mặc định</span>
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="radio"
-            checked={!useDefault}
-            onChange={() => {
-              setUseDefault(false);
-              if (customSteps.length === 0) {
-                // Initialize with default steps structure
-                setCustomSteps(
-                  defaultSteps.map((step: any, idx: number) => {
-                    // ✅ Keep approver_id from template ONLY if it's a valid user type
-                    // Otherwise set to null and let user choose
-                    let approverId = null;
-                    
-                    if (step.approver_type === 'user' && step.approver_id) {
-                      approverId = step.approver_id;
-                    }
-                    // For department/role/manager types, leave null - user must choose
-                    
-                    return {
-                      step_name: step.step_name,
-                      approver_type: 'user', // ✅ Force to 'user' type for customization
-                      approver_id: approverId, // ✅ null if not user type - user must select
-                      participant_role: step.participant_role || 'approver',
-                      due_in_days: step.due_in_days || 3,
-                      order: idx + 1,
-                    };
-                  })
-                );
-              }
-            }}
-            className="w-4 h-4"
-          />
-          <span className="text-sm text-gray-700">Tùy chỉnh</span>
-        </label>
-      </div>
+      <div className="space-y-3">
+        {steps.map((step, index) => {
+          const hasApprover = !!step.approver_id;
 
-      {/* Show default steps */}
-      {useDefault && (
-        <div className="space-y-2">
-          {defaultSteps.map((step: any, index: number) => (
+          return (
             <div
-              key={step.id}
-              className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200"
+              key={`${defaultWorkflowId || 'custom'}-${index}`}
+              className={`rounded-xl border p-4 ${hasApprover ? 'border-slate-200 bg-white' : 'border-amber-300 bg-amber-50'}`}
             >
-              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-semibold">
-                {index + 1}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900">{step.step_name}</p>
-                
-                {/* Approver Info */}
-                {step.approver_name && step.approver_email ? (
-                  <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-100">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-200 text-blue-700 flex items-center justify-center text-xs font-semibold">
-                        {step.approver_name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-blue-900 truncate">
-                          {step.approver_name}
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+                  {index + 1}
+                </div>
+
+                <div className="flex-1 space-y-3">
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+                    <input
+                      type="text"
+                      value={step.step_name}
+                      onChange={(event) => handleUpdateStep(index, 'step_name', event.target.value)}
+                      placeholder="Tên bước"
+                      className="h-11 rounded-lg border border-slate-300 px-3 text-sm"
+                    />
+
+                    <select
+                      value={step.participant_role}
+                      onChange={(event) => handleUpdateStep(index, 'participant_role', event.target.value as 'approver' | 'signer')}
+                      className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                    >
+                      <option value="approver">Người phê duyệt</option>
+                      <option value="signer">Người ký</option>
+                    </select>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px_auto]">
+                    <div>
+                      <SearchableSelect
+                        options={users.map((user: any) => ({
+                          value: user.id,
+                          label: `${user.full_name || user.email}${user.full_name ? ` (${user.email})` : ''}`,
+                        }))}
+                        value={step.approver_id || ''}
+                        onChange={(value) =>
+                          handleUpdateStep(index, 'approver_id', typeof value === 'string' ? parseInt(value, 10) : value)
+                        }
+                        placeholder={step.participant_role === 'signer' ? '-- Chọn người ký --' : '-- Chọn người phê duyệt --'}
+                      />
+                      {!hasApprover && (
+                        <p className="mt-1 text-xs text-amber-700">
+                          Chưa chọn {step.participant_role === 'signer' ? 'người ký' : 'người phê duyệt'} cho bước này.
                         </p>
-                        <p className="text-xs text-blue-600 truncate">
-                          {step.approver_email}
-                        </p>
-                      </div>
+                      )}
+                    </div>
+
+                    <input
+                      type="number"
+                      value={step.due_in_days}
+                      onChange={(event) => handleUpdateStep(index, 'due_in_days', parseInt(event.target.value, 10) || 1)}
+                      min="1"
+                      max="365"
+                      className="h-11 rounded-lg border border-slate-300 px-3 text-sm"
+                    />
+
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>ngày xử lý</span>
                     </div>
                   </div>
-                ) : (
-                  <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
-                    <p className="text-xs text-gray-500">
-                      ⚠️ Chưa có thông tin người phê duyệt
-                    </p>
-                  </div>
-                )}
-                
-                <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                  {/* ✅ Show participant role */}
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    step.participant_role === 'signer' 
-                      ? 'bg-green-100 text-green-700' 
-                      : 'bg-blue-100 text-blue-700'
-                  }`}>
-                    {step.participant_role === 'signer' ? '✍️ Người ký' : '👤 Người phê duyệt'}
-                  </span>
-                  <User className="w-3 h-3" />
-                  <span>
-                    {step.approver_type === 'user' && 'Người dùng'}
-                    {step.approver_type === 'role' && 'Vai trò'}
-                    {step.approver_type === 'department' && 'Phòng ban'}
-                    {step.approver_type === 'manager' && 'Quản lý'}
-                  </span>
-                  <Clock className="w-3 h-3 ml-2" />
-                  <span>{step.due_in_days} ngày</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
-      {/* Custom steps editor */}
-      {!useDefault && (
-        <div className="space-y-2">
-          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-xs text-blue-700">
-              💡 <strong>Mẹo:</strong> Bạn có thể tùy chỉnh số thứ tự của mỗi bước bằng cách nhập vào ô số bên trái
-            </p>
-          </div>
-          
-          {/* ✅ Warning if any step has no approver */}
-          {customSteps.some(s => !s.approver_id || s.approver_id <= 0) && (
-            <div className="p-3 bg-amber-50 rounded-lg border border-amber-300">
-              <p className="text-xs text-amber-800 font-medium">
-                ⚠️ <strong>Cảnh báo:</strong> Có {customSteps.filter(s => !s.approver_id || s.approver_id <= 0).length} bước chưa chọn người phê duyệt/ký. 
-                Vui lòng chọn người cho tất cả các bước trước khi tải lên.
-              </p>
-            </div>
-          )}
-          {customSteps.map((step, index) => {
-            const hasApprover = step.approver_id && step.approver_id > 0;
-            const borderColor = hasApprover ? 'border-gray-200' : 'border-amber-300';
-            const bgColor = hasApprover ? 'bg-white' : 'bg-amber-50';
-            
-            return (
-            <div
-              key={index}
-              className={`flex items-start gap-2 p-3 rounded-lg border ${borderColor} ${bgColor}`}
-            >
-              {/* ✅ Order input instead of fixed number */}
-              <div className="flex-shrink-0">
-                <input
-                  type="number"
-                  value={step.order || index + 1}
-                  onChange={(e) => handleUpdateStep(index, 'order', parseInt(e.target.value) || 1)}
-                  min="1"
-                  className="w-12 h-8 px-2 text-sm text-center border border-gray-300 rounded font-semibold text-blue-600"
-                  title="Số thứ tự"
-                />
-              </div>
-              <div className="flex-1 space-y-2">
-                <input
-                  type="text"
-                  value={step.step_name}
-                  onChange={(e) => handleUpdateStep(index, 'step_name', e.target.value)}
-                  placeholder="Tên bước"
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                />
-                
-                {/* ✅ NEW: Role selector */}
-                <div className="flex gap-2">
-                  <select
-                    value={step.participant_role || 'approver'}
-                    onChange={(e) => handleUpdateStep(index, 'participant_role', e.target.value)}
-                    className="px-2 py-1 text-sm border border-gray-300 rounded bg-white"
-                  >
-                    <option value="approver">👤 Người phê duyệt</option>
-                    <option value="signer">✍️ Người ký</option>
-                  </select>
-                </div>
-                
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <SearchableSelect
-                      options={users.map((user: any) => ({
-                        value: user.id,
-                        label: `${user.full_name || user.email}${user.full_name ? ` (${user.email})` : ''}`,
-                      }))}
-                      value={step.approver_id || ''}
-                      onChange={(value) => handleUpdateStep(index, 'approver_id', typeof value === 'string' ? parseInt(value) : value)}
-                      placeholder={step.participant_role === 'signer' ? '-- Chọn người ký --' : '-- Chọn người phê duyệt --'}
-                    />
-                    {!hasApprover && (
-                      <p className="text-xs text-amber-600 mt-1">
-                        ⚠️ Vui lòng chọn người {step.participant_role === 'signer' ? 'ký' : 'phê duyệt'}
-                      </p>
-                    )}
+                  <div className="flex items-center gap-4 text-xs text-slate-500">
+                    <div className="flex items-center gap-1.5">
+                      <User className="h-3.5 w-3.5" />
+                      <span>{step.participant_role === 'signer' ? 'Bước ký điện tử' : 'Bước phê duyệt'}</span>
+                    </div>
                   </div>
-                  <input
-                    type="number"
-                    value={step.due_in_days}
-                    onChange={(e) => handleUpdateStep(index, 'due_in_days', parseInt(e.target.value))}
-                    min="1"
-                    max="365"
-                    className="w-20 px-2 py-1 text-sm border border-gray-300 rounded"
-                  />
-                  <span className="text-xs text-gray-500 self-center">ngày</span>
                 </div>
+
+                <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveStep(index)} className="flex-shrink-0">
+                  <Trash2 className="h-4 w-4 text-red-500" />
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => handleRemoveStep(index)}
-                className="flex-shrink-0"
-              >
-                <Trash2 className="w-4 h-4 text-red-500" />
-              </Button>
             </div>
           );
-          })}
+        })}
+      </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAddStep}
-            className="w-full"
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            Thêm bước
-          </Button>
-        </div>
-      )}
+      <Button type="button" variant="outline" onClick={handleAddStep} className="w-full">
+        <Plus className="mr-2 h-4 w-4" />
+        Thêm bước
+      </Button>
     </div>
   );
 }

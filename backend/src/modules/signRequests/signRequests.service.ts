@@ -12,6 +12,8 @@ import { signRequestFieldsService } from "./signRequestFields.service";
 import { notificationsService } from "../notifications/notifications.service";
 import { NotificationType } from "../notifications/notifications.types";
 import { authorizationService } from "../authorization/authorization.service";
+import { documentWorkflowOrchestratorService } from "../documents/documentWorkflowOrchestrator.service";
+import { normalizeStoredFieldBox } from "./coordinate.helper";
 
 export interface SignerInput {
   email: string;
@@ -30,6 +32,50 @@ export interface CreateSignRequestInput {
 }
 
 class SignRequestsService {
+  private isEditableStatus(status: string | null | undefined) {
+    return status === "draft" || status === "rejected";
+  }
+
+  private ensureEditableStatus(status: string | null | undefined) {
+    if (!this.isEditableStatus(status)) {
+      throw ApiError.badRequest(
+        "Cannot edit sign request after sign request is sent",
+        "SIGN_REQUEST_EDIT_DENIED"
+      );
+    }
+  }
+
+  private async findInternalSignerForUser(signRequestId: number, userId: number) {
+    const currentUser = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+
+    if (!currentUser?.email) {
+      throw ApiError.notFound("User not found", "USER_NOT_FOUND");
+    }
+
+    const signer = await prisma.signers.findFirst({
+      where: {
+        sign_request_id: signRequestId,
+        is_internal: true,
+        OR: [
+          { user_id: currentUser.id },
+          { email: currentUser.email },
+        ],
+      },
+    });
+
+    if (!signer) {
+      throw ApiError.notFound(
+        "Báº¡n khÃ´ng pháº£i lÃ  ngÆ°á»i kÃ½ cá»§a tÃ i liá»‡u nÃ y",
+        "SIGNER_NOT_FOUND"
+      );
+    }
+
+    return signer;
+  }
+
   private async ensureCanManageSignRequest(signRequestId: number, tenantId: number, userId: number) {
     const signRequest = await this.getSignRequest(signRequestId, tenantId);
     const decision = await authorizationService.canAccessDocument(
@@ -97,9 +143,64 @@ class SignRequestsService {
     if (!signRequest) {
       throw ApiError.notFound("Sign request not found", "SIGN_REQUEST_NOT_FOUND");
     }
+    const normalizedFields = Array.isArray((signRequest as any).fields)
+      ? (signRequest as any).fields.map((field: any) => {
+          const normalized = normalizeStoredFieldBox(field);
+          return {
+            ...field,
+            pageIndex: Math.max(0, (field.page || 1) - 1),
+            coordinateVersion: 2,
+            coordinateUnit: "ratio",
+            coordinateAnchor: "top-left",
+            xPct: normalized.xPct,
+            yPct: normalized.yPct,
+            widthPct: normalized.widthPct,
+            heightPct: normalized.heightPct,
+          };
+        })
+      : undefined;
+    const workflowSnapshot = signRequest.document_id
+      ? await this.getWorkflowSnapshotForDocument(signRequest.document_id, tenantId)
+      : null;
     return {
       ...signRequest,
+      fields: normalizedFields,
+      workflow_snapshot: workflowSnapshot,
       ...this.buildFlowHints(signRequest),
+    };
+  }
+
+  private async getWorkflowSnapshotForDocument(documentId: number, tenantId: number) {
+    const workflow = await prisma.workflows.findFirst({
+      where: {
+        tenant_id: tenantId,
+        created_for_doc: documentId,
+        is_active: true,
+      },
+      include: {
+        steps: {
+          orderBy: { step_order: "asc" },
+        },
+      },
+      orderBy: { id: "desc" },
+    });
+
+    if (!workflow) {
+      return null;
+    }
+
+    return {
+      id: workflow.id,
+      based_on_template: workflow.based_on_template,
+      steps: workflow.steps.map((step) => ({
+        id: step.id,
+        step_name: step.step_name,
+        approver_type: step.approver_type,
+        approver_id: step.approver_id,
+        participant_role: step.participant_role || "approver",
+        due_in_days: step.due_in_days,
+        order: step.step_order,
+      })),
     };
   }
 
@@ -452,10 +553,7 @@ class SignRequestsService {
     // Verify sign request exists and belongs to tenant
     const signRequest = await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
 
-    // Only allow adding signers when status = 'draft'
-    if (signRequest.status !== 'draft') {
-      throw ApiError.badRequest('Cannot add signers after sign request is sent');
-    }
+    this.ensureEditableStatus(signRequest.status);
 
     // Check if signer is internal user
     const internalUser = await prisma.users.findFirst({
@@ -474,7 +572,7 @@ class SignRequestsService {
       name: signerData.name,
       role: signerData.role,
       signing_order: signerData.signing_order,
-      status: 'pending',
+      status: 'draft',
       is_internal: !!internalUser, // ✅ Set based on user existence
       position_data: signerData.position_data as Prisma.InputJsonValue,
     };
@@ -495,26 +593,51 @@ class SignRequestsService {
     this.ensureSendableStatus(signRequest.status || "");
     await this.validateSignFieldsIfNeeded(id);
 
-    if (signRequest.status === "draft") {
-      const movedToApproval = await this.submitDraftToApprovalIfRequired(signRequest, tenantId, userId);
-      if (movedToApproval) {
+    if (signRequest.status === "rejected") {
+      await this.prepareRejectedForResubmission(id, tenantId, userId);
+    }
+
+    if (signRequest.status === "draft" || signRequest.status === "rejected") {
+      const runtime = await documentWorkflowOrchestratorService.beginRuntimeFlow(id, tenantId, userId);
+
+      if (runtime.phase === "approval") {
+        await auditService.record({
+          tenantId,
+          documentId: signRequest.document_id,
+          event: "sign.submitted_for_approval",
+          userId,
+        });
         return this.getSignRequestWithFlowHints(id, tenantId);
       }
 
-      await this.submitDraftToSigning(signRequest, tenantId);
-    } else if (signRequest.status === "pending_approval") {
-      await signRequestsRepository.updateStatus(id, tenantId, "pending");
-    }
+      if (runtime.phase === "completed") {
+        return this.getSignRequestWithFlowHints(id, tenantId);
+      }
 
-    await this.generateSignerTokens(id, signRequest.status === "draft");
-    const signersWithTokens = await signersRepository.findBySignRequest(id);
-
-    if (signersWithTokens.some((s) => s.status === "waiting_approval")) {
+      await this.dispatchPendingSigners(id, tenantId, userId, true);
       return this.getSignRequestWithFlowHints(id, tenantId);
     }
 
-    if (signRequest.status === "draft") {
-      await signRequestsRepository.updateStatus(id, tenantId, "pending");
+    if (signRequest.status === "pending_approval") {
+      return this.getSignRequestWithFlowHints(id, tenantId);
+    }
+
+    await this.dispatchPendingSigners(id, tenantId, userId, false);
+    return this.getSignRequestWithFlowHints(id, tenantId);
+  }
+
+  async dispatchPendingSigners(
+    signRequestId: number,
+    tenantId: number,
+    userId: number,
+    fromDraft: boolean
+  ) {
+    const signRequest = await this.getSignRequest(signRequestId, tenantId);
+    await this.generateSignerTokens(signRequestId, fromDraft);
+
+    const signersWithTokens = await signersRepository.findBySignRequest(signRequestId);
+    if (signersWithTokens.some((signer) => signer.status === "waiting_approval")) {
+      return;
     }
 
     await this.notifyPendingSigners(signRequest, signersWithTokens, tenantId, userId);
@@ -525,8 +648,6 @@ class SignRequestsService {
       event: "sign.sent",
       userId,
     });
-
-    return this.getSignRequestWithFlowHints(id, tenantId);
   }
 
   private async getSignRequestWithFlowHints(id: number, tenantId: number) {
@@ -538,12 +659,66 @@ class SignRequestsService {
   }
 
   private ensureSendableStatus(status: string) {
-    if (status === "completed" || status === "cancelled" || status === "rejected") {
+    if (status === "completed" || status === "cancelled") {
       throw ApiError.badRequest(
         `Cannot send sign request with status: ${status}`,
         "SIGN_REQUEST_INVALID_STATUS"
       );
     }
+  }
+
+  private async prepareRejectedForResubmission(signRequestId: number, tenantId: number, userId: number) {
+    const signRequest = await this.getSignRequest(signRequestId, tenantId);
+    if (signRequest.status !== "rejected") {
+      return;
+    }
+
+    await prisma.sign_request_comments.create({
+      data: {
+        tenant_id: tenantId,
+        sign_request_id: signRequestId,
+        user_id: userId,
+        body: "Gửi lại luồng ký sau khi bị từ chối",
+      },
+    });
+
+    await prisma.document_approvals.deleteMany({
+      where: { document_id: signRequest.document_id },
+    });
+
+    await prisma.workflow_instances.deleteMany({
+      where: { document_id: signRequest.document_id },
+    });
+
+    const signers = await signersRepository.findBySignRequest(signRequestId);
+    for (const signer of signers) {
+      await signersRepository.update(signer.id, {
+        status: "draft",
+        signed_at: null,
+        signature_data: null,
+        signature_type: null,
+        ip_address: null,
+        user_agent: null,
+        otp: null,
+        otp_expire: null,
+        signing_token: null,
+      });
+    }
+
+    await prisma.sign_requests.update({
+      where: { id: signRequestId, tenant_id: tenantId },
+      data: {
+        status: "draft",
+      },
+    });
+
+    await prisma.documents.update({
+      where: { id: signRequest.document_id },
+      data: {
+        status: "draft",
+        signed_file_path: null,
+      },
+    });
   }
 
   private async validateSignFieldsIfNeeded(signRequestId: number) {
@@ -553,75 +728,6 @@ class SignRequestsService {
     const validation = await signRequestFieldsService.validateFieldsBeforeSend(signRequestId);
     if (!validation.valid) {
       throw ApiError.badRequest(validation.message || "Field validation failed");
-    }
-  }
-
-  private async submitDraftToApprovalIfRequired(signRequest: any, tenantId: number, userId: number) {
-    const documentType = signRequest.document?.document_type_id
-      ? await prisma.document_types.findUnique({
-          where: { id: signRequest.document.document_type_id },
-        })
-      : null;
-
-    if (!documentType?.require_approval) return false;
-
-    const draftSigners = await signersRepository.findBySignRequest(signRequest.id);
-    for (const signer of draftSigners) {
-      await signersRepository.update(signer.id, { status: "waiting_approval" });
-    }
-
-    await signRequestsRepository.updateStatus(signRequest.id, tenantId, "pending_approval");
-
-    const documentWorkflow = await prisma.workflows.findFirst({
-      where: {
-        tenant_id: tenantId,
-        created_for_doc: signRequest.document_id,
-        is_active: true,
-      },
-      orderBy: { id: "desc" },
-    });
-
-    const workflowId = documentWorkflow?.id || documentType.default_workflow_id;
-    if (!workflowId) {
-      throw ApiError.badRequest("Workflow is required for approval flow", "WORKFLOW_REQUIRED");
-    }
-
-    const { approvalsService } = await import("../approvals/approvals.service");
-    await approvalsService.submitForApproval(signRequest.document_id, workflowId, tenantId, userId);
-
-    await auditService.record({
-      tenantId,
-      documentId: signRequest.document_id,
-      event: "sign.submitted_for_approval",
-      userId,
-    });
-
-    return true;
-  }
-
-  private async submitDraftToSigning(signRequest: any, tenantId: number) {
-    const orderedSigners = (await signersRepository.findBySignRequest(signRequest.id)).sort(
-      (a, b) => (a.signing_order || 0) - (b.signing_order || 0)
-    );
-
-    if (orderedSigners.length === 0) {
-      throw ApiError.badRequest(
-        "Sign request must have at least one signer before sending",
-        "SIGNERS_REQUIRED"
-      );
-    }
-
-    for (let index = 0; index < orderedSigners.length; index += 1) {
-      const signer = orderedSigners[index];
-      await signersRepository.update(signer.id, {
-        status: index === 0 ? "pending" : "waiting_signing",
-      });
-    }
-
-    if (signRequest.document_id) {
-      await documentsRepository.update(signRequest.document_id, {
-        status: "pending_signature",
-      });
     }
   }
 
@@ -933,6 +1039,125 @@ class SignRequestsService {
   }
 
   // ✅ Phase 2: Get Signers
+  async rejectInternal(
+    signRequestId: number,
+    userId: number,
+    tenantId: number,
+    comment: string,
+    ipAddress: string,
+    userAgent: string
+  ) {
+    const reason = comment.trim();
+    if (!reason) {
+      throw ApiError.badRequest("Comment is required", "COMMENT_REQUIRED");
+    }
+
+    const signRequest = await this.getSignRequest(signRequestId, tenantId);
+    const signer = await this.findInternalSignerForUser(signRequestId, userId);
+
+    if (signer.status === "signed" || signer.status === "completed") {
+      throw ApiError.badRequest(
+        "Báº¡n Ä‘Ã£ kÃ½ tÃ i liá»‡u nÃ y rá»“i",
+        "ALREADY_SIGNED"
+      );
+    }
+
+    if (signer.status === "rejected") {
+      throw ApiError.badRequest(
+        "Báº¡n Ä‘Ã£ tá»« chá»‘i tÃ i liá»‡u nÃ y",
+        "ALREADY_REJECTED"
+      );
+    }
+
+    if (signer.status !== "pending") {
+      throw ApiError.badRequest(
+        "ChÆ°a Ä‘áº¿n lÆ°á»£t báº¡n xá»­ lÃ½ tÃ i liá»‡u nÃ y",
+        "SIGNER_NOT_ACTIVE"
+      );
+    }
+
+    await signersRepository.update(signer.id, {
+      status: "rejected",
+      signed_at: new Date(),
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      position_data: {
+        ...(typeof signer.position_data === "object" && signer.position_data ? signer.position_data as Record<string, unknown> : {}),
+        rejection_reason: reason,
+        rejected_at: new Date().toISOString(),
+      } as any,
+    });
+
+    await prisma.sign_requests.update({
+      where: { id: signRequestId, tenant_id: tenantId },
+      data: {
+        status: "rejected",
+        cancellation_reason: reason,
+      },
+    });
+
+    await prisma.documents.update({
+      where: { id: signRequest.document_id },
+      data: { status: "rejected" },
+    });
+
+    await prisma.workflow_instances.updateMany({
+      where: { document_id: signRequest.document_id },
+      data: {
+        status: "rejected",
+        completed_at: new Date(),
+      },
+    });
+
+    await prisma.sign_request_comments.create({
+      data: {
+        tenant_id: tenantId,
+        sign_request_id: signRequestId,
+        user_id: userId,
+        body: `Tá»« chá»‘i kÃ½: ${reason}`,
+      },
+    });
+
+    await auditService.record({
+      tenantId,
+      documentId: signRequest.document_id,
+      event: "sign.internal_rejected",
+      userId,
+    });
+
+    const document = await prisma.documents.findUnique({
+      where: { id: signRequest.document_id },
+      include: {
+        owner: {
+          select: { id: true, email: true, full_name: true },
+        },
+      },
+    });
+
+    const actor = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { full_name: true, email: true },
+    });
+
+    if (document?.owner && document.owner.id !== userId) {
+      await notificationsService.createNotification({
+        tenantId,
+        userId: document.owner.id,
+        type: NotificationType.APPROVAL_REJECTED,
+        title: "TÃ i liá»‡u bá»‹ tá»« chá»‘i kÃ½",
+        message: `TÃ i liá»‡u "${document.title || signRequest.title || "Untitled"}" Ä‘Ã£ bá»‹ tá»« chá»‘i bá»Ÿi ${actor?.full_name || actor?.email || "ngÆ°á»i kÃ½"}`,
+        link: `/documents/${document.id}/flow`,
+      }).catch((error) => console.error("Failed to create sign rejection notification:", error));
+    }
+
+    return {
+      success: true,
+      message: "ÄÃ£ tá»« chá»‘i kÃ½ tÃ i liá»‡u",
+      signer_id: signer.id,
+      status: "rejected",
+    };
+  }
+
   async getSigners(signRequestId: number, tenantId: number) {
     const signRequest = await this.getSignRequest(signRequestId, tenantId);
     return await signersRepository.findBySignRequest(signRequestId);
@@ -987,8 +1212,8 @@ class SignRequestsService {
       throw ApiError.notFound('Signer not found', 'SIGNER_NOT_FOUND');
     }
 
-    // Verify sign request belongs to tenant
-    await this.ensureCanManageSignRequest(signer.sign_request_id, tenantId, userId);
+    const signRequest = await this.ensureCanManageSignRequest(signer.sign_request_id, tenantId, userId);
+    this.ensureEditableStatus(signRequest.status);
 
     // If email changed, check if new email is internal user
     if (updates.email && updates.email !== signer.email) {
@@ -1035,6 +1260,308 @@ class SignRequestsService {
     return await signersRepository.findById(signerId);
   }
 
+  private async syncWorkflowSnapshotAndInternalSigners(
+    signRequestId: number,
+    tenantId: number,
+    documentId: number,
+    workflowSteps: Array<{
+      step_name: string;
+      approver_type?: string;
+      approver_id?: number | null;
+      participant_role?: string;
+      due_in_days?: number;
+      order?: number;
+    }>
+  ) {
+    const normalizedSteps = workflowSteps
+      .map((step, index) => ({
+        step_name: step.step_name?.trim() || `Bước ${index + 1}`,
+        approver_type: "user",
+        approver_id: step.approver_id || null,
+        participant_role: step.participant_role === "signer" ? "signer" : "approver",
+        due_in_days: step.due_in_days && step.due_in_days > 0 ? step.due_in_days : 3,
+        order: step.order && step.order > 0 ? step.order : index + 1,
+      }))
+      .sort((a, b) => a.order - b.order)
+      .map((step, index) => ({
+        ...step,
+        order: index + 1,
+      }));
+
+    for (const step of normalizedSteps) {
+      if (!step.approver_id || step.approver_id <= 0) {
+        throw ApiError.badRequest("Mỗi bước phải chọn đúng người phụ trách", "INVALID_WORKFLOW_STEP");
+      }
+    }
+
+    const workflow = await prisma.workflows.findFirst({
+      where: {
+        tenant_id: tenantId,
+        created_for_doc: documentId,
+        is_active: true,
+      },
+      orderBy: { id: "desc" },
+    });
+
+    if (!workflow) {
+      throw ApiError.notFound("Workflow snapshot not found", "WORKFLOW_SNAPSHOT_NOT_FOUND");
+    }
+
+    const resolvedUsers = await prisma.users.findMany({
+      where: {
+        tenant_id: tenantId,
+        id: {
+          in: normalizedSteps
+            .map((step) => step.approver_id)
+            .filter((approverId): approverId is number => typeof approverId === "number"),
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        full_name: true,
+        status: true,
+      },
+    });
+
+    const userMap = new Map(resolvedUsers.map((user) => [user.id, user]));
+
+    for (const step of normalizedSteps) {
+      const user = step.approver_id ? userMap.get(step.approver_id) : null;
+      if (!user || user.status !== "active") {
+        throw ApiError.badRequest("Có bước đang chọn người không hợp lệ hoặc đã bị khóa", "INVALID_WORKFLOW_APPROVER");
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.workflow_steps.deleteMany({
+        where: { workflow_id: workflow.id },
+      });
+
+      for (const step of normalizedSteps) {
+        await tx.workflow_steps.create({
+          data: {
+            workflow_id: workflow.id,
+            step_order: step.order,
+            step_name: step.step_name,
+            approver_type: "user",
+            approver_id: step.approver_id,
+            participant_role: step.participant_role,
+            due_in_days: step.due_in_days,
+            is_required: true,
+          },
+        });
+      }
+
+      const signerSteps = normalizedSteps.filter((step) => step.participant_role === "signer");
+      const signerUsers = signerSteps
+        .map((step) => {
+          const user = step.approver_id ? userMap.get(step.approver_id) : null;
+          return user
+            ? {
+                id: user.id,
+                email: user.email,
+                name: user.full_name || user.email,
+                order: step.order,
+              }
+            : null;
+        })
+        .filter((user): user is { id: number; email: string; name: string; order: number } => !!user);
+
+      const existingInternalSigners = await tx.signers.findMany({
+        where: {
+          sign_request_id: signRequestId,
+          is_internal: true,
+        },
+      });
+
+      const signerIdsToKeep = new Set(signerUsers.map((user) => user.id));
+      const signersToDelete = existingInternalSigners.filter(
+        (signer) => !signer.user_id || !signerIdsToKeep.has(signer.user_id)
+      );
+
+      if (signersToDelete.length > 0) {
+        const deleteIds = signersToDelete.map((signer) => signer.id);
+        await tx.sign_request_fields.deleteMany({
+          where: {
+            sign_request_id: signRequestId,
+            assigned_signer_id: { in: deleteIds },
+          },
+        });
+        await tx.signers.deleteMany({
+          where: {
+            id: { in: deleteIds },
+          },
+        });
+      }
+
+      const existingInternalByUserId = new Map(
+        existingInternalSigners
+          .filter((signer) => signer.user_id)
+          .map((signer) => [signer.user_id as number, signer])
+      );
+
+      for (const signerUser of signerUsers) {
+        const existingSigner = existingInternalByUserId.get(signerUser.id);
+        if (existingSigner) {
+          await tx.signers.update({
+            where: { id: existingSigner.id },
+            data: {
+              email: signerUser.email,
+              name: signerUser.name,
+              role: "signer",
+              signing_order: signerUser.order,
+              is_internal: true,
+              user_id: signerUser.id,
+              status: "draft",
+            },
+          });
+          continue;
+        }
+
+        await tx.signers.create({
+          data: {
+            sign_request_id: signRequestId,
+            user_id: signerUser.id,
+            email: signerUser.email,
+            name: signerUser.name,
+            role: "signer",
+            signing_order: signerUser.order,
+            is_internal: true,
+            status: "draft",
+          },
+        });
+      }
+
+      const refreshedInternalSigners = await tx.signers.findMany({
+        where: {
+          sign_request_id: signRequestId,
+          is_internal: true,
+        },
+      });
+
+      const internalMaxOrder = refreshedInternalSigners.reduce(
+        (max, signer) => Math.max(max, signer.signing_order || 0),
+        0
+      );
+
+      const externalSigners = await tx.signers.findMany({
+        where: {
+          sign_request_id: signRequestId,
+          is_internal: false,
+        },
+        orderBy: { signing_order: "asc" },
+      });
+
+      for (let index = 0; index < externalSigners.length; index += 1) {
+        await tx.signers.update({
+          where: { id: externalSigners[index].id },
+          data: {
+            signing_order: internalMaxOrder + index + 1,
+          },
+        });
+      }
+    });
+  }
+
+  async updateDraftConfig(
+    signRequestId: number,
+    tenantId: number,
+    userId: number,
+    payload: {
+      signers: Array<{
+        id?: number | null;
+        email: string;
+        name: string;
+        role?: string;
+        external_org_id?: number | null;
+      }>;
+      workflow_steps?: Array<{
+        step_name: string;
+        approver_type?: string;
+        approver_id?: number | null;
+        participant_role?: string;
+        due_in_days?: number;
+        order?: number;
+      }> | null;
+    }
+  ) {
+    const signRequest = await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
+    this.ensureEditableStatus(signRequest.status);
+
+    if (payload.workflow_steps?.length) {
+      await this.syncWorkflowSnapshotAndInternalSigners(
+        signRequestId,
+        tenantId,
+        signRequest.document_id,
+        payload.workflow_steps
+      );
+    }
+
+    const existingSigners = await signersRepository.findBySignRequest(signRequestId);
+    const externalSigners = existingSigners.filter((signer) => !signer.is_internal);
+    const existingExternalById = new Map(externalSigners.map((signer) => [signer.id, signer]));
+    const incomingIds = new Set(
+      payload.signers
+        .map((signer) => (typeof signer.id === "number" ? signer.id : null))
+        .filter((id): id is number => id !== null)
+    );
+
+    for (const signer of externalSigners) {
+      if (!incomingIds.has(signer.id)) {
+        await prisma.sign_request_fields.deleteMany({
+          where: { assigned_signer_id: signer.id },
+        });
+        await signersRepository.delete(signer.id);
+      }
+    }
+
+    const currentSigners = await signersRepository.findBySignRequest(signRequestId);
+    const internalMaxOrder = currentSigners
+      .filter((signer) => signer.is_internal)
+      .reduce((max, signer) => Math.max(max, signer.signing_order || 0), 0);
+
+    for (let index = 0; index < payload.signers.length; index += 1) {
+      const signerInput = payload.signers[index];
+      const externalOrder = internalMaxOrder + index + 1;
+      const existingSigner =
+        typeof signerInput.id === "number" ? existingExternalById.get(signerInput.id) : null;
+
+      if (existingSigner) {
+        await signersRepository.update(existingSigner.id, {
+          email: signerInput.email,
+          name: signerInput.name,
+          role: signerInput.role || "signer",
+          signing_order: externalOrder,
+          position_data: {
+            ...(typeof existingSigner.position_data === "object" && existingSigner.position_data
+              ? (existingSigner.position_data as Record<string, unknown>)
+              : {}),
+            external_org_id: signerInput.external_org_id || null,
+          } as any,
+        });
+        continue;
+      }
+
+      await signersRepository.create({
+        sign_request: { connect: { id: signRequestId } },
+        email: signerInput.email,
+        name: signerInput.name,
+        role: signerInput.role || "signer",
+        signing_order: externalOrder,
+        status: "draft",
+        is_internal: false,
+        position_data: signerInput.external_org_id
+          ? ({
+              external_org_id: signerInput.external_org_id,
+            } as any)
+          : undefined,
+      });
+    }
+
+    return this.getSignRequest(signRequestId, tenantId);
+  }
+
   // ✅ Reorder Signers (Drag & Drop)
   async reorderSigners(
     signRequestId: number,
@@ -1042,8 +1569,8 @@ class SignRequestsService {
     userId: number,
     signers: Array<{ id: number; signing_order: number }>
   ) {
-    // Verify sign request belongs to tenant
-    await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
+    const signRequest = await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
+    this.ensureEditableStatus(signRequest.status);
 
     // Update signing_order for each signer
     for (const signer of signers) {
@@ -1072,8 +1599,8 @@ class SignRequestsService {
   async deleteSignRequest(id: number, tenantId: number, userId: number) {
     const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
 
-    // Only allow deleting draft sign requests
-    if (signRequest.status !== 'draft') {
+    // Only allow deleting editable sign requests
+    if (!this.isEditableStatus(signRequest.status)) {
       throw ApiError.badRequest(
         'Chỉ có thể xóa văn bản ở trạng thái nháp',
         'SIGN_REQUEST_DELETE_DENIED'

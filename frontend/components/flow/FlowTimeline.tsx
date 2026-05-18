@@ -8,6 +8,7 @@ interface FlowStep {
   id: string;
   type: 'approval' | 'signing';
   order: number;
+  sign_request_id?: number;
   user: {
     id: number;
     name: string;
@@ -88,13 +89,10 @@ export function FlowTimeline({ steps, canApprove, canSign }: FlowTimelineProps) 
       const approvalId = step.id.replace('approval-', '');
       router.push(`/approvals/${approvalId}`);
     } else if (step.type === 'signing' && canSign) {
-      // Navigate to signing page
-      const signerId = step.id.replace('signing-', '');
-      // Determine if internal or external signing
-      if (step.signer_kind === 'internal') {
-        router.push(`/my-tasks`); // Or specific internal signing page
+      if (step.signer_kind === 'internal' && step.sign_request_id) {
+        router.push(`/sign-requests/${step.sign_request_id}/internal-sign`);
       } else {
-        router.push(`/my-tasks`); // External signers use token-based URL
+        router.push(`/my-tasks`);
       }
     }
   };

@@ -21,8 +21,39 @@ const createSchema = z.object({
 });
 
 const idSchema = z.coerce.number().int().positive();
+const rejectInternalSchema = z.object({
+  comment: z.string().trim().min(1, "Comment is required"),
+});
+const draftConfigSchema = z.object({
+  signers: z.array(
+    z.object({
+      id: z.number().int().positive().optional().nullable(),
+      email: z.string().email(),
+      name: z.string().min(1),
+      role: z.string().optional(),
+      external_org_id: z.number().int().positive().optional().nullable(),
+    })
+  ),
+  workflow_steps: z
+    .array(
+      z.object({
+        step_name: z.string().min(1),
+        approver_type: z.string().optional(),
+        approver_id: z.number().int().positive().nullable().optional(),
+        participant_role: z.enum(['approver', 'signer']).optional(),
+        due_in_days: z.number().int().min(1).max(365).optional(),
+        order: z.number().int().min(1).optional(),
+      })
+    )
+    .nullable()
+    .optional(),
+});
 
 export class SignRequestsController {
+  private isEditableStatus(status?: string | null) {
+    return status === 'draft' || status === 'rejected';
+  }
+
   list = async (req: Request, res: Response): Promise<void> => {
     const signRequests = await signRequestsService.listSignRequests(req.auth!.tenantId);
     res.json(ok({ sign_requests: signRequests }));
@@ -107,7 +138,7 @@ export class SignRequestsController {
     
     // ✅ Check if draft
     const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId);
-    if (signRequest.status !== 'draft') {
+    if (!this.isEditableStatus(signRequest.status)) {
       res.status(400).json({
         success: false,
         error: 'Không thể sửa. Tài liệu đã được gửi đi.',
@@ -132,7 +163,7 @@ export class SignRequestsController {
 
     // Check if draft
     const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId);
-    if (signRequest.status !== 'draft') {
+    if (!this.isEditableStatus(signRequest.status)) {
       res.status(400).json({
         success: false,
         error: 'Không thể sửa. Tài liệu đã được gửi đi.',
@@ -174,7 +205,7 @@ export class SignRequestsController {
 
     // Check if draft
     const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId);
-    if (signRequest.status !== 'draft') {
+    if (!this.isEditableStatus(signRequest.status)) {
       res.status(400).json({
         success: false,
         error: 'Không thể sửa. Tài liệu đã được gửi đi.',
@@ -205,7 +236,7 @@ export class SignRequestsController {
 
     // Check if draft
     const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId);
-    if (signRequest.status !== 'draft') {
+    if (!this.isEditableStatus(signRequest.status)) {
       res.status(400).json({
         success: false,
         error: 'Không thể sắp xếp lại. Tài liệu đã được gửi đi.',
@@ -241,7 +272,7 @@ export class SignRequestsController {
     
     // ✅ Check if sign request is in draft status
     const signRequest = await signRequestsService.getSignRequest(id, req.auth!.tenantId);
-    if (signRequest.status !== 'draft') {
+    if (!this.isEditableStatus(signRequest.status)) {
       res.status(400).json({
         success: false,
         error: 'Không thể chỉnh sửa. Tài liệu đã được gửi đi.',
@@ -254,14 +285,14 @@ export class SignRequestsController {
         id: z.number().optional(),
         assigned_signer_id: z.number().nullable().optional(),
         type: z.enum(['signature', 'text', 'date', 'checkbox']),
-        page: z.number().int().min(1),
-        x: z.number(),
-        y: z.number(),
-        width: z.number().optional(),
-        height: z.number().optional(),
+        pageIndex: z.number().int().min(0),
+        xPct: z.number().min(0).max(1),
+        yPct: z.number().min(0).max(1),
+        widthPct: z.number().min(0).max(1).optional(),
+        heightPct: z.number().min(0).max(1).optional(),
         required: z.boolean().optional(),
-        label: z.string().optional(),
-        placeholder: z.string().optional(),
+        label: z.string().nullable().optional(),
+        placeholder: z.string().nullable().optional(),
         read_only: z.boolean().optional(),
       })
     );
@@ -283,6 +314,34 @@ export class SignRequestsController {
     res.json(ok({ sign_request: signRequest }));
   };
 
+  updateDraftConfig = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id);
+    const body = draftConfigSchema.parse(req.body);
+    const signRequest = await signRequestsService.updateDraftConfig(
+      id,
+      req.auth!.tenantId,
+      req.auth!.userId,
+      body as {
+        signers: Array<{
+          id?: number | null;
+          email: string;
+          name: string;
+          role?: string;
+          external_org_id?: number | null;
+        }>;
+        workflow_steps?: Array<{
+          step_name: string;
+          approver_type?: string;
+          approver_id?: number | null;
+          participant_role?: 'approver' | 'signer';
+          due_in_days?: number;
+          order?: number;
+        }> | null;
+      }
+    );
+    res.json(ok({ sign_request: signRequest }));
+  };
+
   cancel = async (req: Request, res: Response): Promise<void> => {
     const id = idSchema.parse(req.params.id);
     const { reason } = req.body;
@@ -301,7 +360,7 @@ export class SignRequestsController {
     
     // Check if draft
     const signRequest = await signRequestsService.getSignRequest(id, req.auth!.tenantId);
-    if (signRequest.status !== 'draft') {
+    if (!this.isEditableStatus(signRequest.status)) {
       res.status(400).json({
         success: false,
         error: 'Chỉ có thể xóa văn bản ở trạng thái nháp',
@@ -346,6 +405,22 @@ export class SignRequestsController {
       req.get('user-agent') || 'unknown'
     );
     
+    res.json(ok(result));
+  };
+
+  rejectInternal = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id);
+    const body = rejectInternalSchema.parse(req.body);
+
+    const result = await signRequestsService.rejectInternal(
+      id,
+      req.auth!.userId,
+      req.auth!.tenantId,
+      body.comment,
+      req.ip || 'unknown',
+      req.get('user-agent') || 'unknown'
+    );
+
     res.json(ok(result));
   };
 }

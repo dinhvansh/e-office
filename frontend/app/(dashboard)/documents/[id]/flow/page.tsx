@@ -30,7 +30,12 @@ export default function DocumentFlowPage() {
       // Auto-refresh every 10 seconds if document is in progress
       // Stop refreshing when completed or rejected
       const status = data?.document?.status;
-      if (status === 'in_progress' || status === 'pending') {
+      if (
+        status === 'in_progress' ||
+        status === 'pending' ||
+        status === 'pending_signature' ||
+        status === 'pending_approval'
+      ) {
         return 10000; // 10 seconds
       }
       return false; // Stop auto-refresh

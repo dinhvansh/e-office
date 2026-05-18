@@ -64,6 +64,7 @@ services:
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-E-Office}
       AUTO_INIT_DB: ${AUTO_INIT_DB:-true}
       DISABLE_LICENSE_CHECK: ${DISABLE_LICENSE_CHECK:-true}
+      RATE_LIMIT_BYPASS_EMAILS: ${RATE_LIMIT_BYPASS_EMAILS:-}
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     volumes:

@@ -514,72 +514,21 @@ class ApprovalsService {
         },
       });
 
-      // ✅ Check if there are signers waiting for approval
       if (document?.sign_request_id) {
-        const { signersRepository } = await import('../signers/signers.repository');
-        const waitingSigners = await prisma.signers.findMany({
-          where: {
-            sign_request_id: document.sign_request_id,
-            status: 'waiting_approval'
-          }
-        });
+        const { documentWorkflowOrchestratorService } = await import('../documents/documentWorkflowOrchestrator.service');
+        const activation = await documentWorkflowOrchestratorService.activateSigningPhase(
+          document.sign_request_id,
+          tenantId
+        );
 
-        if (waitingSigners.length > 0) {
-          // ⭐ SEQUENTIAL SIGNING: Only activate first signer, others stay 'waiting_signing'
-          console.log(`[Approval Complete] Found ${waitingSigners.length} signers waiting for approval`);
-          
-          // Sort by signing_order
-          const sortedSigners = waitingSigners.sort((a, b) => 
-            (a.signing_order || 0) - (b.signing_order || 0)
-          );
-          
-          // Activate first signer: 'waiting_approval' → 'pending'
-          const firstSigner = sortedSigners[0];
-          await signersRepository.update(firstSigner.id, {
-            status: 'pending'
-          });
-          console.log(`[Approval Complete] Activated first signer: ${firstSigner.email} (order: ${firstSigner.signing_order})`);
-          
-          // Change remaining signers: 'waiting_approval' → 'waiting_signing'
-          for (let i = 1; i < sortedSigners.length; i++) {
-            await signersRepository.update(sortedSigners[i].id, {
-              status: 'waiting_signing'
-            });
-            console.log(`[Approval Complete] Set to waiting_signing: ${sortedSigners[i].email} (order: ${sortedSigners[i].signing_order})`);
-          }
-          
-          // Send sign request (this will generate tokens and send emails only to pending signers)
-          const { signRequestsService } = await import('../signRequests/signRequests.service');
-          await signRequestsService.sendSignRequest(
+        if (!activation.completedWithoutSigners) {
+          await signRequestsService.dispatchPendingSigners(
             document.sign_request_id,
             tenantId,
-            document.owner_id || userId
+            document.owner_id || userId,
+            false
           );
-          
-          // Update document status to pending_signature
-          await prisma.documents.update({
-            where: { id: approval.document_id },
-            data: { status: 'pending_signature' },
-          });
-          
-          console.log(`[Approval Complete] ✓ Sign request sent to first signer (${sortedSigners.length - 1} waiting)`);
-        } else {
-          // No signers waiting, mark as completed
-          await prisma.documents.update({
-            where: { id: approval.document_id },
-            data: { status: 'completed' },
-          });
-
-          if (document.sign_request_id) {
-            await prisma.sign_requests.update({
-              where: { id: document.sign_request_id },
-              data: { status: 'completed' },
-            });
-          }
         }
-      } else if (document?.document_type?.require_digital_signing && document.sign_request_id) {
-        // Check if document requires digital signing (external signers already added)
-        await this.autoSendSignRequest(document, tenantId);
       } else {
         // No signing required, mark as completed
         await prisma.documents.update({
@@ -1020,6 +969,10 @@ class ApprovalsService {
     const page = options?.page || 1;
     const limit = options?.limit || 10;
     const skip = (page - 1) * limit;
+    const currentUser = await prisma.users.findFirst({
+      where: { id: userId, tenant_id: tenantId },
+      select: { email: true },
+    });
 
     let allTasks: any[] = [];
 
@@ -1068,8 +1021,11 @@ class ApprovalsService {
         include: {
           signers: {
             where: {
-              user_id: userId,
               is_internal: true,
+              OR: [
+                { user_id: userId },
+                ...(currentUser?.email ? [{ email: currentUser.email }] : []),
+              ],
               status: {
                 in: ['pending', 'otp_sent', 'signed', 'rejected'] // Exclude waiting_signing, waiting_approval
               }

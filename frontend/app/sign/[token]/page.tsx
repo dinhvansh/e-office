@@ -255,9 +255,9 @@ export default function PublicSigningPage() {
     .filter((f) => !f.assigned_signer_id || f.assigned_signer_id === data?.signer.id)
     .sort((a, b) => {
       // Sort by page first, then by y position (top to bottom), then by x (left to right)
-      if (a.page !== b.page) return a.page - b.page;
-      if (Math.abs(a.y - b.y) > 5) return a.y - b.y; // 5% tolerance for same row
-      return a.x - b.x;
+      if (a.pageIndex !== b.pageIndex) return a.pageIndex - b.pageIndex;
+      if (Math.abs(a.yPct - b.yPct) > 0.01) return a.yPct - b.yPct;
+      return a.xPct - b.xPct;
     });
 
   const handleStartGuided = () => {

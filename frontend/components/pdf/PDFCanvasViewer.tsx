@@ -3,18 +3,19 @@
 import { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { usePDFUrl } from '@/hooks/usePDFUrl';
+import { clampNormalizedBox, pctToPx, pxToPct } from '@/lib/coordinate.helper';
+import { getResolvedFieldLabel } from '@/lib/sign-field.helper';
 
-// Configure worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface Field {
   id: string;
   type: 'signature' | 'text' | 'date' | 'checkbox';
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  page: number;
+  xPct: number;
+  yPct: number;
+  widthPct: number;
+  heightPct: number;
+  pageIndex: number;
   assigned_signer_id?: number | null;
   signer_name?: string;
 }
@@ -34,32 +35,50 @@ interface PDFCanvasViewerProps {
   selectedSignerId?: number;
   selectedFieldType?: 'signature' | 'text' | 'date' | 'checkbox';
   onFieldAdd?: (field: Omit<Field, 'id'>) => void;
-  onFieldMove?: (id: string, x: number, y: number) => void;
-  onFieldResize?: (id: string, width: number, height: number) => void;
+  onFieldMove?: (id: string, xPct: number, yPct: number) => void;
+  onFieldResize?: (id: string, widthPct: number, heightPct: number) => void;
 }
 
-export function PDFCanvasViewer({ 
-  fileUrl, 
-  token, 
-  fields, 
-  signers, 
-  selectedSignerId, 
+const DEFAULT_FIELD_SIZE_PX: Record<Field['type'], { width: number; height: number }> = {
+  signature: { width: 120, height: 50 },
+  text: { width: 100, height: 30 },
+  date: { width: 100, height: 30 },
+  checkbox: { width: 25, height: 25 },
+};
+
+export function PDFCanvasViewer({
+  fileUrl,
+  token,
+  fields,
+  signers,
+  selectedSignerId,
   selectedFieldType = 'signature',
-  onFieldAdd, 
+  onFieldAdd,
   onFieldMove,
-  onFieldResize 
+  onFieldResize,
 }: PDFCanvasViewerProps) {
   const { blobUrl, loading, error } = usePDFUrl(fileUrl, token);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { current: viewerId } = useRef(`pdf-canvas-viewer-${Math.random().toString(36).slice(2)}`);
   const [pdf, setPdf] = useState<any>(null);
   const [pageNum, setPageNum] = useState(1);
   const [numPages, setNumPages] = useState(0);
   const [scale, setScale] = useState(1.5);
-  const [resizingField, setResizingField] = useState<{ id: string; handle: string } | null>(null);
-  const [resizeStart, setResizeStart] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [pageSizePx, setPageSizePx] = useState({ width: 0, height: 0 });
+  const [dragState, setDragState] = useState<{
+    id: string;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
+  const [resizeState, setResizeState] = useState<{
+    id: string;
+    startPointerX: number;
+    startPointerY: number;
+    startWidthPct: number;
+    startHeightPct: number;
+  } | null>(null);
 
-  // Load PDF
   useEffect(() => {
     if (!blobUrl) return;
 
@@ -77,57 +96,76 @@ export function PDFCanvasViewer({
     loadPDF();
   }, [blobUrl]);
 
-  // Render page
+  useEffect(() => {
+    if (!pdf || !containerRef.current) return;
+
+    const fitPage = async () => {
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1 });
+      const container = containerRef.current;
+      if (!container) return;
+
+      const availableWidth = Math.max(280, container.clientWidth - 16);
+      const availableHeight = Math.max(320, container.clientHeight - 16);
+      const fitWidthScale = availableWidth / viewport.width;
+      const fitHeightScale = availableHeight / viewport.height;
+      const prefersLandscape = viewport.width > viewport.height;
+      const fitScale = prefersLandscape ? Math.min(fitWidthScale, fitHeightScale) : fitWidthScale;
+      setScale(Math.max(0.85, Math.min(2.5, fitScale)));
+    };
+
+    fitPage();
+  }, [pdf, pageNum]);
+
   useEffect(() => {
     if (!pdf || !canvasRef.current) return;
 
     const renderPage = async () => {
       const page = await pdf.getPage(pageNum);
       const viewport = page.getViewport({ scale });
-      
       const canvas = canvasRef.current!;
       const context = canvas.getContext('2d')!;
-      
+
       canvas.height = viewport.height;
       canvas.width = viewport.width;
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
+      setPageSizePx({ width: viewport.width, height: viewport.height });
 
       await page.render({
         canvasContext: context,
-        viewport: viewport,
+        viewport,
       }).promise;
     };
 
     renderPage();
   }, [pdf, pageNum, scale]);
 
-  // Handle resize mouse move
   useEffect(() => {
-    if (!resizingField || !resizeStart || !canvasRef.current) return;
+    if (!dragState || !canvasRef.current) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = canvasRef.current!.getBoundingClientRect();
-      const deltaX = e.clientX - resizeStart.x;
-      const deltaY = e.clientY - resizeStart.y;
-      
-      // ✅ REDUCED SENSITIVITY: Divide by 1.5 to make resize smoother
-      const deltaXPercent = ((deltaX / rect.width) * 100) / 1.5;
-      const deltaYPercent = ((deltaY / rect.height) * 100) / 1.5;
+    const handleMouseMove = (event: MouseEvent) => {
+      const pageRect = canvasRef.current!.getBoundingClientRect();
+      const activeField = fields.find((field) => field.id === dragState.id);
+      if (!activeField) return;
 
-      let newWidth = resizeStart.width;
-      let newHeight = resizeStart.height;
+      const activeFieldPx = pctToPx(activeField, pageRect.width, pageRect.height);
+      const nextBox = pxToPct(
+        {
+          left: event.clientX - pageRect.left - dragState.offsetX,
+          top: event.clientY - pageRect.top - dragState.offsetY,
+          width: activeFieldPx.width,
+          height: activeFieldPx.height,
+        },
+        pageRect.width,
+        pageRect.height
+      );
 
-      // Only handle bottom-right corner (se)
-      if (resizingField.handle === 'se') {
-        newWidth = Math.max(5, resizeStart.width + deltaXPercent);
-        newHeight = Math.max(3, resizeStart.height + deltaYPercent);
-      }
-
-      onFieldResize?.(resizingField.id, newWidth, newHeight);
+      onFieldMove?.(dragState.id, nextBox.xPct, nextBox.yPct);
     };
 
     const handleMouseUp = () => {
-      setResizingField(null);
-      setResizeStart(null);
+      setDragState(null);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -137,61 +175,81 @@ export function PDFCanvasViewer({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizingField, resizeStart, onFieldResize]);
+  }, [dragState, fields, onFieldMove]);
 
-  // Handle canvas click to add field
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  useEffect(() => {
+    if (!resizeState || !canvasRef.current) return;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const pageRect = canvasRef.current!.getBoundingClientRect();
+      const activeField = fields.find((field) => field.id === resizeState.id);
+      if (!activeField) return;
+
+      const deltaXPx = event.clientX - resizeState.startPointerX;
+      const deltaYPx = event.clientY - resizeState.startPointerY;
+
+      const candidate = clampNormalizedBox({
+        xPct: activeField.xPct,
+        yPct: activeField.yPct,
+        widthPct: resizeState.startWidthPct + deltaXPx / pageRect.width,
+        heightPct: resizeState.startHeightPct + deltaYPx / pageRect.height,
+      });
+
+      onFieldResize?.(resizeState.id, candidate.widthPct, candidate.heightPct);
+    };
+
+    const handleMouseUp = () => {
+      setResizeState(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [fields, onFieldResize, resizeState]);
+
+  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !selectedSignerId) return;
-    
-    const rect = canvasRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
 
-    // ✅ Convert pixel to percentage (0-100%)
-    const xPercent = (clickX / rect.width) * 100;
-    const yPercent = (clickY / rect.height) * 100;
+    const pageRect = canvasRef.current.getBoundingClientRect();
+    const pointerLeft = event.clientX - pageRect.left;
+    const pointerTop = event.clientY - pageRect.top;
+    const defaultSize = DEFAULT_FIELD_SIZE_PX[selectedFieldType];
 
-    // ✅ Convert size from pixel to percentage (REDUCED SIZE)
-    const widthPx = selectedFieldType === 'signature' ? 120 : selectedFieldType === 'checkbox' ? 25 : 100;
-    const heightPx = selectedFieldType === 'signature' ? 50 : selectedFieldType === 'checkbox' ? 25 : 30;
-    const widthPercent = (widthPx / rect.width) * 100;
-    const heightPercent = (heightPx / rect.height) * 100;
+    const normalized = pxToPct(
+      {
+        left: pointerLeft,
+        top: pointerTop,
+        width: defaultSize.width,
+        height: defaultSize.height,
+      },
+      pageRect.width,
+      pageRect.height
+    );
 
-    console.log('🎯 Click position:', { 
-      pixel: { x: clickX, y: clickY }, 
-      percent: { x: xPercent.toFixed(2), y: yPercent.toFixed(2) },
-      canvasSize: { width: rect.width, height: rect.height }
-    });
-    console.log('📏 Field size:', {
-      pixel: { width: widthPx, height: heightPx },
-      percent: { width: widthPercent.toFixed(2), height: heightPercent.toFixed(2) }
-    });
-
-    // Add field at clicked position with selected signer
-    const signer = signers.find(s => s.id === selectedSignerId);
+    const signer = signers.find((item) => item.id === selectedSignerId);
     onFieldAdd?.({
       type: selectedFieldType,
-      x: xPercent,  // ✅ Save as percentage
-      y: yPercent,  // ✅ Save as percentage
-      width: widthPercent,  // ✅ Save as percentage
-      height: heightPercent,  // ✅ Save as percentage
-      page: pageNum,
+      pageIndex: pageNum - 1,
+      xPct: normalized.xPct,
+      yPct: normalized.yPct,
+      widthPct: normalized.widthPct,
+      heightPct: normalized.heightPct,
       assigned_signer_id: selectedSignerId,
       signer_name: signer?.name,
     });
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-gray-500">Loading PDF...</div>
-      </div>
-    );
+    return <div className="flex h-full items-center justify-center text-gray-500">Loading PDF...</div>;
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex h-full items-center justify-center">
         <div className="text-red-500">
           <p className="font-semibold">Failed to load PDF</p>
           <p className="text-sm">{error}</p>
@@ -200,131 +258,115 @@ export function PDFCanvasViewer({
     );
   }
 
+  const pageFields = fields.filter((field) => field.pageIndex === pageNum - 1);
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Controls */}
-      <div className="flex items-center justify-between p-4 bg-gray-50 border-b">
+    <div className="flex h-full flex-col">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-gray-50 p-3 sm:p-4">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setPageNum(Math.max(1, pageNum - 1))}
             disabled={pageNum <= 1}
-            className="px-3 py-1 bg-white border rounded hover:bg-gray-50 disabled:opacity-50"
+            className="rounded border bg-white px-3 py-1 hover:bg-gray-50 disabled:opacity-50"
           >
             ←
           </button>
-          <span className="text-sm">
-            Page {pageNum} / {numPages}
-          </span>
+          <span className="text-sm">Page {pageNum} / {numPages}</span>
           <button
             onClick={() => setPageNum(Math.min(numPages, pageNum + 1))}
             disabled={pageNum >= numPages}
-            className="px-3 py-1 bg-white border rounded hover:bg-gray-50 disabled:opacity-50"
+            className="rounded border bg-white px-3 py-1 hover:bg-gray-50 disabled:opacity-50"
           >
             →
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setScale(Math.max(0.5, scale - 0.25))}
-            className="px-3 py-1 bg-white border rounded hover:bg-gray-50"
-          >
+          <button onClick={() => setScale(Math.max(0.5, scale - 0.25))} className="rounded border bg-white px-3 py-1 hover:bg-gray-50">
             -
           </button>
           <span className="text-sm">{Math.round(scale * 100)}%</span>
-          <button
-            onClick={() => setScale(Math.min(3, scale + 0.25))}
-            className="px-3 py-1 bg-white border rounded hover:bg-gray-50"
-          >
+          <button onClick={() => setScale(Math.min(3, scale + 0.25))} className="rounded border bg-white px-3 py-1 hover:bg-gray-50">
             +
           </button>
         </div>
       </div>
 
-      {/* PDF Canvas */}
-      <div ref={containerRef} className="flex-1 overflow-auto bg-gray-100 p-4">
-        <div className="max-w-4xl mx-auto bg-white shadow-lg relative">
+      <div ref={containerRef} className="flex-1 overflow-auto bg-gray-100 p-2 sm:p-4">
+        <div
+          className="relative mx-auto bg-white shadow-lg"
+          style={{ width: pageSizePx.width ? `${pageSizePx.width}px` : 'fit-content' }}
+        >
           <canvas
             ref={canvasRef}
             onClick={handleCanvasClick}
-            className="cursor-crosshair"
+            className="block cursor-crosshair"
           />
-          
-          {/* Render fields overlay */}
-          {fields
-            .filter(f => f.page === pageNum)
-            .map(field => {
-              // Color by signer
+
+          <div
+            id={viewerId}
+            className="pointer-events-none absolute left-0 top-0"
+            style={{ width: `${pageSizePx.width}px`, height: `${pageSizePx.height}px` }}
+          >
+            {pageFields.map((field) => {
               const colors = [
                 { border: 'border-blue-500', bg: 'bg-blue-100', text: 'text-blue-700', hover: 'hover:border-blue-600 hover:bg-blue-200' },
                 { border: 'border-green-500', bg: 'bg-green-100', text: 'text-green-700', hover: 'hover:border-green-600 hover:bg-green-200' },
                 { border: 'border-purple-500', bg: 'bg-purple-100', text: 'text-purple-700', hover: 'hover:border-purple-600 hover:bg-purple-200' },
                 { border: 'border-orange-500', bg: 'bg-orange-100', text: 'text-orange-700', hover: 'hover:border-orange-600 hover:bg-orange-200' },
               ];
-              const signer = signers.find(s => s.id === field.assigned_signer_id);
+
+              const signer = signers.find((item) => item.id === field.assigned_signer_id);
               const colorIndex = signer ? (signer.signing_order - 1) % colors.length : 0;
               const color = colors[colorIndex];
-              
-              // ✅ Convert percentage to pixel for rendering
-              const canvasRect = canvasRef.current?.getBoundingClientRect();
-              const leftPx = canvasRect ? (field.x / 100) * canvasRect.width : field.x;
-              const topPx = canvasRect ? (field.y / 100) * canvasRect.height : field.y;
-              const widthPx = canvasRect ? (field.width / 100) * canvasRect.width : field.width;
-              const heightPx = canvasRect ? (field.height / 100) * canvasRect.height : field.height;
-              
+              const boxPx = pctToPx(field, pageSizePx.width, pageSizePx.height);
+
               return (
                 <div
                   key={field.id}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.effectAllowed = 'move';
-                  }}
-                  onDragEnd={(e) => {
-                    if (!canvasRef.current) return;
-                    const rect = canvasRef.current.getBoundingClientRect();
-                    const dragX = e.clientX - rect.left;
-                    const dragY = e.clientY - rect.top;
-                    
-                    if (dragX >= 0 && dragY >= 0 && dragX <= rect.width && dragY <= rect.height) {
-                      // ✅ Convert pixel to percentage when moving
-                      const xPercent = (dragX / rect.width) * 100;
-                      const yPercent = (dragY / rect.height) * 100;
-                      onFieldMove?.(field.id, xPercent, yPercent);
-                    }
-                  }}
-                  className={`absolute border-2 ${color.border} ${color.bg} bg-opacity-30 cursor-move ${color.hover} group rounded-md transition-all duration-75`}
+                  className={`pointer-events-auto group absolute rounded-md border-2 ${color.border} ${color.bg} ${color.hover} cursor-move bg-opacity-30 transition-all duration-75`}
                   style={{
-                    left: `${leftPx}px`,
-                    top: `${topPx}px`,
-                    width: `${widthPx}px`,
-                    height: `${heightPx}px`,
-                    willChange: 'transform',
+                    left: `${boxPx.left}px`,
+                    top: `${boxPx.top}px`,
+                    width: `${boxPx.width}px`,
+                    height: `${boxPx.height}px`,
+                  }}
+                  onMouseDown={(event) => {
+                    if ((event.target as HTMLElement).dataset.resizeHandle === 'true') {
+                      return;
+                    }
+
+                    event.preventDefault();
+                    setDragState({
+                      id: field.id,
+                      offsetX: event.clientX - event.currentTarget.getBoundingClientRect().left,
+                      offsetY: event.clientY - event.currentTarget.getBoundingClientRect().top,
+                    });
                   }}
                 >
-                  <div className={`text-xs ${color.text} p-1 font-semibold`}>
-                    {field.type}
-                    {field.signer_name && (
-                      <div className="text-xs opacity-75 truncate">{field.signer_name}</div>
-                    )}
+                  <div className={`p-1 text-xs font-semibold ${color.text}`}>
+                    {getResolvedFieldLabel(field)}
+                    {field.signer_name && <div className="truncate text-xs opacity-75">{field.signer_name}</div>}
                   </div>
-                  
-                  {/* Resize handle - ONLY bottom-right corner (larger & more visible) */}
+
                   <div
-                    className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-600 rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 border-2 border-white shadow-lg hover:bg-blue-700 hover:scale-110 transition-all duration-200"
-                    onMouseDown={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setResizingField({ id: field.id, handle: 'se' });
-                      setResizeStart({
-                        x: e.clientX,
-                        y: e.clientY,
-                        width: field.width,
-                        height: field.height
+                    data-resize-handle="true"
+                    className="absolute -bottom-1 -right-1 h-4 w-4 cursor-se-resize rounded-full border-2 border-white bg-blue-600 opacity-0 shadow-lg transition-all duration-200 group-hover:opacity-100 hover:scale-110 hover:bg-blue-700"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setResizeState({
+                        id: field.id,
+                        startPointerX: event.clientX,
+                        startPointerY: event.clientY,
+                        startWidthPct: field.widthPct,
+                        startHeightPct: field.heightPct,
                       });
                     }}
                   />
                 </div>
               );
             })}
+          </div>
         </div>
       </div>
     </div>

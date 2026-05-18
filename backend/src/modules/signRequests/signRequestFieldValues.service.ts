@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { ApiError } from '../../core/errors/api-error';
+import { normalizeStoredFieldBox } from './coordinate.helper';
 
 const prisma = new PrismaClient();
 
@@ -151,13 +152,14 @@ export class SignRequestFieldValuesService {
     });
 
     return fields.map((field) => ({
+      ...(normalizeStoredFieldBox(field)),
       id: field.id,
       type: field.type,
+      pageIndex: Math.max(0, (field.page || 1) - 1),
       page: field.page,
-      x: field.x,
-      y: field.y,
-      width: field.width,
-      height: field.height,
+      coordinateVersion: 2,
+      coordinateUnit: 'ratio',
+      coordinateAnchor: 'top-left',
       required: field.required,
       label: field.label,
       placeholder: field.placeholder,

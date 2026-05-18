@@ -2,7 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "../../core/utils/asyncHandler";
 import { AuthController } from "./auth.controller";
 import { authGuard } from "./auth.middleware";
-import { authLimiter } from "../../middleware/rate-limiter";
+import { authLoginLimiter, authRefreshLimiter } from "../../middleware/rate-limiter";
 import { passwordResetController } from "./passwordReset.controller";
 import { registrationController } from "./registration.controller";
 
@@ -11,8 +11,8 @@ const controller = new AuthController();
 export const authRouter = Router();
 
 // Apply rate limiting to auth endpoints
-authRouter.post("/login", authLimiter, asyncHandler(controller.login));
-authRouter.post("/refresh", authLimiter, asyncHandler(controller.refresh));
+authRouter.post("/login", authLoginLimiter, asyncHandler(controller.login));
+authRouter.post("/refresh", authRefreshLimiter, asyncHandler(controller.refresh));
 authRouter.post("/logout", asyncHandler(controller.logout));
 authRouter.get("/me", authGuard, asyncHandler(controller.me));
 

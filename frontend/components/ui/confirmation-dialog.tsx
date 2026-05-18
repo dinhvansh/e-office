@@ -35,43 +35,45 @@ export default function ConfirmationDialog({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-[3px]">
+      <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-7 shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-5 flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-6 h-6 text-green-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+              <CheckCircle className="h-6 w-6 text-emerald-600" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+            <div>
+              <h3 className="text-2xl font-semibold text-slate-900">{title}</h3>
+            </div>
           </div>
           <button
             onClick={handleCancel}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Message */}
-        <div className="mb-6">
-          <p className="text-gray-700 whitespace-pre-line leading-relaxed">
+        <div className="mb-7">
+          <p className="whitespace-pre-line text-base leading-7 text-slate-600">
             {message}
           </p>
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 border-t border-slate-200 pt-5">
           <Button
             variant="outline"
             onClick={handleCancel}
-            className="flex-1 h-11"
+            className="h-12 flex-1"
           >
             {cancelText}
           </Button>
           <Button
             onClick={handleConfirm}
-            className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white font-semibold"
+            className="h-12 flex-1 bg-emerald-600 font-semibold text-white hover:bg-emerald-700"
           >
             {confirmText}
           </Button>

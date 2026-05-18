@@ -1,11 +1,11 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, PenTool, Check, FileText, Download } from 'lucide-react';
+import { ArrowLeft, PenTool, Check, FileText, Download, XCircle } from 'lucide-react';
 import SignatureCanvas from 'react-signature-canvas';
 import InternalSigningSidebar from '@/components/signing/InternalSigningSidebar';
 import PDFSigningViewer from '@/components/pdf/PDFSigningViewer';
@@ -35,7 +35,7 @@ function PDFViewer({ documentId, signRequestStatus, signedFilePath, accessToken 
       setLoading(true);
       setError(null);
       
-      // ✅ Use signed file if available (progressive or completed)
+      // âœ… Use signed file if available (progressive or completed)
       const hasSignedFile = signedFilePath && signedFilePath.length > 0;
       const endpoint = hasSignedFile 
         ? `/documents/${documentId}/view-signed` 
@@ -56,7 +56,7 @@ function PDFViewer({ documentId, signRequestStatus, signedFilePath, accessToken 
       );
 
       if (!response.ok) {
-        throw new Error('Không thể tải PDF');
+        throw new Error('KhÃ´ng thá»ƒ táº£i PDF');
       }
 
       const blob = await response.blob();
@@ -69,7 +69,7 @@ function PDFViewer({ documentId, signRequestStatus, signedFilePath, accessToken 
       
       setPdfUrl(url);
     } catch (err: any) {
-      setError(err.message || 'Không thể tải PDF');
+      setError(err.message || 'KhÃ´ng thá»ƒ táº£i PDF');
     } finally {
       setLoading(false);
     }
@@ -86,7 +86,7 @@ function PDFViewer({ documentId, signRequestStatus, signedFilePath, accessToken 
         }
       );
 
-      if (!response.ok) throw new Error('Không thể tải xuống');
+      if (!response.ok) throw new Error('KhÃ´ng thá»ƒ táº£i xuá»‘ng');
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
@@ -98,18 +98,18 @@ function PDFViewer({ documentId, signRequestStatus, signedFilePath, accessToken 
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      toast.success('Đã tải xuống PDF');
+      toast.success('ÄÃ£ táº£i xuá»‘ng PDF');
     } catch (err: any) {
-      toast.error(err.message || 'Không thể tải xuống');
+      toast.error(err.message || 'KhÃ´ng thá»ƒ táº£i xuá»‘ng');
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[600px] bg-gray-100 rounded-lg">
+      <div className="flex h-full items-center justify-center rounded-lg bg-gray-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Đang tải PDF...</p>
+          <p className="text-gray-600">Äang táº£i PDF...</p>
         </div>
       </div>
     );
@@ -117,12 +117,12 @@ function PDFViewer({ documentId, signRequestStatus, signedFilePath, accessToken 
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-[600px] bg-red-50 rounded-lg border border-red-200">
+      <div className="flex h-full min-h-[520px] flex-col items-center justify-center rounded-lg border border-red-200 bg-red-50 sm:min-h-[620px] xl:min-h-[760px]">
         <FileText className="w-16 h-16 text-red-400 mb-4" />
-        <p className="text-red-600 font-medium mb-2">Không thể tải PDF</p>
+        <p className="text-red-600 font-medium mb-2">KhÃ´ng thá»ƒ táº£i PDF</p>
         <p className="text-red-500 text-sm mb-4">{error}</p>
         <Button onClick={loadPDF} variant="outline">
-          Thử lại
+          Thá»­ láº¡i
         </Button>
       </div>
     );
@@ -133,7 +133,7 @@ function PDFViewer({ documentId, signRequestStatus, signedFilePath, accessToken 
       <div className="border rounded-lg overflow-hidden bg-gray-100">
         <iframe
           src={pdfUrl || ''}
-          className="w-full h-[600px]"
+          className="h-[520px] w-full sm:h-[620px] xl:h-[760px]"
           title="Document Preview"
           style={{ border: 'none' }}
         />
@@ -145,7 +145,7 @@ function PDFViewer({ documentId, signRequestStatus, signedFilePath, accessToken 
           onClick={handleDownload}
         >
           <Download className="w-4 h-4 mr-2" />
-          Tải xuống PDF
+          Táº£i xuá»‘ng PDF
         </Button>
       </div>
     </div>
@@ -155,11 +155,12 @@ function PDFViewer({ documentId, signRequestStatus, signedFilePath, accessToken 
 interface SignatureField {
   id: number;
   type: string;
-  page: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  pageIndex: number;
+  page?: number;
+  xPct: number;
+  yPct: number;
+  widthPct: number;
+  heightPct: number;
   assigned_signer_id?: number;
 }
 
@@ -203,6 +204,9 @@ export default function InternalSigningPage() {
   const [data, setData] = useState<SigningData | null>(null);
   const [signatureData, setSignatureData] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [showRejectForm, setShowRejectForm] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
   const [mySigner, setMySigner] = useState<any>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [myFields, setMyFields] = useState<SignatureField[]>([]);
@@ -239,7 +243,7 @@ export default function InternalSigningPage() {
       );
 
       if (!currentSigner) {
-        toast.error('Bạn không phải là người ký của tài liệu này');
+        toast.error('Báº¡n khÃ´ng pháº£i lÃ  ngÆ°á»i kÃ½ cá»§a tÃ i liá»‡u nÃ y');
         router.push('/sign-requests');
         return;
       }
@@ -298,10 +302,10 @@ export default function InternalSigningPage() {
 
       // Check if already signed
       if (currentSigner.status === 'signed' || currentSigner.status === 'completed') {
-        toast.success('Bạn đã ký tài liệu này rồi');
+        toast.success('Báº¡n Ä‘Ã£ kÃ½ tÃ i liá»‡u nÃ y rá»“i');
       }
     } catch (error: any) {
-      toast.error(error.message || 'Không thể tải dữ liệu');
+      toast.error(error.message || 'KhÃ´ng thá»ƒ táº£i dá»¯ liá»‡u');
       router.push('/sign-requests');
     } finally {
       setLoading(false);
@@ -316,7 +320,7 @@ export default function InternalSigningPage() {
   const handleSubmit = async () => {
     // Check if all fields are completed
     if (myFields.length > 0 && completedFields.length < myFields.length) {
-      toast.error(`Vui lòng hoàn thành tất cả ${myFields.length} vùng ký`);
+      toast.error(`Vui lÃ²ng hoÃ n thÃ nh táº¥t cáº£ ${myFields.length} vÃ¹ng kÃ½`);
       return;
     }
 
@@ -332,7 +336,7 @@ export default function InternalSigningPage() {
         })
       });
       
-      toast.success((result as any).message || 'Ký thành công!');
+      toast.success((result as any).message || 'KÃ½ thÃ nh cÃ´ng!');
       
       // Turn off guided mode
       setGuidedMode(false);
@@ -346,9 +350,37 @@ export default function InternalSigningPage() {
       }, 1500);
       
     } catch (error: any) {
-      toast.error(error.message || 'Không thể ký tài liệu');
+      toast.error(error.message || 'KhÃ´ng thá»ƒ kÃ½ tÃ i liá»‡u');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleReject = async () => {
+    const reason = rejectReason.trim();
+    if (!reason) {
+      toast.error('Vui lÃ²ng nháº­p lÃ½ do tá»« chá»‘i');
+      return;
+    }
+
+    setRejecting(true);
+    try {
+      const result = await fetchJson(`/sign-requests/${signRequestId}/reject-internal`, {
+        method: 'POST',
+        body: JSON.stringify({ comment: reason })
+      });
+
+      toast.success((result as any).message || 'ÄÃ£ tá»« chá»‘i tÃ i liá»‡u');
+      setShowRejectForm(false);
+      setRejectReason('');
+
+      setTimeout(() => {
+        router.push('/my-tasks');
+      }, 1000);
+    } catch (error: any) {
+      toast.error(error.message || 'KhÃ´ng thá»ƒ tá»« chá»‘i tÃ i liá»‡u');
+    } finally {
+      setRejecting(false);
     }
   };
 
@@ -357,7 +389,7 @@ export default function InternalSigningPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Đang tải...</p>
+          <p className="text-gray-600">Äang táº£i...</p>
         </div>
       </div>
     );
@@ -383,7 +415,7 @@ export default function InternalSigningPage() {
                 onClick={() => router.back()}
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Quay lại
+                Quay láº¡i
               </Button>
               <div>
                 <div className="flex items-center gap-2">
@@ -401,12 +433,12 @@ export default function InternalSigningPage() {
               {alreadySigned ? (
                 <div className="flex items-center gap-2 text-green-600 bg-green-50 px-4 py-2 rounded-lg">
                   <Check className="w-4 h-4" />
-                  <span className="text-sm font-medium">Đã ký</span>
+                  <span className="text-sm font-medium">ÄÃ£ kÃ½</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-4 py-2 rounded-lg">
                   <PenTool className="w-4 h-4" />
-                  <span className="text-sm font-medium">Chờ ký</span>
+                  <span className="text-sm font-medium">Chá» kÃ½</span>
                 </div>
               )}
             </div>
@@ -415,10 +447,10 @@ export default function InternalSigningPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="max-w-[1800px] mx-auto px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 xl:gap-6">
           {/* Left: Sidebar */}
-          <div className="lg:col-span-2">
+          <div className="order-2 xl:order-1 xl:col-span-3">
             <InternalSigningSidebar
               signers={data.sign_request.signers}
               activities={[]}
@@ -428,20 +460,21 @@ export default function InternalSigningPage() {
           </div>
 
           {/* Center: PDF Viewer with Signature Fields */}
-          <div className="lg:col-span-7">
+          <div className="order-1 xl:order-2 xl:col-span-6">
             <div className="bg-white rounded-lg shadow-sm border">
               <div className="p-4 border-b">
                 <h2 className="text-lg font-semibold flex items-center gap-2">
                   <FileText className="w-5 h-5 text-gray-600" />
-                  Xem tài liệu
+                  Xem tÃ i liá»‡u
                 </h2>
                 {myFields.length > 0 && (
                   <p className="text-sm text-gray-500 mt-1">
-                    Click vào vùng màu xanh để ký
+                    Click vÃ o vÃ¹ng mÃ u xanh Ä‘á»ƒ kÃ½
                   </p>
                 )}
               </div>
               <div className="p-4">
+                <div className="h-[calc(100vh-250px)] min-h-[520px] sm:min-h-[620px] xl:h-[760px]">
                 {pdfUrl && myFields.length > 0 ? (
                   <PDFSigningViewer
                     pdfUrl={pdfUrl}
@@ -471,25 +504,26 @@ export default function InternalSigningPage() {
                     accessToken={tokens?.accessToken}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-[600px] bg-gray-100 rounded-lg">
+                  <div className="flex h-full items-center justify-center rounded-lg bg-gray-100">
                     <div className="text-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                      <p className="text-gray-600">Đang tải PDF...</p>
+                      <p className="text-gray-600">Äang táº£i PDF...</p>
                     </div>
                   </div>
                 )}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Right: Signature Panel or Download */}
-          <div className="lg:col-span-3">
+          <div className="order-3 xl:order-3 xl:col-span-3">
             {!alreadySigned ? (
               <div className="bg-white rounded-lg shadow-sm border">
                 <div className="p-4 border-b">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
                     <PenTool className="w-5 h-5 text-gray-600" />
-                    Tiến độ ký
+                    Tiáº¿n Ä‘á»™ kÃ½
                   </h2>
                 </div>
                 <div className="p-4 space-y-4">
@@ -497,7 +531,7 @@ export default function InternalSigningPage() {
                   {myFields.length > 0 && (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Đã hoàn thành</span>
+                        <span className="text-gray-600">ÄÃ£ hoÃ n thÃ nh</span>
                         <span className="font-semibold text-blue-600">
                           {completedFields.length} / {myFields.length}
                         </span>
@@ -530,7 +564,7 @@ export default function InternalSigningPage() {
                                 <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
                               )}
                               <span className={isCompleted ? 'text-green-700' : 'text-gray-700'}>
-                                {field.type === 'signature' ? '✍️ Chữ ký' : '📝 Văn bản'} - Trang {field.page}
+                                {field.type === 'signature' ? 'âœï¸ Chá»¯ kÃ½' : 'ðŸ“ VÄƒn báº£n'} - Trang {field.pageIndex + 1}
                               </span>
                             </div>
                           );
@@ -538,7 +572,7 @@ export default function InternalSigningPage() {
                       </div>
                       
                       <p className="text-xs text-gray-500 mt-3">
-                        💡 Click vào vùng màu vàng trên PDF để ký
+                        ðŸ’¡ Click vÃ o vÃ¹ng mÃ u vÃ ng trÃªn PDF Ä‘á»ƒ kÃ½
                       </p>
                     </div>
                   )}
@@ -547,29 +581,77 @@ export default function InternalSigningPage() {
                   <div className="flex flex-col gap-2 pt-4 border-t">
                     <Button
                       onClick={handleSubmit}
-                      disabled={submitting || completedFields.length < myFields.length}
+                      disabled={submitting || rejecting || completedFields.length < myFields.length}
                       className="w-full bg-green-600 hover:bg-green-700"
                     >
                       {submitting ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Đang ký...
+                          Äang kÃ½...
                         </>
                       ) : (
                         <>
                           <Check className="w-4 h-4 mr-2" />
-                          Hoàn tất ký ({completedFields.length}/{myFields.length})
+                          HoÃ n táº¥t kÃ½ ({completedFields.length}/{myFields.length})
                         </>
                       )}
                     </Button>
+                    {showRejectForm ? (
+                      <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm">
+                        <label className="mb-2 block font-medium text-red-900">
+                          LÃ½ do tá»« chá»‘i
+                        </label>
+                        <textarea
+                          value={rejectReason}
+                          onChange={(event) => setRejectReason(event.target.value)}
+                          placeholder="Nháº­p lÃ½ do tá»« chá»‘i kÃ½ tÃ i liá»‡u nÃ y..."
+                          className="min-h-[96px] w-full rounded-md border border-red-200 bg-white px-3 py-2 text-sm outline-none ring-0 placeholder:text-gray-400 focus:border-red-400"
+                          disabled={rejecting || submitting}
+                        />
+                        <div className="mt-3 flex gap-2">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={handleReject}
+                            disabled={rejecting || submitting}
+                            className="flex-1"
+                          >
+                            <XCircle className="mr-2 h-4 w-4" />
+                            {rejecting ? 'Äang tá»« chá»‘i...' : 'XÃ¡c nháº­n tá»« chá»‘i'}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setShowRejectForm(false);
+                              setRejectReason('');
+                            }}
+                            disabled={rejecting || submitting}
+                          >
+                            Há»§y
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={() => setShowRejectForm(true)}
+                        disabled={submitting || rejecting}
+                        className="w-full"
+                      >
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Tá»« chá»‘i kÃ½
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       onClick={() => router.back()}
-                      disabled={submitting}
+                      disabled={submitting || rejecting}
                       className="w-full"
                       size="sm"
                     >
-                      Hủy
+                      Há»§y
                     </Button>
                   </div>
                 </div>
@@ -579,17 +661,17 @@ export default function InternalSigningPage() {
                 <div className="p-6 text-center">
                   <Check className="w-12 h-12 text-green-600 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-green-900 mb-2">
-                    Đã ký thành công
+                    ÄÃ£ kÃ½ thÃ nh cÃ´ng
                   </h3>
                   <p className="text-green-700 mb-4 text-sm">
-                    Bạn đã ký tài liệu này vào {new Date(mySigner.signed_at).toLocaleString('vi-VN')}
+                    Báº¡n Ä‘Ã£ kÃ½ tÃ i liá»‡u nÃ y vÃ o {new Date(mySigner.signed_at).toLocaleString('vi-VN')}
                   </p>
                   
                   {/* Check if all signers completed */}
                   {data.sign_request.signers.every(s => s.status === 'signed' || s.status === 'completed') && (
                     <div className="mb-4 p-4 bg-white rounded-lg border border-green-300">
                       <p className="text-sm text-gray-700 mb-3">
-                        ✅ Tất cả người ký đã hoàn thành. Bạn có thể tải xuống tài liệu đã ký.
+                        âœ… Táº¥t cáº£ ngÆ°á»i kÃ½ Ä‘Ã£ hoÃ n thÃ nh. Báº¡n cÃ³ thá»ƒ táº£i xuá»‘ng tÃ i liá»‡u Ä‘Ã£ kÃ½.
                       </p>
                       <Button 
                         onClick={async () => {
@@ -604,7 +686,7 @@ export default function InternalSigningPage() {
                             );
                             
                             if (!response.ok) {
-                              throw new Error('Không thể tải xuống');
+                              throw new Error('KhÃ´ng thá»ƒ táº£i xuá»‘ng');
                             }
                             
                             const blob = await response.blob();
@@ -617,21 +699,21 @@ export default function InternalSigningPage() {
                             document.body.removeChild(a);
                             URL.revokeObjectURL(url);
                             
-                            toast.success('Đã tải xuống tài liệu đã ký');
+                            toast.success('ÄÃ£ táº£i xuá»‘ng tÃ i liá»‡u Ä‘Ã£ kÃ½');
                           } catch (error: any) {
-                            toast.error(error.message || 'Không thể tải xuống');
+                            toast.error(error.message || 'KhÃ´ng thá»ƒ táº£i xuá»‘ng');
                           }
                         }}
                         className="w-full bg-blue-600 hover:bg-blue-700"
                       >
                         <Download className="w-4 h-4 mr-2" />
-                        Tải xuống tài liệu đã ký
+                        Táº£i xuá»‘ng tÃ i liá»‡u Ä‘Ã£ kÃ½
                       </Button>
                     </div>
                   )}
                   
                   <Button onClick={() => router.push('/sign-requests')} size="sm" variant="outline">
-                    Quay về danh sách
+                    Quay vá» danh sÃ¡ch
                   </Button>
                 </div>
               </div>
@@ -642,4 +724,6 @@ export default function InternalSigningPage() {
     </div>
   );
 }
+
+
 

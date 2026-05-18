@@ -1,41 +1,38 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, FileText, Edit, Trash2, Settings, FileType } from 'lucide-react';
-import { DocumentType } from '@/lib/types';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Edit, FileText, FileType, Plus, Settings, Trash2 } from 'lucide-react';
+
 import { useAuth } from '@/components/providers/auth-provider';
-import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/ui/page-header';
 import { SelectWithIcon } from '@/components/ui/select-with-icon';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { DocumentType } from '@/lib/types';
 
 export default function DocumentTypesPage() {
+  const { fetchJson } = useAuth();
+  const queryClient = useQueryClient();
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingType, setEditingType] = useState<DocumentType | null>(null);
   const [showNumberingPattern, setShowNumberingPattern] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [requireApproval, setRequireApproval] = useState(false);
   const [defaultWorkflowId, setDefaultWorkflowId] = useState<number | null>(null);
   const [allowWorkflowOverride, setAllowWorkflowOverride] = useState(false);
-  const queryClient = useQueryClient();
-  const { fetchJson } = useAuth();
 
-  // Sync form state when dialog opens
   const handleOpenDialog = (type: DocumentType | null) => {
     setEditingType(type);
     setSelectedCategory(type?.category || '');
     setRequireApproval(type?.require_approval || false);
     setDefaultWorkflowId(type?.default_workflow_id || null);
     setAllowWorkflowOverride(type?.allow_workflow_override || false);
+    setShowNumberingPattern(type?.require_numbering ?? true);
     setShowCreateModal(true);
   };
 
@@ -44,26 +41,30 @@ export default function DocumentTypesPage() {
     queryFn: () => fetchJson<DocumentType[]>('/document-types'),
   });
 
-  // Fetch workflows for dropdown
   const { data: workflowsData } = useQuery({
     queryKey: ['workflows'],
     queryFn: () => fetchJson<any>('/workflows'),
   });
 
-  const workflows = workflowsData?.workflows?.filter((w: any) => w.is_template) || [];
+  const workflows = workflowsData?.workflows?.filter((workflow: any) => workflow.is_template) || [];
+  const types: DocumentType[] = typesData || [];
+  const typesWithCount = types.map((type) => ({
+    ...type,
+    _count: type._count || { documents: 0 },
+    numbering_rules: type.numbering_rules || [],
+  }));
 
   const createMutation = useMutation({
     mutationFn: (data: Partial<DocumentType>) =>
       fetchJson('/document-types', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
-      toast.success(editingType ? 'Cập nhật loại văn bản thành công!' : 'Tạo loại văn bản thành công!');
+      toast.success(editingType ? 'Cập nhật loại văn bản thành công' : 'Tạo loại văn bản thành công');
       queryClient.invalidateQueries({ queryKey: ['document-types'] });
       setShowCreateModal(false);
       setEditingType(null);
     },
     onError: (error: any) => {
-      const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
-      toast.error(`Lỗi: ${message}`);
+      toast.error(`Lỗi: ${typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra'}`);
     },
   });
 
@@ -71,38 +72,26 @@ export default function DocumentTypesPage() {
     mutationFn: ({ id, ...data }: Partial<DocumentType> & { id: number }) =>
       fetchJson(`/document-types/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     onSuccess: () => {
-      toast.success('Cập nhật loại văn bản thành công!');
+      toast.success('Cập nhật loại văn bản thành công');
       queryClient.invalidateQueries({ queryKey: ['document-types'] });
       setShowCreateModal(false);
       setEditingType(null);
     },
     onError: (error: any) => {
-      const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
-      toast.error(`Lỗi: ${message}`);
+      toast.error(`Lỗi: ${typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra'}`);
     },
   });
 
   const deleteTypeMutation = useMutation({
-    mutationFn: (typeId: number) =>
-      fetchJson(`/document-types/${typeId}`, { method: 'DELETE' }),
+    mutationFn: (typeId: number) => fetchJson(`/document-types/${typeId}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success('Xóa loại văn bản thành công!');
+      toast.success('Xóa loại văn bản thành công');
       queryClient.invalidateQueries({ queryKey: ['document-types'] });
     },
     onError: (error: any) => {
-      const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
-      toast.error(`Lỗi: ${message}`);
+      toast.error(`Lỗi: ${typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra'}`);
     },
   });
-
-  const types: DocumentType[] = typesData || [];
-
-  // Ensure _count exists for compatibility
-  const typesWithCount = types.map(type => ({
-    ...type,
-    _count: type._count || { documents: 0 },
-    numbering_rules: type.numbering_rules || [],
-  }));
 
   const categoryColors: Record<string, string> = {
     incoming: 'bg-blue-100 text-blue-700',
@@ -125,6 +114,17 @@ export default function DocumentTypesPage() {
     { value: 'contract', label: 'Hợp đồng', icon: '📋' },
   ];
 
+  const handleDelete = (type: (typeof typesWithCount)[number]) => {
+    if (type._count.documents > 0) {
+      toast.error('Không thể xóa loại văn bản đang được sử dụng');
+      return;
+    }
+
+    if (confirm(`Xóa loại văn bản "${type.name}"?`)) {
+      deleteTypeMutation.mutate(type.id);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -134,434 +134,392 @@ export default function DocumentTypesPage() {
         iconColor="text-orange-600"
         actions={
           <Button onClick={() => handleOpenDialog(null)}>
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="mr-2 h-4 w-4" />
             Thêm loại văn bản
           </Button>
         }
       />
 
-      {/* Document Types Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {isLoading ? (
-          <>
-            <Skeleton className="h-64" />
-            <Skeleton className="h-64" />
-            <Skeleton className="h-64" />
-          </>
+          <div className="space-y-3 p-4">
+            <Skeleton className="h-20" />
+            <Skeleton className="h-20" />
+            <Skeleton className="h-20" />
+          </div>
         ) : types.length === 0 ? (
-          <div className="col-span-full">
+          <div className="p-6">
             <EmptyState
               icon={FileType}
               title="Chưa có loại văn bản"
               description="Tạo loại văn bản đầu tiên để phân loại và quản lý tài liệu"
-              action={{
-                label: "Thêm loại văn bản",
-                onClick: () => handleOpenDialog(null)
-              }}
+              action={{ label: 'Thêm loại văn bản', onClick: () => handleOpenDialog(null) }}
             />
           </div>
         ) : (
-          typesWithCount.map((type) => (
-            <div
-              key={type.id}
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <FileText className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{type.name}</h3>
-                    <p className="text-sm text-gray-500">{type.code}</p>
-                  </div>
-                </div>
-                {!type.is_active && (
-                  <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                    Inactive
-                  </span>
-                )}
-              </div>
-
-              {type.description && (
-                <p className="text-sm text-gray-600 mb-4">{type.description}</p>
-              )}
-
-              <div className="space-y-2 mb-4">
-                {type.category && (
-                  <span
-                    className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                      categoryColors[type.category] || 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {categoryLabels[type.category] || type.category}
-                  </span>
-                )}
-
-                <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                  {type.require_numbering && (
-                    <span className="flex items-center gap-1">
-                      <Settings className="w-3 h-3" />
-                      Đánh số tự động
-                    </span>
-                  )}
-                  {type.require_digital_signing && (
-                    <span className="flex items-center gap-1">
-                      ✍️ Ký điện tử
-                    </span>
-                  )}
-                  {type.require_approval && (
-                    <span className="flex items-center gap-1">
-                      ✅ Phê duyệt
-                    </span>
-                  )}
-                </div>
-
-                {type.numbering_rules[0] && (
-                  <div className="text-xs text-gray-500 mt-2">
-                    <span className="font-medium">Pattern:</span>{' '}
-                    {type.numbering_rules[0].pattern}
-                    <br />
-                    <span className="font-medium">Số cuối:</span>{' '}
-                    {type.numbering_rules[0].last_number}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                <span className="text-sm text-gray-600">
-                  {type._count.documents} văn bản
-                </span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => {
-                      handleOpenDialog(type);
-                      setShowNumberingPattern(type.require_numbering);
-                    }}
-                    title="Chỉnh sửa"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() => {
-                      if (type._count.documents > 0) {
-                        toast.error('Không thể xóa loại văn bản đang được sử dụng');
-                        return;
-                      }
-                      if (confirm(`Xóa loại văn bản "${type.name}"?`)) {
-                        deleteTypeMutation.mutate(type.id);
-                      }
-                    }}
-                    title="Xóa"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
+          <>
+            <div className="hidden grid-cols-[minmax(0,2.2fr)_140px_minmax(0,1.5fr)_120px_120px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 md:grid">
+              <div>Loại văn bản</div>
+              <div>Danh mục</div>
+              <div>Cấu hình</div>
+              <div>Số lượng</div>
+              <div className="text-right">Thao tác</div>
             </div>
-          ))
+
+            <div className="divide-y divide-slate-200">
+              {typesWithCount.map((type) => (
+                <div
+                  key={type.id}
+                  className="grid gap-4 px-5 py-4 transition-colors hover:bg-slate-50 md:grid-cols-[minmax(0,2.2fr)_140px_minmax(0,1.5fr)_120px_120px] md:items-center"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100">
+                        <FileText className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="truncate text-base font-semibold text-slate-900">{type.name}</h3>
+                          {!type.is_active && (
+                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm text-slate-500">{type.code}</p>
+                        {type.description && (
+                          <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{type.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    {type.category && (
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1.5 text-xs font-medium ${
+                          categoryColors[type.category] || 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {categoryLabels[type.category] || type.category}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                      {type.require_numbering && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1">
+                          <Settings className="h-3 w-3" />
+                          Đánh số
+                        </span>
+                      )}
+                      {type.require_digital_signing && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">
+                          ✍️ Ký điện tử
+                        </span>
+                      )}
+                      {type.require_approval && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                          ✅ Phê duyệt
+                        </span>
+                      )}
+                    </div>
+
+                    {type.numbering_rules[0] && (
+                      <p className="text-xs leading-5 text-slate-500">
+                        Pattern: {type.numbering_rules[0].pattern}
+                        <br />
+                        Số cuối: {type.numbering_rules[0].last_number}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="text-sm font-medium text-slate-700">{type._count.documents} văn bản</div>
+
+                  <div className="flex items-center justify-start gap-2 md:justify-end">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={() => handleOpenDialog(type)}
+                      title="Chỉnh sửa"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => handleDelete(type)}
+                      title="Xóa"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
-      {/* Create/Edit Modal */}
-      <Dialog open={showCreateModal} onOpenChange={(open) => {
-        setShowCreateModal(open);
-        if (!open) setEditingType(null);
-      }}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingType ? 'Chỉnh sửa loại văn bản' : 'Thêm loại văn bản mới'}
-            </DialogTitle>
+      <Dialog
+        open={showCreateModal}
+        onOpenChange={(open) => {
+          setShowCreateModal(open);
+          if (!open) setEditingType(null);
+        }}
+      >
+        <DialogContent className="max-h-[92vh] sm:max-w-4xl">
+          <DialogHeader className="border-b border-slate-200 pb-4 pr-12">
+            <DialogTitle>{editingType ? 'Chỉnh sửa loại văn bản' : 'Thêm loại văn bản mới'}</DialogTitle>
             <DialogDescription>
               {editingType ? 'Cập nhật thông tin loại văn bản' : 'Tạo loại văn bản để phân loại và quản lý tài liệu'}
             </DialogDescription>
           </DialogHeader>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.currentTarget);
-                  const requireNumbering = formData.get('require_numbering') === 'on';
-                  const data = {
-                    code: formData.get('code') as string,
-                    name: formData.get('name') as string,
-                    description: formData.get('description') as string,
-                    category: formData.get('category') as string,
-                    require_numbering: requireNumbering,
-                    require_digital_signing: formData.get('require_digital_signing') === 'on',
-                    numbering_pattern: requireNumbering ? (formData.get('numbering_pattern') as string) : null,
-                    require_approval: requireApproval,
-                    default_workflow_id: defaultWorkflowId,
-                    allow_workflow_override: allowWorkflowOverride,
-                  };
-                  if (editingType) {
-                    updateMutation.mutate({ id: editingType.id, ...data });
-                  } else {
-                    createMutation.mutate(data);
-                  }
-                }}
-                className="space-y-4"
-              >
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Mã *</label>
-                  <input
-                    name="code"
-                    required
-                    defaultValue={editingType?.code}
-                    placeholder="VD: CV, HD, QD"
-                    className="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tên *</label>
-                  <input
-                    name="name"
-                    required
-                    defaultValue={editingType?.name}
-                    placeholder="VD: Công văn, Hợp đồng"
-                    className="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
-                  <textarea
-                    name="description"
-                    rows={3}
-                    defaultValue={editingType?.description || ''}
-                    placeholder="Mô tả chi tiết về loại văn bản..."
-                    className="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all resize-none"
-                  />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Danh mục</label>
-                    <input type="hidden" name="category" value={selectedCategory} />
-                    <SelectWithIcon
-                      options={categoryOptions}
-                      value={selectedCategory}
-                      onChange={(value) => setSelectedCategory(String(value))}
-                      placeholder="Chọn danh mục"
-                    />
+
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const formData = new FormData(event.currentTarget);
+              const requireNumbering = formData.get('require_numbering') === 'on';
+              const data = {
+                code: formData.get('code') as string,
+                name: formData.get('name') as string,
+                description: formData.get('description') as string,
+                category: formData.get('category') as string,
+                require_numbering: requireNumbering,
+                require_digital_signing: formData.get('require_digital_signing') === 'on',
+                numbering_pattern: requireNumbering ? (formData.get('numbering_pattern') as string) : null,
+                require_approval: requireApproval,
+                default_workflow_id: defaultWorkflowId,
+                allow_workflow_override: allowWorkflowOverride,
+              };
+
+              if (editingType) {
+                updateMutation.mutate({ id: editingType.id, ...data });
+                return;
+              }
+
+              createMutation.mutate(data);
+            }}
+            className="space-y-6 overflow-y-auto pr-1"
+          >
+            <div className="grid gap-5 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Mã *</label>
+                <input
+                  name="code"
+                  required
+                  defaultValue={editingType?.code}
+                  placeholder="VD: CV, HD, QD"
+                  className="block h-14 w-full rounded-xl border border-slate-300 px-4 text-base text-slate-900 shadow-sm transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Tên *</label>
+                <input
+                  name="name"
+                  required
+                  defaultValue={editingType?.name}
+                  placeholder="VD: Công văn, Hợp đồng"
+                  className="block h-14 w-full rounded-xl border border-slate-300 px-4 text-base text-slate-900 shadow-sm transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-[1.3fr_0.9fr]">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Mô tả</label>
+                <textarea
+                  name="description"
+                  rows={4}
+                  defaultValue={editingType?.description || ''}
+                  placeholder="Mô tả chi tiết về loại văn bản..."
+                  className="block w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 shadow-sm transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Danh mục</label>
+                <input type="hidden" name="category" value={selectedCategory} />
+                <SelectWithIcon
+                  options={categoryOptions}
+                  value={selectedCategory}
+                  onChange={(value) => setSelectedCategory(String(value))}
+                  placeholder="Chọn danh mục"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6">
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  name="require_numbering"
+                  defaultChecked={editingType?.require_numbering ?? true}
+                  onChange={(event) => setShowNumberingPattern(event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                />
+                <span className="text-sm font-semibold text-slate-800">🔢 Yêu cầu đánh số tự động</span>
+              </label>
+
+              {showNumberingPattern && (
+                <div className="ml-7 space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Cấu hình đánh số
+                  </label>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      ['+ Số tự động', '{AUTO}', 'bg-blue-50 text-blue-700'],
+                      ['+ Năm', '{YEAR}', 'bg-green-50 text-green-700'],
+                      ['+ Tháng', '{MONTH}', 'bg-purple-50 text-purple-700'],
+                      ['+ Mã loại', '{TYPE}', 'bg-orange-50 text-orange-700'],
+                      ['+ Dấu /', '/', 'bg-slate-100 text-slate-700'],
+                      ['+ Dấu -', '-', 'bg-slate-100 text-slate-700'],
+                    ].map(([label, token, className]) => (
+                      <button
+                        key={String(token)}
+                        type="button"
+                        onClick={() => {
+                          const input = document.querySelector('[name="numbering_pattern"]') as HTMLInputElement | null;
+                          if (input) input.value = `${input.value || ''}${token}`;
+                        }}
+                        className={`rounded-lg px-3 py-2 text-xs font-medium transition-colors hover:brightness-95 ${className}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
 
-                <div className="space-y-4 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-5 border border-gray-200">
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      name="require_numbering"
-                      defaultChecked={editingType?.require_numbering ?? true}
-                      onChange={(e) => setShowNumberingPattern(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
-                    />
-                    <span className="text-sm font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-                      🔢 Yêu cầu đánh số tự động
-                    </span>
-                  </label>
+                  <input
+                    type="text"
+                    name="numbering_pattern"
+                    defaultValue={editingType?.numbering_rules?.[0]?.pattern || '{AUTO}/{YEAR}'}
+                    placeholder="VD: {AUTO}/{YEAR}"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  />
 
-                  {showNumberingPattern && (
-                    <div className="ml-7 space-y-3 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                        Cấu hình đánh số
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.querySelector('[name="numbering_pattern"]') as HTMLInputElement;
-                            if (input) input.value = (input.value || '') + '{AUTO}';
-                          }}
-                          className="px-3 py-2 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
-                        >
-                          + Số tự động
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.querySelector('[name="numbering_pattern"]') as HTMLInputElement;
-                            if (input) input.value = (input.value || '') + '{YEAR}';
-                          }}
-                          className="px-3 py-2 text-xs font-medium bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
-                        >
-                          + Năm
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.querySelector('[name="numbering_pattern"]') as HTMLInputElement;
-                            if (input) input.value = (input.value || '') + '{MONTH}';
-                          }}
-                          className="px-3 py-2 text-xs font-medium bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
-                        >
-                          + Tháng
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.querySelector('[name="numbering_pattern"]') as HTMLInputElement;
-                            if (input) input.value = (input.value || '') + '{TYPE}';
-                          }}
-                          className="px-3 py-2 text-xs font-medium bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors"
-                        >
-                          + Mã loại
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.querySelector('[name="numbering_pattern"]') as HTMLInputElement;
-                            if (input) input.value = (input.value || '') + '/';
-                          }}
-                          className="px-3 py-2 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                        >
-                          + Dấu /
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.querySelector('[name="numbering_pattern"]') as HTMLInputElement;
-                            if (input) input.value = (input.value || '') + '-';
-                          }}
-                          className="px-3 py-2 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                        >
-                          + Dấu -
-                        </button>
-                      </div>
-                      <input
-                        type="text"
-                        name="numbering_pattern"
-                        defaultValue="{AUTO}/{YEAR}"
-                        placeholder="VD: {AUTO}/{YEAR} hoặc {TYPE}-{AUTO}/{MONTH}/{YEAR}"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono"
-                      />
-                      <div className="text-xs text-gray-500 space-y-1">
-                        <p className="font-medium">Ví dụ kết quả:</p>
-                        <p className="font-mono bg-gray-50 px-2 py-1 rounded">001/2025 hoặc CV-001/11/2025</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      name="require_digital_signing"
-                      defaultChecked={editingType?.require_digital_signing ?? false}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
-                    />
-                    <span className="text-sm font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-                      ✍️ Yêu cầu ký điện tử
-                    </span>
-                  </label>
+                  <div className="space-y-1 text-xs text-slate-500">
+                    <p className="font-medium">Ví dụ kết quả:</p>
+                    <p className="rounded bg-slate-50 px-2 py-1 font-mono">001/2025 hoặc CV-001/11/2025</p>
+                  </div>
                 </div>
+              )}
 
-                {/* Workflow Settings */}
-                <div className="space-y-4 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-5 border border-blue-200">
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      name="require_approval"
-                      checked={requireApproval}
-                      onChange={(e) => {
-                        setRequireApproval(e.target.checked);
-                        if (!e.target.checked) {
-                          setDefaultWorkflowId(null);
-                          setAllowWorkflowOverride(false);
-                        }
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  name="require_digital_signing"
+                  defaultChecked={editingType?.require_digital_signing ?? false}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                />
+                <span className="text-sm font-semibold text-slate-800">✍️ Yêu cầu ký điện tử</span>
+              </label>
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-6">
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  name="require_approval"
+                  checked={requireApproval}
+                  onChange={(event) => {
+                    setRequireApproval(event.target.checked);
+                    if (!event.target.checked) {
+                      setDefaultWorkflowId(null);
+                      setAllowWorkflowOverride(false);
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                />
+                <span className="text-sm font-semibold text-slate-800">✅ Yêu cầu phê duyệt</span>
+              </label>
+
+              {requireApproval && (
+                <div className="ml-7 space-y-4 rounded-xl border border-blue-200 bg-white p-5 shadow-sm">
+                  <div>
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Luồng phê duyệt mặc định
+                    </label>
+                    <p className="mb-3 text-sm leading-6 text-slate-500">
+                      Màn này chỉ dùng để gán workflow template mặc định cho loại văn bản.
+                      Việc tạo hoặc chỉnh sửa workflow được thực hiện ở màn <span className="font-medium text-slate-700">Quy trình phê duyệt</span>.
+                    </p>
+                    <input type="hidden" name="default_workflow_id" value={defaultWorkflowId || ''} />
+                    <select
+                      value={defaultWorkflowId || ''}
+                      onChange={(event) => {
+                        const value = event.target.value ? parseInt(event.target.value, 10) : null;
+                        setDefaultWorkflowId(value);
+                        if (!value) setAllowWorkflowOverride(false);
                       }}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
-                    />
-                    <span className="text-sm font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-                      ✅ Yêu cầu phê duyệt
-                    </span>
-                  </label>
+                      className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      <option value="">-- Không gán mặc định (người dùng tự chọn/tự tạo khi lập hồ sơ) --</option>
+                      {workflows.map((workflow: any) => (
+                        <option key={workflow.id} value={workflow.id}>
+                          {workflow.name} ({workflow.steps?.length || 0} bước)
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-2 text-xs text-slate-500">
+                      💡 Để trống nếu loại văn bản này không khóa một luồng cố định, và người dùng sẽ tự chọn hoặc tự tạo luồng khi tạo trình ký.
+                    </p>
+                  </div>
 
-                  {requireApproval && (
-                    <div className="ml-7 space-y-4 p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
-                          Quy trình mặc định
-                        </label>
-                        <input type="hidden" name="default_workflow_id" value={defaultWorkflowId || ''} />
-                        <select
-                          value={defaultWorkflowId || ''}
-                          onChange={(e) => {
-                            const value = e.target.value ? parseInt(e.target.value) : null;
-                            setDefaultWorkflowId(value);
-                            if (!value) {
-                              setAllowWorkflowOverride(false);
-                            }
-                          }}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                          <option value="">-- Không chọn (User tự tạo) --</option>
-                          {workflows.map((w: any) => (
-                            <option key={w.id} value={w.id}>
-                              {w.name} ({w.steps?.length || 0} bước)
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-xs text-gray-500 mt-1">
-                          💡 Để trống nếu muốn user tự tạo luồng ký (Ad-hoc mode)
-                        </p>
-                      </div>
-
-                      {defaultWorkflowId && (
-                        <label className="flex items-center gap-3 cursor-pointer group">
-                          <input
-                            type="checkbox"
-                            name="allow_workflow_override"
-                            checked={allowWorkflowOverride}
-                            onChange={(e) => setAllowWorkflowOverride(e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all"
-                          />
-                          <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600 transition-colors">
-                            🔧 Cho phép tùy chỉnh luồng ký
-                          </span>
-                        </label>
-                      )}
-
-                      {/* Mode indicator */}
-                      <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <span className="font-semibold">Chế độ: </span>
-                        {!defaultWorkflowId ? (
-                          <span className="text-purple-600 font-medium">Ad-hoc (User tự tạo workflow)</span>
-                        ) : !allowWorkflowOverride ? (
-                          <span className="text-orange-600 font-medium">Strict (Bắt buộc dùng workflow mặc định)</span>
-                        ) : (
-                          <span className="text-green-600 font-medium">Flexible (Có thể tùy chỉnh workflow)</span>
-                        )}
-                      </div>
-                    </div>
+                  {defaultWorkflowId && (
+                    <label className="flex cursor-pointer items-center gap-3">
+                      <input
+                        type="checkbox"
+                        name="allow_workflow_override"
+                        checked={allowWorkflowOverride}
+                        onChange={(event) => setAllowWorkflowOverride(event.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                      />
+                      <span className="text-sm font-medium text-slate-700">🔧 Cho phép tùy chỉnh lại luồng mặc định khi tạo trình ký</span>
+                    </label>
                   )}
+
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                    <span className="font-semibold">Chế độ: </span>
+                    {!defaultWorkflowId ? (
+                      <span className="font-medium text-purple-600">Không gán mặc định: người dùng tự chọn hoặc tự tạo workflow lúc lập hồ sơ</span>
+                    ) : !allowWorkflowOverride ? (
+                      <span className="font-medium text-orange-600">Cố định: bắt buộc dùng đúng workflow mặc định đã gán cho loại văn bản này</span>
+                    ) : (
+                      <span className="font-medium text-green-600">Linh hoạt: khởi tạo từ workflow mặc định nhưng người dùng được phép chỉnh lại khi tạo trình ký</span>
+                    )}
+                  </div>
                 </div>
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setShowCreateModal(false);
-                      setEditingType(null);
-                    }}
-                  >
-                    Hủy
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                  >
-                    {editingType
-                      ? updateMutation.isPending
-                        ? 'Đang cập nhật...'
-                        : 'Cập nhật'
-                      : createMutation.isPending
-                      ? 'Đang tạo...'
-                      : 'Tạo mới'}
-                  </Button>
-                </DialogFooter>
-              </form>
+              )}
+            </div>
+
+            <DialogFooter className="sticky bottom-0 bg-background/95 pb-1 backdrop-blur">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setEditingType(null);
+                }}
+              >
+                Hủy
+              </Button>
+              <Button className="min-w-36" type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                {editingType
+                  ? updateMutation.isPending
+                    ? 'Đang cập nhật...'
+                    : 'Cập nhật'
+                  : createMutation.isPending
+                    ? 'Đang tạo...'
+                    : 'Tạo mới'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

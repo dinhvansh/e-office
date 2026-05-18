@@ -29,6 +29,7 @@ const envSchema = z.object({
   AUTH_COOKIE_SAME_SITE: z.enum(["lax", "strict", "none"]).default("lax"),
   AUTH_COOKIE_DOMAIN: z.string().optional(),
   DISABLE_LICENSE_CHECK: z.string().default("true"),
+  RATE_LIMIT_BYPASS_EMAILS: z.string().optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

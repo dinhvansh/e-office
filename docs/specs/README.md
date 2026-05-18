@@ -45,6 +45,12 @@ Tài liệu kỹ thuật chi tiết cho các tối ưu và nâng cấp dự án 
    - Backup & restore
    - **Time**: 2 days
 
+7. **[SPEC-9: Document Workflow Snapshot](./SPEC-9-DOCUMENT-WORKFLOW-SNAPSHOT.md)** ⭐ *New*
+   - Chuẩn hóa flow từ document type sang workflow snapshot
+   - Tách rõ create, editor, send, approval, signing
+   - Loại bỏ chồng chéo orchestration giữa services
+   - **Time**: 3-5 days
+
 ## 🎯 Quick Start Guide
 
 ### Tuần 1: Performance Optimization
@@ -106,6 +112,7 @@ Each spec includes:
 | SPEC-4 | HIGH | ⭐⭐⭐⭐ | 3 days | HIGH |
 | SPEC-5 | MEDIUM | ⭐⭐⭐⭐ | 1 week | HIGH |
 | SPEC-6 | MEDIUM | ⭐⭐⭐⭐⭐ | 2 days | HIGH |
+| SPEC-9 | HIGH | ⭐⭐⭐⭐⭐ | 3-5 days | HIGH |
 
 ## 🚀 Next Steps
 

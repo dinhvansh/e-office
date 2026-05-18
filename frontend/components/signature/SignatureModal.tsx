@@ -119,18 +119,18 @@ export default function SignatureModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-h-[92vh] max-w-4xl overflow-y-auto">
+        <DialogHeader className="border-b border-slate-200 pb-4 pr-12">
           <DialogTitle className="text-xl">✍️ {title}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="text-sm text-gray-600">
+        <div className="space-y-6">
+          <div className="text-base text-gray-600">
             Người ký: <span className="font-semibold">{signerName}</span>
           </div>
 
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid h-12 w-full grid-cols-3">
               <TabsTrigger value="draw" className="flex items-center gap-2">
                 <Pencil className="w-4 h-4" />
                 Vẽ
@@ -210,21 +210,21 @@ export default function SignatureModal({
             </TabsContent>
           </Tabs>
 
-          <div className="flex justify-between pt-4 border-t">
+          <div className="flex justify-between border-t pt-5">
             <Button
               variant="outline"
               onClick={handleClear}
-              className="flex items-center gap-2"
+              className="h-11 px-4"
             >
               <Trash2 className="w-4 h-4" />
               Xóa
             </Button>
 
             <div className="flex gap-2">
-              <Button variant="outline" onClick={onClose}>
+              <Button variant="outline" onClick={onClose} className="h-11 px-5">
                 Hủy
               </Button>
-              <Button onClick={handleConfirm} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={handleConfirm} className="h-11 bg-blue-600 px-5 hover:bg-blue-700">
                 ✅ Xác nhận
               </Button>
             </div>

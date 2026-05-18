@@ -6,6 +6,8 @@ import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import SignatureCanvas from '@/components/signature/SignatureCanvas';
 import * as pdfjsLib from 'pdfjs-dist';
 import { toast } from 'sonner';
+import { pctToPx } from '@/lib/coordinate.helper';
+import { getResolvedFieldLabel, getResolvedFieldPlaceholder } from '@/lib/sign-field.helper';
 
 // Configure PDF.js worker
 if (typeof window !== 'undefined') {
@@ -15,11 +17,12 @@ if (typeof window !== 'undefined') {
 interface SignatureField {
   id: number;
   type: string;
-  page: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  pageIndex: number;
+  page?: number;
+  xPct: number;
+  yPct: number;
+  widthPct: number;
+  heightPct: number;
   label?: string;
   assigned_signer_id?: number;
 }
@@ -86,7 +89,7 @@ export default function PDFSigningViewer({
       canvas.height = rect.height;
       
       const pad = new SignaturePad(canvas, {
-        backgroundColor: 'rgb(239, 246, 255)', // bg-blue-50
+        backgroundColor: 'rgba(255, 255, 255, 0)',
         penColor: 'rgb(0, 0, 0)',
       });
       
@@ -119,6 +122,27 @@ export default function PDFSigningViewer({
     loadPDF();
   }, [pdfUrl]);
 
+  useEffect(() => {
+    if (!pdfDoc || !containerRef.current) return;
+
+    const fitPage = async () => {
+      const page = await pdfDoc.getPage(currentPage);
+      const viewport = page.getViewport({ scale: 1 });
+      const container = containerRef.current;
+      if (!container) return;
+
+      const availableWidth = Math.max(280, container.clientWidth - 16);
+      const availableHeight = Math.max(320, container.clientHeight - 16);
+      const fitWidthScale = availableWidth / viewport.width;
+      const fitHeightScale = availableHeight / viewport.height;
+      const prefersLandscape = viewport.width > viewport.height;
+      const fitScale = prefersLandscape ? Math.min(fitWidthScale, fitHeightScale) : fitWidthScale;
+      setScale(Math.max(0.85, Math.min(2.5, fitScale)));
+    };
+
+    fitPage();
+  }, [pdfDoc, currentPage]);
+
   // Render current page
   useEffect(() => {
     if (!pdfDoc || !pdfCanvasRef.current || pageRendering) return;
@@ -131,7 +155,7 @@ export default function PDFSigningViewer({
         const context = canvas.getContext('2d')!;
 
         // Calculate viewport
-        const viewport = page.getViewport({ scale: scale * 1.5 }); // 1.5 for better quality
+        const viewport = page.getViewport({ scale });
         
         // Set canvas dimensions
         canvas.width = viewport.width;
@@ -163,7 +187,7 @@ export default function PDFSigningViewer({
   );
 
   // Get fields for current page
-  const pageFields = myFields.filter((f) => f.page === currentPage);
+  const pageFields = myFields.filter((f) => f.pageIndex === currentPage - 1);
 
   const handleZoomIn = () => setScale((s) => Math.min(s + 0.2, 3.0));
   const handleZoomOut = () => setScale((s) => Math.max(s - 0.2, 0.5));
@@ -223,7 +247,7 @@ export default function PDFSigningViewer({
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center justify-between p-4 bg-gray-100 border-b">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-gray-100 p-3 sm:p-4">
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -260,7 +284,7 @@ export default function PDFSigningViewer({
       {/* PDF Container */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto bg-gray-200 p-4"
+        className="flex-1 overflow-auto bg-gray-200 p-2 sm:p-4"
         style={{ position: 'relative' }}
       >
         <div
@@ -291,6 +315,7 @@ export default function PDFSigningViewer({
               const isSignatureField = field.type === 'signature';
               const isCurrent = guidedMode && field.id === currentFieldId;
               const isDisabled = guidedMode && !isCurrent && !hasSigned;
+              const boxPx = pctToPx(field, pdfDimensions.width, pdfDimensions.height);
               
               // Debug log for each field
               if (guidedMode) {
@@ -310,11 +335,11 @@ export default function PDFSigningViewer({
                   id={`field-${field.id}`}
                   className={`absolute border-2 cursor-pointer pointer-events-auto transition-all ${
                     isCurrent && !isActive
-                      ? 'border-blue-600 bg-blue-100 shadow-2xl z-30 ring-4 ring-blue-300 animate-pulse'
+                      ? 'border-blue-600 bg-white shadow-2xl z-30 ring-4 ring-blue-300 animate-pulse'
                       : isActive
                       ? 'border-blue-500 bg-white shadow-lg z-20'
                       : isCurrent && isActive
-                      ? 'border-blue-600 bg-blue-100 shadow-2xl z-30 ring-4 ring-blue-300'
+                      ? 'border-blue-600 bg-white shadow-2xl z-30 ring-4 ring-blue-300'
                       : hasSigned
                       ? 'border-green-500 bg-green-50'
                       : isDisabled
@@ -322,10 +347,10 @@ export default function PDFSigningViewer({
                       : 'border-yellow-500 bg-yellow-50 hover:bg-yellow-100 hover:shadow-md'
                   }`}
                   style={{
-                    left: `${(field.x / 100) * pdfDimensions.width}px`,
-                    top: `${(field.y / 100) * pdfDimensions.height}px`,
-                    width: `${(field.width / 100) * pdfDimensions.width}px`,
-                    height: `${(field.height / 100) * pdfDimensions.height}px`,
+                    left: `${boxPx.left}px`,
+                    top: `${boxPx.top}px`,
+                    width: `${boxPx.width}px`,
+                    height: `${boxPx.height}px`,
                   }}
                   onClick={() => {
                     console.log('🖱️ Field clicked:', field.id, { 
@@ -367,7 +392,7 @@ export default function PDFSigningViewer({
                       ? '👉 Ký vào đây (Bước hiện tại)'
                       : isDisabled
                       ? '⏳ Chờ đến lượt'
-                      : field.label || 'Click to sign'
+                      : getResolvedFieldLabel(field)
                   }
                 >
                   {/* Active Signing Mode */}
@@ -376,9 +401,9 @@ export default function PDFSigningViewer({
                       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                         <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl">
                           <div className="text-lg font-bold mb-4 text-gray-900 flex items-center gap-2">
-                            ✍️ {field.label || 'Chữ ký'}
+                            ✍️ {getResolvedFieldLabel(field)}
                           </div>
-                          <div className="border-2 border-blue-400 rounded-lg bg-blue-50 mb-3 overflow-hidden">
+                          <div className="mb-3 overflow-hidden rounded-lg border-2 border-blue-400 bg-white">
                             <canvas
                               ref={canvasRef}
                               className="w-full h-60 cursor-crosshair"
@@ -416,12 +441,12 @@ export default function PDFSigningViewer({
                       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                         <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full">
                           <div className="text-lg font-bold mb-4 text-gray-900 flex items-center gap-2">
-                            📅 {field.label || 'Ngày'}
+                            📅 {getResolvedFieldLabel(field)}
                           </div>
                           <input
                             type="date"
                             defaultValue={new Date().toISOString().split('T')[0]}
-                            className="w-full border-2 border-blue-400 rounded-lg px-4 py-3 text-lg bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                            className="mb-3 w-full rounded-lg border-2 border-blue-400 bg-white px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             onChange={(e) => {
                               const dateValue = new Date(e.target.value).toLocaleDateString('vi-VN');
                               setFieldSignatures({
@@ -469,13 +494,13 @@ export default function PDFSigningViewer({
                       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                         <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full">
                           <div className="text-lg font-bold mb-4 text-gray-900 flex items-center gap-2">
-                            ✏️ {field.label || 'Text'}
+                            ✏️ {getResolvedFieldLabel(field)}
                           </div>
                           <input
                             type="text"
-                            placeholder="Nhập nội dung..."
+                            placeholder={getResolvedFieldPlaceholder(field)}
                             defaultValue={fieldSignatures[field.id] || existingFieldValues?.[field.id] || ''}
-                            className="w-full border-2 border-blue-400 rounded-lg px-4 py-3 text-lg bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                            className="mb-3 w-full rounded-lg border-2 border-blue-400 bg-white px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             onChange={(e) => {
                               setFieldSignatures({
                                 ...fieldSignatures,
@@ -538,7 +563,7 @@ export default function PDFSigningViewer({
                   ) : (
                     /* Empty Field */
                     <div className="flex items-center justify-center h-full text-xs font-semibold text-gray-700">
-                      {field.label || '✍️ Click to sign'}
+                      {getResolvedFieldLabel(field)}
                     </div>
                   )}
                 </div>

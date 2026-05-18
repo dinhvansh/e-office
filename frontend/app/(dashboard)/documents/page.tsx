@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
-import { ChangeEvent, useState, useEffect } from "react";
+import { ChangeEvent, KeyboardEvent, MouseEvent, useState, useEffect } from "react";
 import { FileText, Upload, Trash2, Download, Eye, Send, Archive, XCircle } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { DocumentRecord, DocumentType } from "@/lib/types";
@@ -337,6 +337,19 @@ export default function DocumentsPage() {
   const handleView = (id: number) => {
     // Navigate to document flow page
     router.push(`/documents/${id}/flow`);
+  };
+
+  const stopRowNavigation = (event: MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+  };
+
+  const handleDocumentRowKeyDown = (event: KeyboardEvent<HTMLElement>, documentId: number) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    handleView(documentId);
   };
 
   const handleDownload = async (id: number, fileName?: string, document?: DocumentRecord) => {
@@ -943,7 +956,13 @@ export default function DocumentsPage() {
                   </thead>
                   <tbody>
                     {documents.map((doc) => (
-                      <tr key={doc.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                      <tr
+                        key={doc.id}
+                        className="border-b last:border-0 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleView(doc.id)}
+                        onKeyDown={(event) => handleDocumentRowKeyDown(event, doc.id)}
+                        tabIndex={0}
+                      >
                         <td className="px-2 py-3 font-semibold text-xs">#{doc.id}</td>
                         <td className="px-2 py-3">
                           <div className="flex items-center gap-1.5 min-w-0">
@@ -990,7 +1009,7 @@ export default function DocumentsPage() {
                           {dayjs(doc.created_at).format("DD/MM/YY")}
                         </td>
                         <td className="px-2 py-3">
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="flex items-center justify-end gap-1" onClick={stopRowNavigation}>
                             {/* Always show View button */}
                             <Button
                               variant="ghost"
@@ -1153,7 +1172,13 @@ export default function DocumentsPage() {
             {/* Mobile Card View */}
             <div className="md:hidden space-y-3">
               {documents.map((doc) => (
-                <div key={doc.id} className="rounded-lg border bg-card hover:shadow-md transition-shadow p-3">
+                <div
+                  key={doc.id}
+                  className="rounded-lg border bg-card hover:shadow-md transition-shadow p-3 cursor-pointer"
+                  onClick={() => handleView(doc.id)}
+                  onKeyDown={(event) => handleDocumentRowKeyDown(event, doc.id)}
+                  tabIndex={0}
+                >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">
@@ -1177,7 +1202,7 @@ export default function DocumentsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" onClick={stopRowNavigation}>
                     <Button size="sm" variant="outline" onClick={() => router.push(`/documents/${doc.id}/flow`)} className="flex-1 text-xs h-8">
                       <Eye className="w-3.5 h-3.5 mr-1" />Xem
                     </Button>

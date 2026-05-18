@@ -55,6 +55,11 @@ signRequestsRouter.post(
   requirePermission("sign_requests", "update"),
   asyncHandler(controller.saveFields)
 );
+signRequestsRouter.patch(
+  "/:id/draft-config",
+  requirePermission("sign_requests", "update"),
+  asyncHandler(controller.updateDraftConfig)
+);
 signRequestsRouter.delete(
   "/:id/fields/:fieldId",
   requirePermission("sign_requests", "update"),
@@ -77,8 +82,13 @@ signRequestsRouter.post(
 );
 signRequestsRouter.post(
   "/:id/sign-internal",
-  requirePermission("sign_requests", "update"),
+  requirePermission("sign_requests", "read"),
   asyncHandler(controller.signInternal)
+);
+signRequestsRouter.post(
+  "/:id/reject-internal",
+  requirePermission("sign_requests", "read"),
+  asyncHandler(controller.rejectInternal)
 );
 
 signRequestsRouter.get("/:id(\\d+)", requirePermission("sign_requests", "read"), asyncHandler(controller.getById));
