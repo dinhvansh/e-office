@@ -10,6 +10,11 @@ import { prisma } from "../../config/prisma";
 import { CreateDocumentData, documentsRepository } from "./documents.repository";
 import { authorizationService } from "../authorization/authorization.service";
 import { documentWorkflowOrchestratorService } from "./documentWorkflowOrchestrator.service";
+import {
+  applyWatermarkToPdfBytes,
+  getTenantWatermarkConfig,
+  resolveWatermarkVariantForStatus,
+} from "../settings/watermark.helper";
 
 export interface CreateDocumentInput {
   fileName: string;
@@ -916,10 +921,12 @@ class DocumentsService {
   }
 
   async getDocumentFile(documentId: number, tenantId: number, userId?: number): Promise<{
-    filePath: string;
-    fileName: string;
-    mimeType: string;
-  }> {
+      filePath: string;
+      fileName: string;
+      mimeType: string;
+      documentStatus: string | null;
+      tenantId: number;
+    }> {
     const document = await this.getDocument(documentId, tenantId, userId);
     
     // Get absolute file path
@@ -987,14 +994,16 @@ class DocumentsService {
       throw ApiError.notFound("File not found on disk", "FILE_NOT_FOUND");
     }
     
-    return { filePath, fileName, mimeType };
-  }
+      return { filePath, fileName, mimeType, documentStatus: document.status || null, tenantId: document.tenant_id };
+    }
 
   async getSignedDocumentFile(documentId: number, tenantId: number, userId?: number): Promise<{
-    filePath: string;
-    fileName: string;
-    mimeType: string;
-  }> {
+      filePath: string;
+      fileName: string;
+      mimeType: string;
+      documentStatus: string | null;
+      tenantId: number;
+    }> {
     const document = await this.getDocument(documentId, tenantId, userId);
     
     // Check if signed file exists
@@ -1042,7 +1051,28 @@ class DocumentsService {
       throw ApiError.notFound("Signed file not found on disk", "FILE_NOT_FOUND");
     }
     
-    return { filePath, fileName, mimeType };
+      return { filePath, fileName, mimeType, documentStatus: document.status || null, tenantId: document.tenant_id };
+    }
+
+  async getWatermarkedDocumentBufferIfNeeded(input: {
+    filePath: string;
+    mimeType: string;
+    documentStatus: string | null;
+    tenantId: number;
+  }): Promise<Buffer | null> {
+    if (input.mimeType !== 'application/pdf') {
+      return null;
+    }
+
+    const config = await getTenantWatermarkConfig(input.tenantId);
+    const variant = resolveWatermarkVariantForStatus(config, input.documentStatus);
+    if (!variant) {
+      return null;
+    }
+
+    const fileBytes = await fs.readFile(input.filePath);
+    const watermarkedBytes = await applyWatermarkToPdfBytes(fileBytes, config, variant);
+    return Buffer.from(watermarkedBytes);
   }
 
   /**

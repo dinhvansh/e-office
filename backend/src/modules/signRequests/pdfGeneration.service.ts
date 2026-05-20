@@ -3,6 +3,11 @@ import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import { normalizeStoredFieldBox, pctToPdfBox } from './coordinate.helper';
+import {
+  applyWatermarkToPdfBytes,
+  getTenantWatermarkConfig,
+  resolveWatermarkVariantForStatus,
+} from '../settings/watermark.helper';
 
 const prisma = new PrismaClient();
 
@@ -152,7 +157,7 @@ export class PdfGenerationService {
 
     // 6. Add watermark if needed
     if (options.addWatermark) {
-      await this.addWatermark(pdfDoc);
+      await this.addWatermark(pdfDoc, signRequest.document.tenant_id, signRequest.document.status);
       console.log(`[Progressive PDF] Added watermark`);
     }
 
@@ -181,45 +186,28 @@ export class PdfGenerationService {
   /**
    * Add watermark to all pages
    */
-  private async addWatermark(pdfDoc: PDFDocument): Promise<void> {
-    const pages = pdfDoc.getPages();
-    const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    
-    const text = 'CHUA HOAN THANH';
-    const fontSize = 60;
-    
-    for (const page of pages) {
-      const { width, height } = page.getSize();
-      
-      // Calculate text width for centering
-      const textWidth = font.widthOfTextAtSize(text, fontSize);
-      
-      // Calculate diagonal angle (from bottom-left to top-right)
-      const angle = Math.atan2(height, width) * (180 / Math.PI); // Convert to degrees
-      
-      // Calculate center position
-      const centerX = width / 2;
-      const centerY = height / 2;
-      
-      // Draw multiple diagonal watermarks for better coverage
-      const positions = [
-        { x: centerX, y: centerY }, // Center
-        { x: centerX - width / 3, y: centerY - height / 3 }, // Bottom-left
-        { x: centerX + width / 3, y: centerY + height / 3 }, // Top-right
-      ];
-      
-      for (const pos of positions) {
-        page.drawText(text, {
-          x: pos.x - textWidth / 2,
-          y: pos.y,
-          size: fontSize,
-          font: font,
-          color: rgb(1, 0, 0),
-          opacity: 0.15,
-          rotate: { angle: angle, type: 'degrees' } as any,
-        });
-      }
+  private async addWatermark(pdfDoc: PDFDocument, tenantId: number, documentStatus?: string | null): Promise<void> {
+    const config = await getTenantWatermarkConfig(tenantId);
+    const variant = resolveWatermarkVariantForStatus(config, documentStatus || 'in_progress');
+    if (!variant) {
+      return;
     }
+
+    const updatedBytes = await applyWatermarkToPdfBytes(await pdfDoc.save(), config, {
+      ...variant,
+      text: this.sanitizeText(variant.text),
+    });
+    const updatedDoc = await PDFDocument.load(updatedBytes);
+    const pages = pdfDoc.getPages();
+    const nextPages = updatedDoc.getPages();
+
+    while (pages.length > 0) {
+      pdfDoc.removePage(0);
+      pages.shift();
+    }
+
+    const copiedPages = await pdfDoc.copyPages(updatedDoc, nextPages.map((_, index) => index));
+    copiedPages.forEach((page) => pdfDoc.addPage(page));
   }
 
   /**

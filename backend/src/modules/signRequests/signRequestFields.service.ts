@@ -144,7 +144,41 @@ export class SignRequestFieldsService {
             signer_id: signer?.id,
           };
         });
+
+        const participantSignerIds = new Set(
+          participants
+            .filter((participant) => participant.kind === 'signer' && participant.signer_id)
+            .map((participant) => participant.signer_id as number)
+        );
+
+        const missingSignerParticipants = (signRequest.signers || [])
+          .filter((signer) => (signer.role === 'signer' || !signer.role) && !participantSignerIds.has(signer.id))
+          .sort((left, right) => (left.signing_order || 0) - (right.signing_order || 0))
+          .map((signer) => ({
+            key: `signer-${signer.id}`,
+            kind: 'signer' as const,
+            name: signer.name || signer.email || `Signer ${signer.id}`,
+            email: signer.email || null,
+            order: signer.signing_order || participants.length + 1,
+            signer_id: signer.id,
+          }));
+
+        participants = [...participants, ...missingSignerParticipants].sort((left, right) => left.order - right.order);
       }
+    }
+
+    if (participants.length === 0) {
+      participants = (signRequest.signers || [])
+        .filter((signer) => signer.role === 'signer' || !signer.role)
+        .sort((left, right) => (left.signing_order || 0) - (right.signing_order || 0))
+        .map((signer) => ({
+          key: `signer-${signer.id}`,
+          kind: 'signer' as const,
+          name: signer.name || signer.email || `Signer ${signer.id}`,
+          email: signer.email || null,
+          order: signer.signing_order || 1,
+          signer_id: signer.id,
+        }));
     }
 
     return {

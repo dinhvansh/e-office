@@ -327,18 +327,24 @@ export class DocumentsController {
   // Download & View endpoints
   download = async (req: Request, res: Response): Promise<void> => {
     const documentId = idSchema.parse(req.params.id);
-    const { filePath, fileName, mimeType } = await documentsService.getDocumentFile(
+    const file = await documentsService.getDocumentFile(
       documentId,
       req.auth!.tenantId,
       req.auth!.userId
     );
+    const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
 
     // Set headers for download
-    res.setHeader('Content-Type', mimeType || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    
+    res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+
+    if (watermarkBuffer) {
+      res.send(watermarkBuffer);
+      return;
+    }
+
     // Send file
-    res.sendFile(filePath, (err) => {
+    res.sendFile(file.filePath, (err) => {
       if (err) {
         console.error('Error sending file:', err);
         if (!res.headersSent) {
@@ -350,18 +356,24 @@ export class DocumentsController {
 
   view = async (req: Request, res: Response): Promise<void> => {
     const documentId = idSchema.parse(req.params.id);
-    const { filePath, fileName, mimeType } = await documentsService.getDocumentFile(
+    const file = await documentsService.getDocumentFile(
       documentId,
       req.auth!.tenantId,
       req.auth!.userId
     );
+    const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
 
     // Set headers for inline viewing
-    res.setHeader('Content-Type', mimeType || 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
-    
+    res.setHeader('Content-Type', file.mimeType || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${file.fileName}"`);
+
+    if (watermarkBuffer) {
+      res.send(watermarkBuffer);
+      return;
+    }
+
     // Send file
-    res.sendFile(filePath, (err) => {
+    res.sendFile(file.filePath, (err) => {
       if (err) {
         console.error('Error sending file:', err);
         if (!res.headersSent) {

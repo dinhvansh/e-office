@@ -9,7 +9,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { PDFCanvasViewer } from '@/components/pdf/PDFCanvasViewer';
+import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
 import SignatureModal from '@/components/signature/SignatureModal';
 import { getApiBaseUrl } from '@/lib/env';
 
@@ -361,8 +361,8 @@ export default function ApprovalDetailPage() {
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-6 py-5 xl:grid-cols-[1fr_360px]">
-        <main className="space-y-5">
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-6 py-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <main className="min-w-0 space-y-5">
           <section className="rounded-2xl border bg-white p-5 shadow-sm">
             <div className="grid gap-4 md:grid-cols-3">
               <div className="md:col-span-2">
@@ -381,7 +381,7 @@ export default function ApprovalDetailPage() {
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+          <section className="min-w-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
             <div className="flex items-center justify-between border-b px-5 py-4">
               <div>
                 <h2 className="font-semibold text-slate-950">Xem trước tài liệu</h2>
@@ -392,18 +392,13 @@ export default function ApprovalDetailPage() {
                 Làm mới
               </Button>
             </div>
-            <div className="h-[760px] bg-slate-100">
-              <PDFCanvasViewer
-                fileUrl={fileUrl}
-                token={tokens?.accessToken || ''}
-                fields={[]}
-                signers={[]}
-              />
+            <div className="h-[760px] min-h-0 min-w-0 overflow-hidden bg-slate-100">
+              <SimplePDFViewer pdfUrl={fileUrl} />
             </div>
           </section>
         </main>
 
-        <aside className="space-y-5">
+        <aside className="min-w-0 space-y-5">
           <section className="rounded-2xl border bg-white p-5 shadow-sm">
             <h2 className="mb-4 font-semibold text-slate-950">Hành động phê duyệt</h2>
 

@@ -72,16 +72,22 @@ export class ApprovalsController {
       req.auth!.tenantId
     );
 
-    const { filePath, fileName, mimeType } = await documentsService.getDocumentFile(
+    const file = await documentsService.getDocumentFile(
       approval.document.id,
       req.auth!.tenantId,
       req.auth!.userId
     );
+    const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
 
-    res.setHeader('Content-Type', mimeType || 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    res.setHeader('Content-Type', file.mimeType || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${file.fileName}"`);
 
-    res.sendFile(filePath, (err) => {
+    if (watermarkBuffer) {
+      res.send(watermarkBuffer);
+      return;
+    }
+
+    res.sendFile(file.filePath, (err) => {
       if (err) {
         console.error('Error sending approval document file:', err);
         if (!res.headersSent) {
@@ -99,16 +105,22 @@ export class ApprovalsController {
       req.auth!.tenantId
     );
 
-    const { filePath, fileName, mimeType } = await documentsService.getDocumentFile(
+    const file = await documentsService.getDocumentFile(
       approval.document.id,
       req.auth!.tenantId,
       req.auth!.userId
     );
+    const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
 
-    res.setHeader('Content-Type', mimeType || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
 
-    res.sendFile(filePath, (err) => {
+    if (watermarkBuffer) {
+      res.send(watermarkBuffer);
+      return;
+    }
+
+    res.sendFile(file.filePath, (err) => {
       if (err) {
         console.error('Error downloading approval document file:', err);
         if (!res.headersSent) {
