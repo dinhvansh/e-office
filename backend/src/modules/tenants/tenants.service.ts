@@ -2,10 +2,28 @@ import { ApiError } from "../../core/errors/api-error";
 import { tenantsRepository } from "./tenants.repository";
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import { ADMIN_PERMISSION_KEYS, PERMISSION_CATALOG } from "../roles/permission-catalog";
 
 const prisma = new PrismaClient();
 
 class TenantsService {
+  private async ensurePermissionCatalog(tx: any) {
+    for (const permission of PERMISSION_CATALOG) {
+      await tx.permissions.upsert({
+        where: {
+          resource_action: {
+            resource: permission.resource,
+            action: permission.action,
+          },
+        },
+        update: {
+          description: permission.description,
+        },
+        create: permission,
+      });
+    }
+  }
+
   async getTenantProfile(tenantId: number) {
     const tenant = await tenantsRepository.findById(tenantId);
     if (!tenant) {
@@ -61,6 +79,8 @@ class TenantsService {
 
     // Use transaction to ensure atomicity
     return await prisma.$transaction(async (tx) => {
+      await this.ensurePermissionCatalog(tx);
+
       // 1. Create tenant
       const tenant = await tx.tenants.create({
         data: {
@@ -119,21 +139,7 @@ class TenantsService {
       });
 
       // 6. Create default permissions for Admin role
-      const allPermissions = [
-        'documents.create', 'documents.read', 'documents.update', 'documents.delete',
-        'users.create', 'users.read', 'users.update', 'users.delete',
-        'roles.create', 'roles.read', 'roles.update', 'roles.delete',
-        'departments.create', 'departments.read', 'departments.update', 'departments.delete',
-        'workflows.create', 'workflows.read', 'workflows.update', 'workflows.delete',
-        'approvals.create', 'approvals.read', 'approvals.update', 'approvals.delete',
-        'sign_requests.create', 'sign_requests.read', 'sign_requests.update', 'sign_requests.delete',
-        'document_types.create', 'document_types.read', 'document_types.update', 'document_types.delete',
-        'settings.read', 'settings.update',
-        'webhooks.create', 'webhooks.read', 'webhooks.update', 'webhooks.delete',
-        'external_orgs.create', 'external_orgs.read', 'external_orgs.update', 'external_orgs.delete'
-      ];
-
-      for (const permission of allPermissions) {
+      for (const permission of ADMIN_PERMISSION_KEYS) {
         const [resource, action] = permission.split('.');
         const perm = await tx.permissions.findUnique({
           where: { resource_action: { resource, action } }

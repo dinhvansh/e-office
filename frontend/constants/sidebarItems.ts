@@ -54,7 +54,8 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         href: "/documents",
         icon: FileText,
         caption: "Upload & quản trị",
-        color: "text-purple-600"
+        color: "text-purple-600",
+        requiredPermissions: ["documents:read"]
       },
       {
         label: "Công việc của tôi",
@@ -74,7 +75,7 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         icon: Users,
         caption: "Quản lý tài khoản",
         color: "text-indigo-600",
-        requiredRoles: ["Admin", "Manager"]
+        requiredPermissions: ["users:read"]
       },
       {
         label: "Phòng ban",
@@ -82,7 +83,7 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         icon: Building,
         caption: "Cấu trúc tổ chức",
         color: "text-teal-600",
-        requiredRoles: ["Admin", "Manager"]
+        requiredPermissions: ["departments:read"]
       },
       {
         label: "Vai trò & Quyền",
@@ -90,7 +91,7 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         icon: Shield,
         caption: "Phân quyền hệ thống",
         color: "text-rose-600",
-        requiredRoles: ["Admin"]
+        requiredPermissions: ["roles:read"]
       },
       {
         label: "Chức danh",
@@ -98,7 +99,7 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         icon: Briefcase,
         caption: "Quản lý chức danh",
         color: "text-violet-600",
-        requiredRoles: ["Admin", "Manager"]
+        requiredPermissions: ["positions:read"]
       },
     ]
   },
@@ -111,7 +112,7 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         icon: Mail,
         caption: "Email, test SMTP & watermark",
         color: "text-emerald-600",
-        requiredRoles: ["Admin"]
+        requiredPermissions: ["settings:read"]
       },
       {
         label: "Loại văn bản",
@@ -119,7 +120,7 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         icon: FileType,
         caption: "Phân loại & đánh số",
         color: "text-orange-600",
-        requiredRoles: ["Admin", "Manager"]
+        requiredPermissions: ["document_types:read"]
       },
       {
         label: "Quy trình phê duyệt",
@@ -127,7 +128,7 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         icon: Workflow,
         caption: "Cấu hình workflow",
         color: "text-blue-600",
-        requiredRoles: ["Admin", "Manager"]
+        requiredPermissions: ["workflows:read"]
       },
       {
         label: "Tổ chức ngoài",
@@ -135,7 +136,7 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         icon: Building2,
         caption: "Đối tác & cơ quan",
         color: "text-cyan-600",
-        requiredRoles: ["Admin", "Manager"]
+        requiredPermissions: ["external_orgs:read"]
       },
       {
         label: "Doanh nghiệp",
@@ -143,7 +144,7 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         icon: Settings,
         caption: "Branding & domain",
         color: "text-slate-600",
-        requiredRoles: ["Admin"]
+        requiredPermissions: ["settings:read"]
       },
       {
         label: "Webhooks",
@@ -151,7 +152,7 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         icon: Webhook,
         caption: "Thông báo tự động",
         color: "text-amber-600",
-        requiredRoles: ["Admin"]
+        requiredPermissions: ["webhooks:read"]
       },
     ]
   }

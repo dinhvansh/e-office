@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { documentFlowController } from './documentFlow.controller';
 import { authGuard } from '../auth/auth.middleware';
 import { requirePermission } from '../../middleware/permission';
+import { requireDocumentAccess } from '../../middleware/document-access';
 import { asyncHandler } from '../../core/utils/asyncHandler';
 
 const router = Router();
@@ -16,6 +17,8 @@ router.use(authGuard);
  */
 router.get(
   '/:id/flow',
+  requirePermission('documents', 'read'),
+  requireDocumentAccess('read'),
   asyncHandler(documentFlowController.getDocumentFlow)
 );
 

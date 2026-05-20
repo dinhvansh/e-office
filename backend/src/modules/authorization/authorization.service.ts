@@ -17,6 +17,10 @@ type DocumentTypePolicy = {
   allow_departments?: number[];
   deny_departments?: number[];
   min_position_level?: number;
+  default_visibility_scope?: string;
+  default_confidential_level?: string;
+  inherit_creator_department?: boolean;
+  force_private_until_completed?: boolean;
 };
 
 class AuthorizationService {

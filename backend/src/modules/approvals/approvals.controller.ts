@@ -27,7 +27,11 @@ const idSchema = z.coerce.number().int().positive();
 export class ApprovalsController {
   // List all approvals (for admin/debugging)
   list = async (req: Request, res: Response): Promise<void> => {
-    const result = await approvalsService.listApprovals(req.auth!.tenantId);
+    const result = await approvalsService.listApprovals(
+      req.auth!.tenantId,
+      req.auth!.userId,
+      req.auth!.role
+    );
     res.json(ok(result));
   };
 
@@ -216,7 +220,8 @@ export class ApprovalsController {
     const documentId = idSchema.parse(req.params.documentId);
     const approvals = await approvalsService.getDocumentApprovals(
       documentId,
-      req.auth!.tenantId
+      req.auth!.tenantId,
+      req.auth!.userId
     );
     res.json(ok({ approvals }));
   };
@@ -226,7 +231,8 @@ export class ApprovalsController {
     const documentId = idSchema.parse(req.params.documentId);
     const instance = await approvalsService.getWorkflowInstance(
       documentId,
-      req.auth!.tenantId
+      req.auth!.tenantId,
+      req.auth!.userId
     );
     res.json(ok({ instance }));
   };

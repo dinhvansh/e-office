@@ -5,17 +5,21 @@ import { emailService } from '../common/email.service';
 import { signRequestsService } from '../signRequests/signRequests.service';
 import { notificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/notifications.types';
+import { authorizationService } from '../authorization/authorization.service';
 
 class ApprovalsService {
   /**
    * List all approvals for a tenant
    */
-  async listApprovals(tenantId: number) {
+  async listApprovals(tenantId: number, userId: number, role?: string | null) {
+    const isAdmin = role === 'admin';
+
     return await prisma.document_approvals.findMany({
-      where: { 
+      where: {
         document: {
           tenant_id: tenantId
-        }
+        },
+        ...(isAdmin ? {} : { approver_user_id: userId })
       },
       include: {
         document: {
@@ -298,6 +302,7 @@ class ApprovalsService {
       approvers.map(async approver => {
         // Send email
         emailService.sendApprovalRequestNotification({
+          tenantId,
           recipientEmail: approver.email,
           recipientName: approver.full_name || approver.email,
           documentTitle: document.title || 'Untitled',
@@ -466,6 +471,7 @@ class ApprovalsService {
       Promise.all(
         nextApprovals.map(na =>
           emailService.sendApprovalRequestNotification({
+            tenantId,
             recipientEmail: na.approver.email,
             recipientName: na.approver.full_name || na.approver.email,
             documentTitle: na.document.title || 'Untitled',
@@ -920,7 +926,7 @@ class ApprovalsService {
   /**
    * Get document approval history
    */
-  async getDocumentApprovals(documentId: number, tenantId: number) {
+  async getDocumentApprovals(documentId: number, tenantId: number, userId: number) {
     // Verify document belongs to tenant
     const document = await prisma.documents.findFirst({
       where: { id: documentId, tenant_id: tenantId },
@@ -930,13 +936,18 @@ class ApprovalsService {
       throw ApiError.notFound('Document not found', 'DOCUMENT_NOT_FOUND');
     }
 
+    const access = await authorizationService.canAccessDocument(userId, tenantId, documentId, 'read');
+    if (!access.allowed) {
+      throw ApiError.forbidden('You are not authorized to view this document approval history', 'DOCUMENT_ACCESS_DENIED');
+    }
+
     return approvalsRepository.findDocumentApprovals(documentId);
   }
 
   /**
    * Get workflow instance for document
    */
-  async getWorkflowInstance(documentId: number, tenantId: number) {
+  async getWorkflowInstance(documentId: number, tenantId: number, userId: number) {
     // Verify document belongs to tenant
     const document = await prisma.documents.findFirst({
       where: { id: documentId, tenant_id: tenantId },
@@ -944,6 +955,11 @@ class ApprovalsService {
 
     if (!document) {
       throw ApiError.notFound('Document not found', 'DOCUMENT_NOT_FOUND');
+    }
+
+    const access = await authorizationService.canAccessDocument(userId, tenantId, documentId, 'read');
+    if (!access.allowed) {
+      throw ApiError.forbidden('You are not authorized to view this workflow instance', 'DOCUMENT_ACCESS_DENIED');
     }
 
     return approvalsRepository.findWorkflowInstance(documentId);

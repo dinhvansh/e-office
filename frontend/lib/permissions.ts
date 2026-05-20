@@ -18,17 +18,37 @@ export function hasRequiredRole(userRole: string | null | undefined, requiredRol
   return normalizedRequiredRoles.includes(normalizedUserRole);
 }
 
+export function hasRequiredPermissions(
+  userPermissions: string[] | null | undefined,
+  requiredPermissions?: string[],
+): boolean {
+  if (!requiredPermissions || requiredPermissions.length === 0) {
+    return true;
+  }
+
+  if (!userPermissions || userPermissions.length === 0) {
+    return false;
+  }
+
+  return requiredPermissions.every((permission) => userPermissions.includes(permission));
+}
+
 /**
  * Filter sidebar items based on user permissions
  */
 export function filterSidebarByPermissions(
   sidebarStructure: SidebarGroup[],
-  userRole: string | null | undefined
+  userRole: string | null | undefined,
+  userPermissions: string[] | null | undefined,
 ): SidebarGroup[] {
   return sidebarStructure
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => hasRequiredRole(userRole, item.requiredRoles)),
+      items: group.items.filter(
+        (item) =>
+          hasRequiredRole(userRole, item.requiredRoles) &&
+          hasRequiredPermissions(userPermissions, item.requiredPermissions),
+      ),
     }))
     .filter((group) => group.items.length > 0); // Remove empty groups
 }

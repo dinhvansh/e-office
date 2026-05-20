@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../core/errors/api-error";
 import { auditService } from "../audit/audit.service";
+import { authorizationService } from "../authorization/authorization.service";
 import { emailService } from "../common/email.service";
 import { webhookService } from "../webhooks/webhooks.service";
 import { signersRepository } from "./signers.repository";
@@ -11,12 +12,21 @@ import { pdfGenerationService } from "../signRequests/pdfGeneration.service";
 const OTP_EXPIRY_MINUTES = 10;
 
 class SignersService {
-  async addSigner(tenantId: number, input: { sign_request_id: number; email: string; name: string; role?: string }): Promise<void> {
+  async addSigner(tenantId: number, userId: number, input: { sign_request_id: number; email: string; name: string; role?: string }): Promise<void> {
     const signRequest = await prisma.sign_requests.findFirst({
       where: { id: input.sign_request_id, tenant_id: tenantId },
     });
     if (!signRequest) {
       throw ApiError.notFound("Sign request not found", "SIGN_REQUEST_NOT_FOUND");
+    }
+    const decision = await authorizationService.canAccessDocument(
+      userId,
+      tenantId,
+      signRequest.document_id,
+      "edit",
+    );
+    if (!decision.allowed) {
+      throw ApiError.forbidden("Permission denied to manage signer", "SIGNER_EDIT_DENIED");
     }
     await signersRepository.create({
       sign_request: { connect: { id: input.sign_request_id } },
@@ -27,22 +37,21 @@ class SignersService {
     });
   }
 
-  async sendOtp(signerId: number, tenantId: number): Promise<string> {
-    const signer = await signersRepository.findById(signerId);
+  async sendOtp(signerId: number, tenantId: number, userId?: number): Promise<string> {
+    const signer = typeof userId === "number"
+      ? await this.ensureCanManageSigner(signerId, tenantId, userId)
+      : await signersRepository.findById(signerId);
     if (!signer || signer.sign_request.tenant_id !== tenantId) {
       throw ApiError.notFound("Signer not found", "SIGNER_NOT_FOUND");
     }
+
     const otp = this.generateOtp();
     const hashed = await bcrypt.hash(otp, 10);
-    await signersRepository.update(signerId, {
-      otp: hashed,
-      otp_expire: new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000),
-      status: "otp_sent",
-    });
+    const otpExpire = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
-    // Send OTP via email
     try {
       await emailService.sendOtpEmail({
+        tenantId,
         recipientEmail: signer.email ?? "",
         recipientName: signer.name ?? "User",
         otp,
@@ -51,8 +60,14 @@ class SignersService {
       });
     } catch (error) {
       console.error("Failed to send OTP email:", error);
-      // Don't fail the request if email fails, just log it
+      throw ApiError.internal("Kh?ng th? g?i l?i OTP. Vui l?ng th? l?i sau.", "OTP_SEND_FAILED");
     }
+
+    await signersRepository.update(signerId, {
+      otp: hashed,
+      otp_expire: otpExpire,
+      status: "otp_sent",
+    });
 
     return otp;
   }
@@ -60,11 +75,25 @@ class SignersService {
   async submitSignature(
     signerId: number,
     tenantId: number,
+    userId: number,
     input: { otp: string; signature_data?: Record<string, unknown> },
   ): Promise<void> {
     const signer = await signersRepository.findById(signerId);
     if (!signer || signer.sign_request.tenant_id !== tenantId) {
       throw ApiError.notFound("Signer not found", "SIGNER_NOT_FOUND");
+    }
+    if (signer.is_internal) {
+      const currentUser = await prisma.users.findFirst({
+        where: { id: userId, tenant_id: tenantId },
+        select: { id: true, email: true },
+      });
+      const matchesCurrentUser =
+        !!currentUser &&
+        (signer.user_id === currentUser.id ||
+          (!!currentUser.email && signer.email?.toLowerCase() === currentUser.email.toLowerCase()));
+      if (!matchesCurrentUser) {
+        throw ApiError.forbidden("You are not allowed to sign for this signer", "SIGNER_ACCESS_DENIED");
+      }
     }
     if (!signer.otp || !signer.otp_expire) {
       throw ApiError.badRequest("OTP not issued", "OTP_NOT_ISSUED");
@@ -149,6 +178,25 @@ class SignersService {
 
   private generateOtp(): string {
     return (Math.floor(100000 + Math.random() * 900000)).toString();
+  }
+
+  async ensureCanManageSigner(signerId: number, tenantId: number, userId: number) {
+    const signer = await signersRepository.findById(signerId);
+    if (!signer || signer.sign_request.tenant_id !== tenantId) {
+      throw ApiError.notFound("Signer not found", "SIGNER_NOT_FOUND");
+    }
+
+    const decision = await authorizationService.canAccessDocument(
+      userId,
+      tenantId,
+      signer.sign_request.document_id,
+      "edit",
+    );
+    if (!decision.allowed) {
+      throw ApiError.forbidden("Permission denied to manage signer", "SIGNER_EDIT_DENIED");
+    }
+
+    return signer;
   }
 }
 

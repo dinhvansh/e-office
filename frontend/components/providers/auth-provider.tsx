@@ -6,6 +6,14 @@ type AuthUser = {
   id: number;
   email: string;
   role?: string | null;
+  full_name?: string | null;
+};
+
+type UserPermission = {
+  id?: number;
+  resource: string;
+  action: string;
+  description?: string | null;
 };
 
 type TenantProfile = {
@@ -26,9 +34,11 @@ type AuthContextValue = {
   user?: AuthUser;
   tenant?: TenantProfile;
   tokens?: Tokens;
+  permissions: string[];
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  hasPermission: (permission: string | string[]) => boolean;
   fetchJson: <T>(path: string, init?: RequestInit) => Promise<T>;
 };
 
@@ -41,6 +51,7 @@ type StoredSession = {
   user?: AuthUser;
   tenant?: TenantProfile;
   tokens?: Tokens;
+  permissions?: string[];
 };
 
 type ApiEnvelope<T> = {
@@ -76,6 +87,7 @@ const writeStoredSession = (session?: StoredSession) => {
     user: session.user,
     tenant: session.tenant,
     tokens: session.tokens?.accessToken ? { accessToken: session.tokens.accessToken } : undefined,
+    permissions: session.permissions ?? [],
   };
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(safeSession));
 };
@@ -84,6 +96,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [tokens, setTokens] = useState<Tokens | undefined>();
   const [user, setUser] = useState<AuthUser | undefined>();
   const [tenant, setTenant] = useState<TenantProfile | undefined>();
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -92,13 +105,55 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setTokens(stored.tokens);
       setUser(stored.user);
       setTenant(stored.tenant);
+      setPermissions(stored.permissions ?? []);
     }
     setIsLoading(false);
   }, []);
 
   useEffect(() => {
-    writeStoredSession({ tokens, user, tenant });
-  }, [tokens, user, tenant]);
+    writeStoredSession({ tokens, user, tenant, permissions });
+  }, [tokens, user, tenant, permissions]);
+
+  const fetchPermissions = useCallback(async (accessToken?: string) => {
+    if (!accessToken) {
+      setPermissions([]);
+      return;
+    }
+
+    try {
+      const apiBaseUrl = getApiBaseUrl();
+      const res = await fetch(`${apiBaseUrl}/roles/my-permissions`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!res.ok) {
+        setPermissions([]);
+        return;
+      }
+
+      const payload = await res.json();
+      const items = (payload?.data ?? []) as UserPermission[];
+      setPermissions(items.map((item) => `${item.resource}:${item.action}`));
+    } catch {
+      setPermissions([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!tokens?.accessToken) {
+      return;
+    }
+
+    if (permissions.length > 0) {
+      return;
+    }
+
+    fetchPermissions(tokens.accessToken);
+  }, [fetchPermissions, permissions.length, tokens?.accessToken]);
 
   const performLogin = useCallback(async (email: string, password: string) => {
     const apiBaseUrl = getApiBaseUrl();
@@ -133,7 +188,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setTokens(payload.data.tokens);
     setUser(payload.data.user);
     setTenant(payload.data.tenant);
-  }, []);
+    await fetchPermissions(payload.data.tokens?.accessToken);
+  }, [fetchPermissions]);
 
   const logout = useCallback(() => {
     const apiBaseUrl = getApiBaseUrl();
@@ -141,6 +197,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setTokens(undefined);
     setUser(undefined);
     setTenant(undefined);
+    setPermissions([]);
     writeStoredSession(undefined);
   }, []);
 
@@ -165,6 +222,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setTokens(payload.data.tokens);
       setUser(payload.data.user);
       setTenant(payload.data.tenant);
+      await fetchPermissions(payload.data.tokens?.accessToken);
       return true;
     } catch (error) {
       // Only logout if it's an auth error, not network error
@@ -174,6 +232,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return false;
     }
   }, [logout]);
+
+  const hasPermission = useCallback(
+    (permission: string | string[]) => {
+      const required = Array.isArray(permission) ? permission : [permission];
+      if (user?.role === 'super_admin') {
+        return true;
+      }
+      return required.every((item) => permissions.includes(item));
+    },
+    [permissions, user?.role],
+  );
 
   const fetchJson = useCallback(
     async <T,>(path: string, init?: RequestInit): Promise<T> => {
@@ -230,12 +299,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       user,
       tenant,
       tokens,
+      permissions,
       isLoading,
       login: performLogin,
       logout,
+      hasPermission,
       fetchJson,
     }),
-    [fetchJson, isLoading, logout, performLogin, tenant, tokens, user],
+    [fetchJson, hasPermission, isLoading, logout, performLogin, permissions, tenant, tokens, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

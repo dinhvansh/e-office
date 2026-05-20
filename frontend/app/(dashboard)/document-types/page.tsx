@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit, FileText, FileType, Plus, Settings, Trash2 } from 'lucide-react';
 
@@ -12,7 +12,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { SelectWithIcon } from '@/components/ui/select-with-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { DocumentType } from '@/lib/types';
+import { DocumentType, DocumentTypePolicy } from '@/lib/types';
 
 export default function DocumentTypesPage() {
   const { fetchJson } = useAuth();
@@ -25,6 +25,11 @@ export default function DocumentTypesPage() {
   const [requireApproval, setRequireApproval] = useState(false);
   const [defaultWorkflowId, setDefaultWorkflowId] = useState<number | null>(null);
   const [allowWorkflowOverride, setAllowWorkflowOverride] = useState(false);
+  const [defaultVisibilityScope, setDefaultVisibilityScope] = useState<'public' | 'department' | 'private'>('department');
+  const [defaultConfidentialLevel, setDefaultConfidentialLevel] = useState<'normal' | 'confidential' | 'secret' | 'top_secret'>('normal');
+  const [inheritCreatorDepartment, setInheritCreatorDepartment] = useState(true);
+  const [forcePrivateUntilCompleted, setForcePrivateUntilCompleted] = useState(false);
+  const [isPolicyLoading, setIsPolicyLoading] = useState(false);
 
   const handleOpenDialog = (type: DocumentType | null) => {
     setEditingType(type);
@@ -46,6 +51,45 @@ export default function DocumentTypesPage() {
     queryFn: () => fetchJson<any>('/workflows'),
   });
 
+  useEffect(() => {
+    if (!showCreateModal) return;
+
+    if (!editingType?.id) {
+      setDefaultVisibilityScope('department');
+      setDefaultConfidentialLevel('normal');
+      setInheritCreatorDepartment(true);
+      setForcePrivateUntilCompleted(false);
+      setIsPolicyLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsPolicyLoading(true);
+
+    fetchJson<DocumentTypePolicy>(`/settings/document-type-policy/${editingType.id}`)
+      .then((policy) => {
+        if (cancelled) return;
+        setDefaultVisibilityScope(policy?.default_visibility_scope || 'department');
+        setDefaultConfidentialLevel(policy?.default_confidential_level || 'normal');
+        setInheritCreatorDepartment(policy?.inherit_creator_department ?? true);
+        setForcePrivateUntilCompleted(Boolean(policy?.force_private_until_completed));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDefaultVisibilityScope('department');
+        setDefaultConfidentialLevel('normal');
+        setInheritCreatorDepartment(true);
+        setForcePrivateUntilCompleted(false);
+      })
+      .finally(() => {
+        if (!cancelled) setIsPolicyLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editingType?.id, fetchJson, showCreateModal]);
+
   const workflows = workflowsData?.workflows?.filter((workflow: any) => workflow.is_template) || [];
   const types: DocumentType[] = typesData || [];
   const typesWithCount = types.map((type) => ({
@@ -55,8 +99,19 @@ export default function DocumentTypesPage() {
   }));
 
   const createMutation = useMutation({
-    mutationFn: (data: Partial<DocumentType>) =>
-      fetchJson('/document-types', { method: 'POST', body: JSON.stringify(data) }),
+    mutationFn: async (data: Partial<DocumentType>) => {
+      const documentType = await fetchJson<DocumentType>('/document-types', { method: 'POST', body: JSON.stringify(data) });
+      await fetchJson(`/settings/document-type-policy/${documentType.id}`, {
+        method: 'POST',
+        body: JSON.stringify({
+          default_visibility_scope: defaultVisibilityScope,
+          default_confidential_level: defaultConfidentialLevel,
+          inherit_creator_department: inheritCreatorDepartment,
+          force_private_until_completed: forcePrivateUntilCompleted,
+        }),
+      });
+      return documentType;
+    },
     onSuccess: () => {
       toast.success(editingType ? 'Cập nhật loại văn bản thành công' : 'Tạo loại văn bản thành công');
       queryClient.invalidateQueries({ queryKey: ['document-types'] });
@@ -69,8 +124,22 @@ export default function DocumentTypesPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...data }: Partial<DocumentType> & { id: number }) =>
-      fetchJson(`/document-types/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    mutationFn: async ({ id, ...data }: Partial<DocumentType> & { id: number }) => {
+      const documentType = await fetchJson<DocumentType>(`/document-types/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+      await fetchJson(`/settings/document-type-policy/${id}`, {
+        method: 'POST',
+        body: JSON.stringify({
+          default_visibility_scope: defaultVisibilityScope,
+          default_confidential_level: defaultConfidentialLevel,
+          inherit_creator_department: inheritCreatorDepartment,
+          force_private_until_completed: forcePrivateUntilCompleted,
+        }),
+      });
+      return documentType;
+    },
     onSuccess: () => {
       toast.success('Cập nhật loại văn bản thành công');
       queryClient.invalidateQueries({ queryKey: ['document-types'] });
@@ -216,7 +285,7 @@ export default function DocumentTypesPage() {
                       )}
                       {type.require_digital_signing && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">
-                          ✍️ Ký điện tử
+                          {'\u270D\uFE0F G\u1EEDi ngo\u00E0i k\u00FD \u0111i\u1EC7n t\u1EED'}
                         </span>
                       )}
                       {type.require_approval && (
@@ -417,7 +486,9 @@ export default function DocumentTypesPage() {
                   defaultChecked={editingType?.require_digital_signing ?? false}
                   className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20"
                 />
-                <span className="text-sm font-semibold text-slate-800">✍️ Yêu cầu ký điện tử</span>
+                <span className="text-sm font-semibold text-slate-800">
+                  {'\u270D\uFE0F Cho ph\u00E9p g\u1EEDi ra b\u00EAn ngo\u00E0i \u0111\u1EC3 k\u00FD \u0111i\u1EC7n t\u1EED'}
+                </span>
               </label>
             </div>
 
@@ -494,6 +565,74 @@ export default function DocumentTypesPage() {
                       <span className="font-medium text-green-600">Linh hoạt: khởi tạo từ workflow mặc định nhưng người dùng được phép chỉnh lại khi tạo trình ký</span>
                     )}
                   </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-6">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">{'Quy\u1EC1n & b\u1EA3o m\u1EADt m\u1EB7c \u0111\u1ECBnh'}</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  {'Document t\u1EA1o t\u1EEB lo\u1EA1i n\u00E0y s\u1EBD t\u1EF1 \u00E1p m\u1EE9c \u0111\u1ED9 b\u1EA3o m\u1EADt v\u00E0 ph\u1EA1m vi hi\u1EC3n th\u1ECB n\u00E0y. M\u00E0n h\u00ECnh t\u1EA1o tr\u00ECnh k\u00FD kh\u00F4ng c\u1EA7n ch\u1ECDn l\u1EA1i.'}
+                </p>
+              </div>
+
+              {isPolicyLoading ? (
+                <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500">
+                  {'\u0110ang t\u1EA3i policy c\u1EE7a lo\u1EA1i t\u00E0i li\u1EC7u...'}
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-slate-700">{'Ph\u1EA1m vi hi\u1EC3n th\u1ECB m\u1EB7c \u0111\u1ECBnh'}</label>
+                    <select
+                      value={defaultVisibilityScope}
+                      onChange={(event) => setDefaultVisibilityScope(event.target.value as 'public' | 'department' | 'private')}
+                      className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      <option value="public">{'C\u00F4ng khai trong tenant'}</option>
+                      <option value="department">{'Theo ph\u00F2ng ban'}</option>
+                      <option value="private">{'Ri\u00EAng t\u01B0'}</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-slate-700">{'M\u1EE9c \u0111\u1ED9 b\u1EA3o m\u1EADt m\u1EB7c \u0111\u1ECBnh'}</label>
+                    <select
+                      value={defaultConfidentialLevel}
+                      onChange={(event) => setDefaultConfidentialLevel(event.target.value as 'normal' | 'confidential' | 'secret' | 'top_secret')}
+                      className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      <option value="normal">{'Th\u00F4ng th\u01B0\u1EDDng'}</option>
+                      <option value="confidential">{'B\u1EA3o m\u1EADt'}</option>
+                      <option value="secret">{'M\u1EADt'}</option>
+                      <option value="top_secret">{'Tuy\u1EC7t m\u1EADt'}</option>
+                    </select>
+                  </div>
+
+                  <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 md:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={inheritCreatorDepartment}
+                      onChange={(event) => setInheritCreatorDepartment(event.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                    />
+                    <span className="text-sm font-medium text-slate-700">
+                      {'T\u1EF1 \u0111\u1ED9ng g\u00E1n ph\u00F2ng ban c\u1EE7a ng\u01B0\u1EDDi t\u1EA1o v\u00E0o document'}
+                    </span>
+                  </label>
+
+                  <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 md:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={forcePrivateUntilCompleted}
+                      onChange={(event) => setForcePrivateUntilCompleted(event.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                    />
+                    <span className="text-sm font-medium text-slate-700">
+                      {'Lu\u00F4n \u0111\u1EC3 ri\u00EAng t\u01B0 khi m\u1EDBi t\u1EA1o (ghi \u0111\u00E8 ph\u1EA1m vi hi\u1EC3n th\u1ECB th\u00E0nh private)'}
+                    </span>
+                  </label>
                 </div>
               )}
             </div>

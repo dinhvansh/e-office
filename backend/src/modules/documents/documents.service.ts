@@ -44,7 +44,64 @@ export interface CreateDocumentInput {
   forceSignRequest?: boolean;
 }
 
+type DocumentTypeCreationPolicy = {
+  default_visibility_scope?: string;
+  default_confidential_level?: string;
+  inherit_creator_department?: boolean;
+  force_private_until_completed?: boolean;
+};
+
 class DocumentsService {
+  private async resolveDocumentTypeDefaults(
+    tenantId: number,
+    documentTypeId: number | null | undefined,
+    ownerId: number
+  ): Promise<{
+    visibilityScope?: string;
+    confidentialLevel?: string;
+    departmentId?: number | null;
+  }> {
+    if (!documentTypeId) {
+      return {};
+    }
+
+    const setting = await prisma.tenant_settings.findFirst({
+      where: {
+        tenant_id: tenantId,
+        setting_key: `doc_type_policy:${documentTypeId}`,
+      },
+      select: { setting_value: true },
+    });
+
+    const policy = ((setting?.setting_value as DocumentTypeCreationPolicy | null) || {}) as DocumentTypeCreationPolicy;
+    const allowedScopes = new Set(["public", "department", "private"]);
+    const allowedLevels = new Set(["normal", "confidential", "secret", "top_secret"]);
+
+    const visibility = String(policy.default_visibility_scope || "").trim().toLowerCase();
+    const confidential = String(policy.default_confidential_level || "").trim().toLowerCase();
+
+    let departmentId: number | null | undefined = undefined;
+    if (policy.inherit_creator_department) {
+      const owner = await prisma.users.findUnique({
+        where: { id: ownerId },
+        select: { department_id: true },
+      });
+      departmentId = owner?.department_id ?? null;
+    }
+
+    const visibilityScope = policy.force_private_until_completed
+      ? "private"
+      : allowedScopes.has(visibility)
+        ? visibility
+        : undefined;
+
+    return {
+      visibilityScope,
+      confidentialLevel: allowedLevels.has(confidential) ? confidential : undefined,
+      departmentId,
+    };
+  }
+
   async listDocuments(tenantId: number, userId?: number, noSigningOnly = false): Promise<documents[]> {
     const documents = await documentsRepository.listByTenant(tenantId, noSigningOnly);
     
@@ -433,6 +490,12 @@ class DocumentsService {
     const initialStatus =
       documentType?.require_approval || shouldCreateSignRequest ? "draft" : "active";
 
+    const documentTypeDefaults = await this.resolveDocumentTypeDefaults(
+      tenantId,
+      documentTypeId,
+      ownerId
+    );
+
     const payload: CreateDocumentData = {
       tenant_id: tenantId,
       owner_id: ownerId,
@@ -441,14 +504,14 @@ class DocumentsService {
       hash,
       status: initialStatus,
       document_type_id: documentTypeId,
-      department_id: input.departmentId,
       document_number: documentNumber,
       numbering_rule_id: numberingRuleId,
       title: input.title,
       summary: input.summary,
       priority_level: input.priorityLevel,
-      confidential_level: input.confidentialLevel,
-      visibility_scope: input.visibilityScope,
+      confidential_level: input.confidentialLevel ?? documentTypeDefaults.confidentialLevel,
+      visibility_scope: input.visibilityScope ?? documentTypeDefaults.visibilityScope,
+      department_id: input.departmentId ?? documentTypeDefaults.departmentId,
     };
     const document = await documentsRepository.create(payload);
     

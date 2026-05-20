@@ -21,14 +21,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { tokens, user, tenant, logout, isLoading } = useAuth();
+  const { tokens, user, tenant, logout, isLoading, permissions } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Filter sidebar based on user role
-  const filteredSidebar = filterSidebarByPermissions(SIDEBAR_STRUCTURE, user?.role);
+  const filteredSidebar = filterSidebarByPermissions(SIDEBAR_STRUCTURE, user?.role, permissions);
 
   useEffect(() => {
     if (!isLoading && !tokens) {

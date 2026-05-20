@@ -3,8 +3,28 @@
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import { FileText, PenTool, Clock, CheckCircle, TrendingUp, Users, Building2, Shield } from "lucide-react";
-import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
+import {
+  FileText,
+  PenTool,
+  Clock,
+  CheckCircle,
+  TrendingUp,
+  Users,
+  Building2,
+  Shield,
+} from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+} from "recharts";
 import { useAuth } from "@/components/providers/auth-provider";
 import { DocumentRecord, TenantProfile } from "@/lib/types";
 import { PageHeader } from "@/components/ui/page-header";
@@ -12,15 +32,22 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { StatusTag } from "@/components/ui/status-tag";
 
 dayjs.extend(relativeTime);
 
 export default function DashboardPage() {
-  const { fetchJson } = useAuth();
-  
+  const { fetchJson, hasPermission } = useAuth();
+
+  const canReadDocuments = hasPermission("documents:read");
+  const canReadApprovals = hasPermission("approvals:read");
+  const canReadSignRequests = hasPermission("sign_requests:read");
+  const canReadUsers = hasPermission("users:read");
+  const canViewAnyMetric =
+    canReadDocuments || canReadApprovals || canReadSignRequests || canReadUsers;
+
   const { data: documents, isLoading: isLoadingDocs } = useQuery({
     queryKey: ["documents"],
+    enabled: canReadDocuments,
     queryFn: async () => {
       const data = await fetchJson<{ documents: DocumentRecord[] }>("/documents");
       return data.documents;
@@ -36,59 +63,64 @@ export default function DashboardPage() {
   });
 
   const { data: stats, isLoading: isLoadingStats } = useQuery({
-    queryKey: ["dashboard-stats"],
+    queryKey: ["dashboard-stats", canReadApprovals, canReadSignRequests, canReadUsers],
+    enabled: canViewAnyMetric,
     queryFn: async () => {
       const [approvals, signRequests, users] = await Promise.all([
-        fetchJson<any>("/approvals").catch(() => ({ approvals: [] })),
-        fetchJson<any>("/sign-requests").catch(() => ({ signRequests: [] })),
-        fetchJson<any>("/users").catch(() => ({ users: [] }))
+        canReadApprovals
+          ? fetchJson<any>("/approvals").catch(() => ({ approvals: [] }))
+          : Promise.resolve({ approvals: [] }),
+        canReadSignRequests
+          ? fetchJson<any>("/sign-requests").catch(() => ({ signRequests: [] }))
+          : Promise.resolve({ signRequests: [] }),
+        canReadUsers ? fetchJson<any>("/users").catch(() => ({ users: [] })) : Promise.resolve({ users: [] }),
       ]);
-      
-      // Handle different response formats
+
       const usersList = users.users || users || [];
       const approvalsList = approvals.approvals || approvals || [];
       const signRequestsList = signRequests.signRequests || signRequests || [];
-      
+
       return {
         totalApprovals: Array.isArray(approvalsList) ? approvalsList.length : 0,
-        pendingApprovals: Array.isArray(approvalsList) ? approvalsList.filter((a: any) => a.status === 'pending')?.length : 0,
+        pendingApprovals: Array.isArray(approvalsList)
+          ? approvalsList.filter((item: any) => item.status === "pending").length
+          : 0,
         totalSignRequests: Array.isArray(signRequestsList) ? signRequestsList.length : 0,
-        totalUsers: Array.isArray(usersList) ? usersList.length : 0
+        totalUsers: Array.isArray(usersList) ? usersList.length : 0,
       };
     },
   });
 
-  // Calculate stats
-  const totalDocs = documents?.length ?? 0;
-  const activeDocs = documents?.filter(d => d.status === 'active')?.length ?? 0;
-  const pendingDocs = documents?.filter(d => d.status === 'pending')?.length ?? 0;
-  const draftDocs = documents?.filter(d => d.status === 'draft')?.length ?? 0;
-  const recentDocs = documents?.slice(0, 5) ?? [];
+  const totalDocs = canReadDocuments ? documents?.length ?? 0 : 0;
+  const activeDocs = canReadDocuments ? documents?.filter((item) => item.status === "active").length ?? 0 : 0;
+  const pendingDocs = canReadDocuments ? documents?.filter((item) => item.status === "pending").length ?? 0 : 0;
+  const draftDocs = canReadDocuments ? documents?.filter((item) => item.status === "draft").length ?? 0 : 0;
+  const recentDocs = canReadDocuments ? documents?.slice(0, 5) ?? [] : [];
 
-  // Chart data
-  const documentStatusData = [
-    { name: 'Đang hoạt động', value: activeDocs, color: '#10b981' },
-    { name: 'Chờ xử lý', value: pendingDocs, color: '#f59e0b' },
-    { name: 'Nháp', value: draftDocs, color: '#6b7280' }
-  ].filter(item => item.value > 0);
+  const documentStatusData = canReadDocuments
+    ? [
+        { name: "Đang hoạt động", value: activeDocs, color: "#10b981" },
+        { name: "Chờ xử lý", value: pendingDocs, color: "#f59e0b" },
+        { name: "Nháp", value: draftDocs, color: "#6b7280" },
+      ].filter((item) => item.value > 0)
+    : [];
 
   const activityData = [
-    { name: 'Tài liệu', value: totalDocs },
-    { name: 'Phê duyệt', value: stats?.totalApprovals ?? 0 },
-    { name: 'Yêu cầu ký', value: stats?.totalSignRequests ?? 0 },
-    { name: 'Người dùng', value: stats?.totalUsers ?? 0 }
-  ];
+    { name: "Tài liệu", value: totalDocs },
+    { name: "Phê duyệt", value: canReadApprovals ? stats?.totalApprovals ?? 0 : 0 },
+    { name: "Yêu cầu ký", value: canReadSignRequests ? stats?.totalSignRequests ?? 0 : 0 },
+    { name: "Người dùng", value: canReadUsers ? stats?.totalUsers ?? 0 : 0 },
+  ].filter((item) => item.value > 0 || canViewAnyMetric);
 
   return (
-    <div className="space-y-3 md:space-y-6 p-3 md:p-6">
+    <div className="space-y-3 p-3 md:space-y-6 md:p-6">
       <PageHeader
         icon={TrendingUp}
-        title="Dashboard"
-        description="Tổng quan hệ thống và hoạt động gần đây"
+        title="Tổng quan"
+        description="Số liệu hệ thống và hoạt động gần đây theo quyền hiện có"
         iconColor="text-blue-600"
       />
 
-      {/* Metrics Grid - Mobile optimized */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 md:gap-4">
         {isLoadingDocs || isLoadingStats ? (
           <>
@@ -101,39 +133,37 @@ export default function DashboardPage() {
           <>
             <MetricCard
               title="Tổng tài liệu"
-              value={totalDocs.toString()}
+              value={String(totalDocs)}
               icon={FileText}
               iconColor="text-blue-600"
-              description={`${activeDocs} đang hoạt động`}
+              description={canReadDocuments ? `${activeDocs} đang hoạt động` : "Không có quyền xem"}
             />
             <MetricCard
               title="Đang hoạt động"
-              value={activeDocs.toString()}
+              value={String(activeDocs)}
               icon={CheckCircle}
               iconColor="text-green-600"
-              description={`${totalDocs} tổng số`}
+              description={canReadDocuments ? `${totalDocs} tổng số` : "Không có quyền xem"}
             />
             <MetricCard
               title="Chờ xử lý"
-              value={(pendingDocs + (stats?.pendingApprovals ?? 0)).toString()}
+              value={String(pendingDocs + (canReadApprovals ? stats?.pendingApprovals ?? 0 : 0))}
               icon={Clock}
               iconColor="text-amber-600"
-              description={`${stats?.pendingApprovals ?? 0} phê duyệt`}
+              description={canReadApprovals ? `${stats?.pendingApprovals ?? 0} phê duyệt` : "Không có quyền xem"}
             />
             <MetricCard
               title="Quy trình ký"
-              value={(stats?.totalSignRequests ?? 0).toString()}
+              value={String(canReadSignRequests ? stats?.totalSignRequests ?? 0 : 0)}
               icon={PenTool}
               iconColor="text-purple-600"
-              description="Yêu cầu ký điện tử"
+              description={canReadSignRequests ? "Yêu cầu ký điện tử" : "Không có quyền xem"}
             />
           </>
         )}
       </div>
 
-      {/* Charts Row - Mobile optimized */}
-      <div className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
-        {/* Document Status Pie Chart */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 md:gap-6">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base md:text-lg">Trạng thái tài liệu</CardTitle>
@@ -141,9 +171,13 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="pb-4">
             {isLoadingDocs ? (
-              <Skeleton className="h-48 md:h-64 w-full" />
+              <Skeleton className="h-48 w-full md:h-64" />
+            ) : !canReadDocuments ? (
+              <div className="flex h-48 items-center justify-center text-muted-foreground md:h-64">
+                <p className="text-sm">Không có quyền xem thống kê tài liệu</p>
+              </div>
             ) : documentStatusData.length === 0 ? (
-              <div className="h-48 md:h-64 flex items-center justify-center text-muted-foreground">
+              <div className="flex h-48 items-center justify-center text-muted-foreground md:h-64">
                 <p className="text-sm">Chưa có dữ liệu</p>
               </div>
             ) : (
@@ -154,24 +188,22 @@ export default function DashboardPage() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
-                    outerRadius={typeof window !== 'undefined' && window.innerWidth < 768 ? 50 : 80}
-                    fill="#8884d8"
+                    label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
+                    outerRadius={typeof window !== "undefined" && window.innerWidth < 768 ? 50 : 80}
                     dataKey="value"
                   >
                     {documentStatusData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ fontSize: '12px' }} />
-                  <Legend wrapperStyle={{ fontSize: '11px' }} iconSize={10} />
+                  <Tooltip contentStyle={{ fontSize: "12px" }} />
+                  <Legend wrapperStyle={{ fontSize: "11px" }} iconSize={10} />
                 </PieChart>
               </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
 
-        {/* Activity Bar Chart */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base md:text-lg">Tổng quan hoạt động</CardTitle>
@@ -179,13 +211,17 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="pb-4">
             {isLoadingDocs || isLoadingStats ? (
-              <Skeleton className="h-48 md:h-64 w-full" />
+              <Skeleton className="h-48 w-full md:h-64" />
+            ) : !canViewAnyMetric ? (
+              <div className="flex h-48 items-center justify-center text-muted-foreground md:h-64">
+                <p className="text-sm">Không có quyền xem dữ liệu tổng quan</p>
+              </div>
             ) : (
               <ResponsiveContainer width="100%" height={200} className="md:h-[250px]">
                 <BarChart data={activityData}>
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} className="md:text-xs" />
-                  <YAxis tick={{ fontSize: 10 }} className="md:text-xs" />
-                  <Tooltip contentStyle={{ fontSize: '12px' }} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip contentStyle={{ fontSize: "12px" }} />
                   <Bar dataKey="value" fill="#3b82f6" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -194,30 +230,38 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Main Content Grid - Mobile optimized */}
-      <div className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-3">
-        {/* Recent Documents - 2 columns on desktop, full width on mobile */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 md:gap-6">
         <Card className="lg:col-span-2">
           <CardHeader className="pb-3">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="text-base md:text-lg">Tài liệu gần đây</CardTitle>
-                <CardDescription className="text-xs md:text-sm">Hoạt động mới nhất trong hệ thống</CardDescription>
+                <CardDescription className="text-xs md:text-sm">
+                  Hoạt động mới nhất trong hệ thống
+                </CardDescription>
               </div>
-              <Badge variant="secondary" className="w-fit">{totalDocs} tài liệu</Badge>
+              <Badge variant="secondary" className="w-fit">
+                {canReadDocuments ? `${totalDocs} tài liệu` : "Ẩn theo quyền"}
+              </Badge>
             </div>
           </CardHeader>
           <CardContent className="pb-4">
             {isLoadingDocs ? (
               <div className="space-y-2 md:space-y-3">
-                <Skeleton className="h-14 md:h-16 w-full" />
-                <Skeleton className="h-14 md:h-16 w-full" />
-                <Skeleton className="h-14 md:h-16 w-full" />
+                <Skeleton className="h-14 w-full md:h-16" />
+                <Skeleton className="h-14 w-full md:h-16" />
+                <Skeleton className="h-14 w-full md:h-16" />
+              </div>
+            ) : !canReadDocuments ? (
+              <div className="py-6 text-center text-muted-foreground md:py-8">
+                <FileText className="mx-auto mb-2 h-10 w-10 text-muted-foreground/50 md:mb-3 md:h-12 md:w-12" />
+                <p className="text-sm font-medium md:text-base">Không có quyền xem tài liệu</p>
+                <p className="text-xs md:text-sm">Danh sách gần đây chỉ hiện khi tài khoản có quyền đọc tài liệu.</p>
               </div>
             ) : recentDocs.length === 0 ? (
-              <div className="text-center py-6 md:py-8 text-muted-foreground">
-                <FileText className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-2 md:mb-3 text-muted-foreground/50" />
-                <p className="font-medium text-sm md:text-base">Chưa có tài liệu</p>
+              <div className="py-6 text-center text-muted-foreground md:py-8">
+                <FileText className="mx-auto mb-2 h-10 w-10 text-muted-foreground/50 md:mb-3 md:h-12 md:w-12" />
+                <p className="text-sm font-medium md:text-base">Chưa có tài liệu</p>
                 <p className="text-xs md:text-sm">Tải lên tài liệu đầu tiên để bắt đầu</p>
               </div>
             ) : (
@@ -225,27 +269,28 @@ export default function DashboardPage() {
                 {recentDocs.map((doc) => (
                   <div
                     key={doc.id}
-                    className="flex items-center justify-between p-2 md:p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    className="flex items-center justify-between rounded-lg border p-2 transition-colors hover:bg-muted/50 md:p-3"
                   >
-                    <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
-                      <div className="p-1.5 md:p-2 bg-primary/10 rounded-lg flex-shrink-0">
-                        <FileText className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
+                    <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
+                      <div className="rounded-lg bg-primary/10 p-1.5 md:p-2">
+                        <FileText className="h-3.5 w-3.5 text-primary md:h-4 md:w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-xs md:text-sm truncate">
-                          {(doc.original_file_name || doc.title || `Document #${doc.id}`).substring(0, 30)}...
+                        <p className="truncate text-xs font-medium md:text-sm">
+                          {doc.original_file_name || doc.title || `Document #${doc.id}`}
                         </p>
-                        <p className="text-[10px] md:text-xs text-muted-foreground">
+                        <p className="text-[10px] text-muted-foreground md:text-xs">
                           {dayjs(doc.created_at).fromNow()}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
-                      <StatusTag 
-                        status={doc.status ?? "draft"} 
-                        variant={doc.status === "active" ? "success" : "default"}
-                      />
-                      <span className="text-[10px] md:text-xs text-muted-foreground hidden sm:inline">v{doc.version}</span>
+                    <div className="flex flex-shrink-0 items-center gap-2 md:gap-3">
+                      <Badge variant="outline" className="text-[10px] md:text-xs">
+                        {doc.status ?? "draft"}
+                      </Badge>
+                      <span className="hidden text-[10px] text-muted-foreground sm:inline md:text-xs">
+                        v{doc.version}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -254,46 +299,44 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* System Info - 1 column, full width on mobile */}
         <div className="space-y-4 md:space-y-6">
-          {/* Tenant Info - Mobile optimized */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm md:text-base">Thông tin hệ thống</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 md:space-y-3 pb-4">
+            <CardContent className="space-y-2 pb-4 md:space-y-3">
               {isLoadingTenant || isLoadingStats ? (
                 <>
-                  <Skeleton className="h-10 md:h-12 w-full" />
-                  <Skeleton className="h-10 md:h-12 w-full" />
-                  <Skeleton className="h-10 md:h-12 w-full" />
+                  <Skeleton className="h-10 w-full md:h-12" />
+                  <Skeleton className="h-10 w-full md:h-12" />
+                  <Skeleton className="h-10 w-full md:h-12" />
                 </>
               ) : (
                 <>
-                  <div className="flex items-center justify-between p-2 md:p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center justify-between rounded-lg bg-muted/50 p-2 md:p-3">
                     <div className="flex items-center gap-1.5 md:gap-2">
-                      <Building2 className="w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground flex-shrink-0" />
+                      <Building2 className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground md:h-4 md:w-4" />
                       <span className="text-xs md:text-sm">Tổ chức</span>
                     </div>
-                    <span className="text-xs md:text-sm font-medium truncate ml-2">
+                    <span className="ml-2 truncate text-xs font-medium md:text-sm">
                       {tenantProfile?.name ?? "Acme Corp"}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between p-2 md:p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center justify-between rounded-lg bg-muted/50 p-2 md:p-3">
                     <div className="flex items-center gap-1.5 md:gap-2">
-                      <Users className="w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground flex-shrink-0" />
+                      <Users className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground md:h-4 md:w-4" />
                       <span className="text-xs md:text-sm">Người dùng</span>
                     </div>
                     <Badge variant="secondary" className="text-xs">
-                      {stats?.totalUsers ?? 0} users
+                      {canReadUsers ? stats?.totalUsers ?? 0 : 0} users
                     </Badge>
                   </div>
-                  <div className="flex items-center justify-between p-2 md:p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center justify-between rounded-lg bg-muted/50 p-2 md:p-3">
                     <div className="flex items-center gap-1.5 md:gap-2">
-                      <Shield className="w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground flex-shrink-0" />
+                      <Shield className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground md:h-4 md:w-4" />
                       <span className="text-xs md:text-sm">Trạng thái</span>
                     </div>
-                    <Badge variant="default" className="capitalize text-xs">
+                    <Badge variant="default" className="text-xs capitalize">
                       {tenantProfile?.status ?? "active"}
                     </Badge>
                   </div>
@@ -302,7 +345,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Quick Stats - Mobile optimized */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm md:text-base">Thống kê nhanh</CardTitle>
@@ -310,26 +352,30 @@ export default function DashboardPage() {
                 Hoạt động trong hệ thống
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 md:space-y-3 pb-4">
+            <CardContent className="space-y-2 pb-4 md:space-y-3">
               {isLoadingStats ? (
                 <>
-                  <Skeleton className="h-10 md:h-12 w-full" />
-                  <Skeleton className="h-10 md:h-12 w-full" />
-                  <Skeleton className="h-10 md:h-12 w-full" />
+                  <Skeleton className="h-10 w-full md:h-12" />
+                  <Skeleton className="h-10 w-full md:h-12" />
+                  <Skeleton className="h-10 w-full md:h-12" />
                 </>
               ) : (
                 <>
-                  <div className="flex items-center justify-between p-2 md:p-3 bg-blue-50 rounded-lg border border-blue-100">
-                    <span className="text-xs md:text-sm text-blue-900">Tài liệu</span>
-                    <span className="text-xs md:text-sm font-semibold text-blue-900">{totalDocs}</span>
+                  <div className="flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50 p-2 md:p-3">
+                    <span className="text-xs text-blue-900 md:text-sm">Tài liệu</span>
+                    <span className="text-xs font-semibold text-blue-900 md:text-sm">{totalDocs}</span>
                   </div>
-                  <div className="flex items-center justify-between p-2 md:p-3 bg-green-50 rounded-lg border border-green-100">
-                    <span className="text-xs md:text-sm text-green-900">Phê duyệt</span>
-                    <span className="text-xs md:text-sm font-semibold text-green-900">{stats?.totalApprovals ?? 0}</span>
+                  <div className="flex items-center justify-between rounded-lg border border-green-100 bg-green-50 p-2 md:p-3">
+                    <span className="text-xs text-green-900 md:text-sm">Phê duyệt</span>
+                    <span className="text-xs font-semibold text-green-900 md:text-sm">
+                      {canReadApprovals ? stats?.totalApprovals ?? 0 : 0}
+                    </span>
                   </div>
-                  <div className="flex items-center justify-between p-2 md:p-3 bg-purple-50 rounded-lg border border-purple-100">
-                    <span className="text-xs md:text-sm text-purple-900">Yêu cầu ký</span>
-                    <span className="text-xs md:text-sm font-semibold text-purple-900">{stats?.totalSignRequests ?? 0}</span>
+                  <div className="flex items-center justify-between rounded-lg border border-purple-100 bg-purple-50 p-2 md:p-3">
+                    <span className="text-xs text-purple-900 md:text-sm">Yêu cầu ký</span>
+                    <span className="text-xs font-semibold text-purple-900 md:text-sm">
+                      {canReadSignRequests ? stats?.totalSignRequests ?? 0 : 0}
+                    </span>
                   </div>
                 </>
               )}

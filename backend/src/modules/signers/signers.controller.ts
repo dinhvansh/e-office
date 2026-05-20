@@ -21,13 +21,13 @@ const idSchema = z.coerce.number().int().positive();
 export class SignersController {
   addSigner = async (req: Request, res: Response): Promise<void> => {
     const body = createSchema.parse(req.body) as any;
-    await signersService.addSigner(req.auth!.tenantId, body);
+    await signersService.addSigner(req.auth!.tenantId, req.auth!.userId, body);
     res.status(201).json(ok({ created: true }));
   };
 
   sendOtp = async (req: Request, res: Response): Promise<void> => {
     const signerId = idSchema.parse(req.params.id);
-    const otp = await signersService.sendOtp(signerId, req.auth!.tenantId);
+    const otp = await signersService.sendOtp(signerId, req.auth!.tenantId, req.auth!.userId);
     const payload: Record<string, unknown> = { sent: true };
     if (env.NODE_ENV !== "production") {
       payload.debug_otp = otp;
@@ -38,7 +38,7 @@ export class SignersController {
   sign = async (req: Request, res: Response): Promise<void> => {
     const signerId = idSchema.parse(req.params.id);
     const body = signSchema.parse(req.body);
-    await signersService.submitSignature(signerId, req.auth!.tenantId, {
+    await signersService.submitSignature(signerId, req.auth!.tenantId, req.auth!.userId, {
       otp: body.otp,
       signature_data: body.signature_data,
     });

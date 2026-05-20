@@ -55,7 +55,7 @@ export class SignRequestsController {
   }
 
   list = async (req: Request, res: Response): Promise<void> => {
-    const signRequests = await signRequestsService.listSignRequests(req.auth!.tenantId);
+    const signRequests = await signRequestsService.listSignRequests(req.auth!.tenantId, req.auth!.userId);
     res.json(ok({ sign_requests: signRequests }));
   };
 
@@ -111,13 +111,13 @@ export class SignRequestsController {
 
   getById = async (req: Request, res: Response): Promise<void> => {
     const id = idSchema.parse(req.params.id);
-    const signRequest = await signRequestsService.getSignRequest(id, req.auth!.tenantId);
+    const signRequest = await signRequestsService.getSignRequest(id, req.auth!.tenantId, req.auth!.userId);
     res.json(ok({ sign_request: signRequest }));
   };
 
   listComments = async (req: Request, res: Response): Promise<void> => {
     const id = idSchema.parse(req.params.id);
-    const comments = await signRequestsService.listComments(id, req.auth!.tenantId);
+    const comments = await signRequestsService.listComments(id, req.auth!.tenantId, req.auth!.userId);
     res.json(ok({ comments }));
   };
 
@@ -137,7 +137,7 @@ export class SignRequestsController {
     }).parse(req.body);
     
     // ✅ Check if draft
-    const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId);
+    const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId, req.auth!.userId);
     if (!this.isEditableStatus(signRequest.status)) {
       res.status(400).json({
         success: false,
@@ -162,7 +162,7 @@ export class SignRequestsController {
     const signerId = idSchema.parse(req.params.signerId);
 
     // Check if draft
-    const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId);
+    const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId, req.auth!.userId);
     if (!this.isEditableStatus(signRequest.status)) {
       res.status(400).json({
         success: false,
@@ -204,7 +204,7 @@ export class SignRequestsController {
     }).partial().parse(req.body);
 
     // Check if draft
-    const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId);
+    const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId, req.auth!.userId);
     if (!this.isEditableStatus(signRequest.status)) {
       res.status(400).json({
         success: false,
@@ -235,7 +235,7 @@ export class SignRequestsController {
     }).parse(req.body);
 
     // Check if draft
-    const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId);
+    const signRequest = await signRequestsService.getSignRequest(signRequestId, req.auth!.tenantId, req.auth!.userId);
     if (!this.isEditableStatus(signRequest.status)) {
       res.status(400).json({
         success: false,
@@ -271,7 +271,7 @@ export class SignRequestsController {
     const id = idSchema.parse(req.params.id);
     
     // ✅ Check if sign request is in draft status
-    const signRequest = await signRequestsService.getSignRequest(id, req.auth!.tenantId);
+    const signRequest = await signRequestsService.getSignRequest(id, req.auth!.tenantId, req.auth!.userId);
     if (!this.isEditableStatus(signRequest.status)) {
       res.status(400).json({
         success: false,
@@ -312,6 +312,16 @@ export class SignRequestsController {
     const id = idSchema.parse(req.params.id);
     const signRequest = await signRequestsService.sendSignRequest(id, req.auth!.tenantId, req.auth!.userId);
     res.json(ok({ sign_request: signRequest }));
+  };
+
+  remind = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id);
+    const result = await signRequestsService.remindPendingParticipants(
+      id,
+      req.auth!.tenantId,
+      req.auth!.userId
+    );
+    res.json(ok(result));
   };
 
   updateDraftConfig = async (req: Request, res: Response): Promise<void> => {
@@ -359,7 +369,7 @@ export class SignRequestsController {
     const id = idSchema.parse(req.params.id);
     
     // Check if draft
-    const signRequest = await signRequestsService.getSignRequest(id, req.auth!.tenantId);
+    const signRequest = await signRequestsService.getSignRequest(id, req.auth!.tenantId, req.auth!.userId);
     if (!this.isEditableStatus(signRequest.status)) {
       res.status(400).json({
         success: false,

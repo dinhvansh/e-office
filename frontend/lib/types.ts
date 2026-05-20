@@ -34,6 +34,18 @@ export type DocumentType = {
   }>;
 };
 
+export type DocumentTypePolicy = {
+  allow_roles?: string[];
+  deny_roles?: string[];
+  allow_departments?: number[];
+  deny_departments?: number[];
+  min_position_level?: number | null;
+  default_visibility_scope?: 'public' | 'department' | 'private';
+  default_confidential_level?: 'normal' | 'confidential' | 'secret' | 'top_secret';
+  inherit_creator_department?: boolean;
+  force_private_until_completed?: boolean;
+};
+
 export type TenantProfile = {
   id: number;
   name: string | null;

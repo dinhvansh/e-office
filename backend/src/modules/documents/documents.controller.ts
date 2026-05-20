@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ok } from "../../core/utils/response";
 import { documentsService } from "./documents.service";
 import { toDocumentAttachmentDTO, toDocumentAttachmentDTOs, toDocumentDTO, toDocumentDTOs } from "./documents.dto";
+import { auditService } from "../audit/audit.service";
 
 const createSchema = z
   .object({
@@ -187,11 +188,21 @@ export class DocumentsController {
 
   downloadAttachment = async (req: Request, res: Response): Promise<void> => {
     const attachmentId = idSchema.parse(req.params.attachmentId);
+    const documentId = idSchema.parse(req.params.id);
     const { filePath, fileName, mimeType } = await documentsService.getAttachmentFile(
       attachmentId,
       req.auth!.tenantId,
       req.auth!.userId
     );
+
+    await auditService.record({
+      tenantId: req.auth!.tenantId,
+      documentId,
+      event: "document.attachment_downloaded",
+      userId: req.auth!.userId,
+      ip: req.ip,
+      ua: req.headers["user-agent"],
+    });
 
     res.setHeader('Content-Type', mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
@@ -334,6 +345,15 @@ export class DocumentsController {
     );
     const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
 
+    await auditService.record({
+      tenantId: req.auth!.tenantId,
+      documentId,
+      event: "document.downloaded",
+      userId: req.auth!.userId,
+      ip: req.ip,
+      ua: req.headers["user-agent"],
+    });
+
     // Set headers for download
     res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
@@ -363,6 +383,15 @@ export class DocumentsController {
     );
     const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
 
+    await auditService.record({
+      tenantId: req.auth!.tenantId,
+      documentId,
+      event: "document.viewed",
+      userId: req.auth!.userId,
+      ip: req.ip,
+      ua: req.headers["user-agent"],
+    });
+
     // Set headers for inline viewing
     res.setHeader('Content-Type', file.mimeType || 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${file.fileName}"`);
@@ -385,18 +414,33 @@ export class DocumentsController {
 
   downloadSigned = async (req: Request, res: Response): Promise<void> => {
     const documentId = idSchema.parse(req.params.id);
-    const { filePath, fileName, mimeType } = await documentsService.getSignedDocumentFile(
+    const file = await documentsService.getSignedDocumentFile(
       documentId,
       req.auth!.tenantId,
       req.auth!.userId
     );
+    const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
+
+    await auditService.record({
+      tenantId: req.auth!.tenantId,
+      documentId,
+      event: "document.signed_downloaded",
+      userId: req.auth!.userId,
+      ip: req.ip,
+      ua: req.headers["user-agent"],
+    });
 
     // Set headers for download
-    res.setHeader('Content-Type', mimeType || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    
+    res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+
+    if (watermarkBuffer) {
+      res.send(watermarkBuffer);
+      return;
+    }
+
     // Send file
-    res.sendFile(filePath, (err) => {
+    res.sendFile(file.filePath, (err) => {
       if (err) {
         console.error('Error sending file:', err);
         if (!res.headersSent) {
@@ -408,23 +452,38 @@ export class DocumentsController {
 
   viewSigned = async (req: Request, res: Response): Promise<void> => {
     const documentId = idSchema.parse(req.params.id);
-    const { filePath, fileName, mimeType } = await documentsService.getSignedDocumentFile(
+    const file = await documentsService.getSignedDocumentFile(
       documentId,
       req.auth!.tenantId,
       req.auth!.userId
     );
+    const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
+
+    await auditService.record({
+      tenantId: req.auth!.tenantId,
+      documentId,
+      event: "document.signed_viewed",
+      userId: req.auth!.userId,
+      ip: req.ip,
+      ua: req.headers["user-agent"],
+    });
 
     // Set headers for inline viewing
-    res.setHeader('Content-Type', mimeType || 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    res.setHeader('Content-Type', file.mimeType || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${file.fileName}"`);
     
     // Disable caching to ensure latest progressive PDF is always shown
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
+
+    if (watermarkBuffer) {
+      res.send(watermarkBuffer);
+      return;
+    }
     
     // Send file
-    res.sendFile(filePath, (err) => {
+    res.sendFile(file.filePath, (err) => {
       if (err) {
         console.error('Error sending file:', err);
         if (!res.headersSent) {

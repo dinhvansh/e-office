@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -31,9 +31,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreVertical } from "lucide-react";
 
 export default function DocumentsPage() {
-  const { fetchJson } = useAuth();
+  const { fetchJson, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const canReadDocuments = hasPermission("documents:read");
+  const canCreateDocuments = hasPermission("documents:create");
+  const canUpdateDocuments = hasPermission("documents:update");
+  const canDeleteDocuments = hasPermission("documents:delete");
+  const canUpdateSignRequests = hasPermission("sign_requests:update");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [selectedDocumentTypeId, setSelectedDocumentTypeId] = useState<number | null>(null);
@@ -69,6 +74,7 @@ export default function DocumentsPage() {
 
   const { data: documentsData, isLoading } = useQuery({
     queryKey: ["documents", page, limit, statusFilter, searchQuery, documentTypeFilter, confidentialLevelFilter],
+    enabled: canReadDocuments,
     queryFn: async () => {
       let url = `/documents?page=${page}&limit=${limit}`;
       if (statusFilter && statusFilter !== 'all') {
@@ -101,14 +107,15 @@ export default function DocumentsPage() {
 
   const { data: documentTypesData } = useQuery({
     queryKey: ["document-types"],
+    enabled: canReadDocuments || canCreateDocuments,
     queryFn: async () => {
-      const data = await fetchJson<DocumentType[]>("/document-types");
-      return data;
+      return fetchJson<DocumentType[]>("/document-types").catch(() => []);
     },
   });
 
   const { data: workflowsData } = useQuery({
     queryKey: ["workflows"],
+    enabled: canCreateDocuments,
     queryFn: async () => {
       const data: any = await fetchJson("/workflows");
       // Handle both response formats
@@ -119,9 +126,11 @@ export default function DocumentsPage() {
   // Fetch external organizations once at parent level
   const { data: externalOrgs } = useQuery({
     queryKey: ["external-orgs"],
+    enabled: canCreateDocuments,
     queryFn: async () => {
-      const response = await fetchJson<any>("/external-orgs");
-      return Array.isArray(response) ? response : [];
+      return fetchJson<any>("/external-orgs")
+        .then((response) => (Array.isArray(response) ? response : []))
+        .catch(() => []);
     },
   });
 
@@ -331,6 +340,10 @@ export default function DocumentsPage() {
   const [selectedWorkflowForApproval, setSelectedWorkflowForApproval] = useState<number | null>(null);
 
   const handleDelete = (id: number) => {
+    if (!canDeleteDocuments) {
+      toast.error("Bạn không có quyền xóa tài liệu");
+      return;
+    }
     setDeleteConfirm({ open: true, id });
   };
 
@@ -353,6 +366,10 @@ export default function DocumentsPage() {
   };
 
   const handleDownload = async (id: number, fileName?: string, document?: DocumentRecord) => {
+    if (!canReadDocuments) {
+      toast.error("Bạn không có quyền tải tài liệu");
+      return;
+    }
     try {
       // Get token from auth session
       const sessionStr = localStorage.getItem('esign.auth');
@@ -479,6 +496,10 @@ export default function DocumentsPage() {
   });
 
   const handleCancelSignRequest = (signRequestId: number) => {
+    if (!canUpdateSignRequests) {
+      toast.error("Bạn không có quyền hủy luồng ký");
+      return;
+    }
     setCancelDialog({ open: true, signRequestId, reason: '' });
   };
 
@@ -520,12 +541,20 @@ export default function DocumentsPage() {
   });
 
   const handleArchiveDocument = (documentId: number) => {
+    if (!canUpdateDocuments) {
+      toast.error("Bạn không có quyền cập nhật tài liệu");
+      return;
+    }
     if (confirm('Bạn có chắc muốn thanh lý tài liệu này?')) {
       archiveDocumentMutation.mutate(documentId);
     }
   };
 
   const handleCancelDocument = (documentId: number) => {
+    if (!canUpdateDocuments) {
+      toast.error("Bạn không có quyền cập nhật tài liệu");
+      return;
+    }
     if (confirm('Bạn có chắc muốn hủy tài liệu này?')) {
       cancelDocumentMutation.mutate(documentId);
     }
@@ -540,12 +569,13 @@ export default function DocumentsPage() {
         iconColor="text-purple-600"
         actions={
           <Badge variant="secondary" className="text-xs md:text-sm whitespace-nowrap">
-            {documents?.length ?? 0} tài liệu
+            {canReadDocuments ? (documents?.length ?? 0) : 0} tài liệu
           </Badge>
         }
       />
 
       {/* Upload Section - Hidden on mobile */}
+      {canCreateDocuments && (
       <Card className="hidden md:block">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -767,6 +797,7 @@ export default function DocumentsPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Documents List */}
       <Card className="min-w-0">
@@ -779,11 +810,19 @@ export default function DocumentsPage() {
               </CardDescription>
             </div>
             <Badge variant="outline">
-              {isLoading ? "Đang tải..." : `${pagination?.total ?? documents?.length ?? 0} tài liệu`}
+              {!canReadDocuments ? "Không có quyền xem" : isLoading ? "Đang tải..." : `${pagination?.total ?? documents?.length ?? 0} tài liệu`}
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="min-w-0">
+          {!canReadDocuments ? (
+            <EmptyState
+              icon={FileText}
+              title="Không có quyền xem tài liệu"
+              description="Tài khoản hiện tại không có quyền đọc danh sách tài liệu."
+            />
+          ) : (
+            <>
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={(value) => {
             setActiveTab(value as 'all' | 'archive');
@@ -1035,7 +1074,7 @@ export default function DocumentsPage() {
                             )}
                             
                             {/* Delete button - always show for draft */}
-                            {doc.status === "draft" && (
+                            {canDeleteDocuments && doc.status === "draft" && (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -1050,7 +1089,7 @@ export default function DocumentsPage() {
                             {/* Other action buttons only for non-archived/cancelled */}
                             {doc.status !== 'archived' && doc.status !== 'cancelled' && doc.status !== 'draft' && (
                               <>
-                                {(doc.status === "pending_approval" || doc.status === "pending_signature") && doc.sign_request_id && (
+                                {canUpdateSignRequests && (doc.status === "pending_approval" || doc.status === "pending_signature") && doc.sign_request_id && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -1062,7 +1101,7 @@ export default function DocumentsPage() {
                                   </Button>
                                 )}
                                 {/* Archive tab actions - only for completed */}
-                                {activeTab === 'archive' && doc.status === 'completed' && (
+                                {canUpdateDocuments && activeTab === 'archive' && doc.status === 'completed' && (
                                   <>
                                     <Button
                                       variant="ghost"
@@ -1218,14 +1257,14 @@ export default function DocumentsPage() {
                       <DropdownMenuContent align="end">
                         {doc.status !== 'archived' && doc.status !== 'cancelled' && doc.status !== 'draft' && (
                           <>
-                            {(doc.status === "pending_approval" || doc.status === "pending_signature") && doc.sign_request_id && (
+                            {canUpdateSignRequests && (doc.status === "pending_approval" || doc.status === "pending_signature") && doc.sign_request_id && (
                               <DropdownMenuItem onClick={() => handleCancelSignRequest(doc.sign_request_id!)} className="text-red-600">
                                 <XCircle className="w-4 h-4 mr-2" />Hủy luồng ký
                               </DropdownMenuItem>
                             )}
                           </>
                         )}
-                        {doc.status === 'draft' && (
+                        {canDeleteDocuments && doc.status === 'draft' && (
                           <DropdownMenuItem onClick={() => handleDelete(doc.id)} className="text-red-600">
                             <Trash2 className="w-4 h-4 mr-2" />Xóa
                           </DropdownMenuItem>
@@ -1259,6 +1298,8 @@ export default function DocumentsPage() {
               title="Chưa có tài liệu"
               description="Tải tài liệu đầu tiên lên hệ thống để bắt đầu"
             />
+          )}
+            </>
           )}
         </CardContent>
       </Card>

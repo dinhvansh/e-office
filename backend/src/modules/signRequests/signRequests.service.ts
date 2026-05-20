@@ -131,17 +131,41 @@ class SignRequestsService {
     };
   }
 
-  async listSignRequests(tenantId: number) {
-    return signRequestsRepository.listByTenant(tenantId);
+  async listSignRequests(tenantId: number, userId: number) {
+    const signRequests = await signRequestsRepository.listByTenant(tenantId);
+    const decisions = await Promise.all(
+      signRequests.map(async (signRequest) => {
+        const access = await authorizationService.canAccessDocument(
+          userId,
+          tenantId,
+          signRequest.document_id,
+          "read"
+        );
+        return access.allowed ? signRequest : null;
+      })
+    );
+
+    return decisions.filter((signRequest): signRequest is NonNullable<typeof signRequest> => !!signRequest);
   }
 
   /**
    * Get single sign request by ID
    */
-  async getSignRequest(id: number, tenantId: number) {
+  async getSignRequest(id: number, tenantId: number, userId?: number) {
     const signRequest = await signRequestsRepository.findById(id, tenantId);
     if (!signRequest) {
       throw ApiError.notFound("Sign request not found", "SIGN_REQUEST_NOT_FOUND");
+    }
+    if (userId) {
+      const access = await authorizationService.canAccessDocument(
+        userId,
+        tenantId,
+        signRequest.document_id,
+        "read"
+      );
+      if (!access.allowed) {
+        throw ApiError.forbidden("Permission denied to view sign request", "SIGN_REQUEST_READ_DENIED");
+      }
     }
     const normalizedFields = Array.isArray((signRequest as any).fields)
       ? (signRequest as any).fields.map((field: any) => {
@@ -204,8 +228,8 @@ class SignRequestsService {
     };
   }
 
-  async listComments(signRequestId: number, tenantId: number) {
-    const signRequest = await this.getSignRequest(signRequestId, tenantId);
+  async listComments(signRequestId: number, tenantId: number, userId: number) {
+    const signRequest = await this.getSignRequest(signRequestId, tenantId, userId);
 
     return prisma.sign_request_comments.findMany({
       where: {
@@ -650,6 +674,156 @@ class SignRequestsService {
     });
   }
 
+  async remindPendingParticipants(id: number, tenantId: number, userId: number) {
+    const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
+    const { emailService } = await import("../common/email.service");
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const bcrypt = require("bcrypt");
+
+    let approvalsReminded = 0;
+    let internalSignersReminded = 0;
+    let externalSignersReminded = 0;
+
+    if (signRequest.document_id) {
+      const document = await prisma.documents.findUnique({
+        where: { id: signRequest.document_id },
+        include: {
+          workflow_instance: {
+            include: {
+              workflow: true,
+              current_step: true,
+            },
+          },
+          owner: {
+            select: { full_name: true, email: true },
+          },
+        },
+      });
+
+      const currentStepId = document?.workflow_instance?.current_step_id || null;
+      if (currentStepId) {
+        const pendingApprovals = await prisma.document_approvals.findMany({
+          where: {
+            document_id: signRequest.document_id,
+            workflow_step_id: currentStepId,
+            action: "pending",
+          },
+          include: {
+            approver: {
+              select: { id: true, email: true, full_name: true },
+            },
+            workflow_step: {
+              select: { step_name: true, step_order: true },
+            },
+          },
+        });
+
+        const approvalUrl = `${frontendUrl}/approvals`;
+
+        for (const approval of pendingApprovals) {
+          await notificationsService.createNotification({
+            tenantId,
+            userId: approval.approver.id,
+            type: NotificationType.APPROVAL_REQUEST,
+            title: "Nhắc phê duyệt tài liệu",
+            message: `Tài liệu "${signRequest.title || document?.title || "Document"}" đang chờ bạn phê duyệt`,
+            link: "/approvals?filter=pending",
+          }).catch((error) => console.error("Failed to create approval reminder notification:", error));
+
+          await emailService.sendApprovalRequestNotification({
+            tenantId,
+            recipientEmail: approval.approver.email,
+            recipientName: approval.approver.full_name || approval.approver.email,
+            documentTitle: signRequest.title || document?.title || "Untitled",
+            documentNumber: document?.document_number || "",
+            submitterName: document?.owner?.full_name || document?.owner?.email || "System",
+            workflowName: document?.workflow_instance?.workflow?.name || "Workflow",
+            stepName: approval.workflow_step.step_name || `Bước ${approval.workflow_step.step_order}`,
+            dueDate: approval.due_date || undefined,
+            approvalUrl,
+            comment: "Đây là email nhắc nhở phê duyệt từ người gửi.",
+          }).catch((error) => console.error("Failed to send approval reminder email:", error));
+
+          approvalsReminded += 1;
+        }
+      }
+    }
+
+    const sender = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { full_name: true, email: true },
+    });
+
+    const signers = await signersRepository.findBySignRequest(id);
+    const pendingSigners = signers.filter((signer) => signer.status === "pending" || signer.status === "otp_sent");
+
+    for (const signer of pendingSigners) {
+      if (signer.is_internal && signer.user_id) {
+        await notificationsService.createNotification({
+          tenantId,
+          userId: signer.user_id,
+          type: NotificationType.SIGN_REQUEST,
+          title: "Nhắc ký tài liệu",
+          message: `Tài liệu "${signRequest.title || signRequest.document?.title || "Document"}" vẫn đang chờ bạn ký`,
+          link: `/sign-requests/${id}/internal-sign`,
+        }).catch((error) => console.error("Failed to create signer reminder notification:", error));
+
+        internalSignersReminded += 1;
+        continue;
+      }
+
+      if (!signer.is_internal && signer.email) {
+        let signingToken = signer.signing_token;
+        if (!signingToken) {
+          signingToken = crypto.randomBytes(32).toString("hex");
+          await signersRepository.update(signer.id, { signing_token: signingToken });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpHash = await bcrypt.hash(otp, 10);
+        const otpExpire = new Date(Date.now() + 10 * 60 * 1000);
+        const signUrl = `${frontendUrl}/sign/${signingToken}`;        try {
+          await emailService.sendSignRequestWithOTP({
+            tenantId,
+            recipientEmail: signer.email,
+            recipientName: signer.name,
+            documentTitle: signRequest.title || signRequest.document?.title || "Document",
+            documentNumber: signRequest.document?.document_number,
+            senderName: sender?.full_name || sender?.email || "System",
+            signUrl,
+            otp,
+            expiryMinutes: 10,
+          });
+
+          await signersRepository.update(signer.id, {
+            otp: otpHash,
+            otp_expire: otpExpire,
+            status: "otp_sent",
+          });
+
+          externalSignersReminded += 1;
+        } catch (error: any) {
+          console.error(`Failed to send signer reminder email to ${signer.email}:`, error?.message || error);
+        }
+      }
+    }
+
+    await auditService.record({
+      tenantId,
+      documentId: signRequest.document_id,
+      event: "sign.reminded",
+      userId,
+    });
+
+    return {
+      reminded: true,
+      approvals_reminded: approvalsReminded,
+      internal_signers_reminded: internalSignersReminded,
+      external_signers_reminded: externalSignersReminded,
+      total_reminded: approvalsReminded + internalSignersReminded + externalSignersReminded,
+    };
+  }
+
   private async getSignRequestWithFlowHints(id: number, tenantId: number) {
     const signRequest: any = await this.getSignRequest(id, tenantId);
     return {
@@ -776,14 +950,9 @@ class SignRequestsService {
         const otpHash = await bcrypt.hash(otp, 10);
         const otpExpire = new Date(Date.now() + 10 * 60 * 1000);
 
-        await signersRepository.update(signer.id, {
-          otp: otpHash,
-          otp_expire: otpExpire,
-          status: "otp_sent"
-        });
-
         try {
           await emailService.sendSignRequestWithOTP({
+            tenantId,
             recipientEmail: signer.email,
             recipientName: signer.name,
             documentTitle: signRequest.title || signRequest.document?.title || "Document",
@@ -793,6 +962,12 @@ class SignRequestsService {
             signUrl,
             otp,
             expiryMinutes: 10
+          });
+
+          await signersRepository.update(signer.id, {
+            otp: otpHash,
+            otp_expire: otpExpire,
+            status: "otp_sent"
           });
         } catch (error: any) {
           console.error(`Failed to send email to ${signer.email}:`, error?.message || error);
@@ -980,6 +1155,50 @@ class SignRequestsService {
           } catch (error) {
             console.error('Failed to send notification to next signer:', error);
           }
+        } else if (!nextSigner.is_internal) {
+          try {
+            const { emailService } = await import("../common/email.service");
+            const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+            const bcrypt = require("bcrypt");
+            const sender = await prisma.users.findUnique({
+              where: { id: userId },
+              select: { full_name: true, email: true }
+            });
+
+            let signingToken = nextSigner.signing_token;
+            if (!signingToken) {
+              signingToken = crypto.randomBytes(32).toString("hex");
+              await signersRepository.update(nextSigner.id, {
+                signing_token: signingToken
+              });
+            }
+
+            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+            const otpHash = await bcrypt.hash(otp, 10);
+            const otpExpire = new Date(Date.now() + 10 * 60 * 1000);
+            const signUrl = `${frontendUrl}/sign/${signingToken}`;            await emailService.sendSignRequestWithOTP({
+              tenantId,
+              recipientEmail: nextSigner.email,
+              recipientName: nextSigner.name,
+              documentTitle: signRequest.title || signRequest.document?.title || "Document",
+              documentNumber: signRequest.document?.document_number,
+              senderName: sender?.full_name || sender?.email || "System",
+              message: `??n l??t ${nextSigner.name} k? t?i li?u sau khi ng??i k? tr??c ?? ho?n th?nh.`,
+              signUrl,
+              otp,
+              expiryMinutes: 10
+            });
+
+            await signersRepository.update(nextSigner.id, {
+              otp: otpHash,
+              otp_expire: otpExpire,
+              status: "otp_sent"
+            });
+
+            console.log(`[Sequential Signing] OTP email sent to external signer: ${nextSigner.email}`);
+          } catch (error) {
+            console.error("Failed to send OTP email to next external signer:", error);
+          }
         }
       }
     }
@@ -1018,6 +1237,36 @@ class SignRequestsService {
     // Update sign request status
     if (allSigned) {
       await signRequestsRepository.updateStatus(signRequestId, tenantId, 'completed');
+
+      try {
+        const { emailService } = await import("../common/email.service");
+        const documentWithOwner = await prisma.documents.findUnique({
+          where: { id: signRequest.document_id },
+          include: {
+            owner: {
+              select: {
+                email: true,
+                full_name: true,
+              },
+            },
+          },
+        });
+        const owner = documentWithOwner?.owner;
+        if (owner?.email) {
+          const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+          await emailService.sendSignCompletedNotification({
+            tenantId,
+            recipientEmail: owner.email,
+            recipientName: owner.full_name || owner.email,
+            documentTitle: signRequest.title || signRequest.document?.title || "Document",
+            documentNumber: signRequest.document?.document_number || undefined,
+            signerName: signer.name || signer.email,
+            documentUrl: `${frontendUrl}/documents/${signRequest.document_id}/flow`
+          });
+        }
+      } catch (error) {
+        console.error("Failed to send sign completed email:", error);
+      }
     } else {
       await signRequestsRepository.updateStatus(signRequestId, tenantId, 'in_progress');
     }
