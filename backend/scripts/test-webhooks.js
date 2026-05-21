@@ -1,134 +1,145 @@
-const axios = require('axios');
+const axios = require("axios");
 
-const BASE_URL = 'http://localhost:4000/api/v1';
+const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:4000/api/v1";
 
-// Test credentials
 const TEST_USER = {
-  email: 'admin@acme.local',
-  password: 'admin123'
+  email: "admin@acme.local",
+  password: "secret123",
 };
 
-let authToken = '';
+let authToken = "";
+let apiToken = "";
 
 async function login() {
+  const response = await axios.post(`${BASE_URL}/auth/login`, TEST_USER);
+  authToken = response.data.data.tokens.accessToken;
+  console.log("Login success");
+}
+
+async function createWebhook() {
+  const response = await axios.post(
+    `${BASE_URL}/webhooks`,
+    {
+      url: "https://webhook.site/unique-id",
+      events: ["document.created", "sign.completed"],
+      secret: "my-secret-key",
+      active: true,
+    },
+    {
+      headers: { Authorization: `Bearer ${authToken}` },
+    }
+  );
+
+  console.log("Webhook created:", response.data.data.id);
+  return response.data.data;
+}
+
+async function listWebhooks(token = authToken) {
+  const response = await axios.get(`${BASE_URL}/webhooks`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  console.log("Webhooks count:", response.data.data.length);
+  return response.data.data;
+}
+
+async function updateWebhook(id) {
+  const response = await axios.put(
+    `${BASE_URL}/webhooks/${id}`,
+    {
+      active: false,
+      events: ["document.created", "sign.completed", "approval.completed"],
+    },
+    {
+      headers: { Authorization: `Bearer ${authToken}` },
+    }
+  );
+
+  console.log("Webhook updated:", response.data.data.id);
+  return response.data.data;
+}
+
+async function getWebhookLogs(id) {
+  const response = await axios.get(`${BASE_URL}/webhooks/${id}/logs`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+
+  console.log("Webhook logs fetched:", response.data.data.length);
+  return response.data.data;
+}
+
+async function deleteWebhook(id) {
+  const response = await axios.delete(`${BASE_URL}/webhooks/${id}`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+
+  console.log("Webhook deleted:", response.data.data.deleted);
+  return response.data.data;
+}
+
+async function createApiToken() {
+  const response = await axios.post(
+    `${BASE_URL}/webhooks/api-tokens`,
+    {
+      name: `Integration Test ${Date.now()}`,
+    },
+    {
+      headers: { Authorization: `Bearer ${authToken}` },
+    }
+  );
+
+  apiToken = response.data.data.token;
+  console.log("API token created:", response.data.data.metadata.id);
+  return response.data.data.metadata;
+}
+
+async function listApiTokens() {
+  const response = await axios.get(`${BASE_URL}/webhooks/api-tokens`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+
+  console.log("API tokens count:", response.data.data.length);
+  return response.data.data;
+}
+
+async function revokeApiToken(id) {
+  const response = await axios.delete(`${BASE_URL}/webhooks/api-tokens/${id}`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+
+  console.log("API token revoked:", response.data.data.id);
+  return response.data.data;
+}
+
+async function verifyApiTokenCanCallProtectedRoute() {
+  const items = await listWebhooks(apiToken);
+  console.log("API token can call protected route:", Array.isArray(items));
+}
+
+async function main() {
   try {
-    const response = await axios.post(`${BASE_URL}/auth/login`, TEST_USER);
-    authToken = response.data.data.tokens.accessToken;
-    console.log('✅ Logged in successfully');
-    return authToken;
+    console.log("Testing webhook and API token flow");
+
+    await login();
+
+    const webhook = await createWebhook();
+    await listWebhooks();
+    await updateWebhook(webhook.id);
+    await getWebhookLogs(webhook.id);
+
+    const tokenMeta = await createApiToken();
+    await listApiTokens();
+    await verifyApiTokenCanCallProtectedRoute();
+    await revokeApiToken(tokenMeta.id);
+
+    await deleteWebhook(webhook.id);
+    await listWebhooks();
+
+    console.log("All webhook tests completed");
   } catch (error) {
-    console.error('❌ Login failed:', error.response?.data || error.message);
+    console.error("Webhook test failed:", error.response?.data || error.message);
     process.exit(1);
   }
 }
 
-async function createWebhook() {
-  try {
-    const response = await axios.post(
-      `${BASE_URL}/webhooks`,
-      {
-        url: 'https://webhook.site/unique-id',
-        events: ['document.created', 'sign.completed'],
-        secret: 'my-secret-key',
-        active: true
-      },
-      {
-        headers: { Authorization: `Bearer ${authToken}` }
-      }
-    );
-    console.log('✅ Webhook created:', response.data.data);
-    return response.data.data;
-  } catch (error) {
-    console.error('❌ Create webhook failed:', error.response?.data || error.message);
-  }
-}
-
-async function listWebhooks() {
-  try {
-    const response = await axios.get(`${BASE_URL}/webhooks`, {
-      headers: { Authorization: `Bearer ${authToken}` }
-    });
-    console.log('✅ Webhooks list:', response.data.data);
-    return response.data.data;
-  } catch (error) {
-    console.error('❌ List webhooks failed:', error.response?.data || error.message);
-  }
-}
-
-async function updateWebhook(id) {
-  try {
-    const response = await axios.put(
-      `${BASE_URL}/webhooks/${id}`,
-      {
-        active: false,
-        events: ['document.created', 'sign.completed', 'approval.completed']
-      },
-      {
-        headers: { Authorization: `Bearer ${authToken}` }
-      }
-    );
-    console.log('✅ Webhook updated:', response.data.data);
-    return response.data.data;
-  } catch (error) {
-    console.error('❌ Update webhook failed:', error.response?.data || error.message);
-  }
-}
-
-async function getWebhookLogs(id) {
-  try {
-    const response = await axios.get(`${BASE_URL}/webhooks/${id}/logs`, {
-      headers: { Authorization: `Bearer ${authToken}` }
-    });
-    console.log('✅ Webhook logs:', response.data.data);
-    return response.data.data;
-  } catch (error) {
-    console.error('❌ Get webhook logs failed:', error.response?.data || error.message);
-  }
-}
-
-async function deleteWebhook(id) {
-  try {
-    const response = await axios.delete(`${BASE_URL}/webhooks/${id}`, {
-      headers: { Authorization: `Bearer ${authToken}` }
-    });
-    console.log('✅ Webhook deleted:', response.data.data);
-    return response.data.data;
-  } catch (error) {
-    console.error('❌ Delete webhook failed:', error.response?.data || error.message);
-  }
-}
-
-async function main() {
-  console.log('🚀 Testing Webhooks API...\n');
-
-  await login();
-
-  // Create webhook
-  const webhook = await createWebhook();
-  if (!webhook) return;
-
-  console.log('');
-
-  // List webhooks
-  await listWebhooks();
-  console.log('');
-
-  // Update webhook
-  await updateWebhook(webhook.id);
-  console.log('');
-
-  // Get webhook logs
-  await getWebhookLogs(webhook.id);
-  console.log('');
-
-  // Delete webhook
-  await deleteWebhook(webhook.id);
-  console.log('');
-
-  // List webhooks again
-  await listWebhooks();
-
-  console.log('\n✅ All tests completed!');
-}
-
-main().catch(console.error);
+main();

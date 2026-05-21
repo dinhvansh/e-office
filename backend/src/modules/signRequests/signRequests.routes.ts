@@ -71,6 +71,11 @@ signRequestsRouter.post(
   asyncHandler(controller.send)
 );
 signRequestsRouter.post(
+  "/:id/remind",
+  requirePermission("sign_requests", "update"),
+  asyncHandler(controller.remind)
+);
+signRequestsRouter.post(
   "/:id/cancel",
   requirePermission("sign_requests", "update"),
   asyncHandler(controller.cancel)

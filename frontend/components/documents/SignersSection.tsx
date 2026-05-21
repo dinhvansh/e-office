@@ -92,7 +92,7 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
 
   return (
     <div className="space-y-4 p-4 bg-purple-50/50 rounded-lg border border-purple-200">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <User className="w-4 h-4 text-purple-600" />
@@ -107,12 +107,13 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => addSigner("manual")}
+            className="w-full sm:w-auto"
           >
             <User className="w-4 h-4 mr-1" />
             Thêm người ký
@@ -122,6 +123,7 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
             variant="outline"
             size="sm"
             onClick={() => addSigner("external")}
+            className="w-full sm:w-auto"
           >
             <Building2 className="w-4 h-4 mr-1" />
             Thêm tổ chức
@@ -142,8 +144,8 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
               draggedIndex === index ? 'opacity-50 scale-95' : ''
             }`}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-2">
                 {/* ✅ Drag Handle */}
                 <div className="flex-shrink-0 text-gray-400 hover:text-gray-600">
                   <GripVertical className="w-5 h-5" />
@@ -169,7 +171,7 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
                 <span className="text-sm font-medium text-purple-600">
                   {signer.type === "manual" ? "Người ký" : "Tổ chức"}
                 </span>
-                <span className="text-xs text-muted-foreground">
+                <span className="hidden text-xs text-muted-foreground sm:inline">
                   (Ký qua email, không cần đăng nhập)
                 </span>
               </div>
@@ -185,7 +187,7 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
 
             {signer.type === "manual" ? (
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <Label htmlFor={`signer-email-${signer.id}`} className="text-xs">
                       Email *

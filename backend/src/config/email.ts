@@ -1,9 +1,29 @@
 import nodemailer, { Transporter } from "nodemailer";
+import { prisma } from "./prisma";
 import { env } from "./env";
 
 let transporter: Transporter | null = null;
 
-export function getEmailTransporter(): Transporter {
+function normalizeTenantEmailConfig(config: any) {
+  const port = Number(config?.smtp_port || 587);
+  const secure =
+    config?.smtp_secure === true
+    || config?.smtp_secure === "true"
+    || config?.smtp_secure === 1
+    || config?.smtp_secure === "1";
+
+  return {
+    host: String(config?.smtp_host || "").trim(),
+    port: Number.isFinite(port) && port > 0 ? port : 587,
+    secure,
+    user: String(config?.smtp_user || "").trim(),
+    pass: String(config?.smtp_password || ""),
+    fromEmail: String(config?.smtp_from || config?.smtp_user || "").trim(),
+    fromName: String(config?.smtp_from_name || "E-Office").trim(),
+  };
+}
+
+function getDefaultEmailTransporter(): Transporter {
   if (!transporter) {
     transporter = nodemailer.createTransport({
       host: env.SMTP_HOST,
@@ -20,20 +40,76 @@ export function getEmailTransporter(): Transporter {
   return transporter;
 }
 
+async function getTenantMailer(tenantId?: number) {
+  if (!tenantId) {
+    return {
+      transporter: getDefaultEmailTransporter(),
+      fromEmail: env.EMAIL_FROM,
+      fromName: env.EMAIL_FROM_NAME,
+    };
+  }
+
+  const tenantEmailSetting = await prisma.tenant_settings.findFirst({
+    where: {
+      tenant_id: tenantId,
+      setting_key: "email_config",
+    },
+    select: {
+      setting_value: true,
+    },
+  });
+
+  const config = tenantEmailSetting?.setting_value;
+  if (!config) {
+    return {
+      transporter: getDefaultEmailTransporter(),
+      fromEmail: env.EMAIL_FROM,
+      fromName: env.EMAIL_FROM_NAME,
+    };
+  }
+
+  const normalized = normalizeTenantEmailConfig(config);
+  if (!normalized.host || !normalized.user || !normalized.pass || !normalized.fromEmail) {
+    return {
+      transporter: getDefaultEmailTransporter(),
+      fromEmail: env.EMAIL_FROM,
+      fromName: env.EMAIL_FROM_NAME,
+    };
+  }
+
+  return {
+    transporter: nodemailer.createTransport({
+      host: normalized.host,
+      port: normalized.port,
+      secure: normalized.secure,
+      auth: {
+        user: normalized.user,
+        pass: normalized.pass,
+      },
+      tls: {
+        minVersion: "TLSv1.2",
+      },
+    }),
+    fromEmail: normalized.fromEmail,
+    fromName: normalized.fromName,
+  };
+}
+
 export interface SendEmailOptions {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  tenantId?: number;
 }
 
 export async function sendEmail(options: SendEmailOptions): Promise<void> {
-  const transporter = getEmailTransporter();
+  const { transporter, fromEmail, fromName } = await getTenantMailer(options.tenantId);
   
   // In development, log email instead of sending
   if (env.NODE_ENV === "development" && !env.SMTP_USER) {
     console.log("📧 [EMAIL] Would send email:", {
-      from: `${env.EMAIL_FROM_NAME} <${env.EMAIL_FROM}>`,
+      from: `${fromName} <${fromEmail}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -42,7 +118,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
   }
 
   await transporter.sendMail({
-    from: `${env.EMAIL_FROM_NAME} <${env.EMAIL_FROM}>`,
+    from: `${fromName} <${fromEmail}>`,
     to: options.to,
     subject: options.subject,
     html: options.html,

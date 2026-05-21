@@ -87,14 +87,29 @@ export const strictLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Rate limiter for OTP/signing endpoints exposed publicly
-export const publicOtpLimiter = rateLimit({
+// Rate limiter for OTP resend endpoint exposed publicly
+export const publicSendOtpLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 5, // 5 attempts per window
+  max: 10,
   message: {
     success: false,
     error: {
-      message: "Too many OTP attempts. Please try again later.",
+      message: "Too many OTP resend attempts. Please try again later.",
+      code: "TOO_MANY_REQUESTS",
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiter for OTP verification endpoint exposed publicly
+export const publicVerifyOtpLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 10,
+  message: {
+    success: false,
+    error: {
+      message: "Too many OTP verification attempts. Please try again later.",
       code: "TOO_MANY_REQUESTS",
     },
   },

@@ -130,7 +130,7 @@ async function checkDocument003() {
     }
 
     if (document.sign_request && document.sign_request.signers.length > 0) {
-      console.log('   \n   🟢 SIGNING FLOW (Ký số):');
+      console.log('   \n   🟢 SIGNING FLOW (Ký điện tử):');
       document.sign_request.signers.forEach((signer) => {
         const status = signer.status === 'signed' || signer.status === 'completed' ? '✅' : 
                       signer.status === 'rejected' ? '❌' : '⏳';

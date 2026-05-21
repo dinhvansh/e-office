@@ -232,9 +232,11 @@ export default function PublicSigningPage() {
     // Apply signature to all signature fields
     const signatureFields = myFields.filter(f => f.type === 'signature');
     const newFieldSignatures: Record<number, string> = {};
+    const autoCompletedFieldIds: number[] = [];
     
     signatureFields.forEach(field => {
       newFieldSignatures[field.id] = data;
+      autoCompletedFieldIds.push(field.id);
     });
     
     // Auto-fill date fields
@@ -242,11 +244,23 @@ export default function PublicSigningPage() {
     const today = new Date().toLocaleDateString('vi-VN');
     dateFields.forEach(field => {
       newFieldSignatures[field.id] = today;
+      autoCompletedFieldIds.push(field.id);
     });
     
     setFieldSignatures(newFieldSignatures);
-    setCompletedFields(myFields.map(f => f.id));
+    setCompletedFields(Array.from(new Set(autoCompletedFieldIds)));
     
+    const remainingInteractiveFields = myFields.filter(
+      (field) => !autoCompletedFieldIds.includes(field.id)
+    );
+
+    if (remainingInteractiveFields.length > 0) {
+      toast.success(
+        `Đã áp dụng chữ ký cho ${signatureFields.length} vị trí. Còn ${remainingInteractiveFields.length} ô cần nhập/chọn.`
+      );
+      return;
+    }
+
     toast.success(`Đã áp dụng chữ ký cho ${signatureFields.length} vị trí. Nhấn "Hoàn tất ký" để gửi.`);
   };
 

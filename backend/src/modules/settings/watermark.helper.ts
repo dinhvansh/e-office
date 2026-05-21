@@ -170,14 +170,16 @@ export async function applyWatermarkToPdfBytes(
   for (const page of pages) {
     const { width, height } = page.getSize();
     const positions = resolveWatermarkPositions(width, height, config);
-    const angle = config.position === 'diagonal' ? Math.atan2(height, width) * (180 / Math.PI) : config.rotation;
+    const angle = config.position === 'diagonal' ? resolveDiagonalAngle(width, height) : config.rotation;
     const textWidth = variant.text ? font.widthOfTextAtSize(variant.text, config.fontSize) : 0;
+    const textHeight = variant.text ? font.heightAtSize(config.fontSize) : 0;
 
     for (const pos of positions) {
       if ((variant.mode === 'text' || variant.mode === 'both') && variant.text) {
+        const textOrigin = resolveRotatedOrigin(pos.x, pos.y, textWidth, textHeight, angle);
         page.drawText(variant.text, {
-          x: pos.x - textWidth / 2,
-          y: pos.y,
+          x: textOrigin.x,
+          y: textOrigin.y,
           size: config.fontSize,
           font,
           color: rgb(color.r, color.g, color.b),
@@ -188,9 +190,10 @@ export async function applyWatermarkToPdfBytes(
 
       if ((variant.mode === 'image' || variant.mode === 'both') && image) {
         const scaled = image.scale(config.image_scale);
+        const imageOrigin = resolveRotatedOrigin(pos.x, pos.y, scaled.width, scaled.height, angle);
         page.drawImage(image, {
-          x: pos.x - scaled.width / 2,
-          y: pos.y - scaled.height / 2,
+          x: imageOrigin.x,
+          y: imageOrigin.y,
           width: scaled.width,
           height: scaled.height,
           opacity: config.opacity,
@@ -253,6 +256,10 @@ function resolveWatermarkPositions(width: number, height: number, config: Waterm
     ];
   }
 
+  if (config.position === 'diagonal') {
+    return [0.22, 0.5, 0.78].map((ratio) => resolveDiagonalPoint(width, height, ratio));
+  }
+
   return [
     { x: centerX, y: centerY },
     { x: centerX - width / 3, y: centerY - height / 3 },
@@ -263,7 +270,30 @@ function resolveWatermarkPositions(width: number, height: number, config: Waterm
 function resolveSingleWatermarkPosition(width: number, height: number, position: WatermarkConfig['position']) {
   if (position === 'top') return { x: width / 2, y: height - 80 };
   if (position === 'bottom') return { x: width / 2, y: 80 };
+  if (position === 'diagonal') return resolveDiagonalPoint(width, height, 0.5);
   return { x: width / 2, y: height / 2 };
+}
+
+function resolveDiagonalAngle(width: number, height: number) {
+  return Math.atan2(height, width) * (180 / Math.PI);
+}
+
+function resolveDiagonalPoint(width: number, height: number, ratio: number) {
+  return {
+    x: width * ratio,
+    y: height * ratio,
+  };
+}
+
+function resolveRotatedOrigin(centerX: number, centerY: number, width: number, height: number, angle: number) {
+  const radians = (angle * Math.PI) / 180;
+  const offsetX = Math.cos(radians) * (width / 2) - Math.sin(radians) * (height / 2);
+  const offsetY = Math.sin(radians) * (width / 2) + Math.cos(radians) * (height / 2);
+
+  return {
+    x: centerX - offsetX,
+    y: centerY - offsetY,
+  };
 }
 
 function normalizeText(value: any, fallback: string) {

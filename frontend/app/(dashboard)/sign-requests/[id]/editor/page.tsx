@@ -229,9 +229,9 @@ export default function SignRequestEditorPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="sticky top-0 z-10 border-b bg-white">
         <div className="mx-auto max-w-[1800px] px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => router.push(`/sign-requests/create?signRequestId=${signRequestId}`)}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+              <Button variant="ghost" size="sm" onClick={() => router.push(`/sign-requests/create?signRequestId=${signRequestId}`)} className="w-full sm:w-auto">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Quay lại
               </Button>
@@ -251,12 +251,12 @@ export default function SignRequestEditorPage() {
             </div>
 
             {isEditable ? (
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleSave} disabled={saveFieldsMutation.isPending}>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Button variant="outline" onClick={handleSave} disabled={saveFieldsMutation.isPending} className="w-full">
                   <Save className="mr-2 h-4 w-4" />
                   Lưu nháp
                 </Button>
-                <Button onClick={handleSend} disabled={sendMutation.isPending || saveFieldsMutation.isPending} className="bg-green-600 hover:bg-green-700">
+                <Button onClick={handleSend} disabled={sendMutation.isPending || saveFieldsMutation.isPending} className="w-full bg-green-600 hover:bg-green-700">
                   <Send className="mr-2 h-4 w-4" />
                   Gửi trình ký
                 </Button>
@@ -420,14 +420,14 @@ export default function SignRequestEditorPage() {
                   {fields.map((field, index) => {
                     const signer = signers.find((item) => item.id === field.assigned_signer_id);
                     return (
-                      <div key={index} className="flex items-center justify-between rounded-lg border bg-slate-50 p-3">
-                        <div>
+                      <div key={index} className="flex flex-col gap-3 rounded-lg border bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
                           <div className="text-sm font-medium">{getResolvedFieldLabel(field)}</div>
                           <div className="mt-1 text-xs text-slate-500">
                             Trang {field.pageIndex + 1} • x {field.xPct.toFixed(3)} • y {field.yPct.toFixed(3)} • {signer?.name || 'Chưa gán'}
                           </div>
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteField(index)} disabled={isReadOnly}>
+                        <Button variant="ghost" size="sm" onClick={() => handleDeleteField(index)} disabled={isReadOnly} className="w-full sm:w-auto">
                           Xóa
                         </Button>
                       </div>

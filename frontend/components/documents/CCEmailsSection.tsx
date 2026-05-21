@@ -94,7 +94,7 @@ export function CCEmailsSection({ emails, onChange }: CCEmailsSectionProps) {
         <Label htmlFor="cc-email" className="text-xs">
           Thêm email CC
         </Label>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             id="cc-email"
             type="email"
@@ -105,13 +105,14 @@ export function CCEmailsSection({ emails, onChange }: CCEmailsSectionProps) {
               setError("");
             }}
             onKeyPress={handleKeyPress}
-            className="h-9"
+            className="h-9 min-w-0"
           />
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={addEmail}
+            className="w-full sm:w-auto"
           >
             <Plus className="w-4 h-4 mr-1" />
             Thêm

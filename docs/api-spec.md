@@ -65,6 +65,15 @@ Returns audit log for a document.
 ### POST /api/v1/webhooks/register
 Register a webhook endpoint.
 
+### GET /api/v1/webhooks/api-tokens
+List API tokens configured for the current tenant.
+
+### POST /api/v1/webhooks/api-tokens
+Create a new API token for the current tenant.
+
+### DELETE /api/v1/webhooks/api-tokens/{tokenId}
+Revoke an API token.
+
 ### Events
 - document.uploaded
 - sign.started

@@ -383,7 +383,10 @@ export class PdfGenerationService {
     // 6. Add audit trail page
     await this.createAuditTrailPage(pdfDoc, signRequest);
 
-    // 7. Save signed PDF
+    // 7. Apply completed watermark configuration if enabled
+    await this.addWatermark(pdfDoc, signRequest.document.tenant_id, 'completed');
+
+    // 8. Save signed PDF
     const signedPdfBytes = await pdfDoc.save();
     const signedFilePath = await this.saveSignedPdf(
       signedPdfBytes,

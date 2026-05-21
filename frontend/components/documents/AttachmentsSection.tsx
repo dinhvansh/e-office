@@ -60,7 +60,7 @@ export function AttachmentsSection({ files, onChange }: AttachmentsSectionProps)
 
   return (
     <div className="space-y-4 p-4 bg-purple-50/50 rounded-lg border border-purple-200">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <Paperclip className="w-4 h-4 text-purple-600" />
@@ -76,6 +76,7 @@ export function AttachmentsSection({ files, onChange }: AttachmentsSectionProps)
           size="sm"
           onClick={() => fileInputRef.current?.click()}
           disabled={files.length >= 5}
+          className="w-full sm:w-auto"
         >
           <Plus className="w-4 h-4 mr-1" />
           Thêm file
@@ -98,7 +99,7 @@ export function AttachmentsSection({ files, onChange }: AttachmentsSectionProps)
           {files.map((file, index) => (
             <div
               key={index}
-              className="flex items-center justify-between p-2 bg-white rounded border"
+              className="flex items-start justify-between gap-3 rounded border bg-white p-2"
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <span className="text-lg">{getFileIcon(file.name)}</span>
@@ -129,7 +130,7 @@ export function AttachmentsSection({ files, onChange }: AttachmentsSectionProps)
 
       {/* File count indicator */}
       {files.length > 0 && (
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>{files.length}/5 files</span>
           <span>
             Tổng: {formatFileSize(files.reduce((sum, f) => sum + f.size, 0))}

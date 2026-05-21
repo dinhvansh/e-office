@@ -122,7 +122,7 @@ async function main() {
       console.log(`${index + 1}. ${task.document.document_number || task.document.title}`);
       
       if (task.type === 'approval' && task.needsSigning) {
-        console.log(`   🔄 CẢ HAI: Phê duyệt + Ký số`);
+        console.log(`   🔄 CẢ HAI: Phê duyệt + Ký điện tử`);
         console.log(`   → Button: "Phê duyệt" + "Ký ngay"`);
       } else if (task.type === 'approval') {
         console.log(`   ✅ CHỈ PHÊ DUYỆT`);

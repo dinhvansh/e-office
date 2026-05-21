@@ -8,6 +8,10 @@ const controller = new WebhooksController();
 
 export const webhooksRouter = Router();
 
+webhooksRouter.get("/api-tokens", authGuard, requirePermission("webhooks", "read"), asyncHandler(controller.listApiTokens));
+webhooksRouter.post("/api-tokens", authGuard, requirePermission("webhooks", "create"), asyncHandler(controller.createApiToken));
+webhooksRouter.delete("/api-tokens/:tokenId", authGuard, requirePermission("webhooks", "delete"), asyncHandler(controller.revokeApiToken));
+
 webhooksRouter.get("/", authGuard, requirePermission("webhooks", "read"), asyncHandler(controller.list));
 webhooksRouter.post("/", authGuard, requirePermission("webhooks", "create"), asyncHandler(controller.create));
 webhooksRouter.get("/:id", authGuard, requirePermission("webhooks", "read"), asyncHandler(controller.getById));

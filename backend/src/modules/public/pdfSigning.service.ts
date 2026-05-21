@@ -73,17 +73,6 @@ export class PdfSigningService {
         const width = pdfBox.width;
         const height = pdfBox.height;
 
-        // Draw signature box with white background
-        page.drawRectangle({
-          x,
-          y,
-          width,
-          height,
-          color: rgb(1, 1, 1), // White background
-          borderColor: rgb(0, 0.53, 0.71),
-          borderWidth: 1,
-        });
-
         // If signature data exists (base64 image), embed it
         if (signer.signature_data) {
           try {

@@ -10,6 +10,7 @@ import { signersService } from "../signers/signers.service";
 import { pdfGenerationService } from "../signRequests/pdfGeneration.service";
 import { notificationsService } from "../notifications/notifications.service";
 import { NotificationType } from "../notifications/notifications.types";
+import { emailService } from "../common/email.service";
 
 const prisma = new PrismaClient();
 
@@ -209,6 +210,7 @@ export class PublicSignController {
   verifyOtp = async (req: Request, res: Response): Promise<void> => {
     const { token } = req.params;
     const { otp } = z.object({ otp: z.string().length(6) }).parse(req.body);
+    const normalizedOtp = otp.trim();
 
     const signer = await prisma.signers.findUnique({
       where: { signing_token: token },
@@ -225,7 +227,7 @@ export class PublicSignController {
     }
 
     const bcrypt = require("bcrypt");
-    const isValid = await bcrypt.compare(otp, signer.otp);
+    const isValid = await bcrypt.compare(normalizedOtp, signer.otp);
     if (!isValid) {
       throw ApiError.badRequest("Invalid OTP. Please check your email.", "INVALID_OTP");
     }
@@ -382,6 +384,8 @@ export class PublicSignController {
         where: { id: signer.sign_request.document_id },
         include: { owner: true },
       });
+      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+
       if (document?.owner) {
         notificationsService
           .createNotification({
@@ -393,6 +397,34 @@ export class PublicSignController {
             link: `/documents/${document.id}`,
           })
           .catch((err) => console.error("Failed to create notification:", err));
+
+        if (document.owner.email) {
+          emailService
+            .sendSignCompletedNotification({
+              tenantId: document.tenant_id,
+              recipientEmail: document.owner.email,
+              recipientName: document.owner.full_name || document.owner.email,
+              documentTitle: document.title || "Untitled",
+              documentNumber: document.document_number || undefined,
+              signerName: signer.name || signer.email,
+              documentUrl: `${frontendUrl}/documents/${document.id}/flow`,
+            })
+            .catch((err) => console.error("Failed to send owner completion email:", err));
+        }
+      }
+
+      if (signer.email) {
+        emailService
+          .sendSignCompletedNotification({
+            tenantId: signer.sign_request.tenant_id,
+            recipientEmail: signer.email,
+            recipientName: signer.name || signer.email,
+            documentTitle: signer.sign_request.title || document?.title || "Untitled",
+            documentNumber: document?.document_number || undefined,
+            signerName: signer.name || signer.email,
+            documentUrl: `${frontendUrl}/sign/${token}/download-signed`,
+          })
+          .catch((err) => console.error("Failed to send signer completion email:", err));
       }
     } else {
       await prisma.sign_requests.update({
@@ -434,23 +466,22 @@ export class PublicSignController {
           const otp = Math.floor(100000 + Math.random() * 900000).toString();
           const bcrypt = require("bcrypt");
           const otpHash = await bcrypt.hash(otp, 10);
-          const otpExpire = new Date(Date.now() + 10 * 60 * 1000);
-
-          await prisma.signers.update({
-            where: { id: nextSigner.id },
-            data: { otp: otpHash, otp_expire: otpExpire, status: "otp_sent" },
-          });
-
-          try {
+          const otpExpire = new Date(Date.now() + 10 * 60 * 1000);          try {
             await emailService.sendSignRequestWithOTP({
+              tenantId: signer.sign_request.tenant_id || 0,
               recipientEmail: nextSigner.email,
               recipientName: nextSigner.name,
               documentTitle: signer.sign_request.title || "Document",
               senderName: "System",
-              message: "Den luot ban ky. Nguoi ky truoc da hoan thanh.",
+              message: "??n l??t b?n k?. Ng??i k? tr??c ?? ho?n th?nh.",
               signUrl,
               otp,
               expiryMinutes: 10,
+            });
+
+            await prisma.signers.update({
+              where: { id: nextSigner.id },
+              data: { otp: otpHash, otp_expire: otpExpire, status: "otp_sent" },
             });
           } catch (error) {
             console.error(`Failed to send email to ${nextSigner.email}:`, error);

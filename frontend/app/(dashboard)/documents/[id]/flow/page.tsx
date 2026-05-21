@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
 import { FlowTimeline } from '@/components/flow/FlowTimeline';
 import { FlowActivities } from '@/components/flow/FlowActivities';
@@ -10,6 +10,9 @@ import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, FileText, Download, RefreshCw } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 
 export default function DocumentFlowPage() {
   const params = useParams();
@@ -18,6 +21,8 @@ export default function DocumentFlowPage() {
   const documentId = params.id as string;
   const [activeTab, setActiveTab] = useState<'activities' | 'participants'>('activities');
   const [pdfUrl, setPdfUrl] = useState<string>('');
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   // Fetch flow data with auto-refresh to show new signatures
   const { data: flowData, isLoading, refetch, isFetching } = useQuery<any>({
@@ -65,6 +70,57 @@ export default function DocumentFlowPage() {
     }
   }, [documentId, flowData?.document?.signed_file_path, flowData?.document?.status]);
 
+  const remindMutation = useMutation({
+    mutationFn: async () => {
+      const signRequestId = flowData?.document?.sign_request_id;
+      if (!signRequestId) {
+        throw new Error('Không tìm thấy luồng ký để nhắc nhở');
+      }
+
+      return fetchJson<{
+        reminded: boolean;
+        approvals_reminded: number;
+        internal_signers_reminded: number;
+        external_signers_reminded: number;
+        total_reminded: number;
+      }>(`/sign-requests/${signRequestId}/remind`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: (result) => {
+      toast.success(`Đã nhắc ${result.total_reminded} người đang chờ xử lý`);
+      refetch();
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || 'Không thể gửi nhắc nhở');
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      const signRequestId = flowData?.document?.sign_request_id;
+      if (!signRequestId) {
+        throw new Error('Không tìm thấy request để hủy');
+      }
+
+      return fetchJson(`/sign-requests/${signRequestId}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({
+          reason: cancelReason.trim(),
+        }),
+      });
+    },
+    onSuccess: () => {
+      toast.success('Đã hủy request ký');
+      setCancelDialogOpen(false);
+      setCancelReason('');
+      refetch();
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || 'Không thể hủy request');
+    },
+  });
+
 
 
   if (isLoading) {
@@ -93,6 +149,9 @@ export default function DocumentFlowPage() {
   const activities = flowData?.activities || [];
   const can_approve = flowData?.can_approve;
   const can_sign = flowData?.can_sign;
+  const canManageSignRequest = Boolean(flowData?.can_manage_sign_request && flowData?.document?.sign_request_id);
+  const canRemind = canManageSignRequest && ['pending_approval', 'pending_signature', 'in_progress', 'pending'].includes(document.status);
+  const canCancel = canManageSignRequest && !['completed', 'cancelled'].includes(document.status);
 
   // Calculate progress percentage
   const completedSteps = steps.filter((s: any) => 
@@ -105,20 +164,21 @@ export default function DocumentFlowPage() {
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0 flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => router.back()}
+                className="w-fit shrink-0"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Quay lại
               </Button>
-              <div>
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-gray-400" />
-                  <h1 className="text-xl font-semibold">{document.title}</h1>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-start gap-2">
+                  <FileText className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
+                  <h1 className="min-w-0 break-words text-lg font-semibold sm:text-xl">{document.title}</h1>
                   {(document.status === 'in_progress' || document.status === 'pending') && (
                     <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-full">
                       <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse"></span>
@@ -126,7 +186,7 @@ export default function DocumentFlowPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="mt-1 break-words text-sm text-gray-500">
                   {document.document_number} • {document.document_type}
                   {document.signed_file_path && (
                     <span className="ml-2 text-green-600">
@@ -136,12 +196,36 @@ export default function DocumentFlowPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-wrap items-center justify-end gap-2 overflow-hidden lg:w-auto lg:flex-nowrap">
+              {canRemind && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => remindMutation.mutate()}
+                  disabled={remindMutation.isPending}
+                  className="min-w-0 max-w-full"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 shrink-0 ${remindMutation.isPending ? 'animate-spin' : ''}`} />
+                  {remindMutation.isPending ? 'Đang nhắc...' : 'Nhắc nhở'}
+                </Button>
+              )}
+              {canCancel && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="min-w-0 max-w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => setCancelDialogOpen(true)}
+                  disabled={cancelMutation.isPending}
+                >
+                  {cancelMutation.isPending ? 'Đang hủy...' : 'Hủy request'}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => refetch()}
                 disabled={isFetching}
+                className="shrink-0"
                 title="Làm mới để xem cập nhật mới nhất"
               >
                 <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
@@ -149,6 +233,7 @@ export default function DocumentFlowPage() {
               <Button 
                 variant="outline" 
                 size="sm"
+                className="min-w-0 max-w-full px-2 text-[0px] sm:px-3 sm:text-sm"
                 onClick={async () => {
                   try {
                     if (!process.env.NEXT_PUBLIC_API_URL) {
@@ -190,7 +275,7 @@ export default function DocumentFlowPage() {
                   }
                 }}
               >
-                <Download className="w-4 h-4 mr-2" />
+                <Download className="h-4 w-4 shrink-0 sm:mr-2" />
                 Tải xuống {document?.signed_file_path ? (document?.status === 'completed' ? '(Hoàn thành)' : '(Đang ký)') : ''}
               </Button>
             </div>
@@ -299,6 +384,43 @@ export default function DocumentFlowPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Hủy yêu cầu ký</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Request sẽ bị hủy cho toàn bộ người tham gia. Lịch sử xử lý vẫn được giữ lại.
+            </p>
+            <Textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Nhập lý do hủy request"
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCancelDialogOpen(false);
+                setCancelReason('');
+              }}
+            >
+              Đóng
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700"
+              disabled={cancelMutation.isPending || !cancelReason.trim()}
+              onClick={() => cancelMutation.mutate()}
+            >
+              {cancelMutation.isPending ? 'Đang hủy...' : 'Xác nhận hủy'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

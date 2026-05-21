@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { ApiError } from "../../core/errors/api-error";
 import { ok } from "../../core/utils/response";
+import { apiTokensService } from "./apiTokens.service";
 import { webhooksRepository } from "./webhooks.repository";
 
 const createWebhookSchema = z.object({
@@ -20,6 +21,10 @@ const updateWebhookSchema = z.object({
 
 const idSchema = z.coerce.number().int().positive();
 const limitSchema = z.coerce.number().int().positive().max(500).optional();
+const apiTokenIdSchema = z.string().uuid();
+const createApiTokenSchema = z.object({
+  name: z.string().trim().min(3, "Token name must be at least 3 characters").max(100, "Token name is too long"),
+});
 
 const parseOrBadRequest = <T>(result: z.SafeParseReturnType<unknown, T>, message: string): T => {
   if (!result.success) {
@@ -29,6 +34,28 @@ const parseOrBadRequest = <T>(result: z.SafeParseReturnType<unknown, T>, message
 };
 
 export class WebhooksController {
+  listApiTokens = async (req: Request, res: Response): Promise<void> => {
+    const tokens = await apiTokensService.listForTenant(req.auth!.tenantId);
+    res.json(ok(tokens));
+  };
+
+  createApiToken = async (req: Request, res: Response): Promise<void> => {
+    const body = parseOrBadRequest(createApiTokenSchema.safeParse(req.body), "Invalid API token payload");
+    const token = await apiTokensService.createForTenant(req.auth!.tenantId, req.auth!.userId, body.name);
+    res.status(201).json(ok(token));
+  };
+
+  revokeApiToken = async (req: Request, res: Response): Promise<void> => {
+    const tokenId = parseOrBadRequest(apiTokenIdSchema.safeParse(req.params.tokenId), "Invalid API token id");
+    const token = await apiTokensService.revokeForTenant(req.auth!.tenantId, tokenId, req.auth!.userId);
+
+    if (!token) {
+      throw ApiError.notFound("API token not found", "API_TOKEN_NOT_FOUND");
+    }
+
+    res.json(ok(token));
+  };
+
   list = async (req: Request, res: Response): Promise<void> => {
     const webhooks = await webhooksRepository.findByTenantId(req.auth!.tenantId);
     res.json(ok(webhooks));

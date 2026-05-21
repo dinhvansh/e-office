@@ -586,7 +586,7 @@ flowchart TD
 flowchart TD
     A[Admin tạo loại văn bản] --> B[Đặt quy tắc]
     B --> C[Có cần phê duyệt không]
-    B --> D[Có cần ký số không]
+    B --> D[Có cần ký điện tử không]
     B --> E[Có đánh số tự động không]
 ```
 

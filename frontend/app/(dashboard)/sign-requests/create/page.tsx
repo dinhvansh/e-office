@@ -403,7 +403,7 @@ export default function CreateSignRequestPage() {
       />
 
       <form
-        className="mx-auto max-w-5xl space-y-6"
+        className="mx-auto max-w-5xl space-y-6 pb-24 sm:pb-6"
         onSubmit={(event) => {
           event.preventDefault();
           createMutation.mutate();
@@ -437,7 +437,7 @@ export default function CreateSignRequestPage() {
               <p className="mt-1 text-sm text-slate-500">
                 {isEditMode
                   ? 'Nếu cần thêm hoặc bớt người ký ngoài, hãy chỉnh ở đây rồi quay lại editor.'
-                  : 'Chỉ hiển thị các loại văn bản thực sự có ký điện tử hoặc phê duyệt. Loại không cần hai luồng này sẽ không xuất hiện ở màn tạo trình ký.'}
+                  : 'Chỉ hiển thị các loại văn bản thực sự có phê duyệt hoặc cho phép gửi ra bên ngoài để ký điện tử. Loại không cần hai luồng này sẽ không xuất hiện ở màn tạo trình ký.'}
               </p>
             </div>
 
@@ -577,12 +577,12 @@ export default function CreateSignRequestPage() {
               </p>
             </div>
 
-            {(selectedDocType?.require_digital_signing || isEditMode) && (
+            {(selectedDocType?.require_digital_signing || isEditMode || !selectedDocType) && (
               <div className="space-y-3">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
-                    <p>Khai báo tại đây nếu có người ký bên ngoài hệ thống. Danh sách này sẽ đi cùng luồng khi mở editor.</p>
+                    <p>{!selectedDocType ? 'Chọn loại văn bản trước, sau đó anh có thể thêm người ký bên ngoài ngay tại đây.' : 'Khai báo tại đây nếu có người ký bên ngoài hệ thống. Danh sách này sẽ đi cùng luồng khi mở editor.'}</p>
                   </div>
                 </div>
                 <SignersSection signers={signers} onChange={setSigners} externalOrgs={externalOrgs || []} />
@@ -613,11 +613,12 @@ export default function CreateSignRequestPage() {
           </CardContent>
         </Card>
 
-        <div className="flex gap-3">
+        <div className="sticky bottom-20 z-10 -mx-1 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:static sm:mx-0 sm:flex-row sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
           <Button
             type="button"
             variant="outline"
             onClick={() => (isEditMode ? router.push(`/sign-requests/${existingSignRequestId}/editor`) : router.push('/sign-requests'))}
+            className="w-full sm:w-auto"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             {isEditMode ? 'Quay lại editor' : 'Hủy'}
@@ -625,7 +626,7 @@ export default function CreateSignRequestPage() {
           <Button
             type="submit"
             disabled={(!isEditMode && !file) || !documentTypeId || createMutation.isPending || isLoadingExisting}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto"
           >
             {createMutation.isPending
               ? isEditMode

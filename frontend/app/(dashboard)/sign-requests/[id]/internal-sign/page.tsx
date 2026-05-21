@@ -294,29 +294,30 @@ export default function InternalSigningPage() {
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => router.back()}
+                className="shrink-0"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Quay lại
               </Button>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-gray-400" />
-                  <h1 className="text-xl font-semibold">
+                  <FileText className="h-4 w-4 shrink-0 text-gray-400 sm:h-5 sm:w-5" />
+                  <h1 className="truncate text-base font-semibold sm:text-xl">
                     {data.sign_request.document.title || data.sign_request.document.original_file_name}
                   </h1>
                 </div>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="mt-1 truncate text-xs text-gray-500 sm:text-sm">
                   {data.sign_request.document.document_number}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-start sm:self-auto">
               {alreadySigned ? (
                 <div className="flex items-center gap-2 text-green-600 bg-green-50 px-4 py-2 rounded-lg">
                   <Check className="w-4 h-4" />

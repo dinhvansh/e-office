@@ -114,7 +114,9 @@ export default function PDFSigningViewer({
                       : isActive
                         ? 'z-20 border-blue-500 bg-white shadow-lg'
                         : hasSigned
-                          ? 'border-green-500 bg-green-50'
+                          ? field.type === 'signature'
+                            ? 'border-green-500 bg-transparent'
+                            : 'border-green-500 bg-green-50'
                           : isDisabled
                             ? 'cursor-not-allowed border-gray-300 bg-gray-100 opacity-50'
                             : 'cursor-pointer border-yellow-500 bg-yellow-50 hover:bg-yellow-100 hover:shadow-md'
@@ -134,8 +136,8 @@ export default function PDFSigningViewer({
                 >
                   {isActive ? (
                     field.type === 'signature' ? (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                        <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-2xl">
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={(event) => event.stopPropagation()}>
+                        <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
                           <div className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900">
                             {getResolvedFieldLabel(field)}
                           </div>
@@ -143,11 +145,12 @@ export default function PDFSigningViewer({
                             <canvas ref={canvasRef} className="h-60 w-full cursor-crosshair" style={{ touchAction: 'none' }} />
                           </div>
                           <div className="grid grid-cols-3 gap-3">
-                            <button className="h-11 rounded border" onClick={() => signaturePadRef.current?.clear()}>Xóa</button>
-                            <button className="h-11 rounded border" onClick={() => setActiveFieldId(null)}>Hủy</button>
+                            <button className="h-11 rounded border" onClick={(event) => { event.stopPropagation(); signaturePadRef.current?.clear(); }}>Xóa</button>
+                            <button className="h-11 rounded border" onClick={(event) => { event.stopPropagation(); setActiveFieldId(null); }}>Hủy</button>
                             <button
                               className="h-11 rounded bg-blue-600 font-semibold text-white"
-                              onClick={() => {
+                              onClick={(event) => {
+                                event.stopPropagation();
                                 if (!signaturePadRef.current || signaturePadRef.current.isEmpty()) return;
                                 const signature = signaturePadRef.current.toDataURL();
                                 setFieldValues((prev) => ({ ...prev, [field.id]: signature }));
@@ -161,8 +164,8 @@ export default function PDFSigningViewer({
                         </div>
                       </div>
                     ) : (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                        <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={(event) => event.stopPropagation()}>
+                        <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
                           <div className="mb-4 text-lg font-bold text-gray-900">{getResolvedFieldLabel(field)}</div>
                           {field.type === 'date' ? (
                             <input
@@ -186,10 +189,11 @@ export default function PDFSigningViewer({
                             />
                           )}
                           <div className="flex gap-3">
-                            <button className="h-11 flex-1 rounded border" onClick={() => setActiveFieldId(null)}>Hủy</button>
+                            <button className="h-11 flex-1 rounded border" onClick={(event) => { event.stopPropagation(); setActiveFieldId(null); }}>Hủy</button>
                             <button
                               className="h-11 flex-1 rounded bg-blue-600 font-semibold text-white"
-                              onClick={() => {
+                              onClick={(event) => {
+                                event.stopPropagation();
                                 const value =
                                   field.type === 'date'
                                     ? fieldValues[field.id] || new Date().toLocaleDateString('vi-VN')

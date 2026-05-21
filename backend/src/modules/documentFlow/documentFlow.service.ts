@@ -147,7 +147,7 @@ export class DocumentFlowService {
       
       phases.push({
         key: 'signing',
-        label: 'Ký số',
+        label: 'Ký điện tử',
         status: signingStatus,
       });
     }
@@ -263,6 +263,7 @@ export class DocumentFlowService {
         title: document.title,
         document_number: document.document_number,
         status: document.status,
+        sign_request_id: document.sign_request?.id || null,
         document_type: document.document_type?.name,
         created_at: document.created_at.toISOString(),
         signed_file_path: document.signed_file_path, // ✅ Include signed file path for progressive PDF
@@ -278,6 +279,7 @@ export class DocumentFlowService {
       // User permissions for actions
       can_approve: this.canUserApprove(document, userId),
       can_sign: this.canUserSign(document, userId, currentUser?.email || null),
+      can_manage_sign_request: document.owner.id === userId && !!document.sign_request?.id,
     };
   }
 

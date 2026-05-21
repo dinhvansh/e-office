@@ -24,7 +24,7 @@ async function createTestSigningSession() {
       {
         file_name: 'hop-dong-test.pdf',
         storage_path: 'storage/1/1763525748086_test-decision-2.pdf',
-        title: 'Hợp đồng test ký số',
+        title: 'Hợp đồng test ký điện tử',
         document_type_id: 1,
         require_digital_signing: true,
       },

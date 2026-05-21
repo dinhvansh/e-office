@@ -271,7 +271,7 @@ systemctl reload nginx
 
 - ✅ Quản lý văn bản điện tử
 - ✅ Phê duyệt đa cấp
-- ✅ Ký số điện tử
+- ✅ Ký điện tử
 - ✅ Quy trình workflow tùy chỉnh
 - ✅ Phân quyền chi tiết (RBAC)
 - ✅ Đánh số tự động
