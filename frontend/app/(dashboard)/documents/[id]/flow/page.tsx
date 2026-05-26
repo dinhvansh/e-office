@@ -1,28 +1,69 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
 import { FlowTimeline } from '@/components/flow/FlowTimeline';
 import { FlowActivities } from '@/components/flow/FlowActivities';
 import { FlowParticipants } from '@/components/flow/FlowParticipants';
 import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, FileText, Download, RefreshCw } from 'lucide-react';
+import { ArrowLeft, FileText, Download, RefreshCw, Share2, Trash2, History } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+
+type SharePermissionRecord = {
+  id: number;
+  permission_source: 'share' | 'baseline';
+  subject_type: 'user' | 'department' | 'position_in_department' | 'role';
+  subject_id: number;
+  scope_department_id: number;
+  can_read: boolean;
+  can_edit: boolean;
+  can_approve: boolean;
+  can_share: boolean;
+  can_delete: boolean;
+};
+
+type ShareUserOption = {
+  id: number;
+  email: string;
+  full_name?: string;
+};
+
+type ShareDepartmentOption = {
+  id: number;
+  name: string;
+};
+
+type SharePositionOption = {
+  id: number;
+  name: string;
+  code?: string;
+  is_active?: boolean;
+};
 
 export default function DocumentFlowPage() {
   const params = useParams();
   const router = useRouter();
   const { fetchJson } = useAuth();
+  const queryClient = useQueryClient();
   const documentId = params.id as string;
   const [activeTab, setActiveTab] = useState<'activities' | 'participants'>('activities');
   const [pdfUrl, setPdfUrl] = useState<string>('');
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareForm, setShareForm] = useState({
+    subject_type: 'user' as 'user' | 'department' | 'position_in_department',
+    subject_id: '',
+    scope_department_id: '',
+    can_read: true,
+    can_share: false,
+  });
 
   // Fetch flow data with auto-refresh to show new signatures
   const { data: flowData, isLoading, refetch, isFetching } = useQuery<any>({
@@ -69,6 +110,60 @@ export default function DocumentFlowPage() {
       setPdfUrl(`${apiUrl}/documents/${documentId}/${endpoint}${cacheBuster}`);
     }
   }, [documentId, flowData?.document?.signed_file_path, flowData?.document?.status]);
+
+  const isCompleted = (flowData?.document?.status || '').toLowerCase() === 'completed';
+
+  const { data: sharePermissionsData } = useQuery<{ permissions: SharePermissionRecord[] }>({
+    queryKey: ['document-share-permissions', documentId],
+    enabled: shareDialogOpen && isCompleted,
+    queryFn: () => fetchJson(`/documents/${documentId}/permissions`),
+  });
+
+  const { data: shareUsersData } = useQuery<ShareUserOption[]>({
+    queryKey: ['document-share-users'],
+    enabled: shareDialogOpen && isCompleted,
+    queryFn: () => fetchJson('/users/active'),
+  });
+
+  const { data: shareDepartmentsData } = useQuery<any>({
+    queryKey: ['document-share-departments'],
+    enabled: shareDialogOpen && isCompleted,
+    queryFn: () => fetchJson('/departments'),
+  });
+
+  const { data: sharePositionsData } = useQuery<any>({
+    queryKey: ['document-share-positions'],
+    enabled: shareDialogOpen && isCompleted,
+    queryFn: () => fetchJson('/positions'),
+  });
+
+  const sharePermissions = (sharePermissionsData?.permissions || []).filter((item) => item.permission_source === 'share');
+  const shareUsers = shareUsersData || [];
+  const shareDepartments = Array.isArray(shareDepartmentsData)
+    ? shareDepartmentsData
+    : (shareDepartmentsData?.departments || shareDepartmentsData?.data?.departments || shareDepartmentsData?.data || []);
+  const sharePositions = ((sharePositionsData?.positions || sharePositionsData?.data?.positions || sharePositionsData?.data || sharePositionsData || []) as SharePositionOption[])
+    .filter((item) => item.is_active !== false);
+
+  const getShareSubjectLabel = (permission: SharePermissionRecord) => {
+    if (permission.subject_type === 'user') {
+      const match = shareUsers.find((item) => item.id === permission.subject_id);
+      return match?.full_name || match?.email || `User #${permission.subject_id}`;
+    }
+
+    if (permission.subject_type === 'department') {
+      const match = shareDepartments.find((item: ShareDepartmentOption) => item.id === permission.subject_id);
+      return match?.name || `Phòng ban #${permission.subject_id}`;
+    }
+
+    if (permission.subject_type === 'position_in_department') {
+      const position = sharePositions.find((item) => item.id === permission.subject_id);
+      const department = shareDepartments.find((item: ShareDepartmentOption) => item.id === permission.scope_department_id);
+      return `${position?.name || `Chức danh #${permission.subject_id}`} / ${department?.name || `Phòng ban #${permission.scope_department_id}`}`;
+    }
+
+    return `Đối tượng #${permission.subject_id}`;
+  };
 
   const remindMutation = useMutation({
     mutationFn: async () => {
@@ -121,6 +216,63 @@ export default function DocumentFlowPage() {
     },
   });
 
+  const grantShareMutation = useMutation({
+    mutationFn: async () => {
+      if (!isCompleted) {
+        throw new Error('Chỉ được chia sẻ sau khi tài liệu hoàn thành');
+      }
+
+      return fetchJson(`/documents/${documentId}/permissions`, {
+        method: 'POST',
+        body: JSON.stringify({
+          permission_source: 'share',
+          subject_type: shareForm.subject_type,
+          subject_id: Number(shareForm.subject_id),
+          scope_department_id: shareForm.subject_type === 'position_in_department' ? Number(shareForm.scope_department_id) : undefined,
+          can_read: shareForm.can_read,
+          can_edit: false,
+          can_approve: false,
+          can_share: shareForm.can_share,
+          can_delete: false,
+        }),
+      });
+    },
+    onSuccess: async () => {
+      toast.success('Đã chia sẻ tài liệu');
+      setShareForm({
+        subject_type: 'user',
+        subject_id: '',
+        scope_department_id: '',
+        can_read: true,
+        can_share: false,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['document-share-permissions', documentId] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || 'Không thể chia sẻ tài liệu');
+    },
+  });
+
+  const revokeShareMutation = useMutation({
+    mutationFn: async (permission: SharePermissionRecord) =>
+      fetchJson(`/documents/${documentId}/permissions`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          permission_source: 'share',
+          subject_type: permission.subject_type,
+          subject_id: permission.subject_id,
+          scope_department_id: permission.subject_type === 'position_in_department' ? permission.scope_department_id : undefined,
+        }),
+      }),
+    onSuccess: async () => {
+      toast.success('Đã thu hồi chia sẻ');
+      await queryClient.invalidateQueries({ queryKey: ['document-share-permissions', documentId] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || 'Không thể thu hồi chia sẻ');
+    },
+  });
+
 
 
   if (isLoading) {
@@ -152,6 +304,8 @@ export default function DocumentFlowPage() {
   const canManageSignRequest = Boolean(flowData?.can_manage_sign_request && flowData?.document?.sign_request_id);
   const canRemind = canManageSignRequest && ['pending_approval', 'pending_signature', 'in_progress', 'pending'].includes(document.status);
   const canCancel = canManageSignRequest && !['completed', 'cancelled'].includes(document.status);
+  const canShareCompletedDocument = isCompleted;
+  const hasWorkflowSteps = steps.length > 0;
 
   // Calculate progress percentage
   const completedSteps = steps.filter((s: any) => 
@@ -230,6 +384,26 @@ export default function DocumentFlowPage() {
               >
                 <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
               </Button>
+              {canShareCompletedDocument && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="min-w-0 max-w-full"
+                  onClick={() => setShareDialogOpen(true)}
+                >
+                  <Share2 className="h-4 w-4 shrink-0 sm:mr-2" />
+                  Chia sẻ
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="min-w-0 max-w-full"
+                onClick={() => router.push(`/audit/${documentId}`)}
+              >
+                <History className="h-4 w-4 shrink-0 sm:mr-2" />
+                Log tài liệu
+              </Button>
               <Button 
                 variant="outline" 
                 size="sm"
@@ -281,8 +455,9 @@ export default function DocumentFlowPage() {
             </div>
           </div>
 
+          <div className={hasWorkflowSteps ? "mt-4 space-y-4" : "hidden"}>
           {/* Progress Bar */}
-          <div className="mt-4">
+          <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">
                 Tiến độ: {completedSteps}/{steps.length} bước
@@ -300,7 +475,7 @@ export default function DocumentFlowPage() {
           </div>
 
           {/* Phase Indicators */}
-          <div className="flex gap-2 mt-4">
+          <div className="flex gap-2">
             {phases.map((phase: any) => (
               <div
                 key={phase.key}
@@ -318,6 +493,7 @@ export default function DocumentFlowPage() {
               </div>
             ))}
           </div>
+            </div>
         </div>
       </div>
 
@@ -325,7 +501,7 @@ export default function DocumentFlowPage() {
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left: Timeline */}
-          <div className="lg:col-span-3">
+          <div className={hasWorkflowSteps ? "lg:col-span-3" : "hidden"}>
             <FlowTimeline
               steps={steps}
               canApprove={can_approve}
@@ -334,7 +510,7 @@ export default function DocumentFlowPage() {
           </div>
 
           {/* Center: Document Viewer - Larger */}
-          <div className="lg:col-span-6">
+          <div className={hasWorkflowSteps ? "lg:col-span-6" : "lg:col-span-8"}>
             {pdfUrl && (
               <SimplePDFViewer 
                 key={`${documentId}-${flowData?.document?.signed_file_path || 'original'}`}
@@ -344,7 +520,7 @@ export default function DocumentFlowPage() {
           </div>
 
           {/* Right: Activities & Participants */}
-          <div className="lg:col-span-3">
+          <div className={hasWorkflowSteps ? "lg:col-span-3" : "lg:col-span-4"}>
             <div className="bg-white rounded-lg shadow-sm border">
               {/* Tabs */}
               <div className="border-b">
@@ -417,6 +593,181 @@ export default function DocumentFlowPage() {
               onClick={() => cancelMutation.mutate()}
             >
               {cancelMutation.isPending ? 'Đang hủy...' : 'Xác nhận hủy'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Chia sẻ tài liệu đã hoàn thành</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-sm text-green-700">
+              Chỉ tài liệu đã hoàn thành mới được chia sẻ. Quyền mặc định của share là <strong>xem và tải xuống</strong>.
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Loại đối tượng</div>
+              <select
+                value={shareForm.subject_type}
+                onChange={(event) =>
+                  setShareForm((current) => ({
+                    ...current,
+                    subject_type: event.target.value as 'user' | 'department' | 'position_in_department',
+                    subject_id: '',
+                    scope_department_id: '',
+                  }))
+                }
+                className="w-full rounded-md border border-input bg-background px-3 py-2"
+              >
+                <option value="user">Người dùng</option>
+                <option value="department">Phòng ban</option>
+                <option value="position_in_department">Chức danh trong phòng ban</option>
+              </select>
+            </div>
+
+            {shareForm.subject_type === 'user' && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Người dùng</div>
+                <select
+                  value={shareForm.subject_id}
+                  onChange={(event) => setShareForm((current) => ({ ...current, subject_id: event.target.value }))}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2"
+                >
+                  <option value="">-- Chọn người dùng --</option>
+                  {shareUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name || user.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {shareForm.subject_type === 'department' && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Phòng ban</div>
+                <select
+                  value={shareForm.subject_id}
+                  onChange={(event) => setShareForm((current) => ({ ...current, subject_id: event.target.value }))}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2"
+                >
+                  <option value="">-- Chọn phòng ban --</option>
+                  {shareDepartments.map((department: ShareDepartmentOption) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {shareForm.subject_type === 'position_in_department' && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Phòng ban</div>
+                  <select
+                    value={shareForm.scope_department_id}
+                    onChange={(event) => setShareForm((current) => ({ ...current, scope_department_id: event.target.value }))}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2"
+                  >
+                    <option value="">-- Chọn phòng ban --</option>
+                    {shareDepartments.map((department: ShareDepartmentOption) => (
+                      <option key={department.id} value={department.id}>
+                        {department.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Chức danh</div>
+                  <select
+                    value={shareForm.subject_id}
+                    onChange={(event) => setShareForm((current) => ({ ...current, subject_id: event.target.value }))}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2"
+                  >
+                    <option value="">-- Chọn chức danh --</option>
+                    {sharePositions.map((position) => (
+                      <option key={position.id} value={position.id}>
+                        {position.name}{position.code ? ` (${position.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="text-sm font-medium">Quyền chia sẻ</div>
+              <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={shareForm.can_read}
+                  onChange={(event) => setShareForm((current) => ({ ...current, can_read: event.target.checked }))}
+                  className="h-4 w-4"
+                />
+                <span>Xem và tải xuống</span>
+              </label>
+              <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={shareForm.can_share}
+                  onChange={(event) => setShareForm((current) => ({ ...current, can_share: event.target.checked }))}
+                  className="h-4 w-4"
+                />
+                <span>Quyền chia sẻ</span>
+              </label>
+            </div>
+
+            <div className="space-y-3">
+              <div className="text-sm font-medium">Đã chia sẻ</div>
+              {sharePermissions.length === 0 ? (
+                <div className="text-sm text-muted-foreground">Tài liệu này chưa có bản chia sẻ nào.</div>
+              ) : (
+                <div className="space-y-2">
+                  {sharePermissions.map((permission) => (
+                    <div key={permission.id} className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 p-3">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary">Share</Badge>
+                          <span className="text-sm font-medium">{getShareSubjectLabel(permission)}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          {permission.can_read && <Badge variant="outline">Xem và tải xuống</Badge>}
+                          {permission.can_share && <Badge variant="outline">Quyền chia sẻ</Badge>}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => revokeShareMutation.mutate(permission)}
+                        disabled={revokeShareMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShareDialogOpen(false)}>
+              Đóng
+            </Button>
+            <Button
+              onClick={() => grantShareMutation.mutate()}
+              disabled={
+                grantShareMutation.isPending ||
+                !shareForm.subject_id ||
+                !shareForm.can_read ||
+                (shareForm.subject_type === 'position_in_department' && !shareForm.scope_department_id)
+              }
+            >
+              {grantShareMutation.isPending ? 'Đang chia sẻ...' : 'Chia sẻ'}
             </Button>
           </DialogFooter>
         </DialogContent>

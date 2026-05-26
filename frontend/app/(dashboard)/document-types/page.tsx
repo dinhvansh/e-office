@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit, FileText, FileType, Plus, Settings, Trash2 } from 'lucide-react';
 
@@ -14,6 +14,113 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { DocumentType, DocumentTypePolicy } from '@/lib/types';
 
+type VisibilityScope =
+  | 'private'
+  | 'creator_only'
+  | 'department'
+  | 'department_and_manager'
+  | 'workflow_only'
+  | 'company'
+  | 'custom_acl';
+
+type SecurityLevel = 'normal' | 'internal' | 'confidential' | 'secret';
+
+type AclSubjectType =
+  | 'creator'
+  | 'creator_department'
+  | 'creator_manager'
+  | 'specific_department'
+  | 'specific_role'
+  | 'specific_user'
+  | 'workflow_participant'
+  | 'cc_user'
+  | 'legacy_position_in_department';
+
+type AclPermission = 'VIEW' | 'DOWNLOAD' | 'EDIT' | 'COMMENT' | 'APPROVE' | 'SIGN' | 'SHARE' | 'DELETE';
+type AclScope = 'OWN' | 'DEPARTMENT' | 'COMPANY' | 'ASSIGNED_ONLY' | 'ALL';
+
+type AclTemplateForm = {
+  subject_type: AclSubjectType;
+  subject_id: string;
+  scope_department_id: string;
+  scope: AclScope;
+  permissions: AclPermission[];
+  status_limit: string[];
+  is_active: boolean;
+};
+
+type AclTemplateEntry = AclTemplateForm & {
+  id: string;
+};
+
+type AdvancedPolicyForm = {
+  name: string;
+  priority: string;
+  effect: 'ALLOW' | 'DENY';
+  condition_json: string;
+  permission_json: string;
+  is_active: boolean;
+};
+
+type AdvancedPolicyEntry = {
+  id: string;
+  name: string;
+  priority: number;
+  effect: 'ALLOW' | 'DENY';
+  condition_json: Record<string, unknown>;
+  permission_json: Record<string, unknown>;
+  is_active: boolean;
+};
+
+const visibilityOptions: Array<{ value: VisibilityScope; label: string }> = [
+  { value: 'private', label: 'Riêng tư' },
+  { value: 'creator_only', label: 'Chỉ người tạo' },
+  { value: 'department', label: 'Theo phòng ban' },
+  { value: 'department_and_manager', label: 'Phòng ban và quản lý' },
+  { value: 'workflow_only', label: 'Chỉ người trong workflow' },
+  { value: 'company', label: 'Toàn công ty' },
+  { value: 'custom_acl', label: 'Theo ACL tùy chỉnh' },
+];
+
+const securityLevelOptions: Array<{ value: SecurityLevel; label: string }> = [
+  { value: 'normal', label: 'Thông thường' },
+  { value: 'internal', label: 'Nội bộ' },
+  { value: 'confidential', label: 'Bảo mật' },
+  { value: 'secret', label: 'Mật' },
+];
+
+const aclSubjectOptions: Array<{ value: AclSubjectType; label: string }> = [
+  { value: 'creator', label: 'Người tạo' },
+  { value: 'creator_department', label: 'Phòng ban người tạo' },
+  { value: 'creator_manager', label: 'Quản lý trực tiếp của người tạo' },
+  { value: 'specific_department', label: 'Phòng ban cụ thể' },
+  { value: 'specific_role', label: 'Vai trò cụ thể' },
+  { value: 'specific_user', label: 'Người dùng cụ thể' },
+  { value: 'workflow_participant', label: 'Người tham gia workflow' },
+  { value: 'cc_user', label: 'Người nhận CC' },
+];
+
+const aclPermissionOptions: Array<{ value: AclPermission; label: string }> = [
+  { value: 'VIEW', label: 'Xem' },
+  { value: 'DOWNLOAD', label: 'Tải xuống' },
+  { value: 'EDIT', label: 'Chỉnh sửa' },
+  { value: 'COMMENT', label: 'Bình luận' },
+  { value: 'APPROVE', label: 'Phê duyệt' },
+  { value: 'SIGN', label: 'Ký' },
+  { value: 'SHARE', label: 'Chia sẻ' },
+  { value: 'DELETE', label: 'Xóa' },
+];
+
+const aclScopeOptions: Array<{ value: AclScope; label: string }> = [
+  { value: 'OWN', label: 'Của mình' },
+  { value: 'DEPARTMENT', label: 'Phòng ban' },
+  { value: 'COMPANY', label: 'Toàn công ty' },
+  { value: 'ASSIGNED_ONLY', label: 'Chỉ đối tượng được gán' },
+  { value: 'ALL', label: 'Toàn bộ' },
+];
+
+const statusLimitOptions = ['DRAFT', 'REJECTED', 'SUBMITTED', 'APPROVED', 'SIGNED'];
+
 export default function DocumentTypesPage() {
   const { fetchJson } = useAuth();
   const queryClient = useQueryClient();
@@ -25,11 +132,57 @@ export default function DocumentTypesPage() {
   const [requireApproval, setRequireApproval] = useState(false);
   const [defaultWorkflowId, setDefaultWorkflowId] = useState<number | null>(null);
   const [allowWorkflowOverride, setAllowWorkflowOverride] = useState(false);
-  const [defaultVisibilityScope, setDefaultVisibilityScope] = useState<'public' | 'department' | 'private'>('department');
-  const [defaultConfidentialLevel, setDefaultConfidentialLevel] = useState<'normal' | 'confidential' | 'secret' | 'top_secret'>('normal');
-  const [inheritCreatorDepartment, setInheritCreatorDepartment] = useState(true);
-  const [forcePrivateUntilCompleted, setForcePrivateUntilCompleted] = useState(false);
+  const [defaultVisibilityScope, setDefaultVisibilityScope] = useState<VisibilityScope>('department');
+  const [defaultSecurityLevel, setDefaultSecurityLevel] = useState<SecurityLevel>('normal');
+  const [autoAssignCreatorDepartment, setAutoAssignCreatorDepartment] = useState(true);
+  const [forcePrivateOnCreate, setForcePrivateOnCreate] = useState(false);
   const [isPolicyLoading, setIsPolicyLoading] = useState(false);
+  const [aclTemplateForm, setAclTemplateForm] = useState<AclTemplateForm>({
+    subject_type: 'specific_user',
+    subject_id: '',
+    scope_department_id: '',
+    scope: 'ASSIGNED_ONLY',
+    permissions: ['VIEW', 'DOWNLOAD'],
+    status_limit: [],
+    is_active: true,
+  });
+  const [aclTemplates, setAclTemplates] = useState<AclTemplateEntry[]>([]);
+  const [editingAclTemplateId, setEditingAclTemplateId] = useState<string | null>(null);
+  const [advancedPolicyForm, setAdvancedPolicyForm] = useState<AdvancedPolicyForm>({
+    name: '',
+    priority: '1',
+    effect: 'ALLOW',
+    condition_json: '{\n  "security_level": "CONFIDENTIAL"\n}',
+    permission_json: '{\n  "permissions": ["VIEW"]\n}',
+    is_active: true,
+  });
+  const [advancedPolicies, setAdvancedPolicies] = useState<AdvancedPolicyEntry[]>([]);
+  const [editingAdvancedPolicyId, setEditingAdvancedPolicyId] = useState<string | null>(null);
+
+  const resetAclTemplateForm = () => {
+    setAclTemplateForm({
+      subject_type: 'specific_user',
+      subject_id: '',
+      scope_department_id: '',
+      scope: 'ASSIGNED_ONLY',
+      permissions: ['VIEW', 'DOWNLOAD'],
+      status_limit: [],
+      is_active: true,
+    });
+    setEditingAclTemplateId(null);
+  };
+
+  const resetAdvancedPolicyForm = (nextPriority = '1') => {
+    setAdvancedPolicyForm({
+      name: '',
+      priority: nextPriority,
+      effect: 'ALLOW',
+      condition_json: '{\n  "security_level": "CONFIDENTIAL"\n}',
+      permission_json: '{\n  "permissions": ["VIEW"]\n}',
+      is_active: true,
+    });
+    setEditingAdvancedPolicyId(null);
+  };
 
   const handleOpenDialog = (type: DocumentType | null) => {
     setEditingType(type);
@@ -38,6 +191,10 @@ export default function DocumentTypesPage() {
     setDefaultWorkflowId(type?.default_workflow_id || null);
     setAllowWorkflowOverride(type?.allow_workflow_override || false);
     setShowNumberingPattern(type?.require_numbering ?? true);
+    resetAclTemplateForm();
+    setAclTemplates([]);
+    resetAdvancedPolicyForm();
+    setAdvancedPolicies([]);
     setShowCreateModal(true);
   };
 
@@ -51,14 +208,47 @@ export default function DocumentTypesPage() {
     queryFn: () => fetchJson<any>('/workflows'),
   });
 
+  const { data: usersData } = useQuery({
+    queryKey: ['document-type-policy-users'],
+    queryFn: () => fetchJson<any>('/users/active').catch(() => []),
+  });
+
+  const { data: departmentsData } = useQuery({
+    queryKey: ['document-type-policy-departments'],
+    queryFn: async () => {
+      const data = await fetchJson<any>('/departments').catch(() => []);
+      return Array.isArray(data) ? data : data?.departments || data?.data?.departments || data?.data || [];
+    },
+  });
+
+  const { data: rolesData } = useQuery({
+    queryKey: ['document-type-policy-roles'],
+    queryFn: async () => {
+      const data = await fetchJson<any>('/roles').catch(() => []);
+      return Array.isArray(data) ? data : data?.data || data || [];
+    },
+  });
+
+  const { data: positionsData } = useQuery({
+    queryKey: ['document-type-policy-positions'],
+    queryFn: async () => {
+      const data = await fetchJson<any>('/positions').catch(() => []);
+      return data?.positions || data?.data?.positions || data?.data || data || [];
+    },
+  });
+
   useEffect(() => {
     if (!showCreateModal) return;
 
     if (!editingType?.id) {
       setDefaultVisibilityScope('department');
-      setDefaultConfidentialLevel('normal');
-      setInheritCreatorDepartment(true);
-      setForcePrivateUntilCompleted(false);
+      setDefaultSecurityLevel('normal');
+      setAutoAssignCreatorDepartment(true);
+      setForcePrivateOnCreate(false);
+      resetAclTemplateForm();
+      setAclTemplates([]);
+      resetAdvancedPolicyForm();
+      setAdvancedPolicies([]);
       setIsPolicyLoading(false);
       return;
     }
@@ -69,17 +259,34 @@ export default function DocumentTypesPage() {
     fetchJson<DocumentTypePolicy>(`/settings/document-type-policy/${editingType.id}`)
       .then((policy) => {
         if (cancelled) return;
-        setDefaultVisibilityScope(policy?.default_visibility_scope || 'department');
-        setDefaultConfidentialLevel(policy?.default_confidential_level || 'normal');
-        setInheritCreatorDepartment(policy?.inherit_creator_department ?? true);
-        setForcePrivateUntilCompleted(Boolean(policy?.force_private_until_completed));
+        setDefaultVisibilityScope(policy.visibility?.default_visibility_scope || 'department');
+        setDefaultSecurityLevel(policy.visibility?.default_security_level || 'normal');
+        setAutoAssignCreatorDepartment(policy.visibility?.auto_assign_creator_department ?? true);
+        setForcePrivateOnCreate(Boolean(policy.visibility?.force_private_on_create));
+        setAclTemplates(
+          (policy.acl_templates || []).map((template, index) => ({
+            id: template.id || `${editingType.id}-acl-${index}`,
+            subject_type: template.subject_type,
+            subject_id: template.subject_id ? String(template.subject_id) : '',
+            scope_department_id: template.scope_department_id ? String(template.scope_department_id) : '',
+            scope: template.scope || 'ASSIGNED_ONLY',
+            permissions: template.permissions || [],
+            status_limit: template.status_limit || [],
+            is_active: template.is_active !== false,
+          }))
+        );
+        setAdvancedPolicies(policy.advanced_policies || []);
       })
       .catch(() => {
         if (cancelled) return;
         setDefaultVisibilityScope('department');
-        setDefaultConfidentialLevel('normal');
-        setInheritCreatorDepartment(true);
-        setForcePrivateUntilCompleted(false);
+        setDefaultSecurityLevel('normal');
+        setAutoAssignCreatorDepartment(true);
+        setForcePrivateOnCreate(false);
+        resetAclTemplateForm();
+        setAclTemplates([]);
+        resetAdvancedPolicyForm();
+        setAdvancedPolicies([]);
       })
       .finally(() => {
         if (!cancelled) setIsPolicyLoading(false);
@@ -92,23 +299,283 @@ export default function DocumentTypesPage() {
 
   const workflows = workflowsData?.workflows?.filter((workflow: any) => workflow.is_template) || [];
   const types: DocumentType[] = typesData || [];
+  const permissionUsers = Array.isArray(usersData) ? usersData : [];
+  const permissionDepartments = Array.isArray(departmentsData) ? departmentsData : [];
+  const permissionRoles = Array.isArray(rolesData) ? rolesData : [];
+  const permissionPositions = (Array.isArray(positionsData) ? positionsData : []).filter((position: any) => position.is_active !== false);
   const typesWithCount = types.map((type) => ({
     ...type,
     _count: type._count || { documents: 0 },
     numbering_rules: type.numbering_rules || [],
   }));
 
+  const getAclSubjectLabel = (subjectType: AclSubjectType) => {
+    return aclSubjectOptions.find((option) => option.value === subjectType)?.label || subjectType;
+  };
+
+  const getAclTemplateLabel = (permission: AclTemplateEntry) => {
+    if (permission.subject_type === 'specific_user') {
+      const match = permissionUsers.find((user: any) => user.id === Number(permission.subject_id));
+      return match?.full_name || match?.email || `User #${permission.subject_id}`;
+    }
+
+    if (permission.subject_type === 'specific_department') {
+      const match = permissionDepartments.find((department: any) => department.id === Number(permission.subject_id));
+      return match?.name || `Phòng ban #${permission.subject_id}`;
+    }
+
+    if (permission.subject_type === 'specific_role') {
+      const match = permissionRoles.find((role: any) => role.id === Number(permission.subject_id));
+      return match?.name || `Vai trò #${permission.subject_id}`;
+    }
+
+    if (permission.subject_type === 'legacy_position_in_department') {
+      const position = permissionPositions.find((item: any) => item.id === Number(permission.subject_id));
+      const department = permissionDepartments.find((item: any) => item.id === Number(permission.scope_department_id));
+      return `${position?.name || `Chức danh #${permission.subject_id}`} / ${department?.name || `Phòng ban #${permission.scope_department_id}`}`;
+    }
+
+    if (permission.subject_type === 'creator') return 'Người tạo tài liệu';
+    if (permission.subject_type === 'creator_department') return 'Phòng ban của người tạo';
+    if (permission.subject_type === 'creator_manager') return 'Quản lý trực tiếp của người tạo';
+    if (permission.subject_type === 'workflow_participant') return 'Người tham gia workflow';
+    if (permission.subject_type === 'cc_user') return 'Người nhận CC';
+
+    return permission.subject_type;
+  };
+
+  const buildPolicyPayload = useMemo(
+    () => ({
+      visibility: {
+        default_visibility_scope: forcePrivateOnCreate ? 'private' : defaultVisibilityScope,
+        default_security_level: defaultSecurityLevel,
+        auto_assign_creator_department: autoAssignCreatorDepartment,
+        force_private_on_create: forcePrivateOnCreate,
+      },
+      acl_templates: aclTemplates.map((template) => ({
+        id: template.id,
+        subject_type: template.subject_type,
+        subject_id: template.subject_id ? Number(template.subject_id) : null,
+        scope_department_id: template.scope_department_id ? Number(template.scope_department_id) : null,
+        scope: template.scope,
+        permissions: template.permissions,
+        status_limit: template.status_limit.length ? template.status_limit : null,
+        is_active: template.is_active,
+      })),
+      advanced_policies: advancedPolicies,
+    }),
+    [
+      aclTemplates,
+      advancedPolicies,
+      autoAssignCreatorDepartment,
+      defaultSecurityLevel,
+      defaultVisibilityScope,
+      forcePrivateOnCreate,
+    ]
+  );
+
+  const handleAddAclTemplate = () => {
+    const requiresSubjectId = ['specific_user', 'specific_department', 'specific_role', 'legacy_position_in_department'].includes(
+      aclTemplateForm.subject_type
+    );
+    const requiresScopeDepartment = aclTemplateForm.subject_type === 'legacy_position_in_department';
+    const hasPermissions = aclTemplateForm.permissions.length > 0;
+
+    if (requiresSubjectId && !aclTemplateForm.subject_id) {
+      toast.error('Vui lòng chọn đối tượng áp dụng');
+      return;
+    }
+
+    if (requiresScopeDepartment && !aclTemplateForm.scope_department_id) {
+      toast.error('Vui lòng chọn phòng ban phạm vi');
+      return;
+    }
+
+    if (!hasPermissions) {
+      toast.error('Vui lòng chọn ít nhất một quyền');
+      return;
+    }
+
+    if (
+      aclTemplateForm.permissions.includes('DELETE') &&
+      (aclTemplateForm.subject_type === 'specific_department' || aclTemplateForm.scope === 'COMPANY')
+    ) {
+      toast.error('Không được cấp quyền Xóa rộng cho phòng ban hoặc toàn công ty');
+      return;
+    }
+
+    if (
+      aclTemplateForm.subject_type === 'creator' &&
+      ['EDIT', 'DELETE'].some((item) => aclTemplateForm.permissions.includes(item as AclPermission)) &&
+      aclTemplateForm.status_limit.some((item) => !['DRAFT', 'REJECTED'].includes(item))
+    ) {
+      toast.error('Người tạo chỉ được Sửa/Xóa ở DRAFT hoặc REJECTED');
+      return;
+    }
+
+    if (aclTemplateForm.subject_type === 'workflow_participant' && !aclTemplateForm.permissions.includes('VIEW')) {
+      toast.error('Người trong workflow phải có tối thiểu quyền Xem');
+      return;
+    }
+
+    setAclTemplates((current) => [
+      ...current,
+      {
+        ...aclTemplateForm,
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      },
+    ]);
+
+    setAclTemplateForm({
+      subject_type: 'specific_user',
+      subject_id: '',
+      scope_department_id: '',
+      scope: 'ASSIGNED_ONLY',
+      permissions: ['VIEW', 'DOWNLOAD'],
+      status_limit: [],
+      is_active: true,
+    });
+  };
+
+  const handleAddAdvancedPolicy = () => {
+    try {
+      const conditionJson = JSON.parse(advancedPolicyForm.condition_json || '{}');
+      const permissionJson = JSON.parse(advancedPolicyForm.permission_json || '{}');
+      setAdvancedPolicies((current) => [
+        ...current,
+        {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          name: advancedPolicyForm.name.trim() || `Policy ${current.length + 1}`,
+          priority: Number(advancedPolicyForm.priority) || current.length + 1,
+          effect: advancedPolicyForm.effect,
+          condition_json: conditionJson,
+          permission_json: permissionJson,
+          is_active: advancedPolicyForm.is_active,
+        },
+      ]);
+      setAdvancedPolicyForm({
+        name: '',
+        priority: String((advancedPolicies.length || 0) + 1),
+        effect: 'ALLOW',
+        condition_json: '{\n  "security_level": "CONFIDENTIAL"\n}',
+        permission_json: '{\n  "permissions": ["VIEW"]\n}',
+        is_active: true,
+      });
+    } catch {
+      toast.error('condition_json hoặc permission_json không đúng định dạng JSON');
+    }
+  };
+
+  const submitAclTemplate = () => {
+    const requiresSubjectId = ['specific_user', 'specific_department', 'specific_role', 'legacy_position_in_department'].includes(
+      aclTemplateForm.subject_type
+    );
+    const requiresScopeDepartment = aclTemplateForm.subject_type === 'legacy_position_in_department';
+    const hasPermissions = aclTemplateForm.permissions.length > 0;
+
+    if (requiresSubjectId && !aclTemplateForm.subject_id) {
+      toast.error('Vui lòng chọn đối tượng áp dụng');
+      return;
+    }
+
+    if (requiresScopeDepartment && !aclTemplateForm.scope_department_id) {
+      toast.error('Vui lòng chọn phòng ban phạm vi');
+      return;
+    }
+
+    if (!hasPermissions) {
+      toast.error('Vui lòng chọn ít nhất một quyền');
+      return;
+    }
+
+    if (
+      aclTemplateForm.permissions.includes('DELETE') &&
+      (aclTemplateForm.subject_type === 'specific_department' || aclTemplateForm.scope === 'COMPANY')
+    ) {
+      toast.error('Không được cấp quyền Xóa rộng cho phòng ban hoặc toàn công ty');
+      return;
+    }
+
+    if (
+      aclTemplateForm.subject_type === 'creator' &&
+      ['EDIT', 'DELETE'].some((item) => aclTemplateForm.permissions.includes(item as AclPermission)) &&
+      aclTemplateForm.status_limit.some((item) => !['DRAFT', 'REJECTED'].includes(item))
+    ) {
+      toast.error('Người tạo chỉ được Sửa/Xóa ở DRAFT hoặc REJECTED');
+      return;
+    }
+
+    if (aclTemplateForm.subject_type === 'workflow_participant' && !aclTemplateForm.permissions.includes('VIEW')) {
+      toast.error('Người trong workflow phải có tối thiểu quyền Xem');
+      return;
+    }
+
+    const nextEntry: AclTemplateEntry = {
+      ...aclTemplateForm,
+      id: editingAclTemplateId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    };
+
+    setAclTemplates((current) =>
+      editingAclTemplateId ? current.map((item) => (item.id === editingAclTemplateId ? nextEntry : item)) : [...current, nextEntry]
+    );
+
+    resetAclTemplateForm();
+  };
+
+  const submitAdvancedPolicy = () => {
+    try {
+      const conditionJson = JSON.parse(advancedPolicyForm.condition_json || '{}');
+      const permissionJson = JSON.parse(advancedPolicyForm.permission_json || '{}');
+      const nextEntry: AdvancedPolicyEntry = {
+        id: editingAdvancedPolicyId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: advancedPolicyForm.name.trim() || `Policy ${advancedPolicies.length + 1}`,
+        priority: Number(advancedPolicyForm.priority) || advancedPolicies.length + 1,
+        effect: advancedPolicyForm.effect,
+        condition_json: conditionJson,
+        permission_json: permissionJson,
+        is_active: advancedPolicyForm.is_active,
+      };
+
+      setAdvancedPolicies((current) =>
+        editingAdvancedPolicyId ? current.map((item) => (item.id === editingAdvancedPolicyId ? nextEntry : item)) : [...current, nextEntry]
+      );
+      resetAdvancedPolicyForm(String((advancedPolicies.length || 0) + (editingAdvancedPolicyId ? 0 : 1)));
+    } catch {
+      toast.error('condition_json hoặc permission_json không đúng định dạng JSON');
+    }
+  };
+
+  const handleEditAclTemplate = (template: AclTemplateEntry) => {
+    setAclTemplateForm({
+      subject_type: template.subject_type,
+      subject_id: template.subject_id,
+      scope_department_id: template.scope_department_id,
+      scope: template.scope,
+      permissions: template.permissions,
+      status_limit: template.status_limit,
+      is_active: template.is_active,
+    });
+    setEditingAclTemplateId(template.id);
+  };
+
+  const handleEditAdvancedPolicy = (policy: AdvancedPolicyEntry) => {
+    setAdvancedPolicyForm({
+      name: policy.name,
+      priority: String(policy.priority),
+      effect: policy.effect,
+      condition_json: JSON.stringify(policy.condition_json, null, 2),
+      permission_json: JSON.stringify(policy.permission_json, null, 2),
+      is_active: policy.is_active,
+    });
+    setEditingAdvancedPolicyId(policy.id);
+  };
+
   const createMutation = useMutation({
     mutationFn: async (data: Partial<DocumentType>) => {
       const documentType = await fetchJson<DocumentType>('/document-types', { method: 'POST', body: JSON.stringify(data) });
       await fetchJson(`/settings/document-type-policy/${documentType.id}`, {
         method: 'POST',
-        body: JSON.stringify({
-          default_visibility_scope: defaultVisibilityScope,
-          default_confidential_level: defaultConfidentialLevel,
-          inherit_creator_department: inheritCreatorDepartment,
-          force_private_until_completed: forcePrivateUntilCompleted,
-        }),
+        body: JSON.stringify(buildPolicyPayload),
       });
       return documentType;
     },
@@ -131,12 +598,7 @@ export default function DocumentTypesPage() {
       });
       await fetchJson(`/settings/document-type-policy/${id}`, {
         method: 'POST',
-        body: JSON.stringify({
-          default_visibility_scope: defaultVisibilityScope,
-          default_confidential_level: defaultConfidentialLevel,
-          inherit_creator_department: inheritCreatorDepartment,
-          force_private_until_completed: forcePrivateUntilCompleted,
-        }),
+        body: JSON.stringify(buildPolicyPayload),
       });
       return documentType;
     },
@@ -571,71 +1033,422 @@ export default function DocumentTypesPage() {
 
             <div className="space-y-4 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-6">
               <div>
-                <h3 className="text-sm font-semibold text-slate-800">{'Quy\u1EC1n & b\u1EA3o m\u1EADt m\u1EB7c \u0111\u1ECBnh'}</h3>
+                <h3 className="text-sm font-semibold text-slate-800">Thiết lập hiển thị & bảo mật mặc định</h3>
                 <p className="mt-1 text-sm text-slate-600">
-                  {'Document t\u1EA1o t\u1EEB lo\u1EA1i n\u00E0y s\u1EBD t\u1EF1 \u00E1p m\u1EE9c \u0111\u1ED9 b\u1EA3o m\u1EADt v\u00E0 ph\u1EA1m vi hi\u1EC3n th\u1ECB n\u00E0y. M\u00E0n h\u00ECnh t\u1EA1o tr\u00ECnh k\u00FD kh\u00F4ng c\u1EA7n ch\u1ECDn l\u1EA1i.'}
+                  Cấu hình này quyết định document mới tạo thuộc phạm vi nào và có mức bảo mật nào. Đây chưa phải là quyền thao tác chi tiết.
                 </p>
               </div>
 
               {isPolicyLoading ? (
                 <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500">
-                  {'\u0110ang t\u1EA3i policy c\u1EE7a lo\u1EA1i t\u00E0i li\u1EC7u...'}
+                  Đang tải policy của loại tài liệu...
                 </div>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-700">{'Ph\u1EA1m vi hi\u1EC3n th\u1ECB m\u1EB7c \u0111\u1ECBnh'}</label>
+                    <label className="block text-sm font-medium text-slate-700">Phạm vi truy cập mặc định</label>
                     <select
-                      value={defaultVisibilityScope}
-                      onChange={(event) => setDefaultVisibilityScope(event.target.value as 'public' | 'department' | 'private')}
-                      className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                      value={forcePrivateOnCreate ? 'private' : defaultVisibilityScope}
+                      disabled={forcePrivateOnCreate}
+                      onChange={(event) => setDefaultVisibilityScope(event.target.value as VisibilityScope)}
+                      className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm disabled:bg-slate-100 disabled:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                     >
-                      <option value="public">{'C\u00F4ng khai trong tenant'}</option>
-                      <option value="department">{'Theo ph\u00F2ng ban'}</option>
-                      <option value="private">{'Ri\u00EAng t\u01B0'}</option>
+                      {visibilityOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
+                    {forcePrivateOnCreate && (
+                      <p className="text-xs text-amber-700">
+                        Đang ghi đè về Riêng tư vì đã bật “Luôn để riêng tư khi mới tạo”.
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-700">{'M\u1EE9c \u0111\u1ED9 b\u1EA3o m\u1EADt m\u1EB7c \u0111\u1ECBnh'}</label>
+                    <label className="block text-sm font-medium text-slate-700">Mức độ bảo mật mặc định</label>
                     <select
-                      value={defaultConfidentialLevel}
-                      onChange={(event) => setDefaultConfidentialLevel(event.target.value as 'normal' | 'confidential' | 'secret' | 'top_secret')}
+                      value={defaultSecurityLevel}
+                      onChange={(event) => setDefaultSecurityLevel(event.target.value as SecurityLevel)}
                       className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                     >
-                      <option value="normal">{'Th\u00F4ng th\u01B0\u1EDDng'}</option>
-                      <option value="confidential">{'B\u1EA3o m\u1EADt'}</option>
-                      <option value="secret">{'M\u1EADt'}</option>
-                      <option value="top_secret">{'Tuy\u1EC7t m\u1EADt'}</option>
+                      {securityLevelOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
                   <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 md:col-span-2">
                     <input
                       type="checkbox"
-                      checked={inheritCreatorDepartment}
-                      onChange={(event) => setInheritCreatorDepartment(event.target.checked)}
+                      checked={autoAssignCreatorDepartment}
+                      onChange={(event) => setAutoAssignCreatorDepartment(event.target.checked)}
                       className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20"
                     />
                     <span className="text-sm font-medium text-slate-700">
-                      {'T\u1EF1 \u0111\u1ED9ng g\u00E1n ph\u00F2ng ban c\u1EE7a ng\u01B0\u1EDDi t\u1EA1o v\u00E0o document'}
+                      Tự động gán phòng ban người tạo vào document
                     </span>
                   </label>
 
                   <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 md:col-span-2">
                     <input
                       type="checkbox"
-                      checked={forcePrivateUntilCompleted}
-                      onChange={(event) => setForcePrivateUntilCompleted(event.target.checked)}
+                      checked={forcePrivateOnCreate}
+                      onChange={(event) => setForcePrivateOnCreate(event.target.checked)}
                       className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20"
                     />
-                    <span className="text-sm font-medium text-slate-700">
-                      {'Lu\u00F4n \u0111\u1EC3 ri\u00EAng t\u01B0 khi m\u1EDBi t\u1EA1o (ghi \u0111\u00E8 ph\u1EA1m vi hi\u1EC3n th\u1ECB th\u00E0nh private)'}
-                    </span>
+                    <span className="text-sm font-medium text-slate-700">Luôn để riêng tư khi mới tạo</span>
                   </label>
                 </div>
               )}
             </div>
+
+            {false && (
+            <div className="space-y-4 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-6">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">Quyền thao tác mặc định</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Các quyền bên dưới sẽ được tự động gán cho document khi tạo từ loại văn bản này.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">Đối tượng</label>
+                  <select
+                    value={aclTemplateForm.subject_type}
+                    onChange={(event) =>
+                      setAclTemplateForm((current) => ({
+                        ...current,
+                        subject_type: event.target.value as AclSubjectType,
+                        subject_id: '',
+                        scope_department_id: '',
+                      }))
+                    }
+                    className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    {aclSubjectOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">Phạm vi</label>
+                  <select
+                    value={aclTemplateForm.scope}
+                    onChange={(event) =>
+                      setAclTemplateForm((current) => ({
+                        ...current,
+                        scope: event.target.value as AclScope,
+                      }))
+                    }
+                    className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    {aclScopeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">Giới hạn trạng thái</label>
+                  <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-3">
+                    {statusLimitOptions.map((status) => (
+                      <label key={status} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={aclTemplateForm.status_limit.includes(status)}
+                          onChange={(event) =>
+                            setAclTemplateForm((current) => ({
+                              ...current,
+                              status_limit: event.target.checked
+                                ? [...current.status_limit, status]
+                                : current.status_limit.filter((item) => item !== status),
+                            }))
+                          }
+                          className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                        />
+                        <span>{status}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {aclTemplateForm.subject_type === 'specific_user' && (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">Người dùng cụ thể</label>
+                  <select
+                    value={aclTemplateForm.subject_id}
+                    onChange={(event) => setAclTemplateForm((current) => ({ ...current, subject_id: event.target.value }))}
+                    className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    <option value="">-- Chọn người dùng --</option>
+                    {permissionUsers.map((user: any) => (
+                      <option key={user.id} value={user.id}>
+                        {user.full_name || user.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {aclTemplateForm.subject_type === 'specific_department' && (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">Phòng ban cụ thể</label>
+                  <select
+                    value={aclTemplateForm.subject_id}
+                    onChange={(event) => setAclTemplateForm((current) => ({ ...current, subject_id: event.target.value }))}
+                    className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    <option value="">-- Chọn phòng ban --</option>
+                    {permissionDepartments.map((department: any) => (
+                      <option key={department.id} value={department.id}>
+                        {department.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {aclTemplateForm.subject_type === 'specific_role' && (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">Vai trò cụ thể</label>
+                  <select
+                    value={aclTemplateForm.subject_id}
+                    onChange={(event) => setAclTemplateForm((current) => ({ ...current, subject_id: event.target.value }))}
+                    className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    <option value="">-- Chọn vai trò --</option>
+                    {permissionRoles.map((role: any) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-slate-700">Quyền</label>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  {aclPermissionOptions.map((permission) => (
+                    <label key={permission.value} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={aclTemplateForm.permissions.includes(permission.value)}
+                        onChange={(event) =>
+                          setAclTemplateForm((current) => ({
+                            ...current,
+                            permissions: event.target.checked
+                              ? Array.from(new Set([...current.permissions, permission.value]))
+                              : current.permissions.filter((item) => item !== permission.value),
+                          }))
+                        }
+                        className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                      />
+                      <span>{permission.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                {editingAclTemplateId && (
+                  <Button type="button" variant="ghost" onClick={resetAclTemplateForm}>
+                    Hủy sửa
+                  </Button>
+                )}
+                <Button type="button" variant="outline" onClick={submitAclTemplate}>
+                  Thêm quyền thao tác mặc định
+                </Button>
+              </div>
+
+              {aclTemplates.length > 0 && (
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <div className="grid grid-cols-[160px_minmax(0,1.3fr)_120px_minmax(0,1.3fr)_160px_80px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <div>Đối tượng</div>
+                    <div>Giá trị đối tượng</div>
+                    <div>Phạm vi</div>
+                    <div>Quyền</div>
+                    <div>Giới hạn trạng thái</div>
+                    <div>Thao tác</div>
+                  </div>
+                  <div className="divide-y divide-slate-200">
+                    {aclTemplates.map((template) => (
+                      <div key={template.id} className="grid grid-cols-[160px_minmax(0,1.3fr)_120px_minmax(0,1.3fr)_160px_80px] gap-3 px-4 py-3 text-sm">
+                        <div>{getAclSubjectLabel(template.subject_type)}</div>
+                        <div>{getAclTemplateLabel(template)}</div>
+                        <div>{template.scope}</div>
+                        <div className="flex flex-wrap gap-1">
+                          {template.permissions.map((permission) => (
+                            <span key={permission} className="rounded-full border border-slate-200 px-2 py-0.5 text-xs">
+                              {permission}
+                            </span>
+                          ))}
+                        </div>
+                        <div>{template.status_limit.length ? template.status_limit.join(', ') : 'Không giới hạn'}</div>
+                        <div className="flex items-center gap-1">
+                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditAclTemplate(template)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => setAclTemplates((current) => current.filter((item) => item.id !== template.id))}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            )}
+
+            {false && (
+            <>
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-6">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">Quyền tài liệu</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Quyền theo người dùng, phòng ban và chức danh không còn cấu hình tại màn này. Hãy dùng tab <strong>Quyền tài liệu</strong> trong menu <strong>Vai trò &amp; Quyền</strong> để thiết lập quyền theo loại văn bản.
+                </p>
+              </div>
+              <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-600">
+                Màn <strong>Loại văn bản</strong> hiện chỉ dùng để định nghĩa tính chất nền của loại tài liệu như workflow mặc định, phạm vi truy cập mặc định, mức bảo mật mặc định, đánh số và các tùy chọn nghiệp vụ khác.
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-6">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">Quyền nâng cao</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Dùng cho các điều kiện đặc biệt như tài liệu mật, số tiền lớn, phòng ban đặc biệt hoặc trạng thái đặc biệt.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">Tên rule</label>
+                  <input
+                    value={advancedPolicyForm.name}
+                    onChange={(event) => setAdvancedPolicyForm((current) => ({ ...current, name: event.target.value }))}
+                    placeholder="Ví dụ: Chặn xem hồ sơ mật"
+                    className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">Priority</label>
+                  <input
+                    type="number"
+                    value={advancedPolicyForm.priority}
+                    onChange={(event) => setAdvancedPolicyForm((current) => ({ ...current, priority: event.target.value }))}
+                    className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">Effect</label>
+                  <select
+                    value={advancedPolicyForm.effect}
+                    onChange={(event) => setAdvancedPolicyForm((current) => ({ ...current, effect: event.target.value as 'ALLOW' | 'DENY' }))}
+                    className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    <option value="ALLOW">ALLOW</option>
+                    <option value="DENY">DENY</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">condition_json</label>
+                  <textarea
+                    rows={6}
+                    value={advancedPolicyForm.condition_json}
+                    onChange={(event) => setAdvancedPolicyForm((current) => ({ ...current, condition_json: event.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">permission_json</label>
+                  <textarea
+                    rows={6}
+                    value={advancedPolicyForm.permission_json}
+                    onChange={(event) => setAdvancedPolicyForm((current) => ({ ...current, permission_json: event.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={advancedPolicyForm.is_active}
+                  onChange={(event) => setAdvancedPolicyForm((current) => ({ ...current, is_active: event.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                />
+                Bật rule
+              </label>
+
+              <div className="flex justify-end gap-2">
+                {editingAdvancedPolicyId && (
+                  <Button type="button" variant="ghost" onClick={() => resetAdvancedPolicyForm(String(advancedPolicies.length || 1))}>
+                    Hủy sửa
+                  </Button>
+                )}
+                <Button type="button" variant="outline" onClick={submitAdvancedPolicy}>
+                  Thêm policy nâng cao
+                </Button>
+              </div>
+
+              {advancedPolicies.length > 0 && (
+                <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
+                  {advancedPolicies
+                    .slice()
+                    .sort((a, b) => a.priority - b.priority)
+                    .map((policy) => (
+                      <div key={policy.id} className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 p-3">
+                        <div className="space-y-1">
+                          <div className="text-sm font-semibold text-slate-800">
+                            {policy.name} <span className="text-xs font-normal text-slate-500">({policy.effect} / priority {policy.priority})</span>
+                          </div>
+                          <pre className="overflow-auto rounded bg-slate-50 p-2 text-xs text-slate-600">{JSON.stringify(policy.condition_json, null, 2)}</pre>
+                          <pre className="overflow-auto rounded bg-slate-50 p-2 text-xs text-slate-600">{JSON.stringify(policy.permission_json, null, 2)}</pre>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditAdvancedPolicy(policy)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => setAdvancedPolicies((current) => current.filter((item) => item.id !== policy.id))}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+            </>
+            )}
 
             <DialogFooter className="sticky bottom-0 bg-background/95 pb-1 backdrop-blur">
               <Button

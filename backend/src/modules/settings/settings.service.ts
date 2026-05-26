@@ -1,49 +1,10 @@
 import { settingsRepository } from './settings.repository';
 import nodemailer from 'nodemailer';
 import { getTenantWatermarkConfig, normalizeWatermarkConfig } from './watermark.helper';
-
-function normalizeDocumentTypePolicy(policy: any) {
-  const source = policy && typeof policy === 'object' ? policy : {};
-  const allowedScopes = new Set(['public', 'department', 'private']);
-  const allowedLevels = new Set(['normal', 'confidential', 'secret', 'top_secret']);
-
-  const normalizeStringArray = (value: any) =>
-    Array.from(
-      new Set(
-        Array.isArray(value)
-          ? value.map((item) => String(item || '').trim()).filter(Boolean)
-          : []
-      )
-    );
-
-  const normalizeNumberArray = (value: any) =>
-    Array.from(
-      new Set(
-        Array.isArray(value)
-          ? value
-              .map((item) => Number(item))
-              .filter((item) => Number.isInteger(item) && item > 0)
-          : []
-      )
-    );
-
-  const visibility = String(source.default_visibility_scope || '').trim().toLowerCase();
-  const confidential = String(source.default_confidential_level || '').trim().toLowerCase();
-  const minPositionLevel = Number(source.min_position_level);
-
-  return {
-    allow_roles: normalizeStringArray(source.allow_roles),
-    deny_roles: normalizeStringArray(source.deny_roles),
-    allow_departments: normalizeNumberArray(source.allow_departments),
-    deny_departments: normalizeNumberArray(source.deny_departments),
-    min_position_level: Number.isFinite(minPositionLevel) && minPositionLevel > 0 ? minPositionLevel : null,
-    default_visibility_scope: allowedScopes.has(visibility) ? visibility : 'department',
-    default_confidential_level: allowedLevels.has(confidential) ? confidential : 'normal',
-    inherit_creator_department:
-      source.inherit_creator_department === undefined ? true : Boolean(source.inherit_creator_department),
-    force_private_until_completed: Boolean(source.force_private_until_completed),
-  };
-}
+import {
+  normalizeDocumentTypePolicyV2,
+  serializeDocumentTypePolicyV2,
+} from './document-type-policy.helper';
 
 function normalizeEmailConfig(config: any) {
   const port = Number(config?.smtp_port || 587);
@@ -183,12 +144,13 @@ export const settingsService = {
   async getDocumentTypePolicy(tenantId: number, documentTypeId: number) {
     const key = `doc_type_policy:${documentTypeId}`;
     const setting = await settingsRepository.getSetting(tenantId, key);
-    return normalizeDocumentTypePolicy(setting?.setting_value || {});
+    return normalizeDocumentTypePolicyV2(setting?.setting_value || {});
   },
 
   async saveDocumentTypePolicy(tenantId: number, documentTypeId: number, policy: any, userId?: number) {
     const key = `doc_type_policy:${documentTypeId}`;
-    return settingsRepository.upsertSetting(tenantId, key, normalizeDocumentTypePolicy(policy), userId);
+    const normalized = normalizeDocumentTypePolicyV2(policy);
+    return settingsRepository.upsertSetting(tenantId, key, serializeDocumentTypePolicyV2(normalized), userId);
   },
 
   async deleteDocumentTypePolicy(tenantId: number, documentTypeId: number) {

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { ok } from '../../core/utils/response';
 import { workflowsService } from './workflows.service';
+import { workflowAssigneeTypes, workflowCompletionModes } from './workflowStepAssignment';
 
 const createWorkflowSchema = z.object({
   name: z.string().min(1),
@@ -18,11 +19,17 @@ const updateWorkflowSchema = z.object({
 
 const createStepSchema = z.object({
   step_name: z.string().min(1),
-  approver_type: z.enum(['user', 'role', 'department', 'manager']),
+  approver_type: z.enum(['user', 'role', 'department', 'manager', 'position']).optional(),
   approver_id: z.coerce.number().int().positive().optional(),
   approver_user_id: z.coerce.number().int().positive().optional(),
   approver_role_id: z.coerce.number().int().positive().optional(),
   approver_department_id: z.coerce.number().int().positive().optional(),
+  assignee_type: z.enum(workflowAssigneeTypes).optional(),
+  assignee_user_id: z.coerce.number().int().positive().optional(),
+  assignee_department_id: z.coerce.number().int().positive().optional(),
+  assignee_position_id: z.coerce.number().int().positive().optional(),
+  completion_mode: z.enum(workflowCompletionModes).optional(),
+  min_required: z.coerce.number().int().positive().optional(),
   participant_role: z.enum(['approver', 'signer']).optional().default('approver'),
   due_in_days: z.coerce.number().int().positive().optional(),
   is_required: z.boolean().optional(),
@@ -31,11 +38,17 @@ const createStepSchema = z.object({
 
 const updateStepSchema = z.object({
   step_name: z.string().min(1).optional(),
-  approver_type: z.enum(['user', 'role', 'department', 'manager']).optional(),
+  approver_type: z.enum(['user', 'role', 'department', 'manager', 'position']).optional(),
   approver_id: z.coerce.number().int().positive().optional(),
   approver_user_id: z.coerce.number().int().positive().optional(),
   approver_role_id: z.coerce.number().int().positive().optional(),
   approver_department_id: z.coerce.number().int().positive().optional(),
+  assignee_type: z.enum(workflowAssigneeTypes).optional(),
+  assignee_user_id: z.coerce.number().int().positive().optional(),
+  assignee_department_id: z.coerce.number().int().positive().optional(),
+  assignee_position_id: z.coerce.number().int().positive().optional(),
+  completion_mode: z.enum(workflowCompletionModes).optional(),
+  min_required: z.coerce.number().int().positive().optional(),
   participant_role: z.enum(['approver', 'signer']).optional(),
   due_in_days: z.coerce.number().int().positive().optional(),
   is_required: z.boolean().optional(),

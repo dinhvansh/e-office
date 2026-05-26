@@ -1,8 +1,55 @@
 import { documentTypesRepository } from './documentTypes.repository';
+import { prisma } from '../../config/prisma';
+import {
+  canCreateFromDocumentTypePolicy,
+  normalizeDocumentTypePolicyV2,
+} from '../settings/document-type-policy.helper';
 
 export const documentTypesService = {
-  async getDocumentTypes(tenantId: number, filters?: any) {
-    return documentTypesRepository.findByTenant(tenantId, filters);
+  async getDocumentTypes(tenantId: number, filters?: any, userId?: number, purpose?: string) {
+    const documentTypes = await documentTypesRepository.findByTenant(tenantId, filters);
+
+    if (purpose !== 'create' || !userId) {
+      return documentTypes;
+    }
+
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      include: { user_roles: true },
+    });
+
+    if (!user || user.tenant_id !== tenantId) {
+      return [];
+    }
+
+    const policySettings = await prisma.tenant_settings.findMany({
+      where: {
+        tenant_id: tenantId,
+        setting_key: {
+          in: documentTypes.map((item) => `doc_type_policy:${item.id}`),
+        },
+      },
+      select: {
+        setting_key: true,
+        setting_value: true,
+      },
+    });
+
+    const policyByDocumentTypeId = new Map<number, ReturnType<typeof normalizeDocumentTypePolicyV2>>();
+    for (const setting of policySettings) {
+      const [, rawDocumentTypeId] = setting.setting_key.split(':');
+      const documentTypeId = Number(rawDocumentTypeId);
+      if (!Number.isInteger(documentTypeId) || documentTypeId <= 0) continue;
+      policyByDocumentTypeId.set(documentTypeId, normalizeDocumentTypePolicyV2(setting.setting_value || {}));
+    }
+
+    return documentTypes.filter((documentType) => {
+      const policy = policyByDocumentTypeId.get(documentType.id);
+      if (!policy) {
+        return true;
+      }
+      return canCreateFromDocumentTypePolicy(policy, user);
+    });
   },
 
   async getDocumentTypeById(id: number, tenantId: number) {

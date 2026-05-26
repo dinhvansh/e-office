@@ -1,8 +1,8 @@
-'use client';
+﻿'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Shield, Users, Edit, Trash2 } from 'lucide-react';
+import { Plus, Shield, Users, Edit, Trash2, Search, FileText, User, Building2, Briefcase } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +14,9 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusTag } from '@/components/ui/status-tag';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/components/providers/auth-provider';
+import { DocumentTypePermissionsTab } from '@/components/roles/DocumentTypePermissionsTab';
 import { toast } from 'sonner';
 
 interface Role {
@@ -33,14 +35,68 @@ interface Role {
   _count: { user_roles: number };
 }
 
+interface DocumentItem {
+  id: number;
+  title?: string | null;
+  original_file_name?: string | null;
+  document_number?: string | null;
+  status?: string | null;
+  confidential_level?: string | null;
+}
+
+interface PermissionRecord {
+  id: number;
+  permission_source: 'share' | 'baseline';
+  subject_type: 'user' | 'department' | 'position_in_department' | 'role';
+  subject_id: number;
+  scope_department_id: number;
+  can_read: boolean;
+  can_edit: boolean;
+  can_approve: boolean;
+  can_share: boolean;
+  can_delete: boolean;
+  granted_at: string;
+}
+
+interface DepartmentOption {
+  id: number;
+  name: string;
+}
+
+interface PositionOption {
+  id: number;
+  code?: string;
+  name: string;
+  is_active?: boolean;
+}
+
+interface UserOption {
+  id: number;
+  email: string;
+  full_name?: string;
+}
+
 export default function RolesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'document-permissions' | 'system-roles'>('document-permissions');
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [showUsersDialog, setShowUsersDialog] = useState(false);
   const [viewingRoleUsers, setViewingRoleUsers] = useState<Role | null>(null);
   const [formData, setFormData] = useState({ name: '', description: '' });
   const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]);
+  const [documentSearch, setDocumentSearch] = useState('');
+  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
+  const [documentPermissionForm, setDocumentPermissionForm] = useState({
+    subject_type: 'user' as 'user' | 'department' | 'position_in_department',
+    subject_id: '',
+    scope_department_id: '',
+    can_read: true,
+    can_edit: false,
+    can_approve: false,
+    can_share: false,
+    can_delete: false,
+  });
   const queryClient = useQueryClient();
   const { fetchJson } = useAuth();
 
@@ -84,6 +140,52 @@ export default function RolesPage() {
     queryFn: () => fetchJson<any>('/roles/permissions'),
   });
 
+  const { data: documentsData, isLoading: isLoadingDocuments } = useQuery({
+    queryKey: ['document-permissions-documents', documentSearch],
+    enabled: false,
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: '1', limit: '50' });
+      if (documentSearch.trim()) {
+        params.set('search', documentSearch.trim());
+      }
+      const data = await fetchJson<{ documents: DocumentItem[] }>(`/documents?${params.toString()}`);
+      return data.documents || [];
+    },
+  });
+
+  const { data: usersData } = useQuery({
+    queryKey: ['document-permissions-users'],
+    enabled: false,
+    queryFn: () => fetchJson<UserOption[]>('/users/active'),
+  });
+
+  const { data: departmentsData } = useQuery({
+    queryKey: ['document-permissions-departments'],
+    enabled: false,
+    queryFn: async () => {
+      const data = await fetchJson<any>('/departments');
+      return Array.isArray(data) ? data : data?.departments || data?.data?.departments || data?.data || [];
+    },
+  });
+
+  const { data: positionsData } = useQuery({
+    queryKey: ['document-permissions-positions'],
+    enabled: false,
+    queryFn: async () => {
+      const data = await fetchJson<any>('/positions');
+      return data?.positions || data?.data?.positions || data?.data || data || [];
+    },
+  });
+
+  const { data: documentPermissionsData, isLoading: isLoadingDocumentPermissions } = useQuery({
+    queryKey: ['document-permissions', selectedDocumentId],
+    enabled: false,
+    queryFn: async () => {
+      const data = await fetchJson<{ permissions: PermissionRecord[] }>(`/documents/${selectedDocumentId}/permissions`);
+      return data.permissions || [];
+    },
+  });
+
   // Fetch users for a specific role
   const { data: roleUsers, isLoading: isLoadingUsers } = useQuery({
     queryKey: ['role-users', viewingRoleUsers?.id],
@@ -95,6 +197,12 @@ export default function RolesPage() {
     enabled: !!viewingRoleUsers && showUsersDialog,
   });
 
+  const documents = (documentsData || []) as DocumentItem[];
+  const permissionUsers = (usersData || []) as UserOption[];
+  const permissionDepartments = (departmentsData || []) as DepartmentOption[];
+  const permissionPositions = ((positionsData || []) as PositionOption[]).filter((position) => position.is_active !== false);
+  const currentDocumentPermissions = (documentPermissionsData || []) as PermissionRecord[];
+
   const deleteRoleMutation = useMutation({
     mutationFn: (roleId: number) => fetchJson(`/roles/${roleId}`, { method: 'DELETE' }),
     onSuccess: () => {
@@ -104,6 +212,76 @@ export default function RolesPage() {
     onError: (error: any) => {
       const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
       toast.error(`Lỗi: ${message}`);
+    },
+  });
+
+  const grantDocumentPermissionMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedDocumentId) {
+        throw new Error('Vui lòng chọn tài liệu');
+      }
+
+      const subjectId = parseInt(documentPermissionForm.subject_id, 10);
+      const scopeDepartmentId = documentPermissionForm.scope_department_id
+        ? parseInt(documentPermissionForm.scope_department_id, 10)
+        : undefined;
+
+      return fetchJson(`/documents/${selectedDocumentId}/permissions`, {
+        method: 'POST',
+        body: JSON.stringify({
+          permission_source: 'baseline',
+          subject_type: documentPermissionForm.subject_type,
+          subject_id: subjectId,
+          scope_department_id: scopeDepartmentId,
+          can_read: documentPermissionForm.can_read,
+          can_edit: documentPermissionForm.can_edit,
+          can_approve: documentPermissionForm.can_approve,
+          can_share: documentPermissionForm.can_share,
+          can_delete: documentPermissionForm.can_delete,
+        }),
+      });
+    },
+    onSuccess: async () => {
+      toast.success('Đã cấp quyền tài liệu');
+      setDocumentPermissionForm((current) => ({
+        ...current,
+        subject_id: '',
+        scope_department_id: '',
+        can_read: true,
+        can_edit: false,
+        can_approve: false,
+        can_share: false,
+        can_delete: false,
+      }));
+      await queryClient.invalidateQueries({ queryKey: ['document-permissions', selectedDocumentId] });
+    },
+    onError: (error: any) => {
+      toast.error(`Lỗi: ${error?.message || 'Không thể cấp quyền tài liệu'}`);
+    },
+  });
+
+  const revokeDocumentPermissionMutation = useMutation({
+    mutationFn: async (permission: PermissionRecord) => {
+      if (!selectedDocumentId) {
+        throw new Error('Vui lòng chọn tài liệu');
+      }
+
+      return fetchJson(`/documents/${selectedDocumentId}/permissions`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          permission_source: permission.permission_source,
+          subject_type: permission.subject_type,
+          subject_id: permission.subject_id,
+          scope_department_id: permission.subject_type === 'position_in_department' ? permission.scope_department_id : undefined,
+        }),
+      });
+    },
+    onSuccess: async () => {
+      toast.success('Đã thu hồi quyền tài liệu');
+      await queryClient.invalidateQueries({ queryKey: ['document-permissions', selectedDocumentId] });
+    },
+    onError: (error: any) => {
+      toast.error(`Lỗi: ${error?.message || 'Không thể thu hồi quyền tài liệu'}`);
     },
   });
 
@@ -144,26 +322,89 @@ export default function RolesPage() {
     settings: 'Cài đặt',
   };
 
+  useEffect(() => {
+    if (!documents.length) {
+      setSelectedDocumentId(null);
+      return;
+    }
+
+    setSelectedDocumentId((current) => {
+      if (current && documents.some((document) => document.id === current)) {
+        return current;
+      }
+      return documents[0].id;
+    });
+  }, [documents]);
+
+  const getDocumentDisplayName = (document: DocumentItem) =>
+    document.title || document.original_file_name || document.document_number || `Tài liệu #${document.id}`;
+
+  const getPermissionSubjectLabel = (permission: PermissionRecord) => {
+    if (permission.subject_type === 'user') {
+      const match = permissionUsers.find((user) => user.id === permission.subject_id);
+      return match?.full_name || match?.email || `User #${permission.subject_id}`;
+    }
+
+    if (permission.subject_type === 'department') {
+      const match = permissionDepartments.find((department) => department.id === permission.subject_id);
+      return match?.name || `Phòng ban #${permission.subject_id}`;
+    }
+
+    if (permission.subject_type === 'position_in_department') {
+      const position = permissionPositions.find((item) => item.id === permission.subject_id);
+      const department = permissionDepartments.find((item) => item.id === permission.scope_department_id);
+      return `${position?.name || `Chức danh #${permission.subject_id}`} / ${department?.name || `Phòng ban #${permission.scope_department_id}`}`;
+    }
+
+    return `Đối tượng #${permission.subject_id}`;
+  };
+
+  const selectedDocument = documents.find((document) => document.id === selectedDocumentId) || null;
+  const canSubmitDocumentPermission =
+    !!selectedDocumentId &&
+    !!documentPermissionForm.subject_id &&
+    (documentPermissionForm.subject_type !== 'position_in_department' || !!documentPermissionForm.scope_department_id) &&
+    [
+      documentPermissionForm.can_read,
+      documentPermissionForm.can_edit,
+      documentPermissionForm.can_approve,
+      documentPermissionForm.can_share,
+      documentPermissionForm.can_delete,
+    ].some(Boolean);
+
   return (
     <div className="space-y-6">
       <PageHeader
         icon={Shield}
-        title="Quản lý vai trò"
-        description="Phân quyền và quản lý vai trò người dùng"
+        title="Vai trò & Quyền"
+        description="Tra cứu quyền tài liệu và quản trị vai trò hệ thống"
         iconColor="text-rose-600"
         actions={
-          <Button onClick={() => {
-            setEditingRole(null);
-            setFormData({ name: '', description: '' });
-            setSelectedPermissions([]);
-            setShowCreateModal(true);
-          }} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/30">
-            <Plus className="w-4 h-4 mr-2" />
-            Tạo vai trò mới
-          </Button>
+          activeTab === 'system-roles' ? (
+            <Button onClick={() => {
+              setEditingRole(null);
+              setFormData({ name: '', description: '' });
+              setSelectedPermissions([]);
+              setShowCreateModal(true);
+            }} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/30">
+              <Plus className="w-4 h-4 mr-2" />
+              Tạo vai trò mới
+            </Button>
+          ) : undefined
         }
       />
 
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'document-permissions' | 'system-roles')} className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsTrigger value="document-permissions">Quyền tài liệu</TabsTrigger>
+          <TabsTrigger value="system-roles">Vai trò hệ thống</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="document-permissions" className="space-y-6">
+          <DocumentTypePermissionsTab fetchJson={fetchJson} />
+        </TabsContent>
+
+        <TabsContent value="system-roles" className="space-y-6">
       {/* Roles Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {isLoading ? (
@@ -320,6 +561,8 @@ export default function RolesPage() {
           })
         )}
       </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Role Detail Modal */}
       <Dialog open={!!selectedRole} onOpenChange={(open) => !open && setSelectedRole(null)}>
@@ -401,7 +644,7 @@ export default function RolesPage() {
             <DialogDescription>
               {editingRole 
                 ? 'Cập nhật thông tin vai trò' 
-                : 'Sau khi tạo, bạn có thể assign permissions cho vai trò này.'}
+                : 'Sau khi tạo, bạn có thể gán quyền cho vai trò này.'}
             </DialogDescription>
           </DialogHeader>
           <form
@@ -517,7 +760,7 @@ export default function RolesPage() {
                   })}
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                  <span>💡 Chọn quyền phù hợp với vai trò này</span>
+                  <span>Chọn quyền phù hợp với vai trò này</span>
                   <span className="font-medium">{selectedPermissions.length} quyền đã chọn</span>
                 </div>
               </div>

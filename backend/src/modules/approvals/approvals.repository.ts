@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import { resolveAssigneeType } from '../workflows/workflowStepAssignment';
 
 export class ApprovalsRepository {
   // Workflow Instances
@@ -189,6 +190,63 @@ export class ApprovalsRepository {
     }
 
     const approverIds: number[] = [];
+    const assigneeType = resolveAssigneeType(step as any);
+
+    if (assigneeType === 'specific_user' && (step.assignee_user_id || step.approver_id)) {
+      approverIds.push(step.assignee_user_id || step.approver_id);
+      return [...new Set(approverIds)];
+    }
+
+    if (assigneeType === 'department_manager' && (step.assignee_department_id || step.approver_id)) {
+      const department = await prisma.departments.findUnique({
+        where: { id: step.assignee_department_id || step.approver_id || 0 },
+        select: { manager_id: true },
+      });
+      if (department?.manager_id) {
+        approverIds.push(department.manager_id);
+      }
+      return [...new Set(approverIds)];
+    }
+
+    if (assigneeType === 'position_in_department' && step.assignee_department_id && step.assignee_position_id) {
+      const usersWithPosition = await prisma.users.findMany({
+        where: {
+          tenant_id: tenantId,
+          department_id: step.assignee_department_id,
+          position_id: step.assignee_position_id,
+          status: 'active',
+        },
+        select: { id: true },
+      });
+      approverIds.push(...usersWithPosition.map((user) => user.id));
+      return [...new Set(approverIds)];
+    }
+
+    if (assigneeType === 'direct_manager') {
+      if (documentId) {
+        const document = await prisma.documents.findUnique({
+          where: { id: documentId },
+          select: {
+            owner: {
+              select: {
+                manager_id: true,
+                manager: {
+                  select: {
+                    id: true,
+                    status: true,
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        if (document?.owner?.manager_id && document.owner.manager?.status === 'active') {
+          approverIds.push(document.owner.manager_id);
+        }
+      }
+      return [...new Set(approverIds)];
+    }
 
     switch (step.approver_type) {
       case 'user':
@@ -270,7 +328,7 @@ export class ApprovalsRepository {
         break;
     }
 
-    return approverIds;
+    return [...new Set(approverIds)];
   }
 }
 

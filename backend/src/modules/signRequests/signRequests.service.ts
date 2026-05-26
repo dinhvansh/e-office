@@ -14,6 +14,7 @@ import { NotificationType } from "../notifications/notifications.types";
 import { authorizationService } from "../authorization/authorization.service";
 import { documentWorkflowOrchestratorService } from "../documents/documentWorkflowOrchestrator.service";
 import { normalizeStoredFieldBox } from "./coordinate.helper";
+import { getDefaultCompletionMode, resolveAssigneeType, type WorkflowCompletionMode } from "../workflows/workflowStepAssignment";
 
 export interface SignerInput {
   email: string;
@@ -568,6 +569,49 @@ class SignRequestsService {
     }
   }
 
+  private async getSignerStepCompletionConfig(documentId: number, signingOrder: number) {
+    const document = await prisma.documents.findUnique({
+      where: { id: documentId },
+      select: { workflow_instance: { select: { workflow_id: true } } },
+    });
+
+    const workflowId = document?.workflow_instance?.workflow_id;
+    if (!workflowId) {
+      return {
+        completionMode: "all" as WorkflowCompletionMode,
+        minRequired: 1,
+      };
+    }
+
+    const step = await prisma.workflow_steps.findFirst({
+      where: {
+        workflow_id: workflowId,
+        participant_role: "signer",
+        step_order: signingOrder,
+      },
+      select: {
+        approver_type: true,
+        assignee_type: true,
+        completion_mode: true,
+        min_required: true,
+      },
+    });
+
+    const assigneeType = step ? resolveAssigneeType(step as any) : null;
+    const completionMode =
+      (step?.completion_mode as WorkflowCompletionMode | null) ||
+      getDefaultCompletionMode(assigneeType);
+
+    return {
+      completionMode,
+      minRequired: Math.max(1, step?.min_required || 1),
+    };
+  }
+
+  private isSignerStatusComplete(status?: string | null) {
+    return status === "signed" || status === "completed";
+  }
+
   async addSigner(
     signRequestId: number,
     tenantId: number,
@@ -1076,7 +1120,7 @@ class SignRequestsService {
     }
 
     // Check signing order (sequential workflow)
-    if (signRequest.workflow_type === 'sequential' && signer.signing_order) {
+    if (false && signRequest.workflow_type === 'sequential' && signer.signing_order) {
       const allSigners = await signersRepository.findBySignRequest(signRequestId);
       const previousSigners = allSigners.filter(s => 
         s.signing_order && s.signing_order < signer.signing_order
@@ -1124,6 +1168,46 @@ class SignRequestsService {
       ip_address: ipAddress,
       user_agent: userAgent
     });
+
+    let allSigners = await signersRepository.findBySignRequest(signRequestId);
+    if (signer.signing_order && signRequest.document_id) {
+      const currentOrderSigners = allSigners.filter((item) => item.signing_order === signer.signing_order);
+      const { completionMode, minRequired } = await this.getSignerStepCompletionConfig(
+        signRequest.document_id,
+        signer.signing_order,
+      );
+      const completedCount = currentOrderSigners.filter((item) => this.isSignerStatusComplete(item.status)).length;
+      const isCurrentOrderComplete =
+        completionMode === "any_one"
+          ? completedCount >= 1
+          : completionMode === "min_n"
+          ? completedCount >= minRequired
+          : currentOrderSigners.every((item) => this.isSignerStatusComplete(item.status));
+
+      if (isCurrentOrderComplete && (completionMode === "any_one" || completionMode === "min_n")) {
+        for (const pendingSigner of currentOrderSigners.filter(
+          (item) => !this.isSignerStatusComplete(item.status) && item.status !== "rejected",
+        )) {
+          await signersRepository.update(pendingSigner.id, { status: "completed" });
+        }
+        allSigners = await signersRepository.findBySignRequest(signRequestId);
+      }
+
+      if (isCurrentOrderComplete && signRequest.workflow_type === "sequential") {
+        const nextOrders = allSigners
+          .filter((item) => (item.signing_order || 0) > (signer.signing_order || 0))
+          .map((item) => item.signing_order || 0);
+        const nextOrder = nextOrders.length ? Math.min(...nextOrders) : null;
+
+        if (nextOrder !== null) {
+          for (const nextSigner of allSigners.filter(
+            (item) => item.signing_order === nextOrder && item.status === "waiting_signing",
+          )) {
+            await signersRepository.update(nextSigner.id, { status: "pending" });
+          }
+        }
+      }
+    }
 
     // ✅ SEQUENTIAL WORKFLOW: Activate next signer
     if (signRequest.workflow_type === 'sequential' && signer.signing_order) {
@@ -1204,10 +1288,8 @@ class SignRequestsService {
     }
 
     // Check if all signers have signed
-    const allSigners = await signersRepository.findBySignRequest(signRequestId);
-    const allSigned = allSigners.every(s => 
-      s.status === 'signed' || s.status === 'completed'
-    );
+    allSigners = await signersRepository.findBySignRequest(signRequestId);
+    const allSigned = allSigners.every((s) => this.isSignerStatusComplete(s.status));
 
     // ✅ PROGRESSIVE PDF: Generate PDF after each signature
     try {

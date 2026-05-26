@@ -26,6 +26,52 @@ interface Position {
   };
 }
 
+type SecurityAccessBand = 'normal' | 'confidential' | 'secret' | 'top_secret';
+
+const SECURITY_ACCESS_OPTIONS: Array<{
+  value: SecurityAccessBand;
+  threshold: number;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'normal',
+    threshold: 1,
+    label: 'Thông thường',
+    description: 'Chỉ dùng cho tài liệu thông thường.',
+  },
+  {
+    value: 'confidential',
+    threshold: 2,
+    label: 'Bảo mật',
+    description: 'Đọc được tài liệu mức Bảo mật trở xuống.',
+  },
+  {
+    value: 'secret',
+    threshold: 4,
+    label: 'Mật',
+    description: 'Đọc được tài liệu mức Mật trở xuống.',
+  },
+  {
+    value: 'top_secret',
+    threshold: 6,
+    label: 'Tuyệt mật',
+    description: 'Đọc được mọi mức tài liệu bảo mật.',
+  },
+];
+
+function resolveSecurityBand(level?: number): SecurityAccessBand {
+  if (!level || level < 2) return 'normal';
+  if (level >= 6) return 'top_secret';
+  if (level >= 4) return 'secret';
+  return 'confidential';
+}
+
+function getSecurityAccessMeta(level?: number) {
+  const band = resolveSecurityBand(level);
+  return SECURITY_ACCESS_OPTIONS.find((option) => option.value === band) ?? SECURITY_ACCESS_OPTIONS[0];
+}
+
 export default function PositionsPage() {
   const { fetchJson } = useAuth();
   const queryClient = useQueryClient();
@@ -36,11 +82,12 @@ export default function PositionsPage() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [filter, setFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [securityBand, setSecurityBand] = useState<SecurityAccessBand>('normal');
   const [formData, setFormData] = useState({
     code: '',
     name: '',
     description: '',
-    level: '',
+    level: '1',
   });
 
   // Fetch positions with pagination
@@ -153,9 +200,11 @@ export default function PositionsPage() {
         description: position.description || '',
         level: position.level?.toString() || '',
       });
+      setSecurityBand(resolveSecurityBand(position.level));
     } else {
       setEditingPosition(null);
-      setFormData({ code: '', name: '', description: '', level: '' });
+      setFormData({ code: '', name: '', description: '', level: '1' });
+      setSecurityBand('normal');
     }
     setIsDialogOpen(true);
   };
@@ -163,7 +212,8 @@ export default function PositionsPage() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingPosition(null);
-    setFormData({ code: '', name: '', description: '', level: '' });
+    setFormData({ code: '', name: '', description: '', level: '1' });
+    setSecurityBand('normal');
   };
 
   const totalStats = {
@@ -277,7 +327,7 @@ export default function PositionsPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên chức danh</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mô tả</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cấp bậc</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mức truy cập</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nhân viên</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
@@ -298,7 +348,9 @@ export default function PositionsPage() {
                   <td className="px-4 py-3 text-sm text-gray-600">{position.description || '-'}</td>
                   <td className="px-4 py-3 text-sm">
                     {position.level ? (
-                      <Badge variant="outline">Level {position.level}</Badge>
+                      <Badge variant="outline">
+                        {getSecurityAccessMeta(position.level).label}
+                      </Badge>
                     ) : '-'}
                   </td>
                   <td className="px-4 py-3 text-sm">
@@ -451,16 +503,34 @@ export default function PositionsPage() {
             </div>
 
             <div>
-              <Label htmlFor="level">Cấp bậc</Label>
-              <Input
-                id="level"
-                type="number"
-                value={formData.level}
-                onChange={(e) => setFormData({ ...formData, level: e.target.value })}
-                placeholder="VD: 1 (cao nhất)"
-                min="1"
-              />
-              <p className="text-xs text-gray-500 mt-1">Số càng nhỏ, cấp bậc càng cao</p>
+              <Label htmlFor="level">Cấp truy cập bảo mật</Label>
+              <Select
+                value={securityBand}
+                onValueChange={(value: SecurityAccessBand) => {
+                  const selectedOption = SECURITY_ACCESS_OPTIONS.find((option) => option.value === value);
+                  setSecurityBand(value);
+                  if (selectedOption) {
+                    setFormData({ ...formData, level: selectedOption.threshold.toString() });
+                  }
+                }}
+              >
+                <SelectTrigger id="level" className="h-11">
+                  <SelectValue placeholder="Chọn mức truy cập bảo mật" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SECURITY_ACCESS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">
+                {SECURITY_ACCESS_OPTIONS.find((option) => option.value === securityBand)?.description}
+              </p>
+              <p className="text-xs text-gray-400">
+                Hệ thống sẽ tự quy đổi sang mức kỹ thuật phù hợp khi lưu.
+              </p>
             </div>
 
             <DialogFooter>

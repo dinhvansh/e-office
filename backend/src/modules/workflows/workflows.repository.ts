@@ -105,6 +105,12 @@ export class WorkflowsRepository {
     step_name: string;
     approver_type: string;
     approver_id?: number;
+    assignee_type?: string | null;
+    assignee_user_id?: number | null;
+    assignee_department_id?: number | null;
+    assignee_position_id?: number | null;
+    completion_mode?: string;
+    min_required?: number | null;
     participant_role?: string;
     due_in_days?: number;
     is_required?: boolean;
@@ -120,6 +126,12 @@ export class WorkflowsRepository {
     step_name?: string;
     approver_type?: string;
     approver_id?: number;
+    assignee_type?: string | null;
+    assignee_user_id?: number | null;
+    assignee_department_id?: number | null;
+    assignee_position_id?: number | null;
+    completion_mode?: string;
+    min_required?: number | null;
     participant_role?: string;
     due_in_days?: number;
     is_required?: boolean;

@@ -4,6 +4,7 @@ import { ok } from "../../core/utils/response";
 import { documentsService } from "./documents.service";
 import { toDocumentAttachmentDTO, toDocumentAttachmentDTOs, toDocumentDTO, toDocumentDTOs } from "./documents.dto";
 import { auditService } from "../audit/audit.service";
+import { authorizationService } from "../authorization/authorization.service";
 
 const createSchema = z
   .object({
@@ -52,6 +53,28 @@ const createSchema = z
       file_type: z.string(),
     })).optional(),
 
+    detail_permissions: z.array(z.object({
+      subject_type: z.enum(["user", "department", "position_in_department"]),
+      subject_id: z.coerce.number().int().positive(),
+      scope_department_id: z.coerce.number().int().positive().optional(),
+      scope: z.string().optional(),
+      permissions_json: z.array(z.string()).optional().nullable(),
+      status_limit_json: z.array(z.string()).optional().nullable(),
+      can_read: z.boolean().optional(),
+      can_edit: z.boolean().optional(),
+      can_approve: z.boolean().optional(),
+      can_share: z.boolean().optional(),
+      can_delete: z.boolean().optional(),
+    }).superRefine((value, ctx) => {
+      if (value.subject_type === "position_in_department" && !value.scope_department_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "scope_department_id is required for position_in_department",
+          path: ["scope_department_id"],
+        });
+      }
+    })).optional(),
+
     create_sign_request: z.boolean().optional(),
   })
   .refine((data) => data.file_base64 || data.storage_path, {
@@ -67,6 +90,34 @@ const attachmentSchema = z.object({
 });
 const ccEmailsSchema = z.object({
   emails: z.array(z.string().email()),
+});
+const documentPermissionSchema = z.object({
+  permission_source: z.enum(["share", "baseline"]).default("baseline"),
+  subject_type: z.enum(["user", "department", "position_in_department", "role"]),
+  subject_id: z.coerce.number().int().positive(),
+  scope_department_id: z.coerce.number().int().positive().optional(),
+  scope: z.string().optional(),
+  permissions_json: z.array(z.string()).optional().nullable(),
+  status_limit_json: z.array(z.string()).optional().nullable(),
+  can_read: z.boolean().optional(),
+  can_edit: z.boolean().optional(),
+  can_approve: z.boolean().optional(),
+  can_share: z.boolean().optional(),
+  can_delete: z.boolean().optional(),
+}).superRefine((value, ctx) => {
+  if (value.subject_type === "position_in_department" && !value.scope_department_id) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "scope_department_id is required for position_in_department",
+      path: ["scope_department_id"],
+    });
+  }
+});
+const revokeDocumentPermissionSchema = z.object({
+  permission_source: z.enum(["share", "baseline"]).default("baseline"),
+  subject_type: z.enum(["user", "department", "position_in_department", "role"]),
+  subject_id: z.coerce.number().int().positive(),
+  scope_department_id: z.coerce.number().int().positive().optional(),
 });
 
 export class DocumentsController {
@@ -131,6 +182,7 @@ export class DocumentsController {
         signers: body.signers as any,
         ccEmails: body.cc_emails as any,
         attachments: body.attachments as any,
+        detailPermissions: body.detail_permissions as any,
         forceSignRequest: body.create_sign_request,
       },
       req.auth!.tenantId,
@@ -262,9 +314,24 @@ export class DocumentsController {
   grantPermission = async (req: Request, res: Response): Promise<void> => {
     const { permissionsService } = await import("./permissions.service");
     const documentId = idSchema.parse(req.params.id);
+    const body = documentPermissionSchema.parse(req.body);
+    const payload = {
+      permission_source: body.permission_source,
+      subject_type: body.subject_type,
+      subject_id: body.subject_id,
+      scope_department_id: body.scope_department_id,
+      scope: body.scope,
+      permissions_json: body.permissions_json,
+      status_limit_json: body.status_limit_json,
+      can_read: body.can_read,
+      can_edit: body.can_edit,
+      can_approve: body.can_approve,
+      can_share: body.can_share,
+      can_delete: body.can_delete,
+    };
     const permission = await permissionsService.grantPermission(
       documentId,
-      req.body,
+      payload,
       req.auth!.userId,
       req.auth!.tenantId
     );
@@ -274,12 +341,15 @@ export class DocumentsController {
   revokePermission = async (req: Request, res: Response): Promise<void> => {
     const { permissionsService } = await import("./permissions.service");
     const documentId = idSchema.parse(req.params.id);
-    const { subject_type, subject_id } = req.body;
+    const { permission_source, subject_type, subject_id, scope_department_id } =
+      revokeDocumentPermissionSchema.parse(req.body) as z.infer<typeof revokeDocumentPermissionSchema>;
     
     await permissionsService.revokePermission(
       documentId,
       subject_type,
       subject_id,
+      permission_source,
+      scope_department_id,
       req.auth!.tenantId
     );
     res.json(ok({ message: "Permission revoked" }));
@@ -293,6 +363,16 @@ export class DocumentsController {
       req.auth!.tenantId
     );
     res.json(ok({ permissions }));
+  };
+
+  getEffectivePermissions = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    const decision = await authorizationService.resolveDocumentPermission(
+      req.auth!.userId,
+      req.auth!.tenantId,
+      documentId
+    );
+    res.json(ok({ permissions: decision }));
   };
 
   // Versions endpoints

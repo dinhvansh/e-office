@@ -1,5 +1,68 @@
 import { Request, Response } from 'express';
 import { settingsService } from './settings.service';
+import { z } from 'zod';
+
+const documentTypeIdSchema = z.coerce.number().int().positive();
+const aclTemplateSchema = z.object({
+  id: z.string().min(1).optional(),
+  subject_type: z.enum([
+    'creator',
+    'creator_department',
+    'creator_manager',
+    'specific_department',
+    'specific_role',
+    'specific_user',
+    'workflow_participant',
+    'cc_user',
+    'legacy_position_in_department',
+  ]),
+  subject_id: z.coerce.number().int().positive().nullable().optional(),
+  scope_department_id: z.coerce.number().int().positive().nullable().optional(),
+  scope: z.enum(['OWN', 'DEPARTMENT', 'COMPANY', 'ASSIGNED_ONLY', 'ALL']).optional(),
+  permissions: z.array(z.enum(['CREATE', 'VIEW', 'DOWNLOAD', 'EDIT', 'COMMENT', 'APPROVE', 'SIGN', 'SHARE', 'DELETE'])).min(1),
+  status_limit: z.array(z.enum(['DRAFT', 'REJECTED', 'SUBMITTED', 'APPROVED', 'SIGNED'])).optional().nullable(),
+  is_active: z.boolean().optional(),
+});
+
+const advancedPolicySchema = z.object({
+  id: z.string().min(1).optional(),
+  name: z.string().min(1),
+  priority: z.coerce.number().int(),
+  effect: z.enum(['ALLOW', 'DENY']),
+  condition_json: z.record(z.any()),
+  permission_json: z.record(z.any()),
+  is_active: z.boolean(),
+});
+
+const documentTypePolicySchema = z.object({
+  version: z.coerce.number().int().optional(),
+  visibility: z.object({
+    default_visibility_scope: z.enum([
+      'private',
+      'creator_only',
+      'department',
+      'department_and_manager',
+      'workflow_only',
+      'company',
+      'custom_acl',
+    ]),
+    default_security_level: z.enum(['normal', 'internal', 'confidential', 'secret']),
+    auto_assign_creator_department: z.boolean(),
+    force_private_on_create: z.boolean(),
+  }).optional(),
+  acl_templates: z.array(aclTemplateSchema).optional(),
+  advanced_policies: z.array(advancedPolicySchema).optional(),
+  detail_permissions: z.array(z.any()).optional(),
+  allow_roles: z.array(z.string()).optional(),
+  deny_roles: z.array(z.string()).optional(),
+  allow_departments: z.array(z.coerce.number().int().positive()).optional(),
+  deny_departments: z.array(z.coerce.number().int().positive()).optional(),
+  min_position_level: z.coerce.number().int().positive().nullable().optional(),
+  default_visibility_scope: z.string().optional(),
+  default_confidential_level: z.string().optional(),
+  inherit_creator_department: z.boolean().optional(),
+  force_private_until_completed: z.boolean().optional(),
+});
 
 export const settingsController = {
   async getEmailConfig(req: Request, res: Response) {
@@ -81,11 +144,11 @@ export const settingsController = {
   async getDocumentTypePolicy(req: Request, res: Response) {
     try {
       const tenantId = req.auth!.tenantId;
-      const documentTypeId = Number(req.params.documentTypeId);
+      const documentTypeId = documentTypeIdSchema.parse(req.params.documentTypeId);
       const data = await settingsService.getDocumentTypePolicy(tenantId, documentTypeId);
       res.json({ success: true, data });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(400).json({ success: false, error: error.message });
     }
   },
 
@@ -93,23 +156,23 @@ export const settingsController = {
     try {
       const tenantId = req.auth!.tenantId;
       const userId = req.auth!.userId;
-      const documentTypeId = Number(req.params.documentTypeId);
-      const policy = req.body;
+      const documentTypeId = documentTypeIdSchema.parse(req.params.documentTypeId);
+      const policy = documentTypePolicySchema.parse(req.body);
       await settingsService.saveDocumentTypePolicy(tenantId, documentTypeId, policy, userId);
       res.json({ success: true, message: "Document type policy saved" });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(400).json({ success: false, error: error.message });
     }
   },
 
   async deleteDocumentTypePolicy(req: Request, res: Response) {
     try {
       const tenantId = req.auth!.tenantId;
-      const documentTypeId = Number(req.params.documentTypeId);
+      const documentTypeId = documentTypeIdSchema.parse(req.params.documentTypeId);
       await settingsService.deleteDocumentTypePolicy(tenantId, documentTypeId);
       res.json({ success: true, message: "Document type policy deleted" });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(400).json({ success: false, error: error.message });
     }
   }
 };

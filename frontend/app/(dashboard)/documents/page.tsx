@@ -30,6 +30,7 @@ import { AttachmentsSection } from "@/components/documents/AttachmentsSection";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
 
+
 export default function DocumentsPage() {
   const { fetchJson, hasPermission } = useAuth();
   const queryClient = useQueryClient();
@@ -113,6 +114,14 @@ export default function DocumentsPage() {
     },
   });
 
+  const { data: creatableDocumentTypesData } = useQuery({
+    queryKey: ["document-types", "create-purpose"],
+    enabled: canCreateDocuments,
+    queryFn: async () => {
+      return fetchJson<DocumentType[]>("/document-types?purpose=create").catch(() => []);
+    },
+  });
+
   const { data: workflowsData } = useQuery({
     queryKey: ["workflows"],
     enabled: canCreateDocuments,
@@ -134,8 +143,9 @@ export default function DocumentsPage() {
     },
   });
 
+
   // Only show document types that DON'T require digital signing
-  const activeDocumentTypes = documentTypesData?.filter((type) => 
+  const activeDocumentTypes = creatableDocumentTypesData?.filter((type) => 
     type.is_active && !type.require_digital_signing
   ) || [];
   const activeWorkflows = Array.isArray(workflowsData) ? workflowsData.filter((wf) => wf.is_active) : [];
@@ -243,7 +253,7 @@ export default function DocumentsPage() {
       if (ccEmails.length > 0) {
         payload.cc_emails = ccEmails;
       }
-      
+
       // Add attachments if provided
       if (attachments.length > 0) {
         const attachmentPromises = attachments.map(async (file) => ({
@@ -296,6 +306,7 @@ export default function DocumentsPage() {
     setSelectedFile(file ?? null);
     setFileName(file?.name ?? "");
   };
+
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => fetchJson(`/documents/${id}`, { method: "DELETE" }),

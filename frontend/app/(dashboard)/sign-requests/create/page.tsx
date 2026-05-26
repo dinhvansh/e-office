@@ -30,7 +30,7 @@ interface DocumentType {
   is_active: boolean;
 }
 
-type WorkflowMode = 'no_approval' | 'strict' | 'flexible' | 'manual' | 'adhoc' | null;
+type WorkflowMode = 'no_approval' | 'strict' | 'flexible' | 'adhoc' | null;
 
 interface ExistingSignRequestResponse {
   sign_request?: {
@@ -103,8 +103,8 @@ export default function CreateSignRequestPage() {
   const adhocStepsRef = useRef<any[] | null>(null);
 
   const { data: documentTypes } = useQuery({
-    queryKey: ['document-types'],
-    queryFn: async () => fetchJson<DocumentType[]>('/document-types'),
+    queryKey: ['document-types', 'create-purpose'],
+    queryFn: async () => fetchJson<DocumentType[]>('/document-types?purpose=create'),
   });
 
   const { data: workflowsData } = useQuery({
@@ -192,7 +192,7 @@ export default function CreateSignRequestPage() {
     }
 
     setSelectedWorkflowId(null);
-    setWorkflowMode('manual');
+    setWorkflowMode('adhoc');
   }, [documentTypeId, activeDocumentTypes]);
 
   useEffect(() => {
@@ -258,7 +258,7 @@ export default function CreateSignRequestPage() {
       }
 
       if (selectedDocType?.require_approval) {
-        if (workflowMode === 'manual' && !selectedWorkflowId && (!adhocSteps || adhocSteps.length === 0)) {
+        if (false && !selectedWorkflowId && (!adhocSteps || adhocSteps.length === 0)) {
           throw new Error('Vui lòng chọn workflow có sẵn hoặc tự tạo workflow thủ công');
         }
         if (workflowMode === 'adhoc' && (!adhocStepsRef.current || adhocStepsRef.current.length === 0)) {
@@ -337,11 +337,7 @@ export default function CreateSignRequestPage() {
         payload.customized_steps = customizedStepsRef.current;
       }
 
-      if (workflowMode === 'manual' && selectedWorkflowId) {
-        payload.workflow_id = selectedWorkflowId;
-      }
-
-      if ((workflowMode === 'manual' || workflowMode === 'adhoc') && adhocStepsRef.current?.length) {
+      if (workflowMode === 'adhoc' && adhocStepsRef.current?.length) {
         payload.adhoc_steps = adhocStepsRef.current;
       }
 
@@ -528,9 +524,9 @@ export default function CreateSignRequestPage() {
                 />
               )}
 
-              {workflowMode === 'manual' && (
+              {workflowMode === 'adhoc' && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
+                  {false && <div className="space-y-2">
                     <Label>Chọn workflow thủ công</Label>
                     <Select value={selectedWorkflowId?.toString() || ''} onValueChange={(value) => setSelectedWorkflowId(Number(value))}>
                       <SelectTrigger>
@@ -544,9 +540,9 @@ export default function CreateSignRequestPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </div>}
 
-                  {selectedWorkflowId ? (
+                  {false ? (
                     <WorkflowPreview workflowId={selectedWorkflowId} />
                   ) : (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
@@ -554,7 +550,7 @@ export default function CreateSignRequestPage() {
                     </div>
                   )}
 
-                  {!selectedWorkflowId && (
+                  {true && (
                     <AdhocWorkflowBuilder
                       onBuild={(steps) => {
                         adhocStepsRef.current = steps;

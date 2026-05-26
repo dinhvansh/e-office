@@ -339,21 +339,26 @@ model document_tags {
 }
 
 model document_permissions {
-  id          Int       @id @default(autoincrement())
-  document_id Int
-  subject_type String
-  subject_id  Int
-  can_read    Boolean   @default(true)
-  can_edit    Boolean   @default(false)
-  can_approve Boolean   @default(false)
-  can_share   Boolean   @default(false)
-  can_delete  Boolean   @default(false)
-  granted_by  Int?
-  granted_at  DateTime  @default(now())
+  id                  Int       @id @default(autoincrement())
+  document_id         Int
+  permission_source   String    @default("baseline")
+  subject_type        String
+  subject_id          Int
+  scope_department_id Int       @default(0)
+  scope               String?   @db.VarChar(50)
+  permissions_json    Json?
+  status_limit_json   Json?
+  can_read            Boolean   @default(true)
+  can_edit            Boolean   @default(false)
+  can_approve         Boolean   @default(false)
+  can_share           Boolean   @default(false)
+  can_delete          Boolean   @default(false)
+  granted_by          Int?
+  granted_at          DateTime  @default(now())
   
-  document    documents @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  document            documents @relation(fields: [document_id], references: [id], onDelete: Cascade)
   
-  @@unique([document_id, subject_type, subject_id])
+  @@unique([document_id, permission_source, subject_type, subject_id, scope_department_id], name: "document_permissions_lookup_key")
 }
 
 model document_versions {
@@ -401,6 +406,12 @@ model workflow_steps {
   step_name         String
   approver_type     String    // 'user', 'role', 'department', 'manager'
   approver_id       Int?
+  assignee_type     String?
+  assignee_user_id  Int?
+  assignee_department_id Int?
+  assignee_position_id Int?
+  completion_mode   String    @default("all")
+  min_required      Int?
   participant_role  String?   // 'approver' | 'signer' - Vai trò của người tham gia
   due_in_days       Int       @default(3)
   is_required       Boolean   @default(true)

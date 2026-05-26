@@ -10,6 +10,13 @@ import { prisma } from "../../config/prisma";
 import { CreateDocumentData, documentsRepository } from "./documents.repository";
 import { authorizationService } from "../authorization/authorization.service";
 import { documentWorkflowOrchestratorService } from "./documentWorkflowOrchestrator.service";
+import { permissionsService } from "./permissions.service";
+import {
+  canCreateFromDocumentTypePolicy,
+  DocumentTypePolicyV2,
+  mapSecurityLevelToDocumentConfidentialLevel,
+  normalizeDocumentTypePolicyV2,
+} from "../settings/document-type-policy.helper";
 import {
   applyWatermarkToPdfBytes,
   getTenantWatermarkConfig,
@@ -41,15 +48,21 @@ export interface CreateDocumentInput {
     file_base64: string;
     file_type: string;
   }>;
+  detailPermissions?: Array<{
+    subject_type: 'user' | 'department' | 'position_in_department';
+    subject_id: number;
+    scope_department_id?: number;
+    scope?: string;
+    permissions_json?: string[] | null;
+    status_limit_json?: string[] | null;
+    can_read?: boolean;
+    can_edit?: boolean;
+    can_approve?: boolean;
+    can_share?: boolean;
+    can_delete?: boolean;
+  }>;
   forceSignRequest?: boolean;
 }
-
-type DocumentTypeCreationPolicy = {
-  default_visibility_scope?: string;
-  default_confidential_level?: string;
-  inherit_creator_department?: boolean;
-  force_private_until_completed?: boolean;
-};
 
 class DocumentsService {
   private async resolveDocumentTypeDefaults(
@@ -60,6 +73,7 @@ class DocumentsService {
     visibilityScope?: string;
     confidentialLevel?: string;
     departmentId?: number | null;
+    policy?: DocumentTypePolicyV2;
   }> {
     if (!documentTypeId) {
       return {};
@@ -73,15 +87,10 @@ class DocumentsService {
       select: { setting_value: true },
     });
 
-    const policy = ((setting?.setting_value as DocumentTypeCreationPolicy | null) || {}) as DocumentTypeCreationPolicy;
-    const allowedScopes = new Set(["public", "department", "private"]);
-    const allowedLevels = new Set(["normal", "confidential", "secret", "top_secret"]);
-
-    const visibility = String(policy.default_visibility_scope || "").trim().toLowerCase();
-    const confidential = String(policy.default_confidential_level || "").trim().toLowerCase();
+    const policy = normalizeDocumentTypePolicyV2(setting?.setting_value || {});
 
     let departmentId: number | null | undefined = undefined;
-    if (policy.inherit_creator_department) {
+    if (policy.visibility.auto_assign_creator_department) {
       const owner = await prisma.users.findUnique({
         where: { id: ownerId },
         select: { department_id: true },
@@ -89,17 +98,106 @@ class DocumentsService {
       departmentId = owner?.department_id ?? null;
     }
 
-    const visibilityScope = policy.force_private_until_completed
-      ? "private"
-      : allowedScopes.has(visibility)
-        ? visibility
-        : undefined;
-
     return {
-      visibilityScope,
-      confidentialLevel: allowedLevels.has(confidential) ? confidential : undefined,
+      visibilityScope: policy.visibility.force_private_on_create
+        ? "private"
+        : policy.visibility.default_visibility_scope,
+      confidentialLevel: mapSecurityLevelToDocumentConfidentialLevel(
+        policy.visibility.default_security_level
+      ),
       departmentId,
+      policy,
     };
+  }
+
+  private async snapshotAclTemplatesToDocument(
+    tenantId: number,
+    ownerId: number,
+    documentId: number,
+    policy: DocumentTypePolicyV2 | undefined
+  ) {
+    if (!policy) return;
+
+    const owner = await prisma.users.findUnique({
+      where: { id: ownerId },
+      select: { department_id: true, manager_id: true },
+    });
+
+    for (const template of policy.acl_templates.filter((item) => item.is_active)) {
+      const permissions = new Set(template.permissions);
+      const basePermission = {
+        permission_source: "baseline" as const,
+        scope: template.scope ?? null,
+        permissions_json: template.permissions,
+        status_limit_json: template.status_limit ?? null,
+        can_read: permissions.has("VIEW") || permissions.has("DOWNLOAD"),
+        can_edit: permissions.has("EDIT"),
+        can_approve: permissions.has("APPROVE"),
+        can_share: permissions.has("SHARE"),
+        can_delete: permissions.has("DELETE"),
+      };
+
+      const grants: Array<{
+        subject_type: "user" | "department" | "position_in_department" | "role";
+        subject_id: number;
+        scope_department_id?: number;
+      }> = [];
+
+      switch (template.subject_type) {
+        case "creator":
+          grants.push({ subject_type: "user", subject_id: ownerId });
+          break;
+        case "creator_department":
+          if (owner?.department_id) {
+            grants.push({ subject_type: "department", subject_id: owner.department_id });
+          }
+          break;
+        case "creator_manager":
+          if (owner?.manager_id) {
+            grants.push({ subject_type: "user", subject_id: owner.manager_id });
+          }
+          break;
+        case "specific_department":
+          if (template.subject_id) {
+            grants.push({ subject_type: "department", subject_id: template.subject_id });
+          }
+          break;
+        case "specific_role":
+          if (template.subject_id) {
+            grants.push({ subject_type: "role", subject_id: template.subject_id });
+          }
+          break;
+        case "specific_user":
+          if (template.subject_id) {
+            grants.push({ subject_type: "user", subject_id: template.subject_id });
+          }
+          break;
+        case "legacy_position_in_department":
+          if (template.subject_id && template.scope_department_id) {
+            grants.push({
+              subject_type: "position_in_department",
+              subject_id: template.subject_id,
+              scope_department_id: template.scope_department_id,
+            });
+          }
+          break;
+        case "workflow_participant":
+        case "cc_user":
+          continue;
+      }
+
+      for (const grant of grants) {
+        await permissionsService.grantPermission(
+          documentId,
+          {
+            ...grant,
+            ...basePermission,
+          },
+          ownerId,
+          tenantId
+        );
+      }
+    }
   }
 
   async listDocuments(tenantId: number, userId?: number, noSigningOnly = false): Promise<documents[]> {
@@ -496,6 +594,24 @@ class DocumentsService {
       ownerId
     );
 
+    if (documentTypeId && documentTypeDefaults.policy) {
+      const owner = await prisma.users.findUnique({
+        where: { id: ownerId },
+        include: { user_roles: true },
+      });
+
+      if (
+        owner &&
+        owner.tenant_id === tenantId &&
+        !canCreateFromDocumentTypePolicy(documentTypeDefaults.policy, owner)
+      ) {
+        throw ApiError.forbidden(
+          "Bạn không có quyền tạo tài liệu từ loại văn bản này",
+          "DOCUMENT_TYPE_CREATE_DENIED"
+        );
+      }
+    }
+
     const payload: CreateDocumentData = {
       tenant_id: tenantId,
       owner_id: ownerId,
@@ -510,10 +626,44 @@ class DocumentsService {
       summary: input.summary,
       priority_level: input.priorityLevel,
       confidential_level: input.confidentialLevel ?? documentTypeDefaults.confidentialLevel,
-      visibility_scope: input.visibilityScope ?? documentTypeDefaults.visibilityScope,
+      visibility_scope:
+        documentTypeDefaults.policy?.visibility.force_private_on_create
+          ? "private"
+          : input.visibilityScope ?? documentTypeDefaults.visibilityScope,
       department_id: input.departmentId ?? documentTypeDefaults.departmentId,
     };
     const document = await documentsRepository.create(payload);
+
+    if (input.detailPermissions && input.detailPermissions.length > 0) {
+      for (const permission of input.detailPermissions) {
+        await permissionsService.grantPermission(
+          document.id,
+          {
+            permission_source: "baseline",
+            subject_type: permission.subject_type,
+            subject_id: permission.subject_id,
+            scope_department_id: permission.scope_department_id,
+            scope: permission.scope,
+            permissions_json: permission.permissions_json ?? null,
+            status_limit_json: permission.status_limit_json ?? null,
+            can_read: permission.can_read,
+            can_edit: permission.can_edit,
+            can_approve: permission.can_approve,
+            can_share: permission.can_share,
+            can_delete: permission.can_delete,
+          },
+          ownerId,
+          tenantId
+        );
+      }
+    } else {
+      await this.snapshotAclTemplatesToDocument(
+        tenantId,
+        ownerId,
+        document.id,
+        documentTypeDefaults.policy
+      );
+    }
     
     if (shouldCreateSignRequest) {
       await documentWorkflowOrchestratorService.prepareDraftPackage({
@@ -832,6 +982,9 @@ class DocumentsService {
           step_name: `Bước ${i + 1}`,
           approver_type: 'user',
           approver_id: steps[i].approver_user_id,
+          assignee_type: 'specific_user',
+          assignee_user_id: steps[i].approver_user_id,
+          completion_mode: 'all',
           due_in_days: steps[i].due_in_days,
           is_required: true,
         },
@@ -964,6 +1117,12 @@ class DocumentsService {
           step_name: step.step_name,
           approver_type: step.approver_type,
           approver_id: step.approver_id,
+          assignee_type: step.assignee_type,
+          assignee_user_id: step.assignee_user_id,
+          assignee_department_id: step.assignee_department_id,
+          assignee_position_id: step.assignee_position_id,
+          completion_mode: step.completion_mode,
+          min_required: step.min_required,
           participant_role: step.participant_role,
           due_in_days: step.due_in_days,
           is_required: step.is_required,

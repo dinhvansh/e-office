@@ -189,11 +189,11 @@ class EmailService {
     await sendEmail({
       tenantId: data.tenantId,
       to: data.recipientEmail,
-      subject: `[E-Office] OTP k? t?i li?u: ${docInfo}`,
+      subject: `[E-Office] OTP ký tài liệu: ${docInfo}`,
       html,
-      text: `Xin ch?o ${data.recipientName}
+      text: `Xin chào ${data.recipientName}
 
-${data.senderName} ?? g?i cho b?n y?u c?u k? t?i li?u: ${docInfo}
+${data.senderName} đã gửi cho bạn yêu cầu ký tài liệu: ${docInfo}
 
 M? OTP: ${data.otp}
 Hi?u l?c: ${data.expiryMinutes} ph?t
@@ -248,7 +248,7 @@ Link k?: ${data.signUrl}`,
             <p style="color: #666; font-size: 14px;">Hoặc copy link sau vào trình duyệt:<br>${data.signUrl}</p>
           </div>
           <div class="footer">
-            <p>Email này được gửi tự động từ WP Sign. Vui lòng không trả lời email này.</p>
+            <p>Email này được gửi tự động từ E-Office. Vui lòng không trả lời email này.</p>
           </div>
         </div>
       </body>

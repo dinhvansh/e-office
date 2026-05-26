@@ -10,8 +10,8 @@ export class AuditController {
       throw ApiError.badRequest("Invalid document id", "INVALID_DOCUMENT_ID");
     }
     const tenantId = req.auth!.tenantId;
-    const logs = await auditService.listDocumentLogs(documentId, tenantId);
-    res.json(ok({ logs }));
+    const report = await auditService.getDocumentAuditReport(documentId, tenantId);
+    res.json(ok(report));
   };
 
   getAuthorizationDecisions = async (req: Request, res: Response): Promise<void> => {

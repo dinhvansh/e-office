@@ -9,8 +9,14 @@ export const documentTypesController = {
         category: req.query.category as string,
         is_active: req.query.is_active === 'true' ? true : req.query.is_active === 'false' ? false : undefined,
       };
+      const purpose = req.query.purpose as string | undefined;
 
-      const documentTypes = await documentTypesService.getDocumentTypes(tenantId, filters);
+      const documentTypes = await documentTypesService.getDocumentTypes(
+        tenantId,
+        filters,
+        (req as any).auth.userId,
+        purpose
+      );
       res.json({ success: true, data: documentTypes });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });

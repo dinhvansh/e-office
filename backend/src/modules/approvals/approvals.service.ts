@@ -6,6 +6,7 @@ import { signRequestsService } from '../signRequests/signRequests.service';
 import { notificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/notifications.types';
 import { authorizationService } from '../authorization/authorization.service';
+import { getDefaultCompletionMode, resolveAssigneeType } from '../workflows/workflowStepAssignment';
 
 class ApprovalsService {
   /**
@@ -379,17 +380,37 @@ class ApprovalsService {
       acted_at: new Date(),
     } as any);
 
-    // Check if all approvals for this step are done
+    const completionMode =
+      (approval.workflow_step as any).completion_mode ||
+      getDefaultCompletionMode(resolveAssigneeType(approval.workflow_step as any));
+
+    const minRequired =
+      completionMode === 'min_n'
+        ? Math.max(1, Number((approval.workflow_step as any).min_required || 1))
+        : null;
+
+    // Check if current step is complete according to completion mode
     const stepApprovals = await approvalsRepository.findStepApprovals(
       approval.document_id,
       approval.workflow_step_id
     );
 
+    const approvedCount = stepApprovals.filter(
+      (item) => item.id === approvalId || item.action === 'approved',
+    ).length;
+
     const allStepApproved = stepApprovals.every(
-      a => a.id === approvalId || a.action === 'approved'
+      (item) => item.id === approvalId || item.action === 'approved',
     );
 
-    if (!allStepApproved) {
+    const isStepComplete =
+      completionMode === 'any_one'
+        ? approvedCount >= 1
+        : completionMode === 'min_n'
+          ? approvedCount >= (minRequired || 1)
+          : allStepApproved;
+
+    if (!isStepComplete) {
       // Still waiting for other approvers in this step
       return {
         message: 'Approval recorded. Waiting for other approvers in this step.',
@@ -398,6 +419,20 @@ class ApprovalsService {
     }
 
     // ⭐ SEQUENTIAL APPROVAL: Current step is complete, activate next step
+    if (completionMode === 'any_one' || completionMode === 'min_n') {
+      const pendingApprovals = stepApprovals.filter(
+        (item) => item.id !== approvalId && (item.action === 'pending' || item.action === 'waiting'),
+      );
+
+      for (const pendingApproval of pendingApprovals) {
+        await approvalsRepository.updateApproval(pendingApproval.id, {
+          action: 'skipped',
+          comment: completionMode === 'any_one' ? 'Step completed by another approver' : 'Step threshold reached',
+          acted_at: new Date(),
+        });
+      }
+    }
+
     console.log(`[Sequential Approval] Step ${approval.workflow_step_id} completed`);
     
     // Get workflow instance to find next step

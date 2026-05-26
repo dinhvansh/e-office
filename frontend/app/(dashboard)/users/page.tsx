@@ -430,6 +430,14 @@ export default function UsersPage() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (!formData.department_id) {
+                toast.error('Vui lòng chọn phòng ban');
+                return;
+              }
+              if (!formData.position_id) {
+                toast.error('Vui lòng chọn chức danh');
+                return;
+              }
               const submitData: any = {
                 ...formData,
                 department_id: formData.department_id ? parseInt(formData.department_id) : undefined,
@@ -501,6 +509,7 @@ export default function UsersPage() {
                 value={formData.department_id}
                 onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
                 className="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring"
+                required
               >
                 <option value="">-- Chọn phòng ban --</option>
                 {departments.map((dept) => (
@@ -518,6 +527,7 @@ export default function UsersPage() {
                 value={formData.position_id}
                 onChange={(e) => setFormData({ ...formData, position_id: e.target.value })}
                 className="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring"
+                required
               >
                 <option value="">-- Chọn chức danh --</option>
                 {positions.map((pos: any) => (

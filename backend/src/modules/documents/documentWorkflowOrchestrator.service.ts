@@ -5,6 +5,7 @@ import { documentsRepository } from "./documents.repository";
 import { signRequestsRepository } from "../signRequests/signRequests.repository";
 import { signersRepository } from "../signers/signers.repository";
 import type { CreateDocumentInput } from "./documents.service";
+import { resolveAssigneeType } from "../workflows/workflowStepAssignment";
 
 type CustomizedStepInput = {
   step_name?: string;
@@ -133,9 +134,10 @@ class DocumentWorkflowOrchestratorService {
       return { completedWithoutSigners: true };
     }
 
+    const firstOrder = orderedSigners[0].signing_order || 0;
     for (let index = 0; index < orderedSigners.length; index += 1) {
       await signersRepository.update(orderedSigners[index].id, {
-        status: index === 0 ? "pending" : "waiting_signing",
+        status: (orderedSigners[index].signing_order || 0) === firstOrder ? "pending" : "waiting_signing",
       });
     }
 
@@ -220,6 +222,10 @@ class DocumentWorkflowOrchestratorService {
       step_order: number;
       approver_type: string | null;
       approver_id: number | null;
+      assignee_type?: string | null;
+      assignee_user_id?: number | null;
+      assignee_department_id?: number | null;
+      assignee_position_id?: number | null;
       participant_role: string | null;
     }>,
     tenantId: number,
@@ -228,24 +234,24 @@ class DocumentWorkflowOrchestratorService {
     const signerSteps = steps.filter((step) => step.participant_role === "signer");
 
     for (const step of signerSteps) {
-      const resolvedSigner = await this.resolveSignerFromStep(step, tenantId, ownerId);
-      if (!resolvedSigner?.email) continue;
+      const resolvedSigners = await this.resolveSignerCandidatesFromStep(step, tenantId, ownerId);
+      for (const resolvedSigner of resolvedSigners) {
+        const signerData: Prisma.signersCreateInput = {
+          sign_request: { connect: { id: signRequestId } },
+          email: resolvedSigner.email,
+          name: resolvedSigner.name,
+          role: "signer",
+          signing_order: step.step_order,
+          status: "draft",
+          is_internal: !!resolvedSigner.userId,
+        };
 
-      const signerData: Prisma.signersCreateInput = {
-        sign_request: { connect: { id: signRequestId } },
-        email: resolvedSigner.email,
-        name: resolvedSigner.name,
-        role: "signer",
-        signing_order: step.step_order,
-        status: "draft",
-        is_internal: !!resolvedSigner.userId,
-      };
+        if (resolvedSigner.userId) {
+          signerData.user = { connect: { id: resolvedSigner.userId } };
+        }
 
-      if (resolvedSigner.userId) {
-        signerData.user = { connect: { id: resolvedSigner.userId } };
+        await signersRepository.create(signerData);
       }
-
-      await signersRepository.create(signerData);
     }
 
     return signerSteps.length;
@@ -291,81 +297,71 @@ class DocumentWorkflowOrchestratorService {
     }
   }
 
-  private async resolveSignerFromStep(
+  private async resolveSignerCandidatesFromStep(
     step: {
       approver_type: string | null;
       approver_id: number | null;
+      assignee_type?: string | null;
+      assignee_user_id?: number | null;
+      assignee_department_id?: number | null;
+      assignee_position_id?: number | null;
     },
     tenantId: number,
     ownerId: number
   ) {
-    let email = "";
-    let name = "";
+    const assigneeType = resolveAssigneeType(step as any);
+    let candidates: Array<{ id: number; email: string; full_name: string | null }> = [];
 
-    if (step.approver_type === "user" && step.approver_id) {
-      const user = await prisma.users.findUnique({
-        where: { id: step.approver_id },
+    if (assigneeType === "specific_user" && (step.assignee_user_id || step.approver_id)) {
+      const user = await prisma.users.findFirst({
+        where: { id: step.assignee_user_id || step.approver_id || undefined, tenant_id: tenantId, status: "active" },
         select: { id: true, email: true, full_name: true },
       });
-      if (user) {
-        email = user.email;
-        name = user.full_name || user.email;
-        return { email, name, userId: user.id };
-      }
-    }
-
-    if (step.approver_type === "role" && step.approver_id) {
-      const userRole = await prisma.user_roles.findFirst({
-        where: { role_id: step.approver_id },
-        include: { user: { select: { id: true, email: true, full_name: true } } },
+      if (user) candidates = [user];
+    } else if (assigneeType === "department_manager" && (step.assignee_department_id || step.approver_id)) {
+      const department = await prisma.departments.findFirst({
+        where: { id: step.assignee_department_id || step.approver_id || undefined, tenant_id: tenantId },
+        include: { manager: { select: { id: true, email: true, full_name: true, status: true } } },
       });
-      if (userRole?.user) {
-        email = userRole.user.email;
-        name = userRole.user.full_name || userRole.user.email;
-        return { email, name, userId: userRole.user.id };
+      if (department?.manager?.status === "active") {
+        candidates = [department.manager];
       }
-    }
-
-    if (step.approver_type === "department" && step.approver_id) {
-      const dept = await prisma.departments.findUnique({
-        where: { id: step.approver_id },
-        include: { manager: { select: { id: true, email: true, full_name: true } } },
+    } else if (assigneeType === "position_in_department" && step.assignee_department_id && step.assignee_position_id) {
+      candidates = await prisma.users.findMany({
+        where: {
+          tenant_id: tenantId,
+          department_id: step.assignee_department_id,
+          position_id: step.assignee_position_id,
+          status: "active",
+        },
+        select: { id: true, email: true, full_name: true },
       });
-      if (dept?.manager) {
-        email = dept.manager.email;
-        name = dept.manager.full_name || dept.manager.email;
-        return { email, name, userId: dept.manager.id };
-      }
-    }
-
-    if (step.approver_type === "manager") {
+    } else if (assigneeType === "direct_manager") {
       const owner = await prisma.users.findUnique({
         where: { id: ownerId },
-        include: { manager: { select: { id: true, email: true, full_name: true } } },
+        include: { manager: { select: { id: true, email: true, full_name: true, status: true } } },
       });
-      if (owner?.manager) {
-        email = owner.manager.email;
-        name = owner.manager.full_name || owner.manager.email;
-        return { email, name, userId: owner.manager.id };
+      if (owner?.manager?.status === "active") {
+        candidates = [owner.manager];
       }
+    } else if (step.approver_type === "role" && step.approver_id) {
+      const userRoles = await prisma.user_roles.findMany({
+        where: { role_id: step.approver_id, user: { tenant_id: tenantId, status: "active" } },
+        include: { user: { select: { id: true, email: true, full_name: true } } },
+      });
+      candidates = userRoles.map((entry) => entry.user).filter(Boolean);
     }
 
-    if (!email) return null;
+    const deduped = new Map<number, { id: number; email: string; full_name: string | null }>();
+    for (const candidate of candidates) {
+      deduped.set(candidate.id, candidate);
+    }
 
-    const internalUser = await prisma.users.findFirst({
-      where: {
-        tenant_id: tenantId,
-        email,
-        status: "active",
-      },
-      select: { id: true },
-    });
-
-    return {
-      email,
-      name: name || email,
-      userId: internalUser?.id || null,
-    };
+    return [...deduped.values()].map((candidate) => ({
+      email: candidate.email,
+      name: candidate.full_name || candidate.email,
+      userId: candidate.id,
+    }));
   }
 
   private async createAdhocWorkflow(
@@ -419,6 +415,9 @@ class DocumentWorkflowOrchestratorService {
           step_name: `Buoc ${i + 1}`,
           approver_type: "user",
           approver_id: steps[i].approver_user_id,
+          assignee_type: "specific_user",
+          assignee_user_id: steps[i].approver_user_id,
+          completion_mode: "all",
           due_in_days: steps[i].due_in_days,
           is_required: true,
         },
@@ -557,6 +556,12 @@ class DocumentWorkflowOrchestratorService {
           step_name: step.step_name,
           approver_type: step.approver_type,
           approver_id: step.approver_id,
+          assignee_type: step.assignee_type,
+          assignee_user_id: step.assignee_user_id,
+          assignee_department_id: step.assignee_department_id,
+          assignee_position_id: step.assignee_position_id,
+          completion_mode: step.completion_mode,
+          min_required: step.min_required,
           participant_role: step.participant_role,
           due_in_days: step.due_in_days,
           is_required: step.is_required,

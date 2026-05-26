@@ -2,6 +2,20 @@ import bcrypt from 'bcrypt';
 import { usersRepository } from './users.repository';
 
 export const usersService = {
+  validateOrganizationalFields(data: {
+    department_id?: number;
+    position_id?: number;
+    manager_id?: number;
+  }) {
+    if (!data.department_id) {
+      throw new Error('Department is required');
+    }
+
+    if (!data.position_id) {
+      throw new Error('Position is required');
+    }
+  },
+
   async getUsers(tenantId: number | null, filters?: any) {
     return usersRepository.findByTenant(tenantId, filters);
   },
@@ -43,6 +57,8 @@ export const usersService = {
     position_id?: number;
     role_ids?: number[];
   }) {
+    this.validateOrganizationalFields(data);
+
     // Check if email already exists
     const existing = await usersRepository.findByEmail(data.email);
     if (existing) {
@@ -81,9 +97,15 @@ export const usersService = {
     role_ids?: number[];
     password?: string;
   }) {
+    this.validateOrganizationalFields(data);
+
     const existing = await usersRepository.findById(id, tenantId);
     if (!existing) {
       throw new Error('User not found');
+    }
+
+    if (data.manager_id && data.manager_id === id) {
+      throw new Error('Manager cannot be the same user');
     }
 
     const { role_ids, password, ...userData } = data;
