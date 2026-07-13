@@ -1,0 +1,130 @@
+name: PostgreSQL E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-e2e:
+    name: Workflow E2E (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: eoffice_ci
+          POSTGRES_PASSWORD: eoffice_ci_password
+          POSTGRES_DB: eoffice_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eoffice_ci -d eoffice_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: development
+      PORT: "4000"
+      DATABASE_URL: postgresql://eoffice_ci:eoffice_ci_password@localhost:5432/eoffice_e2e?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-only-jwt-secret-with-at-least-thirty-two-characters
+      REFRESH_TOKEN_SECRET: ci-only-refresh-secret-with-at-least-thirty-two-characters
+      DISABLE_LICENSE_CHECK: "true"
+      CORS_ORIGIN: http://localhost:3000
+      STORAGE_DRIVER: local
+      STORAGE_BASE_PATH: ./storage
+      PDF_UNICODE_FONT_PATH: /usr/share/fonts/truetype/noto/NotoSans-Regular.ttf
+      PDF_UNICODE_BOLD_FONT_PATH: /usr/share/fonts/truetype/noto/NotoSans-Bold.ttf
+      E2E_API_BASE: http://localhost:4000/api/v1
+      E2E_PUBLIC_BASE: http://localhost:4000/public
+      E2E_ADMIN_EMAIL: admin@acme.local
+      E2E_ADMIN_PASSWORD: secret123
+      E2E_INTERNAL_SIGNER_EMAIL: admin@acme.local
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Unicode PDF fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes fonts-noto-core
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply migrations and synchronize disposable test schema
+        run: |
+          npx prisma migrate deploy
+          # The historical migration chain is incremental and has no initial
+          # baseline migration, so a blank CI database also needs the current
+          # Prisma schema before its synthetic fixtures can be seeded.
+          npx prisma db push
+
+      - name: Seed required E2E baseline
+        run: |
+          node scripts/seed.js
+          node scripts/seed-rbac.js
+          node scripts/seed-document-types.js
+          node scripts/seed-workflows-simple.js
+
+      - name: Build backend
+        run: npm run build
+
+      - name: Start backend
+        run: nohup npm run start > "$RUNNER_TEMP/eoffice-backend.log" 2>&1 &
+
+      - name: Wait for backend health
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://localhost:4000/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend did not become healthy in time"
+          cat "$RUNNER_TEMP/eoffice-backend.log" || true
+          exit 1
+
+      - name: Run PostgreSQL workflow E2E
+        run: npm run test:e2e:workflow
+
+      - name: Show backend and service logs on failure
+        if: failure()
+        run: |
+          cat "$RUNNER_TEMP/eoffice-backend.log" || true
+          docker logs "${{ job.services.postgres.id }}" || true
+          docker logs "${{ job.services.redis.id }}" || true
+
+      - name: Clean up service containers
+        if: always()
+        run: |
+          docker rm -f "${{ job.services.postgres.id }}" "${{ job.services.redis.id }}" || true

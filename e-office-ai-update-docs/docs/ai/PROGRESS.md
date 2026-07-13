@@ -663,6 +663,68 @@ script runner is introduced.
 
 Next recommended issue: Continue P1 architecture/controller audit and bounded backend lint remediation.
 
+## 2026-07-13 — PostgreSQL workflow E2E in GitHub Actions
+
+Status: Implemented and locally verified against disposable PostgreSQL and Redis
+containers.
+
+Files changed:
+
+- `.github/workflows/e2e-postgres.yml`
+- `docs/dev/E2E-TEST-MATRIX.md`
+- `e-office-ai-update-docs/docs/ai/PROGRESS.md`
+
+Workflow added: `PostgreSQL E2E` runs on pull requests to `main`, pushes to
+`main`, and manual `workflow_dispatch`. It installs Node 20 dependencies with
+`npm ci`, starts PostgreSQL 16 and Redis 7 service containers, applies Prisma
+migrations, synchronizes the disposable schema, seeds synthetic baseline data,
+installs Unicode PDF fonts, starts the backend, and runs
+`npm run test:e2e:workflow`. Backend and service logs are printed on failure;
+the job removes its service containers at completion.
+
+Behavior changed: No product behavior changed. The CI-specific schema
+synchronization is necessary because the legacy migration chain has no initial
+baseline migration; `prisma migrate deploy` alone leaves a new database without
+the base application tables.
+
+Security impact: CI uses only fixed fake database credentials, fake JWT/refresh
+secrets, synthetic seeded users, and `DISABLE_LICENSE_CHECK=true`. It does not
+read repository-local `.env` files or require SMTP, production license, or real
+document credentials.
+
+Migration impact: None for deployed environments. `prisma db push` runs only
+against the new disposable CI database after `prisma migrate deploy`.
+
+Tests added: No new application test; the existing workflow E2E is now an
+automatic GitHub Actions gate.
+
+Commands run:
+
+- `docker exec eoffice-backend node scripts/e2e-workflow-refactor.js` — passed
+  against the current Docker PostgreSQL stack.
+- `npm run test:e2e:workflow` with disposable PostgreSQL/Redis and a backend on
+  port 4100 — passed. It verified package rollback, duplicate approval/signing,
+  signing rollback, artifact download, refresh rotation/logout, and disabled
+  refresh-session revocation.
+- `cd backend && npm test` — passed, 64/64.
+- `cd backend && npm run build` — passed after stopping the disposable backend
+  process that had temporarily locked Prisma's Windows engine.
+- `npx prettier@3.2.5 --check .github/workflows/e2e-postgres.yml
+  docs/dev/E2E-TEST-MATRIX.md` — passed; validates the workflow YAML parser and
+  formatting.
+
+Result: The previously manual Docker/PostgreSQL workflow E2E command now has a
+dedicated CI workflow with service readiness, schema/seed order, failure logs,
+and cleanup.
+
+Known limitations: The CI test database needs `prisma db push` until a baseline
+initial migration exists. The workflow validates backend API/Persistence E2E;
+it does not run browser Playwright E2E or legacy full-repository lint.
+
+Next recommended issue: Add a reviewed baseline Prisma migration so CI can rely
+on `prisma migrate deploy` alone, or continue the separately scoped backend lint
+remediation.
+
 ## 2026-07-13 20:26 — P1-OPS-014 and P1-PDF-015 verification
 
 Status: Verified from Docker configuration and current runtime workflow test.
