@@ -86,7 +86,7 @@ done
 # Setup database
 echo -e "\n${YELLOW}[7/8] Setting up database...${NC}"
 echo "Running Prisma migrations..."
-docker-compose exec -T backend npx prisma db push
+docker-compose exec -T backend npx prisma migrate deploy
 
 echo "Running seeds..."
 docker-compose exec -T backend node scripts/seed-rbac.js

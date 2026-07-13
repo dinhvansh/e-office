@@ -100,7 +100,7 @@ if (-not $frontendReady) {
 # Setup database
 Write-Host "`n[7/8] Setting up database..." -ForegroundColor Yellow
 Write-Host "Running Prisma migrations..."
-docker-compose exec -T backend npx prisma db push
+docker-compose exec -T backend npx prisma migrate deploy
 
 Write-Host "Running seeds..."
 docker-compose exec -T backend node scripts/seed-rbac.js

@@ -17,8 +17,7 @@ function run(command, args, options = {}) {
 }
 
 function main() {
-  // Schema push and demo seeds are destructive/development-only operations.
-  // Require an explicit opt-in even when this script is invoked outside Compose.
+  // Demo seeds remain opt-in even when this script is invoked outside Compose.
   const autoInitEnabled = (process.env.AUTO_INIT_DB || 'false').toLowerCase() === 'true';
   if (!autoInitEnabled) {
     console.log('[init-db] AUTO_INIT_DB=false, skipping initialization.');
@@ -27,8 +26,7 @@ function main() {
 
   console.log('[init-db] Starting database initialization...');
 
-  // Keep local Docker setup resilient against broken migration chain.
-  run('npx', ['prisma', 'db', 'push', '--accept-data-loss']);
+  run('npx', ['prisma', 'migrate', 'deploy']);
 
   // Required baseline data for login + RBAC visibility.
   run('node', ['scripts/seed.js']);

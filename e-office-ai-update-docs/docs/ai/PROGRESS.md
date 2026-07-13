@@ -1516,3 +1516,57 @@ Migration impact: None.
 
 Next recommended issue: Implement the P0-SEC-001 HTTP-level characterization
 coverage described above, after review of this audit.
+
+## 2026-07-13 — Prisma migration baseline
+
+Status: Implemented and verified on a fresh disposable PostgreSQL database.
+
+Files changed:
+
+- `backend/prisma/migrations/0_init/migration.sql`
+- `backend/prisma/migrations/migration_lock.toml`
+- `backend/prisma/migrations_archive/` (historical incremental migrations)
+- `backend/scripts/init-db.js`
+- `.github/workflows/ci.yml`
+- `.github/workflows/e2e-postgres.yml`
+- Docker/E2E migration documentation and `docs/database-migrations.md`
+- `e-office-ai-update-docs/docs/ai/PROGRESS.md`
+
+Behavior changed: No application business behavior or Prisma schema changed.
+The active Prisma history is now a reviewed `0_init` baseline generated from
+the current schema. New/empty databases use `prisma migrate deploy`; CI and
+Docker bootstrap/E2E no longer use `prisma db push`.
+
+SQL review: `0_init` was generated with `prisma migrate diff --from-empty
+--to-schema-datamodel prisma/schema.prisma --script`. It creates 35 tables,
+their indexes, and foreign keys; it contains no `DROP`, `INSERT`, `UPDATE`,
+`DELETE`, or `TRUNCATE` statements. Seed data remains in separate idempotent
+seed scripts.
+
+Security and migration impact: The baseline does not run against populated
+databases. Existing deployments must back up first, prove zero schema drift,
+then use `prisma migrate resolve --applied 0_init` only when the schema matches.
+The adoption runbook is in `docs/database-migrations.md`.
+
+Commands run:
+
+- `npx prisma migrate diff --from-empty --to-schema-datamodel
+  prisma/schema.prisma --script` — generated baseline SQL.
+- Fresh disposable PostgreSQL: `npx prisma migrate deploy`, `npx prisma migrate
+  status`, and `npx prisma migrate diff --from-url ... --to-schema-datamodel
+  prisma/schema.prisma --exit-code` — passed; no schema drift.
+- `docker exec eoffice-backend node scripts/e2e-workflow-refactor.js` — passed.
+- `cd backend && npm test` — passed, 64/64.
+- `cd backend && npm run build` — passed.
+
+Result: A blank PostgreSQL database now initializes through `migrate deploy`
+alone, while existing populated databases receive an explicit, non-destructive
+adoption path.
+
+Known limitations: Historical migrations are archived rather than active.
+Operators must manually verify a backup and zero schema drift before marking
+the baseline applied on an existing database; this task deliberately does not
+alter any developer or deployment database.
+
+Next recommended issue: Create future schema changes with reviewed migrations
+after `0_init`; do not reintroduce `prisma db push` into CI or deployment flows.

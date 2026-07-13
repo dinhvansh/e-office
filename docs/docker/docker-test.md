@@ -62,7 +62,7 @@ curl http://localhost:3000
 docker-compose exec backend sh
 
 # Chạy migrations và seeds
-npx prisma db push
+npx prisma migrate deploy
 node scripts/seed-rbac.js
 node scripts/seed-document-types.js
 node scripts/seed-workflows-simple.js
@@ -139,7 +139,7 @@ docker-compose restart db
 
 # Kiểm tra connection từ backend
 docker-compose exec backend sh
-npx prisma db push
+npx prisma migrate deploy
 ```
 
 ### Lỗi: Build failed

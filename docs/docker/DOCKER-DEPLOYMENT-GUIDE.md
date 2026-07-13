@@ -151,7 +151,7 @@ docker-compose logs -f
 # Khi thấy "Backend listening on port 4000" là OK
 
 # 6. Setup database
-docker-compose exec backend npx prisma db push
+docker-compose exec backend npx prisma migrate deploy
 docker-compose exec backend node scripts/seed-rbac.js
 docker-compose exec backend node scripts/seed-document-types.js
 docker-compose exec backend node scripts/seed-workflows-simple.js

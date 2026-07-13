@@ -118,7 +118,7 @@ Trước khi deploy production:
 ### 3. Database Setup
 Sau khi start containers lần đầu, cần chạy:
 ```bash
-docker-compose exec backend npx prisma db push
+docker-compose exec backend npx prisma migrate deploy
 docker-compose exec backend node scripts/seed-rbac.js
 docker-compose exec backend node scripts/seed-document-types.js
 docker-compose exec backend node scripts/seed-workflows-simple.js

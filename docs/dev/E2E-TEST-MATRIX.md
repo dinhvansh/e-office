@@ -49,7 +49,6 @@ export LICENSE_SIGNING_SECRET=local-only-license-secret-with-at-least-thirty-two
 export DATABASE_URL=postgresql://eoffice:eoffice-local-test-password@db:5432/eoffice_db
 docker compose up -d --build
 docker exec eoffice-backend npx prisma migrate deploy
-docker exec eoffice-backend npx prisma db push
 docker exec eoffice-backend node scripts/seed.js
 docker exec eoffice-backend node scripts/seed-rbac.js
 docker exec eoffice-backend node scripts/seed-document-types.js
@@ -59,11 +58,10 @@ docker exec eoffice-backend node scripts/e2e-workflow-refactor.js
 
 GitHub Actions runs the equivalent command in
 `.github/workflows/e2e-postgres.yml`. It starts PostgreSQL 16 and Redis 7 as
-service containers, runs `prisma migrate deploy` and `prisma db push`, seeds the
-existing synthetic baseline (`seed.js`, RBAC, document types, and workflows),
-starts the backend, then runs `npm run test:e2e:workflow`. `db push` is required
-for the disposable CI database because the legacy migration chain has no initial
-schema baseline. The job installs Noto fonts because signed-artifact generation
+service containers, runs `prisma migrate deploy`, seeds the existing synthetic
+baseline (`seed.js`, RBAC, document types, and workflows), starts the backend,
+then runs `npm run test:e2e:workflow`. The job installs Noto fonts because
+signed-artifact generation
 requires Unicode font files. CI uses only fixed fake test credentials; do not
 supply production SMTP, JWT, database, or license secrets.
 

@@ -96,7 +96,7 @@ sleep 30
 docker-compose exec backend npx prisma generate
 
 # Push database schema
-docker-compose exec backend npx prisma db push
+docker-compose exec backend npx prisma migrate deploy
 
 # Seed data
 docker-compose exec backend node scripts/seed-rbac.js
@@ -203,7 +203,7 @@ docker-compose ps db
 docker-compose logs db
 
 # Verify connection
-docker-compose exec backend npx prisma db push
+docker-compose exec backend npx prisma migrate deploy
 ```
 
 ### 3. Frontend không kết nối được Backend

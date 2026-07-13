@@ -64,7 +64,7 @@ jobs:
 
       - name: Prepare database
         run: |
-          npx prisma db push
+          npx prisma migrate deploy
           node scripts/seed.js
           node scripts/seed-rbac.js
           node scripts/seed-document-types.js

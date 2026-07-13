@@ -81,13 +81,8 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Apply migrations and synchronize disposable test schema
-        run: |
-          npx prisma migrate deploy
-          # The historical migration chain is incremental and has no initial
-          # baseline migration, so a blank CI database also needs the current
-          # Prisma schema before its synthetic fixtures can be seeded.
-          npx prisma db push
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
 
       - name: Seed required E2E baseline
         run: |
