@@ -1,5 +1,5 @@
-import { Prisma, PrismaClient } from "@prisma/client";
-import { prisma } from "../../config/prisma";
+import type { Prisma } from "@prisma/client";
+import { prisma, type DbClient } from "../../config/prisma";
 import { ApiError } from "../../core/errors/api-error";
 import { documentsRepository } from "./documents.repository";
 import { signRequestsRepository } from "../signRequests/signRequests.repository";
@@ -20,8 +20,6 @@ type AdhocStepInput = {
   approver_user_id: number;
   due_in_days: number;
 };
-
-type DbClient = PrismaClient | Prisma.TransactionClient;
 
 type PrepareDraftPackageInput = {
   documentId: number;

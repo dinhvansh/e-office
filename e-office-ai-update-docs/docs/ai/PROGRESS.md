@@ -618,29 +618,48 @@ Known limitations: Backend lint remediation remains required.
 
 Next recommended issue: Fix backend lint debt in bounded module slices while continuing the P1 architecture audit.
 
-## 2026-07-13 20:26 — P1-CODE-012 audit
+## 2026-07-13 — P1-CODE-012 shared Prisma client
 
-Status: Verified in runtime source.
+Status: Completed for the backend application runtime.
 
-Files changed: `e-office-ai-update-docs/docs/ai/PROGRESS.md`.
+Files changed: `backend/src/modules/workflows/workflowState.service.ts`,
+`backend/src/modules/documents/documentWorkflowOrchestrator.service.ts`, and
+`e-office-ai-update-docs/docs/ai/PROGRESS.md`.
 
-Behavior changed: None.
+Behavior changed: None. The two transaction-aware services now import the shared
+`DbClient` type from `config/prisma` rather than duplicating its
+`PrismaClient | Prisma.TransactionClient` definition. All audited interactive
+transactions pass their callback `tx` into the nested state/field services that
+write inside the transaction.
 
-Security impact: One Prisma client per backend process avoids connection-pool exhaustion and inconsistent transaction contexts.
+Security impact: One Prisma client per backend application process avoids
+request-scoped connection pools and preserves transaction context.
 
 Migration impact: None.
 
-Tests added: None.
+Tests added: None; the change is type-only and covered by the existing
+workflow/signing transaction tests.
 
 Commands run:
 
-- `rg "new PrismaClient\\(" backend/src -g "*.ts"` — only `backend/src/config/prisma.ts`
-- `cd backend && npm test` — 41 passing (previous current-source verification)
-- `cd backend && npm run build` — passed (previous current-source verification)
+- `rg -n --glob "*.ts" "\\bPrismaClient\\b|new\\s+PrismaClient" backend/src` — one
+  instantiation, in `backend/src/config/prisma.ts` only.
+- `rg -l "new\\s+PrismaClient\\s*\\(" backend --glob "!node_modules/**" --glob
+  "!dist/**" --glob "!*package-lock.json"` — 314 files: the central runtime
+  configuration plus 313 standalone maintenance/seed/test CLI scripts under
+  `backend/scripts`.
+- `cd backend && npm test` — passed, 64/64.
+- `cd backend && npm run build` — passed.
 
-Result: Runtime modules use the shared Prisma client; transaction-aware command services use Prisma transaction client types.
+Result: Runtime service code uses the central singleton and the shared `DbClient`
+type. The 313 script occurrences remain intentionally separate: each is a
+standalone Node process, so it cannot share the application process's client;
+moving them to the application config would force unrelated JWT/SMTP environment
+validation and change established maintenance-script startup behavior.
 
-Known limitations: Not every repository method has been independently audited for an optional transaction-client parameter.
+Known limitations: The maintenance scripts retain one client per script process;
+they should be modernized under a separately scoped tooling change if a shared
+script runner is introduced.
 
 Next recommended issue: Continue P1 architecture/controller audit and bounded backend lint remediation.
 

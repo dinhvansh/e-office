@@ -1,8 +1,6 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import type { DbClient } from "../../config/prisma";
 import { ApiError } from "../../core/errors/api-error";
 import { assertDocumentStatusTransition } from "./workflowState.policy";
-
-type DbClient = PrismaClient | Prisma.TransactionClient;
 
 class WorkflowStateService {
   async transitionDocument(
