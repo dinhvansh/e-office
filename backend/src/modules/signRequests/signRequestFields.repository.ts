@@ -1,7 +1,7 @@
-import { PrismaClient, sign_request_fields } from '@prisma/client';
+import { sign_request_fields } from '@prisma/client';
+import { DbClient, prisma } from '../../config/prisma';
 import { normalizeStoredFieldBox } from './coordinate.helper';
 
-const prisma = new PrismaClient();
 
 export interface CreateFieldData {
   sign_request_id: number;
@@ -88,8 +88,8 @@ export class SignRequestFieldsRepository {
   /**
    * Find all fields for a sign request
    */
-  async findBySignRequest(signRequestId: number): Promise<SignRequestFieldDto[]> {
-    const fields = await prisma.sign_request_fields.findMany({
+  async findBySignRequest(signRequestId: number, db: DbClient = prisma): Promise<SignRequestFieldDto[]> {
+    const fields = await db.sign_request_fields.findMany({
       where: { sign_request_id: signRequestId },
       include: {
         assigned_signer: {
@@ -109,8 +109,8 @@ export class SignRequestFieldsRepository {
   /**
    * Find field by ID
    */
-  async findById(fieldId: number): Promise<SignRequestFieldDto | null> {
-    const field = await prisma.sign_request_fields.findUnique({
+  async findById(fieldId: number, db: DbClient = prisma): Promise<SignRequestFieldDto | null> {
+    const field = await db.sign_request_fields.findUnique({
       where: { id: fieldId },
       include: {
         assigned_signer: true,
@@ -123,8 +123,8 @@ export class SignRequestFieldsRepository {
   /**
    * Create a new field
    */
-  async create(data: CreateFieldData): Promise<SignRequestFieldDto> {
-    const field = await prisma.sign_request_fields.create({
+  async create(data: CreateFieldData, db: DbClient = prisma): Promise<SignRequestFieldDto> {
+    const field = await db.sign_request_fields.create({
       data,
     });
     return this.mapFieldRecord(field);
@@ -133,8 +133,8 @@ export class SignRequestFieldsRepository {
   /**
    * Update a field
    */
-  async update(fieldId: number, data: UpdateFieldData): Promise<SignRequestFieldDto> {
-    const field = await prisma.sign_request_fields.update({
+  async update(fieldId: number, data: UpdateFieldData, db: DbClient = prisma): Promise<SignRequestFieldDto> {
+    const field = await db.sign_request_fields.update({
       where: { id: fieldId },
       data,
     });
@@ -144,8 +144,8 @@ export class SignRequestFieldsRepository {
   /**
    * Delete a field
    */
-  async delete(fieldId: number): Promise<void> {
-    await prisma.sign_request_fields.delete({
+  async delete(fieldId: number, db: DbClient = prisma): Promise<void> {
+    await db.sign_request_fields.delete({
       where: { id: fieldId },
     });
   }
@@ -153,8 +153,8 @@ export class SignRequestFieldsRepository {
   /**
    * Bulk upsert fields (delete old, insert new)
    */
-  async bulkUpsert(signRequestId: number, fields: CreateFieldData[]): Promise<void> {
-    await prisma.$transaction(async (tx) => {
+  async bulkUpsert(signRequestId: number, fields: CreateFieldData[], db: DbClient = prisma): Promise<void> {
+    const persist = async (tx: DbClient) => {
       // Delete existing fields
       await tx.sign_request_fields.deleteMany({
         where: { sign_request_id: signRequestId },
@@ -166,14 +166,16 @@ export class SignRequestFieldsRepository {
           data: fields,
         });
       }
-    });
+    };
+    if ('$transaction' in db) await db.$transaction(persist);
+    else await persist(db);
   }
 
   /**
    * Count fields by sign request
    */
-  async countBySignRequest(signRequestId: number): Promise<number> {
-    return prisma.sign_request_fields.count({
+  async countBySignRequest(signRequestId: number, db: DbClient = prisma): Promise<number> {
+    return db.sign_request_fields.count({
       where: { sign_request_id: signRequestId },
     });
   }
@@ -181,8 +183,8 @@ export class SignRequestFieldsRepository {
   /**
    * Find fields assigned to a specific signer
    */
-  async findBySignerAndRequest(signRequestId: number, signerId: number): Promise<sign_request_fields[]> {
-    return prisma.sign_request_fields.findMany({
+  async findBySignerAndRequest(signRequestId: number, signerId: number, db: DbClient = prisma): Promise<sign_request_fields[]> {
+    return db.sign_request_fields.findMany({
       where: {
         sign_request_id: signRequestId,
         assigned_signer_id: signerId,

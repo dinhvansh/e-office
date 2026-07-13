@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { canTransitionDocumentStatus } from "../src/modules/workflows/workflowState.policy";
+
+test("allows document signing to enter artifact generation", () => {
+  assert.equal(canTransitionDocumentStatus("pending_signature", "generating_artifact"), true);
+  assert.equal(canTransitionDocumentStatus("in_progress", "generating_artifact"), true);
+});
+
+test("allows an approval-only workflow to complete", () => {
+  assert.equal(canTransitionDocumentStatus("pending_approval", "completed"), true);
+});
+
+test("rejects invalid document workflow transitions", () => {
+  assert.equal(canTransitionDocumentStatus("draft", "completed"), false);
+  assert.equal(canTransitionDocumentStatus("completed", "pending_signature"), false);
+  assert.equal(canTransitionDocumentStatus("cancelled", "draft"), false);
+});

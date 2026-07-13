@@ -57,6 +57,7 @@ model users {
   approvals     document_approvals[]
   signers       signers[]     @relation("signer_user") // ✅ Relation to signers
   password_reset_tokens password_reset_tokens[]
+  refresh_sessions     refresh_sessions[]
   notifications notifications[]
   sign_request_comments sign_request_comments[]
 }
@@ -610,4 +611,39 @@ model tenant_settings {
 
   @@unique([tenant_id, setting_key])
   @@index([tenant_id])
+}
+
+model refresh_sessions {
+  id              String   @id
+  user_id         Int
+  tenant_id       Int
+  token_hash      String   @unique
+  expires_at      DateTime
+  revoked_at      DateTime?
+  replaced_by_id  String?
+  created_at      DateTime @default(now())
+  user            users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, revoked_at])
+  @@index([tenant_id, expires_at])
+}
+
+model outbox_events {
+  id                String   @id @default(cuid())
+  tenant_id         Int?
+  aggregate_type    String
+  aggregate_id      String
+  event_type        String
+  payload           Json
+  deduplication_key String   @unique
+  status            String   @default("pending")
+  attempt_count     Int      @default(0)
+  available_at      DateTime @default(now())
+  locked_at         DateTime?
+  processed_at      DateTime?
+  last_error        String?
+  created_at        DateTime @default(now())
+
+  @@index([status, available_at])
+  @@index([aggregate_type, aggregate_id])
 }

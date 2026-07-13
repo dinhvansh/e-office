@@ -1,20 +1,23 @@
-import { Prisma, sign_requests } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import * as crypto from "crypto";
 import { prisma } from "../../config/prisma";
+import { storageService } from "../../core/storage/storage.service";
 import { ApiError } from "../../core/errors/api-error";
 import { auditService } from "../audit/audit.service";
 import { documentsRepository } from "../documents/documents.repository";
 import { licenseService } from "../licenses/license.service";
 import { signersRepository } from "../signers/signers.repository";
-import { webhookService } from "../webhooks/webhooks.service";
 import { signRequestsRepository } from "./signRequests.repository";
 import { signRequestFieldsService } from "./signRequestFields.service";
 import { notificationsService } from "../notifications/notifications.service";
 import { NotificationType } from "../notifications/notifications.types";
 import { authorizationService } from "../authorization/authorization.service";
 import { documentWorkflowOrchestratorService } from "../documents/documentWorkflowOrchestrator.service";
-import { normalizeStoredFieldBox } from "./coordinate.helper";
 import { getDefaultCompletionMode, resolveAssigneeType, type WorkflowCompletionMode } from "../workflows/workflowStepAssignment";
+import { canSignerActInOrder, findNextWaitingSigningOrder } from "./signingOrder.policy";
+import { workflowStateService } from "../workflows/workflowState.service";
+import { buildSignRequestFlowHints, canSendSignRequestStatus, isEditableSignRequestStatus } from "./signRequestFlow.policy";
+import { signRequestQueriesService } from "./signRequestQueries.service";
 
 export interface SignerInput {
   email: string;
@@ -34,7 +37,7 @@ export interface CreateSignRequestInput {
 
 class SignRequestsService {
   private isEditableStatus(status: string | null | undefined) {
-    return status === "draft" || status === "rejected";
+    return isEditableSignRequestStatus(status);
   }
 
   private ensureEditableStatus(status: string | null | undefined) {
@@ -93,43 +96,7 @@ class SignRequestsService {
 
   private buildFlowHints(signRequest: any) {
     const signers = Array.isArray(signRequest?.signers) ? signRequest.signers : [];
-    const status = signRequest?.status || "draft";
-    const pendingCount = signers.filter((s: any) => ["pending", "otp_sent"].includes(s.status)).length;
-    const waitingApprovalCount = signers.filter((s: any) => s.status === "waiting_approval").length;
-    const waitingSigningCount = signers.filter((s: any) => s.status === "waiting_signing").length;
-    const signedCount = signers.filter((s: any) => ["signed", "completed"].includes(s.status)).length;
-
-    let flowState = "DRAFT";
-    let nextAction = "EDIT_AND_SEND";
-
-    if (status === "completed") {
-      flowState = "COMPLETED";
-      nextAction = "VIEW_COMPLETED";
-    } else if (status === "cancelled") {
-      flowState = "CANCELLED";
-      nextAction = "REVIEW_STATUS";
-    } else if (status === "rejected") {
-      flowState = "REJECTED";
-      nextAction = "REVIEW_STATUS";
-    } else if (status === "pending_approval" || waitingApprovalCount > 0) {
-      flowState = "AWAITING_APPROVAL";
-      nextAction = "WAIT_FOR_APPROVAL";
-    } else if (status === "pending" || status === "in_progress" || pendingCount > 0 || waitingSigningCount > 0) {
-      flowState = "AWAITING_SIGNATURES";
-      nextAction = "WAIT_FOR_SIGNING";
-    }
-
-    return {
-      flow_state: flowState,
-      next_action: nextAction,
-      flow_counters: {
-        total_signers: signers.length,
-        pending: pendingCount,
-        waiting_approval: waitingApprovalCount,
-        waiting_signing: waitingSigningCount,
-        signed: signedCount,
-      },
-    };
+    return buildSignRequestFlowHints(signRequest?.status, signers);
   }
 
   async listSignRequests(tenantId: number, userId: number) {
@@ -153,80 +120,7 @@ class SignRequestsService {
    * Get single sign request by ID
    */
   async getSignRequest(id: number, tenantId: number, userId?: number) {
-    const signRequest = await signRequestsRepository.findById(id, tenantId);
-    if (!signRequest) {
-      throw ApiError.notFound("Sign request not found", "SIGN_REQUEST_NOT_FOUND");
-    }
-    if (userId) {
-      const access = await authorizationService.canAccessDocument(
-        userId,
-        tenantId,
-        signRequest.document_id,
-        "read"
-      );
-      if (!access.allowed) {
-        throw ApiError.forbidden("Permission denied to view sign request", "SIGN_REQUEST_READ_DENIED");
-      }
-    }
-    const normalizedFields = Array.isArray((signRequest as any).fields)
-      ? (signRequest as any).fields.map((field: any) => {
-          const normalized = normalizeStoredFieldBox(field);
-          return {
-            ...field,
-            pageIndex: Math.max(0, (field.page || 1) - 1),
-            coordinateVersion: 2,
-            coordinateUnit: "ratio",
-            coordinateAnchor: "top-left",
-            xPct: normalized.xPct,
-            yPct: normalized.yPct,
-            widthPct: normalized.widthPct,
-            heightPct: normalized.heightPct,
-          };
-        })
-      : undefined;
-    const workflowSnapshot = signRequest.document_id
-      ? await this.getWorkflowSnapshotForDocument(signRequest.document_id, tenantId)
-      : null;
-    return {
-      ...signRequest,
-      fields: normalizedFields,
-      workflow_snapshot: workflowSnapshot,
-      ...this.buildFlowHints(signRequest),
-    };
-  }
-
-  private async getWorkflowSnapshotForDocument(documentId: number, tenantId: number) {
-    const workflow = await prisma.workflows.findFirst({
-      where: {
-        tenant_id: tenantId,
-        created_for_doc: documentId,
-        is_active: true,
-      },
-      include: {
-        steps: {
-          orderBy: { step_order: "asc" },
-        },
-      },
-      orderBy: { id: "desc" },
-    });
-
-    if (!workflow) {
-      return null;
-    }
-
-    return {
-      id: workflow.id,
-      based_on_template: workflow.based_on_template,
-      steps: workflow.steps.map((step) => ({
-        id: step.id,
-        step_name: step.step_name,
-        approver_type: step.approver_type,
-        approver_id: step.approver_id,
-        participant_role: step.participant_role || "approver",
-        due_in_days: step.due_in_days,
-        order: step.step_order,
-      })),
-    };
+    return signRequestQueriesService.getSignRequest(id, tenantId, userId);
   }
 
   async listComments(signRequestId: number, tenantId: number, userId: number) {
@@ -424,17 +318,7 @@ class SignRequestsService {
       throw ApiError.notFound("Document not found", "DOCUMENT_NOT_FOUND");
     }
 
-    const signRequestData: Prisma.sign_requestsCreateInput = {
-      tenant: { connect: { id: tenantId } },
-      document: { connect: { id: document.id } },
-      title: input.title,
-      message: input.message,
-      workflow_type: input.workflow_type ?? "sequential",
-      status: "draft",
-      deadline: input.deadline ?? null,
-    };
-    const signRequest = await signRequestsRepository.create(signRequestData);
-
+    let signerRows: Prisma.signersCreateManyInput[] = [];
     if (input.signers?.length) {
       // Check which signers are internal users
       const signerEmails = input.signers.map(s => s.email);
@@ -448,9 +332,8 @@ class SignRequestsService {
       });
       const internalUserMap = new Map(internalUsers.map(u => [u.email, u.id]));
 
-      await signersRepository.createMany(
-        input.signers.map((signer) => ({
-          sign_request_id: signRequest.id,
+      signerRows = input.signers.map((signer) => ({
+          sign_request_id: 0,
           email: signer.email,
           name: signer.name,
           role: signer.role || 'signer', // ✅ Default to 'signer' if not specified
@@ -458,21 +341,41 @@ class SignRequestsService {
           is_internal: internalUserMap.has(signer.email), // ✅ Set based on user existence
           user_id: internalUserMap.get(signer.email) || null, // ✅ Set user_id for internal users
           position_data: signer.position_data ? (signer.position_data as Prisma.InputJsonValue) : undefined,
-        })),
-      );
+        }));
     }
 
-    await auditService.record({
-      tenantId,
-      documentId: document.id,
-      event: "sign.started",
-      userId,
+    const signRequest = await prisma.$transaction(async (tx) => {
+      const created = await tx.sign_requests.create({
+        data: {
+          tenant_id: tenantId,
+          document_id: document.id,
+          title: input.title,
+          message: input.message,
+          workflow_type: input.workflow_type ?? "sequential",
+          status: "draft",
+          deadline: input.deadline ?? null,
+        },
+      });
+      if (signerRows.length) {
+        await tx.signers.createMany({
+          data: signerRows.map((signer) => ({ ...signer, sign_request_id: created.id })),
+        });
+      }
+      await tx.audit_logs.create({
+        data: { document_id: document.id, event: "sign.started", user_id: userId },
+      });
+      await tx.outbox_events.create({
+        data: {
+          tenant_id: tenantId,
+          aggregate_type: "sign_request",
+          aggregate_id: String(created.id),
+          event_type: "SIGN_REQUEST_CREATED",
+          payload: { sign_request_id: created.id, document_id: document.id },
+          deduplication_key: `sign-request-created:${created.id}`,
+        },
+      });
+      return created;
     });
-    await webhookService.emit(tenantId, "sign.started", {
-      sign_request_id: signRequest.id,
-      document_id: document.id,
-    });
-
     return this.getSignRequest(signRequest.id, tenantId);
   }
 
@@ -869,15 +772,11 @@ class SignRequestsService {
   }
 
   private async getSignRequestWithFlowHints(id: number, tenantId: number) {
-    const signRequest: any = await this.getSignRequest(id, tenantId);
-    return {
-      ...signRequest,
-      ...this.buildFlowHints(signRequest),
-    };
+    return signRequestQueriesService.getSignRequestWithFlowHints(id, tenantId);
   }
 
   private ensureSendableStatus(status: string) {
-    if (status === "completed" || status === "cancelled") {
+    if (!canSendSignRequestStatus(status)) {
       throw ApiError.badRequest(
         `Cannot send sign request with status: ${status}`,
         "SIGN_REQUEST_INVALID_STATUS"
@@ -1120,21 +1019,16 @@ class SignRequestsService {
     }
 
     // Check signing order (sequential workflow)
-    if (false && signRequest.workflow_type === 'sequential' && signer.signing_order) {
+    if (signRequest.workflow_type === 'sequential' && signer.signing_order) {
       const allSigners = await signersRepository.findBySignRequest(signRequestId);
-      const previousSigners = allSigners.filter(s => 
-        s.signing_order && s.signing_order < signer.signing_order
-      );
-      
-      const allPreviousSigned = previousSigners.every(s => 
-        s.status === 'signed' || s.status === 'completed'
-      );
-
-      if (!allPreviousSigned) {
+      if (!canSignerActInOrder(signRequest.workflow_type, signer.signing_order, allSigners)) {
+        const previousSigners = allSigners.filter(s =>
+          s.signing_order && s.signing_order < signer.signing_order
+        );
         const pendingSigners = previousSigners.filter(s => 
           s.status !== 'signed' && s.status !== 'completed'
         );
-        throw ApiError.badRequest(
+        throw ApiError.conflict(
           `Vui lòng đợi người ký trước hoàn thành. Đang chờ: ${pendingSigners.map(s => s.name).join(', ')}`,
           'SIGNING_ORDER_VIOLATION'
         );
@@ -1153,142 +1047,97 @@ class SignRequestsService {
       const firstSignature = Object.values(signatureData)[0];
       finalSignatureData = firstSignature || '';
       
-      // Store field signatures in position_data for future use
-      await signersRepository.update(signer.id, {
-        position_data: signatureData as any
+    }
+
+    const completionConfig = signer.signing_order && signRequest.document_id
+      ? await this.getSignerStepCompletionConfig(signRequest.document_id, signer.signing_order)
+      : null;
+
+    // State changes that make a signature visible must commit together.  PDF
+    // generation and notifications intentionally happen after this transaction.
+    await prisma.$transaction(async (tx) => {
+      const signed = await tx.signers.updateMany({
+        where: { id: signer.id, sign_request_id: signRequestId, status: "pending" },
+        data: {
+          status: "signed",
+          signed_at: new Date(),
+          signature_data: finalSignatureData,
+          signature_type: signatureType,
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          ...(typeof signatureData === "object" ? { position_data: signatureData as Prisma.InputJsonValue } : {}),
+        },
       });
-    }
+      if (signed.count !== 1) {
+        throw ApiError.conflict("Signer is no longer active", "CONCURRENT_MODIFICATION");
+      }
 
-    // Update signer with signature
-    await signersRepository.update(signer.id, {
-      status: 'signed',
-      signed_at: new Date(),
-      signature_data: finalSignatureData,
-      signature_type: signatureType,
-      ip_address: ipAddress,
-      user_agent: userAgent
-    });
-
-    let allSigners = await signersRepository.findBySignRequest(signRequestId);
-    if (signer.signing_order && signRequest.document_id) {
-      const currentOrderSigners = allSigners.filter((item) => item.signing_order === signer.signing_order);
-      const { completionMode, minRequired } = await this.getSignerStepCompletionConfig(
-        signRequest.document_id,
-        signer.signing_order,
-      );
-      const completedCount = currentOrderSigners.filter((item) => this.isSignerStatusComplete(item.status)).length;
-      const isCurrentOrderComplete =
-        completionMode === "any_one"
+      let transactionSigners = await tx.signers.findMany({ where: { sign_request_id: signRequestId } });
+      if (signer.signing_order) {
+        const currentOrder = transactionSigners.filter((item) => item.signing_order === signer.signing_order);
+        const completedCount = currentOrder.filter((item) => this.isSignerStatusComplete(item.status)).length;
+        const stepComplete = completionConfig?.completionMode === "any_one"
           ? completedCount >= 1
-          : completionMode === "min_n"
-          ? completedCount >= minRequired
-          : currentOrderSigners.every((item) => this.isSignerStatusComplete(item.status));
+          : completionConfig?.completionMode === "min_n"
+            ? completedCount >= completionConfig.minRequired
+            : currentOrder.every((item) => this.isSignerStatusComplete(item.status));
 
-      if (isCurrentOrderComplete && (completionMode === "any_one" || completionMode === "min_n")) {
-        for (const pendingSigner of currentOrderSigners.filter(
-          (item) => !this.isSignerStatusComplete(item.status) && item.status !== "rejected",
-        )) {
-          await signersRepository.update(pendingSigner.id, { status: "completed" });
+        if (stepComplete && (completionConfig?.completionMode === "any_one" || completionConfig?.completionMode === "min_n")) {
+          await tx.signers.updateMany({
+            where: { sign_request_id: signRequestId, signing_order: signer.signing_order, status: { notIn: ["signed", "completed", "rejected"] } },
+            data: { status: "completed" },
+          });
+          transactionSigners = await tx.signers.findMany({ where: { sign_request_id: signRequestId } });
         }
-        allSigners = await signersRepository.findBySignRequest(signRequestId);
-      }
 
-      if (isCurrentOrderComplete && signRequest.workflow_type === "sequential") {
-        const nextOrders = allSigners
-          .filter((item) => (item.signing_order || 0) > (signer.signing_order || 0))
-          .map((item) => item.signing_order || 0);
-        const nextOrder = nextOrders.length ? Math.min(...nextOrders) : null;
-
-        if (nextOrder !== null) {
-          for (const nextSigner of allSigners.filter(
-            (item) => item.signing_order === nextOrder && item.status === "waiting_signing",
-          )) {
-            await signersRepository.update(nextSigner.id, { status: "pending" });
-          }
-        }
-      }
-    }
-
-    // ✅ SEQUENTIAL WORKFLOW: Activate next signer
-    if (signRequest.workflow_type === 'sequential' && signer.signing_order) {
-      const allSigners = await signersRepository.findBySignRequest(signRequestId);
-      
-      // Find next signer in order
-      const nextSigner = allSigners.find(s => 
-        s.signing_order === (signer.signing_order! + 1) &&
-        s.status === 'waiting_signing'
-      );
-
-      if (nextSigner) {
-        console.log(`[Sequential Signing] Activating next signer: ${nextSigner.name} (order ${nextSigner.signing_order})`);
-        await signersRepository.update(nextSigner.id, {
-          status: 'pending'
-        });
-
-        // Send notification to next signer
-        if (nextSigner.is_internal && nextSigner.user_id) {
-          try {
-            await notificationsService.createNotification({
-              tenantId,
-              userId: nextSigner.user_id,
-              type: NotificationType.SIGN_REQUEST,
-              title: 'Đến lượt bạn ký tài liệu',
-              message: `Tài liệu "${signRequest.title}" đang chờ bạn ký`,
-              link: `/sign-requests/${signRequestId}/internal-sign`
+        if (stepComplete && signRequest.workflow_type === "sequential") {
+          const nextOrder = findNextWaitingSigningOrder(transactionSigners);
+          if (nextOrder !== null) {
+            const activated = await tx.signers.updateMany({
+              where: { sign_request_id: signRequestId, signing_order: nextOrder, status: "waiting_signing" },
+              data: { status: "pending" },
             });
-          } catch (error) {
-            console.error('Failed to send notification to next signer:', error);
-          }
-        } else if (!nextSigner.is_internal) {
-          try {
-            const { emailService } = await import("../common/email.service");
-            const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-            const bcrypt = require("bcrypt");
-            const sender = await prisma.users.findUnique({
-              where: { id: userId },
-              select: { full_name: true, email: true }
-            });
-
-            let signingToken = nextSigner.signing_token;
-            if (!signingToken) {
-              signingToken = crypto.randomBytes(32).toString("hex");
-              await signersRepository.update(nextSigner.id, {
-                signing_token: signingToken
+            if (activated.count > 0) {
+              await tx.outbox_events.create({
+                data: {
+                  tenant_id: tenantId,
+                  aggregate_type: "sign_request",
+                  aggregate_id: String(signRequestId),
+                  event_type: "SIGNER_ACTIVATED",
+                  payload: { sign_request_id: signRequestId, signing_order: nextOrder },
+                  deduplication_key: `signer-activated:${signRequestId}:${nextOrder}`,
+                },
               });
             }
-
-            const otp = Math.floor(100000 + Math.random() * 900000).toString();
-            const otpHash = await bcrypt.hash(otp, 10);
-            const otpExpire = new Date(Date.now() + 10 * 60 * 1000);
-            const signUrl = `${frontendUrl}/sign/${signingToken}`;            await emailService.sendSignRequestWithOTP({
-              tenantId,
-              recipientEmail: nextSigner.email,
-              recipientName: nextSigner.name,
-              documentTitle: signRequest.title || signRequest.document?.title || "Document",
-              documentNumber: signRequest.document?.document_number,
-              senderName: sender?.full_name || sender?.email || "System",
-              message: `??n l??t ${nextSigner.name} k? t?i li?u sau khi ng??i k? tr??c ?? ho?n th?nh.`,
-              signUrl,
-              otp,
-              expiryMinutes: 10
-            });
-
-            await signersRepository.update(nextSigner.id, {
-              otp: otpHash,
-              otp_expire: otpExpire,
-              status: "otp_sent"
-            });
-
-            console.log(`[Sequential Signing] OTP email sent to external signer: ${nextSigner.email}`);
-          } catch (error) {
-            console.error("Failed to send OTP email to next external signer:", error);
           }
         }
       }
-    }
+
+      const allSignedInTransaction = (await tx.signers.findMany({ where: { sign_request_id: signRequestId } }))
+        .every((item) => this.isSignerStatusComplete(item.status));
+      await workflowStateService.transitionSigningPair(tx, {
+        documentId: signRequest.document_id,
+        signRequestId,
+        documentStatus: allSignedInTransaction ? "generating_artifact" : "in_progress",
+        signRequestStatus: allSignedInTransaction ? "generating_artifact" : "in_progress",
+      });
+      await tx.audit_logs.create({
+        data: { document_id: signRequest.document_id, event: "sign.internal_signed", user_id: userId, ip: ipAddress, ua: userAgent },
+      });
+      await tx.outbox_events.create({
+        data: {
+          tenant_id: tenantId,
+          aggregate_type: "sign_request",
+          aggregate_id: String(signRequestId),
+          event_type: "SIGNATURE_SUBMITTED",
+          payload: { sign_request_id: signRequestId, signer_id: signer.id, is_internal: true },
+          deduplication_key: `signature-submitted:${signRequestId}:${signer.id}`,
+        },
+      });
+    });
 
     // Check if all signers have signed
-    allSigners = await signersRepository.findBySignRequest(signRequestId);
+    const allSigners = await signersRepository.findBySignRequest(signRequestId);
     const allSigned = allSigners.every((s) => this.isSignerStatusComplete(s.status));
 
     // ✅ PROGRESSIVE PDF: Generate PDF after each signature
@@ -1303,23 +1152,34 @@ class SignRequestsService {
           addWatermark: !allSigned        // Add watermark if not completed
         }
       );
+      const artifactBytes = await storageService.get(signedPdfPath);
+      const artifactHash = crypto.createHash("sha256").update(artifactBytes).digest("hex");
       
-      // Update document with signed PDF path
-      await documentsRepository.update(signRequest.document_id, {
-        signed_file_path: signedPdfPath,
-        status: allSigned ? 'completed' : 'in_progress'
-      } as any);
+      await prisma.$transaction((tx) => workflowStateService.transitionSigningPair(tx, {
+        documentId: signRequest.document_id,
+        signRequestId,
+        documentStatus: allSigned ? "completed" : "in_progress",
+        signRequestStatus: allSigned ? "completed" : "in_progress",
+        signedFilePath: signedPdfPath,
+        hash: artifactHash,
+      }));
       
       console.log(`[Internal Signing] Progressive PDF generated: ${signedPdfPath}`);
-    } catch (error: any) {
-      console.error(`[Internal Signing] Failed to generate progressive PDF: ${error.message}`);
-      // Don't fail the signing process if PDF generation fails
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown artifact generation error";
+      console.error(`[Internal Signing] Failed to generate progressive PDF: ${message}`);
+      if (allSigned) {
+        await prisma.$transaction((tx) => workflowStateService.transitionSigningPair(tx, {
+          documentId: signRequest.document_id,
+          signRequestId,
+          documentStatus: "artifact_failed",
+          signRequestStatus: "artifact_failed",
+        }));
+        throw ApiError.internal('Signed document generation failed', 'ARTIFACT_GENERATION_FAILED');
+      }
     }
 
-    // Update sign request status
     if (allSigned) {
-      await signRequestsRepository.updateStatus(signRequestId, tenantId, 'completed');
-
       try {
         const { emailService } = await import("../common/email.service");
         const documentWithOwner = await prisma.documents.findUnique({
@@ -1349,17 +1209,7 @@ class SignRequestsService {
       } catch (error) {
         console.error("Failed to send sign completed email:", error);
       }
-    } else {
-      await signRequestsRepository.updateStatus(signRequestId, tenantId, 'in_progress');
     }
-
-    // Audit log
-    await auditService.record({
-      tenantId,
-      documentId: signRequest.document_id,
-      event: 'sign.internal_signed',
-      userId
-    });
 
     return {
       success: true,
@@ -1367,6 +1217,66 @@ class SignRequestsService {
       all_signed: allSigned,
       signer_id: signer.id
     };
+  }
+
+  async retrySignedArtifactGeneration(signRequestId: number, tenantId: number, userId: number) {
+    const signRequest = await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
+    if (signRequest.status !== "artifact_failed") {
+      throw ApiError.badRequest("Signed artifact is not retryable", "ARTIFACT_RETRY_NOT_ALLOWED");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await workflowStateService.transitionSigningPair(tx, {
+        documentId: signRequest.document_id,
+        signRequestId,
+        documentStatus: "generating_artifact",
+        signRequestStatus: "generating_artifact",
+      });
+      await tx.outbox_events.create({
+        data: {
+          tenant_id: tenantId,
+          aggregate_type: "sign_request",
+          aggregate_id: String(signRequestId),
+          event_type: "SIGNED_ARTIFACT_REQUESTED",
+          payload: { sign_request_id: signRequestId, retry: true },
+          deduplication_key: `signed-artifact-retry:${signRequestId}:${Date.now()}`,
+        },
+      });
+    });
+
+    try {
+      const { pdfGenerationService } = await import("./pdfGeneration.service");
+      const signedFilePath = await pdfGenerationService.generateSignedPdf(signRequestId);
+      const artifactBytes = await storageService.get(signedFilePath);
+      const artifactHash = crypto.createHash("sha256").update(artifactBytes).digest("hex");
+      await prisma.$transaction(async (tx) => {
+        await workflowStateService.transitionSigningPair(tx, {
+          documentId: signRequest.document_id,
+          signRequestId,
+          documentStatus: "completed",
+          signRequestStatus: "completed",
+          signedFilePath,
+          hash: artifactHash,
+        });
+        await tx.audit_logs.create({
+          data: { document_id: signRequest.document_id, event: "artifact.retry_succeeded", user_id: userId },
+        });
+      });
+      return { status: "completed", signed_file_path: signedFilePath };
+    } catch (error) {
+      await prisma.$transaction(async (tx) => {
+        await workflowStateService.transitionSigningPair(tx, {
+          documentId: signRequest.document_id,
+          signRequestId,
+          documentStatus: "artifact_failed",
+          signRequestStatus: "artifact_failed",
+        });
+        await tx.audit_logs.create({
+          data: { document_id: signRequest.document_id, event: "artifact.retry_failed", user_id: userId },
+        });
+      });
+      throw ApiError.internal("Signed document generation failed", "ARTIFACT_GENERATION_FAILED");
+    }
   }
 
   // ✅ Phase 2: Get Signers

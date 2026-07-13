@@ -8,10 +8,36 @@ import { emailService } from "../common/email.service";
 import { webhookService } from "../webhooks/webhooks.service";
 import { signersRepository } from "./signers.repository";
 import { pdfGenerationService } from "../signRequests/pdfGeneration.service";
+import { notificationsService } from "../notifications/notifications.service";
+import { NotificationType } from "../notifications/notifications.types";
 
 const OTP_EXPIRY_MINUTES = 10;
 
 class SignersService {
+  async notifyNextPendingSigner(signRequestId: number, tenantId: number): Promise<void> {
+    const nextSigner = await prisma.signers.findFirst({
+      where: { sign_request_id: signRequestId, status: "pending" },
+      orderBy: { signing_order: "asc" },
+    });
+    if (!nextSigner) return;
+
+    if (nextSigner.is_internal && nextSigner.user_id) {
+      await notificationsService.createNotification({
+        tenantId,
+        userId: nextSigner.user_id,
+        type: NotificationType.SIGN_REQUEST,
+        title: "Your signing turn",
+        message: "A document is waiting for your signature.",
+        link: `/sign-requests/${signRequestId}/internal-sign`,
+      });
+      return;
+    }
+
+    if (!nextSigner.is_internal) {
+      await this.sendOtp(nextSigner.id, tenantId);
+    }
+  }
+
   async addSigner(tenantId: number, userId: number, input: { sign_request_id: number; email: string; name: string; role?: string }): Promise<void> {
     const signRequest = await prisma.sign_requests.findFirst({
       where: { id: input.sign_request_id, tenant_id: tenantId },

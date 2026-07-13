@@ -7,6 +7,8 @@ import { notificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/notifications.types';
 import { authorizationService } from '../authorization/authorization.service';
 import { getDefaultCompletionMode, resolveAssigneeType } from '../workflows/workflowStepAssignment';
+import { isApprovalStepComplete } from './approvalCompletion.policy';
+import { workflowStateService } from '../workflows/workflowState.service';
 
 class ApprovalsService {
   /**
@@ -371,15 +373,6 @@ class ApprovalsService {
       );
     }
 
-    // Update approval record
-    await approvalsRepository.updateApproval(approvalId, {
-      action: 'approved',
-      comment,
-      signature_data: signatureData,
-      signature_type: signatureType,
-      acted_at: new Date(),
-    } as any);
-
     const completionMode =
       (approval.workflow_step as any).completion_mode ||
       getDefaultCompletionMode(resolveAssigneeType(approval.workflow_step as any));
@@ -389,26 +382,100 @@ class ApprovalsService {
         ? Math.max(1, Number((approval.workflow_step as any).min_required || 1))
         : null;
 
-    // Check if current step is complete according to completion mode
-    const stepApprovals = await approvalsRepository.findStepApprovals(
-      approval.document_id,
-      approval.workflow_step_id
-    );
+    const approverSteps = await prisma.workflow_steps.findMany({
+      where: {
+        workflow_id: approval.workflow_id,
+        OR: [{ participant_role: null }, { participant_role: { not: 'signer' } }],
+      },
+      orderBy: { step_order: 'asc' },
+    });
+    const currentStepIndex = approverSteps.findIndex((step) => step.id === approval.workflow_step_id);
+    const nextStepForTransition = approverSteps[currentStepIndex + 1] ?? null;
 
-    const approvedCount = stepApprovals.filter(
-      (item) => item.id === approvalId || item.action === 'approved',
-    ).length;
-
-    const allStepApproved = stepApprovals.every(
-      (item) => item.id === approvalId || item.action === 'approved',
-    );
-
-    const isStepComplete =
-      completionMode === 'any_one'
-        ? approvedCount >= 1
-        : completionMode === 'min_n'
-          ? approvedCount >= (minRequired || 1)
-          : allStepApproved;
+    const runApprovalTransaction = () => prisma.$transaction(async (tx) => {
+      const markedApproved = await tx.document_approvals.updateMany({
+        where: { id: approvalId, approver_user_id: userId, action: 'pending' },
+        data: {
+          action: 'approved', comment, signature_data: signatureData,
+          signature_type: signatureType, acted_at: new Date(),
+        },
+      });
+      if (markedApproved.count !== 1) {
+        throw ApiError.conflict('Approval was already processed', 'CONCURRENT_MODIFICATION');
+      }
+      const approvals = await tx.document_approvals.findMany({
+        where: { document_id: approval.document_id, workflow_step_id: approval.workflow_step_id },
+      });
+      const complete = isApprovalStepComplete(
+        approvals.map((item) => item.action),
+        completionMode as 'all' | 'any_one' | 'min_n',
+        minRequired,
+      );
+      if (complete && (completionMode === 'any_one' || completionMode === 'min_n')) {
+        await tx.document_approvals.updateMany({
+          where: {
+            document_id: approval.document_id,
+            workflow_step_id: approval.workflow_step_id,
+            action: { in: ['pending', 'waiting'] },
+          },
+          data: {
+            action: 'skipped',
+            comment: completionMode === 'any_one' ? 'Step completed by another approver' : 'Step threshold reached',
+            acted_at: new Date(),
+          },
+        });
+      }
+      if (complete && nextStepForTransition) {
+        await tx.document_approvals.updateMany({
+          where: { document_id: approval.document_id, workflow_step_id: nextStepForTransition.id, action: 'waiting' },
+          data: { action: 'pending' },
+        });
+        await tx.workflow_instances.updateMany({
+          where: { document_id: approval.document_id, status: 'in_progress' },
+          data: { current_step_id: nextStepForTransition.id },
+        });
+        await tx.outbox_events.create({
+          data: {
+            tenant_id: tenantId, aggregate_type: 'workflow_instance', aggregate_id: String(approval.document_id),
+            event_type: 'APPROVAL_STEP_ACTIVATED',
+            payload: { document_id: approval.document_id, workflow_step_id: nextStepForTransition.id },
+            deduplication_key: `approval-step-activated:${approval.document_id}:${nextStepForTransition.id}`,
+          },
+        });
+      } else if (complete) {
+        await tx.workflow_instances.updateMany({
+          where: { document_id: approval.document_id, status: 'in_progress' },
+          data: { status: 'completed', completed_at: new Date(), current_step_id: null },
+        });
+        await tx.outbox_events.create({
+          data: {
+            tenant_id: tenantId, aggregate_type: 'workflow_instance', aggregate_id: String(approval.document_id),
+            event_type: 'APPROVAL_WORKFLOW_COMPLETED',
+            payload: { document_id: approval.document_id, workflow_id: approval.workflow_id },
+            deduplication_key: `approval-workflow-completed:${approval.document_id}`,
+          },
+        });
+      }
+      return { isStepComplete: complete, nextStep: nextStepForTransition };
+    }, { isolationLevel: 'Serializable' });
+    let transition: Awaited<ReturnType<typeof runApprovalTransaction>> | undefined;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        transition = await runApprovalTransaction();
+        break;
+      } catch (error) {
+        const isSerializationConflict =
+          typeof error === 'object'
+          && error !== null
+          && 'code' in error
+          && (error as { code?: unknown }).code === 'P2034';
+        if (!isSerializationConflict || attempt === 2) throw error;
+      }
+    }
+    if (!transition) {
+      throw ApiError.conflict('Approval was already processed', 'CONCURRENT_MODIFICATION');
+    }
+    const { isStepComplete, nextStep } = transition;
 
     if (!isStepComplete) {
       // Still waiting for other approvers in this step
@@ -419,20 +486,6 @@ class ApprovalsService {
     }
 
     // ⭐ SEQUENTIAL APPROVAL: Current step is complete, activate next step
-    if (completionMode === 'any_one' || completionMode === 'min_n') {
-      const pendingApprovals = stepApprovals.filter(
-        (item) => item.id !== approvalId && (item.action === 'pending' || item.action === 'waiting'),
-      );
-
-      for (const pendingApproval of pendingApprovals) {
-        await approvalsRepository.updateApproval(pendingApproval.id, {
-          action: 'skipped',
-          comment: completionMode === 'any_one' ? 'Step completed by another approver' : 'Step threshold reached',
-          acted_at: new Date(),
-        });
-      }
-    }
-
     console.log(`[Sequential Approval] Step ${approval.workflow_step_id} completed`);
     
     // Get workflow instance to find next step
@@ -443,39 +496,9 @@ class ApprovalsService {
     }
     
     // Get all approver steps (not signer steps)
-    const approverSteps = instance.workflow.steps.filter(
-      s => s.participant_role !== 'signer'
-    );
-    
-    // Find current step index
-    const currentStepIndex = approverSteps.findIndex(
-      s => s.id === approval.workflow_step_id
-    );
-    
-    // Check if there's a next step
-    const nextStep = approverSteps[currentStepIndex + 1];
-    
     if (nextStep) {
       // ⭐ Activate next step: change 'waiting' → 'pending'
       console.log(`[Sequential Approval] Activating next step: ${nextStep.step_name} (ID: ${nextStep.id})`);
-      
-      const activatedCount = await prisma.document_approvals.updateMany({
-        where: {
-          document_id: approval.document_id,
-          workflow_step_id: nextStep.id,
-          action: 'waiting'
-        },
-        data: {
-          action: 'pending'
-        }
-      });
-      
-      console.log(`[Sequential Approval] Activated ${activatedCount.count} approvals for next step`);
-      
-      // Update workflow instance current step
-      await approvalsRepository.updateWorkflowInstance(approval.document_id, {
-        current_step_id: nextStep.id
-      });
       
       // Send email notifications to next approvers
       const nextApprovals = await prisma.document_approvals.findMany({
@@ -572,9 +595,9 @@ class ApprovalsService {
         }
       } else {
         // No signing required, mark as completed
-        await prisma.documents.update({
-          where: { id: approval.document_id },
-          data: { status: 'completed' },
+        await workflowStateService.transitionDocument(prisma, {
+          documentId: approval.document_id,
+          status: 'completed',
         });
 
         if (document?.sign_request_id) {
@@ -671,31 +694,42 @@ class ApprovalsService {
       );
     }
 
-    // Update approval record
-    await approvalsRepository.updateApproval(approvalId, {
-      action: 'rejected',
-      comment,
-      acted_at: new Date(),
-    });
-
-    // Update workflow instance
-    await approvalsRepository.updateWorkflowInstance(approval.document_id, {
-      status: 'rejected',
-      completed_at: new Date(),
-    });
-
-    // Update document status
-    await prisma.documents.update({
-      where: { id: approval.document_id },
-      data: { status: 'rejected' },
-    });
-
-    if (approval.document.sign_request_id) {
-      await prisma.sign_requests.update({
-        where: { id: approval.document.sign_request_id },
-        data: { status: 'rejected' },
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.document_approvals.updateMany({
+        where: { id: approvalId, approver_user_id: userId, action: 'pending' },
+        data: { action: 'rejected', comment, acted_at: new Date() },
       });
-    }
+      if (updated.count !== 1) {
+        throw ApiError.conflict('Approval was already processed', 'CONCURRENT_MODIFICATION');
+      }
+      await tx.workflow_instances.updateMany({
+        where: { document_id: approval.document_id },
+        data: { status: 'rejected', completed_at: new Date() },
+      });
+      if (approval.document.sign_request_id) {
+        await workflowStateService.transitionSigningPair(tx, {
+          documentId: approval.document_id,
+          signRequestId: approval.document.sign_request_id,
+          documentStatus: 'rejected',
+          signRequestStatus: 'rejected',
+        });
+      } else {
+        await workflowStateService.transitionDocument(tx, {
+          documentId: approval.document_id,
+          status: 'rejected',
+        });
+      }
+      await tx.outbox_events.create({
+        data: {
+          tenant_id: tenantId,
+          aggregate_type: "document",
+          aggregate_id: String(approval.document_id),
+          event_type: "DOCUMENT_REJECTED",
+          payload: { document_id: approval.document_id, approval_id: approvalId },
+          deduplication_key: `document-rejected:${approval.document_id}`,
+        },
+      });
+    });
 
     // Send rejection notification to document owner
     const document = await prisma.documents.findUnique({

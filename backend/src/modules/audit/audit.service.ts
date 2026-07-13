@@ -1,4 +1,4 @@
-import { audit_logs } from "@prisma/client";
+import { audit_logs, Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../core/errors/api-error";
 
@@ -170,7 +170,7 @@ export class AuditService {
       limit?: number;
     }
   ): Promise<audit_logs[]> {
-    const where: any = {
+    const where: Prisma.audit_logsWhereInput = {
       event: { startsWith: "authz.document." },
       document: { tenant_id: tenantId },
     };

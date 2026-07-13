@@ -81,6 +81,11 @@ signRequestsRouter.post(
   asyncHandler(controller.cancel)
 );
 signRequestsRouter.post(
+  "/:id/retry-artifact",
+  requirePermission("sign_requests", "update"),
+  asyncHandler(controller.retryArtifact)
+);
+signRequestsRouter.post(
   "/:id/revoke",
   requirePermission("sign_requests", "update"),
   asyncHandler(controller.revoke)

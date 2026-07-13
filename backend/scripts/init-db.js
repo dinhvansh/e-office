@@ -17,7 +17,9 @@ function run(command, args, options = {}) {
 }
 
 function main() {
-  const autoInitEnabled = (process.env.AUTO_INIT_DB || 'true').toLowerCase() === 'true';
+  // Schema push and demo seeds are destructive/development-only operations.
+  // Require an explicit opt-in even when this script is invoked outside Compose.
+  const autoInitEnabled = (process.env.AUTO_INIT_DB || 'false').toLowerCase() === 'true';
   if (!autoInitEnabled) {
     console.log('[init-db] AUTO_INIT_DB=false, skipping initialization.');
     return;

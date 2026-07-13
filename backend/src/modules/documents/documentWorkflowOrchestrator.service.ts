@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../core/errors/api-error";
 import { documentsRepository } from "./documents.repository";
@@ -21,6 +21,8 @@ type AdhocStepInput = {
   due_in_days: number;
 };
 
+type DbClient = PrismaClient | Prisma.TransactionClient;
+
 type PrepareDraftPackageInput = {
   documentId: number;
   tenantId: number;
@@ -39,35 +41,26 @@ type PrepareDraftPackageInput = {
 
 class DocumentWorkflowOrchestratorService {
   async prepareDraftPackage(input: PrepareDraftPackageInput) {
-    const { signRequestsService } = await import("../signRequests/signRequests.service");
+    return prisma.$transaction(async (tx) => {
+      const signRequest = await tx.sign_requests.create({
+        data: {
+          document_id: input.documentId,
+          tenant_id: input.tenantId,
+          title: input.documentTitle || `Sign Request for ${input.documentFileName}`,
+          workflow_type: "sequential",
+          status: "draft",
+          auto_created: true,
+        },
+      });
+      await tx.documents.update({ where: { id: input.documentId }, data: { sign_request_id: signRequest.id } });
 
-    const signRequest = await signRequestsService.createDraftSignRequest({
-      document_id: input.documentId,
-      tenant_id: input.tenantId,
-      title: input.documentTitle || `Sign Request for ${input.documentFileName}`,
-      auto_created: true,
+      const workflow = await this.resolveWorkflowSnapshot(input, tx);
+      const workflowSignerCount = await this.seedWorkflowSigners(
+        signRequest.id, workflow?.steps || [], input.tenantId, input.ownerId, tx,
+      );
+      await this.seedManualSigners(signRequest.id, input.signers || [], input.tenantId, workflowSignerCount, tx);
+      return { signRequest, workflow };
     });
-
-    await documentsRepository.update(input.documentId, {
-      sign_request_id: signRequest.id,
-    });
-
-    const workflow = await this.resolveWorkflowSnapshot(input);
-    const workflowSignerCount = await this.seedWorkflowSigners(
-      signRequest.id,
-      workflow?.steps || [],
-      input.tenantId,
-      input.ownerId
-    );
-
-    await this.seedManualSigners(
-      signRequest.id,
-      input.signers || [],
-      input.tenantId,
-      workflowSignerCount
-    );
-
-    return { signRequest, workflow };
   }
 
   async beginRuntimeFlow(signRequestId: number, tenantId: number, userId: number) {
@@ -182,7 +175,7 @@ class DocumentWorkflowOrchestratorService {
     }
   }
 
-  private async resolveWorkflowSnapshot(input: PrepareDraftPackageInput) {
+  private async resolveWorkflowSnapshot(input: PrepareDraftPackageInput, db: DbClient) {
     if (input.customizedSteps && input.customizedSteps.length > 0) {
       const sourceWorkflowId = input.workflowId || input.documentType?.default_workflow_id;
       if (!sourceWorkflowId) {
@@ -197,12 +190,12 @@ class DocumentWorkflowOrchestratorService {
         input.customizedSteps,
         input.documentId,
         input.tenantId,
-        input.ownerId
+        input.ownerId, db
       );
     }
 
     if (input.adhocSteps && input.adhocSteps.length > 0) {
-      return this.createAdhocWorkflow(input.adhocSteps, input.documentId, input.tenantId, input.ownerId);
+      return this.createAdhocWorkflow(input.adhocSteps, input.documentId, input.tenantId, input.ownerId, db);
     }
 
     const snapshotWorkflowId = input.workflowId || input.documentType?.default_workflow_id;
@@ -212,7 +205,7 @@ class DocumentWorkflowOrchestratorService {
       snapshotWorkflowId,
       input.documentId,
       input.tenantId,
-      input.ownerId
+      input.ownerId, db
     );
   }
 
@@ -229,12 +222,13 @@ class DocumentWorkflowOrchestratorService {
       participant_role: string | null;
     }>,
     tenantId: number,
-    ownerId: number
+    ownerId: number,
+    db: DbClient,
   ) {
     const signerSteps = steps.filter((step) => step.participant_role === "signer");
 
     for (const step of signerSteps) {
-      const resolvedSigners = await this.resolveSignerCandidatesFromStep(step, tenantId, ownerId);
+      const resolvedSigners = await this.resolveSignerCandidatesFromStep(step, tenantId, ownerId, db);
       for (const resolvedSigner of resolvedSigners) {
         const signerData: Prisma.signersCreateInput = {
           sign_request: { connect: { id: signRequestId } },
@@ -250,7 +244,7 @@ class DocumentWorkflowOrchestratorService {
           signerData.user = { connect: { id: resolvedSigner.userId } };
         }
 
-        await signersRepository.create(signerData);
+        await db.signers.create({ data: signerData });
       }
     }
 
@@ -261,12 +255,13 @@ class DocumentWorkflowOrchestratorService {
     signRequestId: number,
     signers: NonNullable<CreateDocumentInput["signers"]>,
     tenantId: number,
-    workflowSignerCount: number
+    workflowSignerCount: number,
+    db: DbClient,
   ) {
     if (!signers.length) return;
 
     const signerEmails = signers.map((signer) => signer.email);
-    const internalUsers = await prisma.users.findMany({
+    const internalUsers = await db.users.findMany({
       where: {
         tenant_id: tenantId,
         email: { in: signerEmails },
@@ -276,7 +271,7 @@ class DocumentWorkflowOrchestratorService {
     });
     const internalUserMap = new Map(internalUsers.map((user) => [user.email, user.id]));
 
-    const currentSigners = await signersRepository.findBySignRequest(signRequestId);
+    const currentSigners = await db.signers.findMany({ where: { sign_request_id: signRequestId } });
     const maxExistingOrder = currentSigners.reduce(
       (maxOrder, signer) => Math.max(maxOrder, signer.signing_order || 0),
       workflowSignerCount
@@ -284,7 +279,7 @@ class DocumentWorkflowOrchestratorService {
 
     for (const signer of signers) {
       const internalUserId = internalUserMap.get(signer.email) || null;
-      await signersRepository.create({
+      await db.signers.create({ data: {
         sign_request: { connect: { id: signRequestId } },
         email: signer.email,
         name: signer.name,
@@ -293,7 +288,7 @@ class DocumentWorkflowOrchestratorService {
         status: "draft",
         is_internal: !!internalUserId,
         ...(internalUserId ? { user: { connect: { id: internalUserId } } } : {}),
-      });
+      }});
     }
   }
 
@@ -307,19 +302,20 @@ class DocumentWorkflowOrchestratorService {
       assignee_position_id?: number | null;
     },
     tenantId: number,
-    ownerId: number
+    ownerId: number,
+    db: DbClient,
   ) {
     const assigneeType = resolveAssigneeType(step as any);
     let candidates: Array<{ id: number; email: string; full_name: string | null }> = [];
 
     if (assigneeType === "specific_user" && (step.assignee_user_id || step.approver_id)) {
-      const user = await prisma.users.findFirst({
+      const user = await db.users.findFirst({
         where: { id: step.assignee_user_id || step.approver_id || undefined, tenant_id: tenantId, status: "active" },
         select: { id: true, email: true, full_name: true },
       });
       if (user) candidates = [user];
     } else if (assigneeType === "department_manager" && (step.assignee_department_id || step.approver_id)) {
-      const department = await prisma.departments.findFirst({
+      const department = await db.departments.findFirst({
         where: { id: step.assignee_department_id || step.approver_id || undefined, tenant_id: tenantId },
         include: { manager: { select: { id: true, email: true, full_name: true, status: true } } },
       });
@@ -327,7 +323,7 @@ class DocumentWorkflowOrchestratorService {
         candidates = [department.manager];
       }
     } else if (assigneeType === "position_in_department" && step.assignee_department_id && step.assignee_position_id) {
-      candidates = await prisma.users.findMany({
+      candidates = await db.users.findMany({
         where: {
           tenant_id: tenantId,
           department_id: step.assignee_department_id,
@@ -337,7 +333,7 @@ class DocumentWorkflowOrchestratorService {
         select: { id: true, email: true, full_name: true },
       });
     } else if (assigneeType === "direct_manager") {
-      const owner = await prisma.users.findUnique({
+      const owner = await db.users.findUnique({
         where: { id: ownerId },
         include: { manager: { select: { id: true, email: true, full_name: true, status: true } } },
       });
@@ -345,7 +341,7 @@ class DocumentWorkflowOrchestratorService {
         candidates = [owner.manager];
       }
     } else if (step.approver_type === "role" && step.approver_id) {
-      const userRoles = await prisma.user_roles.findMany({
+      const userRoles = await db.user_roles.findMany({
         where: { role_id: step.approver_id, user: { tenant_id: tenantId, status: "active" } },
         include: { user: { select: { id: true, email: true, full_name: true } } },
       });
@@ -368,7 +364,8 @@ class DocumentWorkflowOrchestratorService {
     steps: AdhocStepInput[],
     documentId: number,
     tenantId: number,
-    userId: number
+    userId: number,
+    db: DbClient,
   ) {
     if (!steps || steps.length === 0) {
       throw ApiError.badRequest("Phai co it nhat 1 buoc phe duyet", "AD_HOC_STEPS_REQUIRED");
@@ -379,7 +376,7 @@ class DocumentWorkflowOrchestratorService {
     }
 
     for (const step of steps) {
-      const user = await prisma.users.findFirst({
+      const user = await db.users.findFirst({
         where: {
           id: step.approver_user_id,
           tenant_id: tenantId,
@@ -395,7 +392,7 @@ class DocumentWorkflowOrchestratorService {
       }
     }
 
-    const workflow = await prisma.workflows.create({
+    const workflow = await db.workflows.create({
       data: {
         tenant_id: tenantId,
         name: `Ad-hoc workflow for Document #${documentId}`,
@@ -408,7 +405,7 @@ class DocumentWorkflowOrchestratorService {
     });
 
     for (let i = 0; i < steps.length; i += 1) {
-      await prisma.workflow_steps.create({
+      await db.workflow_steps.create({
         data: {
           workflow_id: workflow.id,
           step_order: i + 1,
@@ -424,7 +421,7 @@ class DocumentWorkflowOrchestratorService {
       });
     }
 
-    return prisma.workflows.findUnique({
+    return db.workflows.findUnique({
       where: { id: workflow.id },
       include: {
         steps: {
@@ -439,9 +436,10 @@ class DocumentWorkflowOrchestratorService {
     customSteps: CustomizedStepInput[],
     documentId: number,
     tenantId: number,
-    userId: number
+    userId: number,
+    db: DbClient,
   ) {
-    const template = await prisma.workflows.findFirst({
+    const template = await db.workflows.findFirst({
       where: {
         id: templateId,
         tenant_id: tenantId,
@@ -473,7 +471,7 @@ class DocumentWorkflowOrchestratorService {
       }
     }
 
-    const workflow = await prisma.workflows.create({
+    const workflow = await db.workflows.create({
       data: {
         tenant_id: tenantId,
         name: `${template.name} (Tuy chinh cho #${documentId})`,
@@ -487,7 +485,7 @@ class DocumentWorkflowOrchestratorService {
     });
 
     for (let i = 0; i < normalizedSteps.length; i += 1) {
-      await prisma.workflow_steps.create({
+      await db.workflow_steps.create({
         data: {
           workflow_id: workflow.id,
           step_order: i + 1,
@@ -501,7 +499,7 @@ class DocumentWorkflowOrchestratorService {
       });
     }
 
-    return prisma.workflows.findUnique({
+    return db.workflows.findUnique({
       where: { id: workflow.id },
       include: {
         steps: {
@@ -515,9 +513,10 @@ class DocumentWorkflowOrchestratorService {
     templateId: number,
     documentId: number,
     tenantId: number,
-    userId: number
+    userId: number,
+    db: DbClient,
   ) {
-    const template = await prisma.workflows.findFirst({
+    const template = await db.workflows.findFirst({
       where: {
         id: templateId,
         tenant_id: tenantId,
@@ -534,7 +533,7 @@ class DocumentWorkflowOrchestratorService {
       throw ApiError.notFound("Workflow not found", "WORKFLOW_NOT_FOUND");
     }
 
-    const workflow = await prisma.workflows.create({
+    const workflow = await db.workflows.create({
       data: {
         tenant_id: tenantId,
         name: `${template.name} (Document #${documentId})`,
@@ -549,7 +548,7 @@ class DocumentWorkflowOrchestratorService {
     });
 
     for (const step of template.steps) {
-      await prisma.workflow_steps.create({
+      await db.workflow_steps.create({
         data: {
           workflow_id: workflow.id,
           step_order: step.step_order,
@@ -571,7 +570,7 @@ class DocumentWorkflowOrchestratorService {
       });
     }
 
-    return prisma.workflows.findUnique({
+    return db.workflows.findUnique({
       where: { id: workflow.id },
       include: {
         steps: {

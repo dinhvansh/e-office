@@ -91,14 +91,7 @@ export class ApprovalsController {
       return;
     }
 
-    res.sendFile(file.filePath, (err) => {
-      if (err) {
-        console.error('Error sending approval document file:', err);
-        if (!res.headersSent) {
-          res.status(404).json({ success: false, error: { message: 'File not found' } });
-        }
-      }
-    });
+    res.send(file.fileBytes);
   };
 
   downloadDocument = async (req: Request, res: Response): Promise<void> => {
@@ -124,14 +117,7 @@ export class ApprovalsController {
       return;
     }
 
-    res.sendFile(file.filePath, (err) => {
-      if (err) {
-        console.error('Error downloading approval document file:', err);
-        if (!res.headersSent) {
-          res.status(404).json({ success: false, error: { message: 'File not found' } });
-        }
-      }
-    });
+    res.send(file.fileBytes);
   };
 
   // Submit document for approval

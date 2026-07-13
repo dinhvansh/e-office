@@ -74,7 +74,13 @@ export class AuthController {
     res.json(ok(result));
   };
 
-  logout = async (_req: Request, res: Response): Promise<void> => {
+  logout = async (req: Request, res: Response): Promise<void> => {
+    const body = refreshSchema.parse(req.body ?? {});
+    const cookies = parseCookie(req.headers.cookie);
+    const refreshToken = body.refresh_token ?? cookies[env.AUTH_COOKIE_NAME];
+    if (refreshToken) {
+      await authService.logout(refreshToken);
+    }
     clearRefreshCookie(res);
     res.json(ok({ logged_out: true }));
   };

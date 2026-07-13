@@ -1,5 +1,5 @@
-import { documents } from "@prisma/client";
-import { prisma } from "../../config/prisma";
+import { documents, Prisma } from "@prisma/client";
+import { DbClient, prisma } from "../../config/prisma";
 
 export interface CreateDocumentData {
   tenant_id: number;
@@ -37,8 +37,8 @@ export interface PaginatedResult<T> {
 }
 
 export class DocumentsRepository {
-  async listByTenant(tenantId: number, noSigningOnly = false): Promise<documents[]> {
-    const whereClause: any = { tenant_id: tenantId };
+  async listByTenant(tenantId: number, noSigningOnly = false, db: DbClient = prisma): Promise<documents[]> {
+    const whereClause: Prisma.documentsWhereInput = { tenant_id: tenantId };
     
     if (noSigningOnly) {
       // Only documents whose document type doesn't require digital signing
@@ -47,7 +47,7 @@ export class DocumentsRepository {
       };
     }
     
-    return prisma.documents.findMany({
+    return db.documents.findMany({
       where: whereClause,
       orderBy: { created_at: "desc" },
     });
@@ -60,13 +60,14 @@ export class DocumentsRepository {
     status?: string,
     search?: string,
     documentTypeId?: number,
-    confidentialLevel?: string
+    confidentialLevel?: string,
+    db: DbClient = prisma,
   ): Promise<PaginatedResult<documents>> {
     const page = params.page || 1;
     const limit = params.limit || 10;
     const skip = (page - 1) * limit;
 
-    const whereClause: any = { tenant_id: tenantId };
+    const whereClause: Prisma.documentsWhereInput = { tenant_id: tenantId };
     
     if (noSigningOnly) {
       // Only documents whose document type doesn't require digital signing
@@ -97,10 +98,11 @@ export class DocumentsRepository {
     }
 
     const [data, total] = await Promise.all([
-      prisma.documents.findMany({
+      db.documents.findMany({
         where: whereClause,
         include: {
           document_type: true,
+          department: { select: { id: true, code: true, manager_id: true } },
           owner: {
             select: {
               id: true,
@@ -113,7 +115,7 @@ export class DocumentsRepository {
         skip,
         take: limit,
       }),
-      prisma.documents.count({
+      db.documents.count({
         where: whereClause,
       }),
     ]);
@@ -129,8 +131,43 @@ export class DocumentsRepository {
     };
   }
 
-  findById(id: number, tenantId: number): Promise<documents | null> {
-    return prisma.documents.findFirst({ 
+  async listByTenantForAccess(
+    tenantId: number,
+    noSigningOnly = false,
+    status?: string,
+    search?: string,
+    documentTypeId?: number,
+    confidentialLevel?: string,
+    db: DbClient = prisma,
+  ) {
+    const whereClause: Prisma.documentsWhereInput = { tenant_id: tenantId };
+
+    if (noSigningOnly) whereClause.document_type = { require_digital_signing: false };
+    if (status) whereClause.status = status;
+    if (documentTypeId) whereClause.document_type_id = documentTypeId;
+    if (confidentialLevel) whereClause.confidential_level = confidentialLevel;
+    if (search) {
+      whereClause.OR = [
+        { title: { contains: search, mode: "insensitive" } },
+        { original_file_name: { contains: search, mode: "insensitive" } },
+        { document_number: { contains: search, mode: "insensitive" } },
+        { summary: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    return db.documents.findMany({
+      where: whereClause,
+      include: {
+        document_type: true,
+        department: { select: { id: true, code: true, manager_id: true } },
+        owner: { select: { id: true, manager_id: true, department_id: true } },
+      },
+      orderBy: { created_at: "desc" },
+    });
+  }
+
+  findById(id: number, tenantId: number, db: DbClient = prisma): Promise<documents | null> {
+    return db.documents.findFirst({
       where: { id, tenant_id: tenantId },
       include: {
         cc_emails: true,
@@ -147,18 +184,18 @@ export class DocumentsRepository {
     });
   }
 
-  create(data: CreateDocumentData): Promise<documents> {
-    return prisma.documents.create({ data });
+  create(data: CreateDocumentData, db: DbClient = prisma): Promise<documents> {
+    return db.documents.create({ data });
   }
 
-  delete(id: number): Promise<documents> {
-    return prisma.documents.delete({
+  delete(id: number, db: DbClient = prisma): Promise<documents> {
+    return db.documents.delete({
       where: { id },
     });
   }
 
-  update(id: number, data: Partial<CreateDocumentData>): Promise<documents> {
-    return prisma.documents.update({
+  update(id: number, data: Partial<CreateDocumentData>, db: DbClient = prisma): Promise<documents> {
+    return db.documents.update({
       where: { id },
       data,
     });

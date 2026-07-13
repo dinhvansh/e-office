@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client';
 import { ApiError } from '../../core/errors/api-error';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../../config/prisma';
 import { normalizeStoredFieldBox } from './coordinate.helper';
-
-const prisma = new PrismaClient();
 
 export interface FieldValueInput {
   field_id: number;
@@ -21,6 +20,40 @@ export class SignRequestFieldValuesService {
    */
   async saveFieldValues(signerId: number, fieldValues: FieldValueInput[]): Promise<void> {
     await prisma.$transaction(async (tx) => {
+      await this.saveFieldValuesInTransaction(tx, signerId, fieldValues);
+    });
+  }
+
+  async saveFieldValuesInTransaction(
+    tx: Prisma.TransactionClient,
+    signerId: number,
+    fieldValues: FieldValueInput[],
+  ): Promise<void> {
+      const signer = await tx.signers.findUnique({
+        where: { id: signerId },
+        select: { sign_request_id: true },
+      });
+      if (!signer) {
+        throw ApiError.forbidden("Signing field access denied", "FIELD_ACCESS_DENIED");
+      }
+
+      const uniqueFieldIds = [...new Set(fieldValues.map(({ field_id }) => field_id))];
+      const writableFields = await tx.sign_request_fields.findMany({
+        where: {
+          id: { in: uniqueFieldIds },
+          sign_request_id: signer.sign_request_id,
+          OR: [
+            { assigned_signer_id: signerId },
+            { assigned_signer_id: null },
+          ],
+        },
+        select: { id: true },
+      });
+
+      if (writableFields.length !== uniqueFieldIds.length) {
+        throw ApiError.forbidden("Signing field access denied", "FIELD_ACCESS_DENIED");
+      }
+
       for (const fieldValue of fieldValues) {
         await tx.sign_request_field_values.upsert({
           where: {
@@ -40,7 +73,6 @@ export class SignRequestFieldValuesService {
           },
         });
       }
-    });
   }
 
   /**
@@ -63,8 +95,15 @@ export class SignRequestFieldValuesService {
    * Validate that all required fields are filled
    */
   async validateRequiredFields(signerId: number): Promise<boolean> {
+    return prisma.$transaction((tx) => this.validateRequiredFieldsInTransaction(tx, signerId));
+  }
+
+  async validateRequiredFieldsInTransaction(
+    tx: Prisma.TransactionClient,
+    signerId: number,
+  ): Promise<boolean> {
     // Get signer info to find sign_request_id
-    const signer = await prisma.signers.findUnique({
+    const signer = await tx.signers.findUnique({
       where: { id: signerId },
       select: { id: true, sign_request_id: true },
     });
@@ -76,7 +115,7 @@ export class SignRequestFieldValuesService {
     // Get all required fields for this sign request that are:
     // 1. Assigned to this signer, OR
     // 2. Not assigned to anyone (assigned_signer_id is null) - shared fields
-    const requiredFields = await prisma.sign_request_fields.findMany({
+    const requiredFields = await tx.sign_request_fields.findMany({
       where: {
         sign_request_id: signer.sign_request_id,
         required: true,
@@ -89,7 +128,7 @@ export class SignRequestFieldValuesService {
     });
 
     // Get filled field values for this signer
-    const filledFields = await prisma.sign_request_field_values.findMany({
+    const filledFields = await tx.sign_request_field_values.findMany({
       where: { signer_id: signerId },
       select: { field_id: true, value: true },
     });

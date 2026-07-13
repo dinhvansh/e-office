@@ -84,7 +84,7 @@ export class WorkflowsController {
   };
 
   create = async (req: Request, res: Response): Promise<void> => {
-    const body = createWorkflowSchema.parse(req.body) as any;
+    const body = createWorkflowSchema.parse(req.body) as { name: string; description?: string; document_type_id?: number };
     const workflow = await workflowsService.createWorkflow(
       body,
       req.auth!.tenantId,
@@ -115,7 +115,24 @@ export class WorkflowsController {
 
   createStep = async (req: Request, res: Response): Promise<void> => {
     const workflowId = idSchema.parse(req.params.id);
-    const body = createStepSchema.parse(req.body) as any;
+    const body = createStepSchema.parse(req.body) as {
+      step_name: string;
+      approver_type?: string;
+      approver_id?: number;
+      approver_user_id?: number;
+      approver_role_id?: number;
+      approver_department_id?: number;
+      assignee_type?: (typeof workflowAssigneeTypes)[number];
+      assignee_user_id?: number;
+      assignee_department_id?: number;
+      assignee_position_id?: number;
+      completion_mode?: (typeof workflowCompletionModes)[number];
+      min_required?: number;
+      participant_role?: 'approver' | 'signer';
+      due_in_days?: number;
+      is_required?: boolean;
+      conditions?: unknown;
+    };
     const step = await workflowsService.createWorkflowStep(
       workflowId,
       body,
@@ -142,7 +159,7 @@ export class WorkflowsController {
     const body = reorderStepsSchema.parse(req.body);
     const steps = await workflowsService.reorderWorkflowSteps(
       workflowId,
-      body.steps as any,
+      body.steps as { id: number; step_order: number }[],
       req.auth!.tenantId
     );
     res.json(ok({ steps }));

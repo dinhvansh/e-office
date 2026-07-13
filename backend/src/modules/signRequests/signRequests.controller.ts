@@ -364,6 +364,12 @@ export class SignRequestsController {
     res.json(ok({ sign_request: signRequest }));
   };
 
+  retryArtifact = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id);
+    const result = await signRequestsService.retrySignedArtifactGeneration(id, req.auth!.tenantId, req.auth!.userId);
+    res.json(ok(result));
+  };
+
   // Delete sign request (draft only)
   delete = async (req: Request, res: Response): Promise<void> => {
     const id = idSchema.parse(req.params.id);

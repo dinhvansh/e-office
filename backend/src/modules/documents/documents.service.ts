@@ -1,14 +1,18 @@
 import { Prisma, documents } from "@prisma/client";
 import { promises as fs } from "fs";
+import path from "node:path";
 import crypto from "crypto";
 import { ApiError } from "../../core/errors/api-error";
 import { saveBase64Document } from "../../core/utils/fileStorage";
+import { storageService } from "../../core/storage/storage.service";
 import { auditService } from "../audit/audit.service";
 import { licenseService } from "../licenses/license.service";
 import { numberingService } from "../numbering/numbering.service";
 import { prisma } from "../../config/prisma";
 import { CreateDocumentData, documentsRepository } from "./documents.repository";
 import { authorizationService } from "../authorization/authorization.service";
+import { canCancelDocumentStatus, canHardDeleteDocumentStatus } from "./documentLifecycle.policy";
+import { workflowStateService } from "../workflows/workflowState.service";
 import { documentWorkflowOrchestratorService } from "./documentWorkflowOrchestrator.service";
 import { permissionsService } from "./permissions.service";
 import {
@@ -477,22 +481,18 @@ class DocumentsService {
       throw ApiError.forbidden("You do not have access to this attachment", "ATTACHMENT_ACCESS_DENIED");
     }
 
-    const path = require("path");
-    const filePath = path.isAbsolute(attachment.file_path)
-      ? attachment.file_path
-      : path.resolve(process.cwd(), attachment.file_path);
-
     try {
-      await fs.access(filePath);
+      const fileBytes = path.isAbsolute(attachment.file_path)
+        ? await fs.readFile(attachment.file_path)
+        : await storageService.get(attachment.file_path);
+      return {
+        fileBytes: Buffer.from(fileBytes),
+        fileName: attachment.file_name,
+        mimeType: attachment.file_type,
+      };
     } catch {
       throw ApiError.notFound("Attachment file not found on disk", "ATTACHMENT_FILE_NOT_FOUND");
     }
-
-    return {
-      filePath,
-      fileName: attachment.file_name,
-      mimeType: attachment.file_type,
-    };
   }
 
   async createDocument(input: CreateDocumentInput & {
@@ -518,7 +518,6 @@ class DocumentsService {
       filePath = await saveBase64Document(tenantId, input.fileName, input.base64);
     } else {
       // Security: Validate storage_path to prevent Local File Read (LFR) attacks
-      const path = require('path');
       const storagePath = input.storagePath!;
       
       // Check for path traversal attempts
@@ -526,17 +525,13 @@ class DocumentsService {
         throw ApiError.badRequest("Invalid storage path: path traversal detected", "INVALID_STORAGE_PATH");
       }
       
-      // Ensure path is within STORAGE_BASE_PATH
-      const { env } = await import('../../config/env');
-      const resolvedPath = path.resolve(process.cwd(), storagePath);
-      const allowedBasePath = path.resolve(process.cwd(), env.STORAGE_BASE_PATH);
-      
-      if (!resolvedPath.startsWith(allowedBasePath)) {
+      // Object keys are portable across local and S3-compatible backends.
+      if (!storagePath.replace(/\\/g, "/").startsWith("storage/")) {
         throw ApiError.badRequest("Invalid storage path: must be within storage directory", "INVALID_STORAGE_PATH");
       }
       
       filePath = storagePath;
-      const buffer = await fs.readFile(filePath);
+      const buffer = await storageService.get(filePath);
       hash = crypto.createHash("sha256").update(buffer).digest("hex");
     }
 
@@ -544,7 +539,7 @@ class DocumentsService {
     let documentTypeId: number | null = null;
     let documentNumber: string | null = null;
     let numberingRuleId: number | null = null;
-    let documentType: any = null;
+    let documentType: Prisma.document_typesGetPayload<{ include: { default_workflow: true } }> | null = null;
 
     if (input.documentTypeId) {
       // Load document type with workflow settings
@@ -633,7 +628,9 @@ class DocumentsService {
       department_id: input.departmentId ?? documentTypeDefaults.departmentId,
     };
     const document = await documentsRepository.create(payload);
+    const createdAttachmentPaths: string[] = [];
 
+    try {
     if (input.detailPermissions && input.detailPermissions.length > 0) {
       for (const permission of input.detailPermissions) {
         await permissionsService.grantPermission(
@@ -666,23 +663,23 @@ class DocumentsService {
     }
     
     if (shouldCreateSignRequest) {
-      await documentWorkflowOrchestratorService.prepareDraftPackage({
-        documentId: document.id,
-        tenantId,
-        ownerId,
-        documentTitle: document.title,
-        documentFileName: document.original_file_name,
-        workflowId: input.workflowId,
-        signers: input.signers,
-        customizedSteps: input.customizedSteps,
-        adhocSteps: input.adhocSteps,
-        documentType: documentType
-          ? {
-              default_workflow_id: documentType.default_workflow_id,
-              require_approval: documentType.require_approval,
-            }
-          : null,
-      });
+        await documentWorkflowOrchestratorService.prepareDraftPackage({
+          documentId: document.id,
+          tenantId,
+          ownerId,
+          documentTitle: document.title,
+          documentFileName: document.original_file_name,
+          workflowId: input.workflowId,
+          signers: input.signers,
+          customizedSteps: input.customizedSteps,
+          adhocSteps: input.adhocSteps,
+          documentType: documentType
+            ? {
+                default_workflow_id: documentType.default_workflow_id,
+                require_approval: documentType.require_approval,
+              }
+            : null,
+        });
     }
     
     // ✅ Save CC emails if provided
@@ -726,6 +723,7 @@ class DocumentsService {
           attachment.file_name,
           attachment.file_base64
         );
+        createdAttachmentPaths.push(attachmentPath);
         
         const buffer = Buffer.from(attachment.file_base64, 'base64');
         const fileSize = buffer.length;
@@ -740,6 +738,18 @@ class DocumentsService {
           },
         });
       }
+    }
+    } catch (error) {
+      // Document, ACL, workflow package, CC and attachment persistence span
+      // services with their own transactions. Compensate as one creation unit
+      // so a later failure cannot leave a partial draft package behind.
+      await this.deleteDocument(document.id, tenantId, ownerId).catch(() => undefined);
+      const cleanupPaths = [
+        ...(input.base64 ? [filePath] : []),
+        ...createdAttachmentPaths,
+      ];
+      await Promise.all(cleanupPaths.map((path) => storageService.remove(path).catch(() => undefined)));
+      throw error;
     }
     
     await auditService.record({
@@ -835,8 +845,7 @@ class DocumentsService {
     const document = await this.getDocument(documentId, tenantId);
     
     // ✅ Status check: Only allow delete for 'draft' or 'cancelled' status
-    const allowedStatuses = ['draft', 'cancelled'];
-    if (!allowedStatuses.includes(document.status)) {
+    if (!canHardDeleteDocumentStatus(document.status)) {
       throw ApiError.badRequest(
         `Không thể xóa tài liệu đang ở trạng thái "${document.status}". Chỉ có thể xóa tài liệu ở trạng thái "Nháp" hoặc "Đã hủy". Vui lòng hủy luồng ký/phê duyệt trước khi xóa.`,
         "DOCUMENT_DELETE_DENIED_STATUS"
@@ -866,59 +875,28 @@ class DocumentsService {
       }
     }
     
-    // Delete related data first to avoid foreign key constraints
-    
-    // 1. Delete audit logs
-    await prisma.audit_logs.deleteMany({
-      where: { document_id: document.id },
+    // Database runtime records are deleted atomically. Files are intentionally
+    // not removed here; storage cleanup must remain retryable/outside the DB transaction.
+    await prisma.$transaction(async (tx) => {
+      await tx.audit_logs.deleteMany({ where: { document_id: document.id } });
+
+      if (document.sign_request_id) {
+        await tx.sign_request_field_values.deleteMany({
+          where: { field: { sign_request_id: document.sign_request_id } },
+        });
+        await tx.sign_request_fields.deleteMany({ where: { sign_request_id: document.sign_request_id } });
+        await tx.signers.deleteMany({ where: { sign_request_id: document.sign_request_id } });
+        await tx.sign_requests.delete({ where: { id: document.sign_request_id } });
+      }
+
+      const workflowInstance = await tx.workflow_instances.findUnique({ where: { document_id: document.id } });
+      if (workflowInstance) {
+        await tx.document_approvals.deleteMany({ where: { document_id: document.id } });
+        await tx.workflow_instances.delete({ where: { document_id: document.id } });
+      }
+
+      await documentsRepository.delete(document.id, tx);
     });
-    
-    // 2. Delete sign request and related data if exists
-    if (document.sign_request_id) {
-      // Delete field values first
-      await prisma.sign_request_field_values.deleteMany({
-        where: {
-          field: {
-            sign_request_id: document.sign_request_id
-          }
-        }
-      });
-      
-      // Delete fields
-      await prisma.sign_request_fields.deleteMany({
-        where: { sign_request_id: document.sign_request_id }
-      });
-      
-      // Delete signers
-      await prisma.signers.deleteMany({
-        where: { sign_request_id: document.sign_request_id }
-      });
-      
-      // Delete sign request
-      await prisma.sign_requests.delete({
-        where: { id: document.sign_request_id }
-      });
-    }
-    
-    // 3. Delete workflow instance and approvals if exists
-    const workflowInstance = await prisma.workflow_instances.findUnique({
-      where: { document_id: document.id }
-    });
-    
-    if (workflowInstance) {
-      // Delete approvals first
-      await prisma.document_approvals.deleteMany({
-        where: { document_id: document.id }
-      });
-      
-      // Delete workflow instance
-      await prisma.workflow_instances.delete({
-        where: { document_id: document.id }
-      });
-    }
-    
-    // 4. Finally delete the document
-    await documentsRepository.delete(document.id);
     
     // Note: Cannot record audit log after deletion since document_id is required
     // and the document no longer exists
@@ -1143,7 +1121,7 @@ class DocumentsService {
   }
 
   async getDocumentFile(documentId: number, tenantId: number, userId?: number): Promise<{
-      filePath: string;
+      fileBytes: Buffer;
       fileName: string;
       mimeType: string;
       documentStatus: string | null;
@@ -1151,33 +1129,17 @@ class DocumentsService {
     }> {
     const document = await this.getDocument(documentId, tenantId, userId);
     
-    // Get absolute file path
-    const path = require('path');
-    
     // Handle different path formats:
     // 1. "storage/1/file.pdf" -> resolve from cwd
     // 2. "/uploads/file.pdf" -> resolve from backend/ (legacy seed data)
     // 3. Absolute paths -> use as-is
-    let filePath: string;
-    
-    if (path.isAbsolute(document.file_path)) {
-      filePath = document.file_path;
-    } else if (document.file_path.startsWith('storage/') || document.file_path.startsWith('storage\\')) {
-      // Real uploaded files (from fileStorage.ts)
-      // Storage is in backend/storage/ directory
-      // process.cwd() is already backend/, so just resolve from there
-      filePath = path.resolve(process.cwd(), document.file_path);
-    } else if (document.file_path.startsWith('/uploads/')) {
+    if (document.file_path.startsWith('/uploads/')) {
       // Legacy seed data - files don't exist
       throw ApiError.notFound("File not found (seed data)", "FILE_NOT_FOUND");
-    } else {
-      // Fallback: try relative to cwd
-      filePath = path.resolve(process.cwd(), document.file_path);
     }
     
     // ✅ Create meaningful filename for download (original file)
     // Format: [DocumentNumber]_[Title]_Original.pdf
-    let fileName: string;
     
     const docNumber = document.document_number || `DOC-${document.id}`;
     const title = document.title || document.original_file_name.replace(/\.[^/.]+$/, ''); // Remove extension
@@ -1189,7 +1151,7 @@ class DocumentsService {
       .substring(0, 50);
     
     const ext = path.extname(document.file_path);
-    fileName = `${docNumber}_${sanitizedTitle}_Original${ext}`;
+    const fileName = `${docNumber}_${sanitizedTitle}_Original${ext}`;
     
     // Determine mime type from extension
     const extLower = ext.toLowerCase();
@@ -1211,16 +1173,17 @@ class DocumentsService {
     
     // Check if file exists
     try {
-      await fs.access(filePath);
+      const fileBytes = path.isAbsolute(document.file_path)
+        ? await fs.readFile(document.file_path)
+        : await storageService.get(document.file_path);
+      return { fileBytes: Buffer.from(fileBytes), fileName, mimeType, documentStatus: document.status || null, tenantId: document.tenant_id };
     } catch (error) {
       throw ApiError.notFound("File not found on disk", "FILE_NOT_FOUND");
     }
-    
-      return { filePath, fileName, mimeType, documentStatus: document.status || null, tenantId: document.tenant_id };
     }
 
   async getSignedDocumentFile(documentId: number, tenantId: number, userId?: number): Promise<{
-      filePath: string;
+      fileBytes: Buffer;
       fileName: string;
       mimeType: string;
       documentStatus: string | null;
@@ -1233,23 +1196,9 @@ class DocumentsService {
       throw ApiError.notFound("Signed file not available", "SIGNED_FILE_NOT_FOUND");
     }
     
-    // Get absolute file path
-    const path = require('path');
-    
-    let filePath: string;
-    
-    if (path.isAbsolute(document.signed_file_path)) {
-      filePath = document.signed_file_path;
-    } else if (document.signed_file_path.startsWith('storage/') || document.signed_file_path.startsWith('storage\\')) {
-      filePath = path.resolve(process.cwd(), document.signed_file_path);
-    } else {
-      filePath = path.resolve(process.cwd(), document.signed_file_path);
-    }
-    
     // ✅ Create meaningful filename for download
     // Format: [DocumentNumber]_[Title]_[Status].pdf
     // Example: 027-2025_Giay-De-Nghi_Signed.pdf or 027-2025_Giay-De-Nghi_Draft.pdf
-    let fileName: string;
     
     const docNumber = document.document_number || `DOC-${document.id}`;
     const title = document.title || document.original_file_name.replace('.pdf', '');
@@ -1261,23 +1210,24 @@ class DocumentsService {
       .replace(/\s+/g, '-')               // Replace spaces with dash
       .substring(0, 50);                  // Limit length
     
-    fileName = `${docNumber}_${sanitizedTitle}_${status}.pdf`;
+    const fileName = `${docNumber}_${sanitizedTitle}_${status}.pdf`;
     
     // Signed files are always PDF
     const mimeType = 'application/pdf';
     
     // Check if file exists
     try {
-      await fs.access(filePath);
+      const fileBytes = path.isAbsolute(document.signed_file_path)
+        ? await fs.readFile(document.signed_file_path)
+        : await storageService.get(document.signed_file_path);
+      return { fileBytes: Buffer.from(fileBytes), fileName, mimeType, documentStatus: document.status || null, tenantId: document.tenant_id };
     } catch (error) {
       throw ApiError.notFound("Signed file not found on disk", "FILE_NOT_FOUND");
     }
-    
-      return { filePath, fileName, mimeType, documentStatus: document.status || null, tenantId: document.tenant_id };
     }
 
   async getWatermarkedDocumentBufferIfNeeded(input: {
-    filePath: string;
+    fileBytes: Uint8Array;
     mimeType: string;
     documentStatus: string | null;
     tenantId: number;
@@ -1292,8 +1242,7 @@ class DocumentsService {
       return null;
     }
 
-    const fileBytes = await fs.readFile(input.filePath);
-    const watermarkedBytes = await applyWatermarkToPdfBytes(fileBytes, config, variant);
+    const watermarkedBytes = await applyWatermarkToPdfBytes(input.fileBytes, config, variant);
     return Buffer.from(watermarkedBytes);
   }
 
@@ -1364,14 +1313,28 @@ class DocumentsService {
 
   async cancelDocument(documentId: number, tenantId: number, userId: number): Promise<void> {
     const document = await this.getDocument(documentId, tenantId, userId);
-    
-    if (document.status !== 'completed') {
-      throw ApiError.badRequest('Only completed documents can be cancelled', 'DOCUMENT_NOT_COMPLETED');
+
+    if (!canCancelDocumentStatus(document.status)) {
+      throw ApiError.badRequest('Only active workflow documents can be cancelled', 'DOCUMENT_CANCEL_DENIED');
     }
-    
-    await prisma.documents.update({
-      where: { id: documentId },
-      data: { status: 'cancelled' }
+
+    await prisma.$transaction(async (tx) => {
+      if (document.sign_request_id) {
+        await workflowStateService.transitionSigningPair(tx, {
+          documentId,
+          signRequestId: document.sign_request_id,
+          documentStatus: "cancelled",
+          signRequestStatus: "cancelled",
+        });
+        await tx.signers.updateMany({
+          where: { sign_request_id: document.sign_request_id, status: { in: ["pending", "waiting_approval", "waiting_signing", "otp_sent"] } },
+          data: { status: "cancelled" },
+        });
+      } else {
+        await workflowStateService.transitionDocument(tx, { documentId, status: "cancelled" });
+      }
+      await tx.workflow_instances.updateMany({ where: { document_id: documentId, status: { notIn: ["completed", "cancelled"] } }, data: { status: "cancelled", completed_at: new Date() } });
+      await tx.audit_logs.create({ data: { document_id: documentId, event: "document.cancelled", user_id: userId, ip: null, ua: null } });
     });
   }
 }

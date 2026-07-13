@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { ApiError } from "../../core/errors/api-error";
 import { authRepository } from "./auth.repository";
 import { authService } from "./auth.service";
+import { getAuthStatusError } from "./auth-status.policy";
 import { apiTokensService } from "../webhooks/apiTokens.service";
 
 export const authGuard = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
@@ -40,8 +41,9 @@ export const authGuard = async (req: Request, _res: Response, next: NextFunction
     if (!user || user.tenant_id !== tenantId) {
       throw ApiError.unauthorized("Invalid token context", "INVALID_TOKEN_CONTEXT");
     }
-    if (user.status === "disabled") {
-      throw ApiError.forbidden("User disabled", "USER_DISABLED");
+    const statusError = getAuthStatusError(user.status, user.tenant?.status);
+    if (statusError) {
+      throw ApiError.forbidden(statusError.message, statusError.code);
     }
     req.auth = {
       userId: user.id,
