@@ -1,4 +1,10 @@
-import { documents } from '@prisma/client';
+import { document_attachments, document_cc_emails, document_types, documents } from '@prisma/client';
+
+type DocumentDTOInput = documents & {
+  document_type?: Pick<document_types, 'name'> | null;
+  cc_emails?: document_cc_emails[];
+  attachments?: document_attachments[];
+};
 
 /**
  * Document response DTO - excludes sensitive internal fields
@@ -39,7 +45,7 @@ export interface DocumentAttachmentDTO {
   uploaded_at: Date;
 }
 
-export function toDocumentAttachmentDTO(attachment: any): DocumentAttachmentDTO {
+export function toDocumentAttachmentDTO(attachment: document_attachments): DocumentAttachmentDTO {
   return {
     id: attachment.id,
     file_name: attachment.file_name,
@@ -49,7 +55,7 @@ export function toDocumentAttachmentDTO(attachment: any): DocumentAttachmentDTO 
   };
 }
 
-export function toDocumentAttachmentDTOs(attachments: any[] = []): DocumentAttachmentDTO[] {
+export function toDocumentAttachmentDTOs(attachments: document_attachments[] = []): DocumentAttachmentDTO[] {
   return attachments.map(toDocumentAttachmentDTO);
 }
 
@@ -57,7 +63,7 @@ export function toDocumentAttachmentDTOs(attachments: any[] = []): DocumentAttac
  * Map document entity to response DTO
  * Excludes file_path for security
  */
-export function toDocumentDTO(doc: any): DocumentResponseDTO {
+export function toDocumentDTO(doc: DocumentDTOInput): DocumentResponseDTO {
   return {
     id: doc.id,
     tenant_id: doc.tenant_id,
@@ -81,7 +87,7 @@ export function toDocumentDTO(doc: any): DocumentResponseDTO {
     issued_date: doc.issued_date || null,
     sign_request_id: doc.sign_request_id ?? null,
     created_at: doc.created_at,
-    cc_emails: Array.isArray(doc.cc_emails) ? doc.cc_emails.map((item: any) => item.email).filter(Boolean) : undefined,
+    cc_emails: doc.cc_emails?.map((item) => item.email).filter((email): email is string => Boolean(email)),
     attachments: Array.isArray(doc.attachments) ? toDocumentAttachmentDTOs(doc.attachments) : undefined,
   };
 }
@@ -89,6 +95,6 @@ export function toDocumentDTO(doc: any): DocumentResponseDTO {
 /**
  * Map array of documents to DTOs
  */
-export function toDocumentDTOs(docs: any[]): DocumentResponseDTO[] {
+export function toDocumentDTOs(docs: DocumentDTOInput[]): DocumentResponseDTO[] {
   return docs.map(toDocumentDTO);
 }

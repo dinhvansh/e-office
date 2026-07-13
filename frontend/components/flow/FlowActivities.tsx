@@ -64,7 +64,7 @@ export function FlowActivities({ activities }: FlowActivitiesProps) {
                 </p>
                 {activity.details && (
                   <p className="text-xs text-gray-500 mt-1 italic">
-                    "{activity.details}"
+                    &quot;{activity.details}&quot;
                   </p>
                 )}
               </div>

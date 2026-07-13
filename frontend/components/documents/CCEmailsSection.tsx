@@ -125,7 +125,7 @@ export function CCEmailsSection({ emails, onChange }: CCEmailsSectionProps) {
 
       {emails.length === 0 && (
         <div className="text-center py-4 text-sm text-muted-foreground">
-          Chưa có email CC. Nhập email và click "Thêm".
+          Chưa có email CC. Nhập email và click &quot;Thêm&quot;.
         </div>
       )}
     </div>

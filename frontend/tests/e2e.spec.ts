@@ -1,4 +1,4 @@
-import { expect, request as playwrightRequest, test } from "@playwright/test";
+import { expect, type APIRequestContext, test } from "@playwright/test";
 
 // Require environment variables - no fallback to localhost
 if (!process.env.PLAYWRIGHT_API_BASE_URL) {
@@ -17,7 +17,7 @@ const creds = {
   password: process.env.PLAYWRIGHT_PASSWORD,
 };
 
-async function authenticate(api = playwrightRequest) {
+async function authenticate(api: APIRequestContext) {
   const response = await api.post(`${API_BASE}/auth/login`, {
     data: {
       email: creds.email,

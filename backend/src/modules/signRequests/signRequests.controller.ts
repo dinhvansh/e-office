@@ -8,7 +8,7 @@ const signerSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
   role: z.string().optional(),
-  position_data: z.record(z.any()).optional(),
+  position_data: z.record(z.unknown()).optional(),
 });
 
 const createSchema = z.object({
@@ -73,10 +73,13 @@ export class SignRequestsController {
     );
     
     // Calculate progress for each request
-    const requestsWithProgress = result.data.map((sr: any) => {
-      const totalSigners = sr.signers?.length || 0;
-      const signedCount = sr.signers?.filter((s: any) => s.status === 'signed' || s.status === 'completed').length || 0;
-      const rejectedCount = sr.signers?.filter((s: any) => s.status === 'rejected').length || 0;
+    const requestsWithProgress = result.data.map((sr) => {
+      const requestWithSigners = sr as typeof sr & {
+        signers?: Array<{ status: string | null }>;
+      };
+      const totalSigners = requestWithSigners.signers?.length || 0;
+      const signedCount = requestWithSigners.signers?.filter((signer) => signer.status === 'signed' || signer.status === 'completed').length || 0;
+      const rejectedCount = requestWithSigners.signers?.filter((signer) => signer.status === 'rejected').length || 0;
       
       return {
         ...sr,
@@ -104,7 +107,12 @@ export class SignRequestsController {
       message: body.message,
       workflow_type: body.workflow_type,
       deadline: body.deadline ? new Date(body.deadline) : null,
-      signers: body.signers as any,
+      signers: body.signers.map((signer) => ({
+        email: signer.email!,
+        name: signer.name!,
+        role: signer.role,
+        position_data: signer.position_data,
+      })),
     });
     res.status(201).json(ok({ sign_request: signRequest }));
   };
@@ -150,7 +158,13 @@ export class SignRequestsController {
       signRequestId,
       req.auth!.tenantId,
       req.auth!.userId,
-      signerData as any
+      {
+        email: signerData.email!,
+        name: signerData.name!,
+        role: signerData.role,
+        position_data: signerData.position_data,
+        signing_order: signerData.signing_order,
+      }
     );
     
     res.status(201).json(ok({ signer }));
@@ -249,7 +263,7 @@ export class SignRequestsController {
       signRequestId,
       req.auth!.tenantId,
       req.auth!.userId,
-      signers as any
+      signers.map((signer) => ({ id: signer.id!, signing_order: signer.signing_order! }))
     );
 
     res.json(ok({ message: 'Đã cập nhật thứ tự ký' }));
@@ -297,12 +311,29 @@ export class SignRequestsController {
       })
     );
     const fields = fieldsSchema.parse(req.body.fields);
-    await signRequestFieldsService.saveFields(id, fields as any, req.auth!.tenantId, req.auth!.userId);
+    await signRequestFieldsService.saveFields(
+      id,
+      fields.map((field) => ({
+        id: field.id,
+        assigned_signer_id: field.assigned_signer_id,
+        type: field.type!,
+        pageIndex: field.pageIndex!,
+        xPct: field.xPct!,
+        yPct: field.yPct!,
+        widthPct: field.widthPct,
+        heightPct: field.heightPct,
+        required: field.required,
+        label: field.label ?? undefined,
+        placeholder: field.placeholder ?? undefined,
+        read_only: field.read_only,
+      })),
+      req.auth!.tenantId,
+      req.auth!.userId,
+    );
     res.json(ok({ saved: true }));
   };
 
   deleteField = async (req: Request, res: Response): Promise<void> => {
-    const signRequestId = idSchema.parse(req.params.id);
     const fieldId = idSchema.parse(req.params.fieldId);
     await signRequestFieldsService.deleteField(fieldId, req.auth!.tenantId, req.auth!.userId);
     res.json(ok({ deleted: true }));

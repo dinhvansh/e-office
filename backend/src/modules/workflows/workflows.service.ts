@@ -1,13 +1,51 @@
 import { ApiError } from '../../core/errors/api-error';
 import { workflowsRepository } from './workflows.repository';
 import { prisma } from '../../config/prisma';
+import { Prisma } from '@prisma/client';
 import {
   getDefaultCompletionMode,
+  isWorkflowAssigneeType,
+  isWorkflowCompletionMode,
   normalizeWorkflowStepAssignment,
   resolveAssigneeType,
   type WorkflowAssigneeType,
   type WorkflowCompletionMode,
 } from './workflowStepAssignment';
+
+type WorkflowStepPreviewInput = {
+  approver_type: string | null;
+  approver_id: number | null;
+  assignee_type: string | null;
+  assignee_user_id: number | null;
+  assignee_department_id: number | null;
+  assignee_position_id: number | null;
+  completion_mode: string | null;
+};
+
+function getWorkflowStepAssigneeType(step: WorkflowStepPreviewInput): WorkflowAssigneeType {
+  return resolveAssigneeType({
+    approver_type: step.approver_type ?? undefined,
+    approver_id: step.approver_id ?? undefined,
+    assignee_type: isWorkflowAssigneeType(step.assignee_type) ? step.assignee_type : undefined,
+    assignee_user_id: step.assignee_user_id ?? undefined,
+    assignee_department_id: step.assignee_department_id ?? undefined,
+    assignee_position_id: step.assignee_position_id ?? undefined,
+  });
+}
+
+function toInputJsonValue(value: unknown): Prisma.InputJsonValue | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => toInputJsonValue(item) ?? Prisma.JsonNull) as Prisma.InputJsonArray;
+  }
+  if (typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, toInputJsonValue(item) ?? Prisma.JsonNull]),
+    ) as Prisma.InputJsonObject;
+  }
+  throw ApiError.badRequest('Workflow conditions must be JSON-compatible', 'WORKFLOW_CONDITIONS_INVALID');
+}
 
 class WorkflowsService {
   // Workflows
@@ -27,7 +65,7 @@ class WorkflowsService {
         workflow.steps.map(async (step) => {
           let approverName = '';
           let approverEmail = '';
-          const modernPreview = await this.buildStepPreview(step as any, tenantId, userId);
+          const modernPreview = await this.buildStepPreview(step, tenantId, userId);
 
           if (modernPreview) {
             return {
@@ -243,7 +281,7 @@ class WorkflowsService {
       participant_role?: 'approver' | 'signer';
       due_in_days?: number;
       is_required?: boolean;
-      conditions?: any;
+      conditions?: unknown;
     },
     tenantId: number
   ) {
@@ -256,7 +294,7 @@ class WorkflowsService {
     // Get next step order
     const existingSteps = await workflowsRepository.findSteps(workflowId);
     const nextOrder = existingSteps.length > 0
-      ? Math.max(...existingSteps.map((s: any) => s.step_order)) + 1
+      ? Math.max(...existingSteps.map((step) => step.step_order)) + 1
       : 1;
 
     return workflowsRepository.createStep({
@@ -274,7 +312,7 @@ class WorkflowsService {
       participant_role: data.participant_role || 'approver',
       due_in_days: data.due_in_days,
       is_required: data.is_required,
-      conditions: data.conditions,
+      conditions: toInputJsonValue(data.conditions),
     });
   }
 
@@ -296,7 +334,7 @@ class WorkflowsService {
       participant_role?: 'approver' | 'signer';
       due_in_days?: number;
       is_required?: boolean;
-      conditions?: any;
+      conditions?: unknown;
     },
     tenantId: number
   ) {
@@ -328,7 +366,7 @@ class WorkflowsService {
         approver_id: data.approver_id ?? step.approver_id ?? undefined,
         approver_user_id: data.approver_user_id ?? step.assignee_user_id ?? undefined,
         approver_department_id: data.approver_department_id ?? step.assignee_department_id ?? undefined,
-        assignee_type: data.assignee_type ?? resolveAssigneeType(step as any),
+        assignee_type: data.assignee_type ?? getWorkflowStepAssigneeType(step),
         assignee_user_id: data.assignee_user_id ?? step.assignee_user_id ?? undefined,
         assignee_department_id: data.assignee_department_id ?? step.assignee_department_id ?? undefined,
         assignee_position_id: data.assignee_position_id ?? step.assignee_position_id ?? undefined,
@@ -351,7 +389,7 @@ class WorkflowsService {
       participant_role: data.participant_role,
       due_in_days: data.due_in_days,
       is_required: data.is_required,
-      conditions: data.conditions,
+      conditions: toInputJsonValue(data.conditions),
     });
   }
 
@@ -377,8 +415,8 @@ class WorkflowsService {
 
     // Verify all steps belong to this workflow
     const steps = await workflowsRepository.findSteps(workflowId);
-    const stepIds = steps.map((s: any) => s.id);
-    const invalidSteps = stepOrders.filter((so: any) => !stepIds.includes(so.id));
+    const stepIds = steps.map((step) => step.id);
+    const invalidSteps = stepOrders.filter((stepOrder) => !stepIds.includes(stepOrder.id));
 
     if (invalidSteps.length > 0) {
       throw ApiError.badRequest('Invalid step IDs', 'INVALID_STEP_IDS');
@@ -407,9 +445,11 @@ class WorkflowsService {
     return { users, departments, positions };
   }
 
-  private async buildStepPreview(step: any, tenantId: number, userId?: number) {
-    const assigneeType = resolveAssigneeType(step);
-    const completionMode = step.completion_mode || getDefaultCompletionMode(assigneeType);
+  private async buildStepPreview(step: WorkflowStepPreviewInput, tenantId: number, userId?: number) {
+    const assigneeType = getWorkflowStepAssigneeType(step);
+    const completionMode = isWorkflowCompletionMode(step.completion_mode)
+      ? step.completion_mode
+      : getDefaultCompletionMode(assigneeType);
 
     if (assigneeType === 'specific_user' && (step.assignee_user_id || step.approver_id)) {
       const user = await prisma.users.findUnique({

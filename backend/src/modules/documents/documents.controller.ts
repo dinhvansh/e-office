@@ -177,12 +177,44 @@ export class DocumentsController {
         confidentialLevel: body.confidential_level,
         visibilityScope: body.visibility_scope,
         workflowId: body.workflow_id, // ✅ Pass workflow_id to service
-        adhocSteps: body.adhoc_steps as any,
-        customizedSteps: body.customized_steps as any,
-        signers: body.signers as any,
-        ccEmails: body.cc_emails as any,
-        attachments: body.attachments as any,
-        detailPermissions: body.detail_permissions as any,
+        adhocSteps: body.adhoc_steps?.map((step) => ({
+          approver_user_id: step.approver_user_id!,
+          due_in_days: step.due_in_days!,
+        })),
+        customizedSteps: body.customized_steps?.map((step) => ({
+          step_name: step.step_name,
+          approver_type: step.approver_type!,
+          approver_id: step.approver_id!,
+          participant_role: step.participant_role,
+          due_in_days: step.due_in_days!,
+          order: step.order,
+        })),
+        signers: body.signers?.map((signer) => ({
+          email: signer.email!,
+          name: signer.name!,
+          order: signer.order!,
+          type: signer.type!,
+          external_org_id: signer.external_org_id,
+        })),
+        ccEmails: body.cc_emails,
+        attachments: body.attachments?.map((attachment) => ({
+          file_name: attachment.file_name!,
+          file_base64: attachment.file_base64!,
+          file_type: attachment.file_type!,
+        })),
+        detailPermissions: body.detail_permissions?.map((permission) => ({
+          subject_type: permission.subject_type!,
+          subject_id: permission.subject_id!,
+          scope_department_id: permission.scope_department_id,
+          scope: permission.scope,
+          permissions_json: permission.permissions_json,
+          status_limit_json: permission.status_limit_json,
+          can_read: permission.can_read,
+          can_edit: permission.can_edit,
+          can_approve: permission.can_approve,
+          can_share: permission.can_share,
+          can_delete: permission.can_delete,
+        })),
         forceSignRequest: body.create_sign_request,
       },
       req.auth!.tenantId,
@@ -241,7 +273,7 @@ export class DocumentsController {
   downloadAttachment = async (req: Request, res: Response): Promise<void> => {
     const attachmentId = idSchema.parse(req.params.attachmentId);
     const documentId = idSchema.parse(req.params.id);
-    const { filePath, fileName, mimeType } = await documentsService.getAttachmentFile(
+    const { fileBytes, fileName, mimeType } = await documentsService.getAttachmentFile(
       attachmentId,
       req.auth!.tenantId,
       req.auth!.userId
@@ -258,14 +290,7 @@ export class DocumentsController {
 
     res.setHeader('Content-Type', mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.sendFile(filePath, (err) => {
-      if (err) {
-        console.error('Error sending attachment file:', err);
-        if (!res.headersSent) {
-          res.status(404).json({ success: false, error: { message: 'File not found' } });
-        }
-      }
-    });
+    res.send(fileBytes);
   };
 
   // Tags endpoints
@@ -443,15 +468,7 @@ export class DocumentsController {
       return;
     }
 
-    // Send file
-    res.sendFile(file.filePath, (err) => {
-      if (err) {
-        console.error('Error sending file:', err);
-        if (!res.headersSent) {
-          res.status(404).json({ success: false, error: { message: 'File not found' } });
-        }
-      }
-    });
+    res.send(file.fileBytes);
   };
 
   view = async (req: Request, res: Response): Promise<void> => {
@@ -481,15 +498,7 @@ export class DocumentsController {
       return;
     }
 
-    // Send file
-    res.sendFile(file.filePath, (err) => {
-      if (err) {
-        console.error('Error sending file:', err);
-        if (!res.headersSent) {
-          res.status(404).json({ success: false, error: { message: 'File not found' } });
-        }
-      }
-    });
+    res.send(file.fileBytes);
   };
 
   downloadSigned = async (req: Request, res: Response): Promise<void> => {
@@ -519,15 +528,7 @@ export class DocumentsController {
       return;
     }
 
-    // Send file
-    res.sendFile(file.filePath, (err) => {
-      if (err) {
-        console.error('Error sending file:', err);
-        if (!res.headersSent) {
-          res.status(404).json({ success: false, error: { message: 'File not found' } });
-        }
-      }
-    });
+    res.send(file.fileBytes);
   };
 
   viewSigned = async (req: Request, res: Response): Promise<void> => {
@@ -562,15 +563,7 @@ export class DocumentsController {
       return;
     }
     
-    // Send file
-    res.sendFile(file.filePath, (err) => {
-      if (err) {
-        console.error('Error sending file:', err);
-        if (!res.headersSent) {
-          res.status(404).json({ success: false, error: { message: 'File not found' } });
-        }
-      }
-    });
+    res.send(file.fileBytes);
   };
 
   submitForApproval = async (req: Request, res: Response): Promise<void> => {

@@ -6,7 +6,27 @@ import { signRequestsService } from '../signRequests/signRequests.service';
 import { notificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/notifications.types';
 import { authorizationService } from '../authorization/authorization.service';
-import { getDefaultCompletionMode, resolveAssigneeType } from '../workflows/workflowStepAssignment';
+import {
+  getDefaultCompletionMode,
+  isWorkflowAssigneeType,
+  isWorkflowCompletionMode,
+  resolveAssigneeType,
+} from '../workflows/workflowStepAssignment';
+import type { documents, Prisma } from '@prisma/client';
+
+type CombinedTask = {
+  task_type: 'approval' | 'signing';
+  task_id: number;
+  document_id: number;
+  document_number: string | null;
+  document_title: string | null;
+  document_type: { id: number } | null;
+  owner: unknown;
+  status: string | null;
+  created_at: Date;
+  due_date: Date | null;
+  [key: string]: unknown;
+};
 import { isApprovalStepComplete } from './approvalCompletion.policy';
 import { workflowStateService } from '../workflows/workflowState.service';
 
@@ -373,13 +393,22 @@ class ApprovalsService {
       );
     }
 
-    const completionMode =
-      (approval.workflow_step as any).completion_mode ||
-      getDefaultCompletionMode(resolveAssigneeType(approval.workflow_step as any));
+    const workflowStep = approval.workflow_step;
+    const assigneeType = resolveAssigneeType({
+      approver_type: workflowStep.approver_type ?? undefined,
+      approver_id: workflowStep.approver_id ?? undefined,
+      assignee_type: isWorkflowAssigneeType(workflowStep.assignee_type) ? workflowStep.assignee_type : undefined,
+      assignee_user_id: workflowStep.assignee_user_id ?? undefined,
+      assignee_department_id: workflowStep.assignee_department_id ?? undefined,
+      assignee_position_id: workflowStep.assignee_position_id ?? undefined,
+    });
+    const completionMode = isWorkflowCompletionMode(workflowStep.completion_mode)
+      ? workflowStep.completion_mode
+      : getDefaultCompletionMode(assigneeType);
 
     const minRequired =
       completionMode === 'min_n'
-        ? Math.max(1, Number((approval.workflow_step as any).min_required || 1))
+        ? Math.max(1, Number(workflowStep.min_required || 1))
         : null;
 
     const approverSteps = await prisma.workflow_steps.findMany({
@@ -560,7 +589,7 @@ class ApprovalsService {
     console.log(`[Sequential Approval] All approval steps completed!`);
     
     // Mark workflow as completed
-    if (true) {
+    if (approval) {
       // No more APPROVER steps, check if there are SIGNER steps
       await approvalsRepository.updateWorkflowInstance(approval.document_id, {
         status: 'completed',
@@ -885,7 +914,7 @@ class ApprovalsService {
     const skip = (page - 1) * limit;
 
     // Build where clause - simplified to avoid nested complexity
-    const where: any = {
+    const where: Prisma.document_approvalsWhereInput = {
       approver_user_id: userId
     };
 
@@ -1059,7 +1088,7 @@ class ApprovalsService {
       select: { email: true },
     });
 
-    let allTasks: any[] = [];
+    let allTasks: CombinedTask[] = [];
 
     // Get approvals if taskType is 'approval' or undefined (all)
     if (!options?.taskType || options.taskType === 'approval') {
@@ -1102,7 +1131,7 @@ class ApprovalsService {
       // Get all sign requests with signers
       // ✅ Only get signers that are ready to sign (pending, otp_sent)
       // ❌ Exclude waiting_signing (waiting for their turn)
-      const signRequests: any = await prisma.sign_requests.findMany({
+      const signRequests = await prisma.sign_requests.findMany({
         include: {
           signers: {
             where: {
@@ -1126,9 +1155,9 @@ class ApprovalsService {
       });
 
       // Filter by tenant and map to tasks
-      signRequests.forEach((signRequest: any) => {
+      signRequests.forEach((signRequest) => {
         if (signRequest.document.tenant_id === tenantId && signRequest.signers.length > 0) {
-          signRequest.signers.forEach((signer: any) => {
+          signRequest.signers.forEach((signer) => {
             allTasks.push({
               task_type: 'signing',
               task_id: signer.id,
@@ -1209,7 +1238,10 @@ class ApprovalsService {
    * Auto-send sign request after approval completes
    * ✅ Activates signers (waiting_approval → pending) and sends emails
    */
-  private async autoSendSignRequest(document: any, tenantId: number) {
+  private async autoSendSignRequest(
+    document: Pick<documents, 'id' | 'sign_request_id' | 'owner_id'>,
+    tenantId: number,
+  ) {
     const { signRequestsService } = await import('../signRequests/signRequests.service');
     const { signersRepository } = await import('../signers/signers.repository');
     

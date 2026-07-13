@@ -5,7 +5,7 @@ import { documentsRepository } from "./documents.repository";
 import { signRequestsRepository } from "../signRequests/signRequests.repository";
 import { signersRepository } from "../signers/signers.repository";
 import type { CreateDocumentInput } from "./documents.service";
-import { resolveAssigneeType } from "../workflows/workflowStepAssignment";
+import { isWorkflowAssigneeType, resolveAssigneeType } from "../workflows/workflowStepAssignment";
 
 type CustomizedStepInput = {
   step_name?: string;
@@ -303,7 +303,14 @@ class DocumentWorkflowOrchestratorService {
     ownerId: number,
     db: DbClient,
   ) {
-    const assigneeType = resolveAssigneeType(step as any);
+    const assigneeType = resolveAssigneeType({
+      approver_type: step.approver_type ?? undefined,
+      approver_id: step.approver_id ?? undefined,
+      assignee_type: isWorkflowAssigneeType(step.assignee_type) ? step.assignee_type : undefined,
+      assignee_user_id: step.assignee_user_id ?? undefined,
+      assignee_department_id: step.assignee_department_id ?? undefined,
+      assignee_position_id: step.assignee_position_id ?? undefined,
+    });
     let candidates: Array<{ id: number; email: string; full_name: string | null }> = [];
 
     if (assigneeType === "specific_user" && (step.assignee_user_id || step.approver_id)) {

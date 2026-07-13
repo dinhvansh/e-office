@@ -1,13 +1,13 @@
 import { ApiError } from "../../core/errors/api-error";
 import { tenantsRepository } from "./tenants.repository";
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/prisma';
 import bcrypt from 'bcrypt';
+import type { Prisma } from '@prisma/client';
 import { ADMIN_PERMISSION_KEYS, PERMISSION_CATALOG } from "../roles/permission-catalog";
 
-const prisma = new PrismaClient();
 
 class TenantsService {
-  private async ensurePermissionCatalog(tx: any) {
+  private async ensurePermissionCatalog(tx: Prisma.TransactionClient) {
     for (const permission of PERMISSION_CATALOG) {
       await tx.permissions.upsert({
         where: {
@@ -129,6 +129,8 @@ class TenantsService {
           description: 'Regular user'
         }
       });
+      void managerRole;
+      void userRole;
 
       // 5. Assign admin role to admin user
       await tx.user_roles.create({

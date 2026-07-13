@@ -166,8 +166,9 @@ class SignersService {
       });
       
       console.log(`[Signers Service] Progressive PDF generated: ${pdfPath}`);
-    } catch (error: any) {
-      console.error(`[Signers Service] Failed to generate progressive PDF: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[Signers Service] Failed to generate progressive PDF: ${message}`);
       // Don't throw - signing was successful, PDF generation is secondary
     }
     

@@ -68,8 +68,14 @@ const defaultWatermarkConfig: WatermarkConfig = {
   image_scale: 0.35,
 };
 
-export function normalizeWatermarkConfig(raw: any): WatermarkConfig {
-  const config = raw && typeof raw === 'object' ? raw : {};
+type UnknownRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): UnknownRecord {
+  return value !== null && typeof value === 'object' ? value as UnknownRecord : {};
+}
+
+export function normalizeWatermarkConfig(raw: unknown): WatermarkConfig {
+  const config = asRecord(raw);
   const legacyImageData = normalizeImageData(config.image_data || config.imageData);
   const legacyImageMimeType = normalizeImageMimeType(config.image_mime_type || config.imageMimeType);
   const legacyUseImage = Boolean(config.use_image);
@@ -296,18 +302,18 @@ function resolveRotatedOrigin(centerX: number, centerY: number, width: number, h
   };
 }
 
-function normalizeText(value: any, fallback: string) {
+function normalizeText(value: unknown, fallback: string) {
   return String(value || fallback).trim() || fallback;
 }
 
-function resolveMode(value: any, fallback: WatermarkContentMode): WatermarkContentMode {
+function resolveMode(value: unknown, fallback: WatermarkContentMode): WatermarkContentMode {
   const normalized = String(value || '').trim().toLowerCase();
   return ['none', 'text', 'image', 'both'].includes(normalized)
     ? (normalized as WatermarkContentMode)
     : fallback;
 }
 
-function resolveFontFamily(value: any): WatermarkFontFamily {
+function resolveFontFamily(value: unknown): WatermarkFontFamily {
   const normalized = String(value || '').trim().toLowerCase();
   const available: WatermarkFontFamily[] = [
     'helvetica',
@@ -352,13 +358,13 @@ async function embedWatermarkImage(pdfDoc: PDFDocument, variant: WatermarkVarian
   return pdfDoc.embedJpg(imageBytes);
 }
 
-function clampNumber(value: any, min: number, max: number, fallback: number) {
+function clampNumber(value: unknown, min: number, max: number, fallback: number) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(max, Math.max(min, parsed));
 }
 
-function normalizeHexColor(value: any) {
+function normalizeHexColor(value: unknown) {
   const color = String(value || '').trim();
   return /^#([0-9a-fA-F]{6})$/.test(color) ? color : defaultWatermarkConfig.color;
 }
@@ -372,13 +378,13 @@ function hexToRgb(hex: string) {
   };
 }
 
-function normalizeImageData(value: any) {
+function normalizeImageData(value: unknown) {
   const data = String(value || '').trim();
   if (!data) return '';
   return /^data:image\/(png|jpeg|jpg);base64,/.test(data) ? data : '';
 }
 
-function normalizeImageMimeType(value: any) {
+function normalizeImageMimeType(value: unknown) {
   const mimeType = String(value || '').trim().toLowerCase();
   return ['image/png', 'image/jpeg', 'image/jpg'].includes(mimeType) ? mimeType : '';
 }

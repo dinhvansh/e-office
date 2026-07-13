@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import type { Prisma } from '@prisma/client';
 
 export class WorkflowsRepository {
   // Workflows
@@ -114,7 +115,7 @@ export class WorkflowsRepository {
     participant_role?: string;
     due_in_days?: number;
     is_required?: boolean;
-    conditions?: any;
+    conditions?: Prisma.InputJsonValue;
   }) {
     return prisma.workflow_steps.create({
       data,
@@ -135,7 +136,7 @@ export class WorkflowsRepository {
     participant_role?: string;
     due_in_days?: number;
     is_required?: boolean;
-    conditions?: any;
+    conditions?: Prisma.InputJsonValue;
   }) {
     return prisma.workflow_steps.update({
       where: { id: stepId },

@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/prisma';
+import type { Prisma } from '@prisma/client';
 
-const prisma = new PrismaClient();
 
 export const settingsRepository = {
   async getSetting(tenantId: number, key: string) {
@@ -12,7 +12,12 @@ export const settingsRepository = {
     });
   },
 
-  async upsertSetting(tenantId: number, key: string, value: any, updatedBy?: number) {
+  async upsertSetting(
+    tenantId: number,
+    key: string,
+    value: Prisma.InputJsonValue | Prisma.JsonNullValueInput,
+    updatedBy?: number,
+  ) {
     const existing = await prisma.tenant_settings.findFirst({
       where: {
         tenant_id: tenantId,

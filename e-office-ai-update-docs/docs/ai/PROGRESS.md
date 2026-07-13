@@ -1570,3 +1570,22 @@ alter any developer or deployment database.
 
 Next recommended issue: Create future schema changes with reviewed migrations
 after `0_init`; do not reintroduce `prisma db push` into CI or deployment flows.
+## 2026-07-13 — P1-FE-013 lint and typecheck gates
+
+Status: Implemented and verified.
+
+Files changed: frontend lint/typecheck configuration, React 18 type alignment,
+frontend test typing, quality-only backend type fixes, and
+`LINT-TYPECHECK-REPORT.md`.
+
+Results:
+
+- backend lint: 157 errors to 0;
+- backend build: passed;
+- backend tests: 64/64 passed;
+- frontend lint: 0 errors (legacy warnings remain visible);
+- frontend direct typecheck and production build: passed.
+
+No build/lint suppression, ignore flag, or `ts-ignore` was added. Remaining
+frontend warnings need separate UI/behavior review, especially hook dependency
+warnings in approval and signing screens.

@@ -1,5 +1,15 @@
 import bcrypt from 'bcrypt';
+import type { Prisma } from '@prisma/client';
 import { usersRepository } from './users.repository';
+
+type UserFilters = {
+  page?: number;
+  limit?: number;
+  department_id?: number;
+  role?: string;
+  status?: string;
+  search?: string;
+};
 
 export const usersService = {
   validateOrganizationalFields(data: {
@@ -16,7 +26,7 @@ export const usersService = {
     }
   },
 
-  async getUsers(tenantId: number | null, filters?: any) {
+  async getUsers(tenantId: number | null, filters?: UserFilters) {
     return usersRepository.findByTenant(tenantId, filters);
   },
 
@@ -27,7 +37,7 @@ export const usersService = {
 
   async getDirectoryUsers(tenantId: number, search?: string) {
     const users = await usersRepository.findByTenant(tenantId, { status: 'active', search });
-    return users.map((user: any) => ({
+    return users.map((user) => ({
       id: user.id,
       email: user.email,
       full_name: user.full_name,
@@ -43,7 +53,8 @@ export const usersService = {
     }
     
     // Remove password hash from response
-    const { password_hash, ...userWithoutPassword } = user;
+    const userWithoutPassword = { ...user };
+    delete userWithoutPassword.password_hash;
     return userWithoutPassword;
   },
 
@@ -112,11 +123,14 @@ export const usersService = {
 
     // Hash new password if provided
     if (password) {
-      (userData as any).password_hash = await bcrypt.hash(password, 10);
+      const updateData: Prisma.usersUncheckedUpdateInput = {
+        ...userData,
+        password_hash: await bcrypt.hash(password, 10),
+      };
+      await usersRepository.update(id, updateData);
+    } else {
+      await usersRepository.update(id, userData);
     }
-
-    // Update user
-    await usersRepository.update(id, userData);
 
     // Update roles if provided
     if (role_ids !== undefined) {

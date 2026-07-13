@@ -5,12 +5,12 @@ import { normalizeStoredFieldBox } from './coordinate.helper';
 
 export interface FieldValueInput {
   field_id: number;
-  value: any; // JSON value
+  value: Prisma.InputJsonValue;
 }
 
 export interface FieldValue {
   field_id: number;
-  value: any;
+  value: Prisma.JsonValue;
   filled_at: Date;
 }
 

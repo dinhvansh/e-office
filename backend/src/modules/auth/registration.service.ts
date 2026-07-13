@@ -1,8 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/prisma';
+import type { users } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { sendEmail } from '../../config/email';
 
-const prisma = new PrismaClient();
 
 export class RegistrationService {
   // Public registration - creates user with 'pending' status
@@ -95,7 +95,7 @@ export class RegistrationService {
   }
 
   // Admin approves user
-  async approveUser(userId: number, approvedBy: number): Promise<{ success: boolean; message: string }> {
+  async approveUser(userId: number): Promise<{ success: boolean; message: string }> {
     const user = await prisma.users.findUnique({
       where: { id: userId },
       include: {
@@ -190,7 +190,7 @@ export class RegistrationService {
   }
 
   // Admin rejects user
-  async rejectUser(userId: number, reason: string, rejectedBy: number): Promise<{ success: boolean; message: string }> {
+  async rejectUser(userId: number, reason: string): Promise<{ success: boolean; message: string }> {
     const user = await prisma.users.findUnique({
       where: { id: userId }
     });
@@ -223,7 +223,7 @@ export class RegistrationService {
   }
 
   // Get pending users for admin
-  async getPendingUsers(tenantId: number | null): Promise<any[]> {
+  async getPendingUsers(tenantId: number | null) {
     return await prisma.users.findMany({
       where: {
         ...(tenantId !== null && { tenant_id: tenantId }),
@@ -249,7 +249,7 @@ export class RegistrationService {
   }
 
   // Notify admins about new registration
-  private async notifyAdminsAboutNewRegistration(user: any): Promise<void> {
+  private async notifyAdminsAboutNewRegistration(user: users): Promise<void> {
     // Find all admin users in the tenant
     const adminRole = await prisma.roles.findFirst({
       where: {

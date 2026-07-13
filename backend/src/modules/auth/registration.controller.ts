@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { registrationService } from './registration.service';
-import { z } from 'zod';
+import { ZodError, z } from 'zod';
 
 // Validation schemas
 const registerSchema = z.object({
@@ -10,10 +10,6 @@ const registerSchema = z.object({
   terms_accepted: z.boolean().refine(val => val === true, 'You must accept terms and conditions'),
   company_name: z.string().optional(),
   create_tenant: z.boolean().optional()
-});
-
-const approveRejectSchema = z.object({
-  reason: z.string().optional()
 });
 
 export class RegistrationController {
@@ -31,21 +27,23 @@ export class RegistrationController {
       });
 
       res.status(201).json(result);
-    } catch (error: any) {
-      if (error.name === 'ZodError') {
+    } catch (error: unknown) {
+      if (error instanceof ZodError) {
         return res.status(400).json({ error: 'Validation error', details: error.errors });
       }
 
-      if (error.message.includes('Email already registered')) {
-        return res.status(409).json({ error: error.message });
+      const message = error instanceof Error ? error.message : '';
+
+      if (message.includes('Email already registered')) {
+        return res.status(409).json({ error: message });
       }
 
-      if (error.message.includes('re-register 24 hours')) {
-        return res.status(429).json({ error: error.message });
+      if (message.includes('re-register 24 hours')) {
+        return res.status(429).json({ error: message });
       }
 
-      if (error.message.includes('Password must')) {
-        return res.status(400).json({ error: error.message });
+      if (message.includes('Password must')) {
+        return res.status(400).json({ error: message });
       }
 
       console.error('Registration error:', error);
@@ -56,7 +54,7 @@ export class RegistrationController {
   // GET /users/pending - Get pending users (admin only)
   async getPendingUsers(req: Request, res: Response) {
     try {
-      const user = (req as any).user;
+      const user = req.user;
       const tenantId = user?.tenant_id || 1;
       
       // Check if user is super admin (can see all tenants)
@@ -65,7 +63,7 @@ export class RegistrationController {
       const users = await registrationService.getPendingUsers(isSuperAdmin ? null : tenantId);
 
       res.json({ users });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Get pending users error:', error);
       res.status(500).json({ error: 'Failed to get pending users' });
     }
@@ -75,22 +73,21 @@ export class RegistrationController {
   async approveUser(req: Request, res: Response) {
     try {
       const userId = parseInt(req.params.id);
-      const approvedBy = (req as any).user?.id;
-
       if (!userId || isNaN(userId)) {
         return res.status(400).json({ error: 'Invalid user ID' });
       }
 
-      const result = await registrationService.approveUser(userId, approvedBy);
+      const result = await registrationService.approveUser(userId);
 
       res.json(result);
-    } catch (error: any) {
-      if (error.message.includes('not found')) {
-        return res.status(404).json({ error: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.includes('not found')) {
+        return res.status(404).json({ error: message });
       }
 
-      if (error.message.includes('not in pending status')) {
-        return res.status(400).json({ error: error.message });
+      if (message.includes('not in pending status')) {
+        return res.status(400).json({ error: message });
       }
 
       console.error('Approve user error:', error);
@@ -102,7 +99,6 @@ export class RegistrationController {
   async rejectUser(req: Request, res: Response) {
     try {
       const userId = parseInt(req.params.id);
-      const rejectedBy = (req as any).user?.id;
       const { reason } = req.body;
 
       if (!userId || isNaN(userId)) {
@@ -113,16 +109,17 @@ export class RegistrationController {
         return res.status(400).json({ error: 'Rejection reason is required' });
       }
 
-      const result = await registrationService.rejectUser(userId, reason, rejectedBy);
+      const result = await registrationService.rejectUser(userId, reason);
 
       res.json(result);
-    } catch (error: any) {
-      if (error.message.includes('not found')) {
-        return res.status(404).json({ error: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.includes('not found')) {
+        return res.status(404).json({ error: message });
       }
 
-      if (error.message.includes('not in pending status')) {
-        return res.status(400).json({ error: error.message });
+      if (message.includes('not in pending status')) {
+        return res.status(400).json({ error: message });
       }
 
       console.error('Reject user error:', error);

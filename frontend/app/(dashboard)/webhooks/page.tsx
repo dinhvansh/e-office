@@ -364,7 +364,7 @@ export default function WebhooksPage() {
                     <td colSpan={5} className="px-6 py-12 text-center">
                       <Webhook className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                       <p className="text-muted-foreground">Chưa có webhook nào.</p>
-                      <p className="text-sm text-muted-foreground mt-1">Nhấn "Thêm webhook" để bắt đầu.</p>
+                      <p className="text-sm text-muted-foreground mt-1">Nhấn &quot;Thêm webhook&quot; để bắt đầu.</p>
                     </td>
                   </tr>
                 ) : (

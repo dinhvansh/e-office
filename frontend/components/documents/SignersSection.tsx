@@ -293,7 +293,7 @@ export function SignersSection({ signers, onChange, externalOrgs }: SignersSecti
       {signers.length === 0 && (
         <div className="text-center py-6 text-sm text-muted-foreground bg-purple-50 rounded-lg border border-purple-200">
           <p className="font-medium">Chưa có người ký bên ngoài</p>
-          <p className="text-xs mt-1">Click "Thêm người ký" hoặc "Thêm tổ chức" để thêm đối tác/khách hàng</p>
+          <p className="text-xs mt-1">Click &quot;Thêm người ký&quot; hoặc &quot;Thêm tổ chức&quot; để thêm đối tác/khách hàng</p>
           <p className="text-xs mt-1">💡 Họ sẽ nhận email với link ký, không cần đăng nhập hệ thống</p>
         </div>
       )}

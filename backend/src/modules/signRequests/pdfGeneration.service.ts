@@ -1,4 +1,5 @@
-import { PDFDocument, rgb, PDFPage } from 'pdf-lib';
+import { PDFDocument, rgb, PDFPage, PDFFont } from 'pdf-lib';
+import type { documents, Prisma, sign_request_fields, sign_requests, signers, users } from '@prisma/client';
 import fontkit from 'fontkit';
 import { prisma } from '../../config/prisma';
 import * as fs from 'fs';
@@ -10,6 +11,17 @@ import {
   getTenantWatermarkConfig,
   resolveWatermarkVariantForStatus,
 } from '../settings/watermark.helper';
+
+type PdfFieldValue =
+  | Prisma.sign_request_field_valuesGetPayload<{ include: { field: true; signer: true } }>
+  | { field: sign_request_fields; signer: signers; value: string };
+
+type PdfSignRequest = sign_requests & {
+  document: documents & { owner: users | null };
+  signers: signers[];
+};
+
+type StoredDocument = Pick<documents, 'id' | 'file_path'>;
 
 
 export class PdfGenerationService {
@@ -74,7 +86,7 @@ export class PdfGenerationService {
     console.log(`[Progressive PDF] Found ${fields.length} fields`);
 
     // 3. Prepare field values from both sources (only signed ones)
-    const fieldValues: any[] = [];
+    const fieldValues: PdfFieldValue[] = [];
 
     // 3a. Load from sign_request_field_values (external signing)
     const externalFieldValues = await prisma.sign_request_field_values.findMany({
@@ -192,7 +204,7 @@ export class PdfGenerationService {
    */
   private async saveProgressivePdf(
     pdfBytes: Uint8Array,
-    document: any,
+    document: StoredDocument,
     isCompleted: boolean
   ): Promise<string> {
     const timestamp = Date.now();
@@ -248,8 +260,8 @@ export class PdfGenerationService {
       }
 
       console.log(`[Progressive PDF] Cleaned up ${signingFiles.length} old files`);
-    } catch (error: any) {
-      console.error(`[Progressive PDF] Cleanup error: ${error.message}`);
+    } catch (error: unknown) {
+      console.error(`[Progressive PDF] Cleanup error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       // Don't throw - cleanup is not critical
     }
   }
@@ -290,7 +302,7 @@ export class PdfGenerationService {
     console.log(`[PDF Generation] Found ${fields.length} fields`);
 
     // 3. Prepare field values from both sources
-    const fieldValues: any[] = [];
+    const fieldValues: PdfFieldValue[] = [];
 
     // 3a. Load from sign_request_field_values (external signing)
     const externalFieldValues = await prisma.sign_request_field_values.findMany({
@@ -371,8 +383,8 @@ export class PdfGenerationService {
   private async drawFieldValue(
     pdfDoc: PDFDocument,
     pages: PDFPage[],
-    fieldValue: any,
-    font: any
+    fieldValue: PdfFieldValue,
+    font: PDFFont,
   ): Promise<void> {
     const field = fieldValue.field;
     const page = pages[field.page - 1];
@@ -389,7 +401,7 @@ export class PdfGenerationService {
     const fieldWidth = pdfBox.width;
     const fieldHeight = pdfBox.height;
 
-    if (field.type === 'signature' && fieldValue.value) {
+    if (field.type === 'signature' && typeof fieldValue.value === 'string' && fieldValue.value) {
       try {
         // Extract base64 data
         const base64Data = fieldValue.value.replace(/^data:image\/\w+;base64,/, '');
@@ -412,8 +424,8 @@ export class PdfGenerationService {
         });
 
         console.log(`[PDF Generation] Drew signature for ${fieldValue.signer.name} on page ${field.page}`);
-      } catch (error: any) {
-        console.error(`[PDF Generation] Failed to draw signature: ${error.message}`);
+      } catch (error: unknown) {
+        console.error(`[PDF Generation] Failed to draw signature: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     } else if (field.type === 'text' || field.type === 'date') {
       // Noto Sans is embedded above, so preserve Unicode text verbatim.
@@ -434,14 +446,13 @@ export class PdfGenerationService {
    */
   private async createAuditTrailPage(
     pdfDoc: PDFDocument,
-    signRequest: any
+    signRequest: PdfSignRequest,
   ): Promise<void> {
     console.log('[PDF Generation] Creating audit trail page');
 
     const page = pdfDoc.addPage([595, 842]); // A4 size
     const font = await this.embedUnicodeFont(pdfDoc);
     const boldFont = await this.embedUnicodeFont(pdfDoc, true);
-    const smallFont = font;
 
     let y = 800;
 
@@ -481,7 +492,6 @@ export class PdfGenerationService {
     const createdDate = signRequest.document.created_at 
       ? new Date(signRequest.document.created_at).toLocaleString('vi-VN')
       : new Date().toLocaleString('vi-VN');
-    const completedDate = new Date().toLocaleString('vi-VN');
     
     // Left column
     page.drawText('Ten tai lieu:', { x: 40, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
@@ -740,7 +750,7 @@ export class PdfGenerationService {
       // Column 5: IP / Auth
       const ipAuth = signer.ip_address 
         ? signer.ip_address 
-        : (signer.type === 'internal' ? 'Internal' : 'External');
+        : (signer.is_internal ? 'Internal' : 'External');
       page.drawText(ipAuth, {
         x: 450, y: y - 7, size: 6, font: font, color: rgb(0.4, 0.4, 0.4)
       });
@@ -770,7 +780,7 @@ export class PdfGenerationService {
    */
   private async saveSignedPdf(
     signedPdfBytes: Uint8Array,
-    document: any
+    document: StoredDocument,
   ): Promise<string> {
     // Create filename
     const signedFileName = `signed_${Date.now()}_${document.id}.pdf`;

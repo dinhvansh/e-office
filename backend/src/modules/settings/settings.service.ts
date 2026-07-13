@@ -6,22 +6,48 @@ import {
   serializeDocumentTypePolicyV2,
 } from './document-type-policy.helper';
 
-function normalizeEmailConfig(config: any) {
-  const port = Number(config?.smtp_port || 587);
-  const smtpSecure =
-    config?.smtp_secure === true
-    || config?.smtp_secure === 'true'
-    || config?.smtp_secure === 1
-    || config?.smtp_secure === '1';
+import { Prisma } from '@prisma/client';
 
-  return {
-    ...config,
-    smtp_port: Number.isFinite(port) && port > 0 ? port : 587,
-    smtp_secure: smtpSecure,
-  };
+type SettingsRecord = Record<string, unknown>;
+type EmailConfig = SettingsRecord & { smtp_port: number; smtp_secure: boolean };
+
+function asSettingsRecord(value: unknown): SettingsRecord {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as SettingsRecord
+    : {};
 }
 
-function buildSmtpAttempts(config: any) {
+function toInputJsonValue(value: unknown): Prisma.InputJsonValue | Prisma.JsonNullValueInput {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (value === null) return Prisma.JsonNull;
+  if (Array.isArray(value)) {
+    return value.map((item) => item === null ? null : toInputJsonValue(item) as Prisma.InputJsonValue) as Prisma.InputJsonArray;
+  }
+  if (typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(asSettingsRecord(value)).map(([key, item]) => [key, item === null ? null : toInputJsonValue(item)]),
+    ) as Prisma.InputJsonObject;
+  }
+  return Prisma.JsonNull;
+}
+
+function normalizeEmailConfig(config: unknown): EmailConfig {
+  const source = asSettingsRecord(config);
+  const port = Number(source.smtp_port || 587);
+  const smtpSecure =
+    source.smtp_secure === true
+    || source.smtp_secure === 'true'
+    || source.smtp_secure === 1
+    || source.smtp_secure === '1';
+
+  return {
+    ...source,
+    smtp_port: Number.isFinite(port) && port > 0 ? port : 587,
+    smtp_secure: smtpSecure,
+  } as EmailConfig;
+}
+
+function buildSmtpAttempts(config: unknown) {
   const normalized = normalizeEmailConfig(config);
   const host = String(normalized.smtp_host || '').trim();
   const port = Number(normalized.smtp_port || 587);
@@ -45,7 +71,7 @@ function buildSmtpAttempts(config: any) {
     pushAttempt(true, 'SSL/TLS trực tiếp');
   } else {
     pushAttempt(Boolean(normalized.smtp_secure), normalized.smtp_secure ? 'SSL/TLS trực tiếp' : 'không SSL trực tiếp');
-    pushAttempt(!Boolean(normalized.smtp_secure), !normalized.smtp_secure ? 'SSL/TLS trực tiếp' : 'không SSL trực tiếp');
+    pushAttempt(!normalized.smtp_secure, !normalized.smtp_secure ? 'SSL/TLS trực tiếp' : 'không SSL trực tiếp');
   }
 
   return { host, port, user, pass, fromEmail, fromName, attempts, normalized };
@@ -57,8 +83,8 @@ export const settingsService = {
     return setting?.setting_value || null;
   },
 
-  async saveEmailConfig(tenantId: number, config: any, userId?: number) {
-    return settingsRepository.upsertSetting(tenantId, 'email_config', normalizeEmailConfig(config), userId);
+  async saveEmailConfig(tenantId: number, config: unknown, userId?: number) {
+    return settingsRepository.upsertSetting(tenantId, 'email_config', toInputJsonValue(normalizeEmailConfig(config)), userId);
   },
 
   async sendTestEmail(tenantId: number, testEmail: string) {
@@ -67,7 +93,7 @@ export const settingsService = {
       throw new Error('Email config not found');
     }
 
-    if (config.use_oauth) {
+    if (normalizeEmailConfig(config).use_oauth) {
       throw new Error('OAuth SMTP test is not implemented yet. Please use SMTP/App Password for this setup.');
     }
 
@@ -108,8 +134,8 @@ export const settingsService = {
         });
 
         return;
-      } catch (error: any) {
-        errors.push(`${attempt.label}: ${error?.message || 'Unknown SMTP error'}`);
+      } catch (error: unknown) {
+        errors.push(`${attempt.label}: ${error instanceof Error ? error.message : 'Unknown SMTP error'}`);
       }
     }
 
@@ -128,13 +154,13 @@ export const settingsService = {
     return getTenantWatermarkConfig(tenantId);
   },
 
-  async saveWatermarkConfig(tenantId: number, config: any, userId?: number) {
-    return settingsRepository.upsertSetting(tenantId, 'watermark_config', normalizeWatermarkConfig(config), userId);
+  async saveWatermarkConfig(tenantId: number, config: unknown, userId?: number) {
+    return settingsRepository.upsertSetting(tenantId, 'watermark_config', toInputJsonValue(normalizeWatermarkConfig(config)), userId);
   },
 
   async getAllSettings(tenantId: number) {
     const settings = await settingsRepository.getAllSettings(tenantId);
-    const result: Record<string, any> = {};
+    const result: Record<string, Prisma.JsonValue> = {};
     settings.forEach(s => {
       result[s.setting_key] = s.setting_value;
     });
@@ -147,10 +173,10 @@ export const settingsService = {
     return normalizeDocumentTypePolicyV2(setting?.setting_value || {});
   },
 
-  async saveDocumentTypePolicy(tenantId: number, documentTypeId: number, policy: any, userId?: number) {
+  async saveDocumentTypePolicy(tenantId: number, documentTypeId: number, policy: unknown, userId?: number) {
     const key = `doc_type_policy:${documentTypeId}`;
     const normalized = normalizeDocumentTypePolicyV2(policy);
-    return settingsRepository.upsertSetting(tenantId, key, serializeDocumentTypePolicyV2(normalized), userId);
+    return settingsRepository.upsertSetting(tenantId, key, toInputJsonValue(serializeDocumentTypePolicyV2(normalized)), userId);
   },
 
   async deleteDocumentTypePolicy(tenantId: number, documentTypeId: number) {

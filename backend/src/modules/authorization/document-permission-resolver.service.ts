@@ -1,7 +1,7 @@
-import { PrismaClient, users } from "@prisma/client";
-import { normalizeDocumentTypePolicyV2 } from "../settings/document-type-policy.helper";
+import { document_permissions, Prisma, users } from "@prisma/client";
+import { prisma } from "../../config/prisma";
+import { DocumentTypePolicyV2, normalizeDocumentTypePolicyV2 } from "../settings/document-type-policy.helper";
 
-const prisma = new PrismaClient();
 
 export type ResolvedDocumentPermissions = {
   canView: boolean;
@@ -36,6 +36,12 @@ const ALL_PERMISSION_KEYS: PermissionKey[] = [
   "canDelete",
 ];
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
 const SNAPSHOT_PERMISSION_TO_KEYS: Record<string, PermissionKey[]> = {
   VIEW: ["canView"],
   DOWNLOAD: ["canDownload"],
@@ -59,6 +65,32 @@ function createBlankPermissions(): Omit<ResolvedDocumentPermissions, "reasons"> 
     canDelete: false,
   };
 }
+
+type ResolverUser = Prisma.usersGetPayload<{
+  include: { position: true; user_roles: true };
+}>;
+
+type ResolverDocument = Prisma.documentsGetPayload<{
+  include: {
+    department: { select: { id: true; code: true; manager_id: true } };
+    owner: { select: { id: true; manager_id: true; department_id: true } };
+  };
+}>;
+
+type WorkflowParticipation = {
+  isParticipant: boolean;
+  isApprover: boolean;
+  isSigner: boolean;
+  isCc: boolean;
+};
+
+type PreloadedResolution = {
+  user: ResolverUser;
+  document: ResolverDocument;
+  typePolicy: DocumentTypePolicyV2 | null;
+  workflowParticipation: WorkflowParticipation;
+  aclPolicies: document_permissions[];
+};
 
 class DocumentPermissionResolverService {
   private normalizePermissionArray(value: unknown): string[] {
@@ -265,6 +297,10 @@ class DocumentPermissionResolverService {
       },
     });
 
+    return this.resolveAclSnapshotPolicies(policies, currentStatus);
+  }
+
+  private resolveAclSnapshotPolicies(policies: document_permissions[], currentStatus: string) {
     const allow = createBlankPermissions();
     const deny = createBlankPermissions();
     const reasons: string[] = [];
@@ -379,13 +415,14 @@ class DocumentPermissionResolverService {
   async resolveDocumentPermission(
     userId: number,
     tenantId: number,
-    documentId: number
+    documentId: number,
+    preloaded?: PreloadedResolution
   ): Promise<ResolvedDocumentPermissions> {
     const reasons: string[] = [];
     const resolved = createBlankPermissions();
     const deny = createBlankPermissions();
 
-    const user = await prisma.users.findUnique({
+    const user = preloaded?.user ?? await prisma.users.findUnique({
       where: { id: userId },
       include: {
         position: true,
@@ -397,7 +434,7 @@ class DocumentPermissionResolverService {
       return { ...resolved, reasons: ["USER_NOT_FOUND_OR_TENANT_MISMATCH"] };
     }
 
-    const document = await prisma.documents.findFirst({
+    const document = preloaded?.document ?? await prisma.documents.findFirst({
       where: { id: documentId, tenant_id: tenantId },
       include: {
         department: { select: { id: true, code: true, manager_id: true } },
@@ -427,10 +464,12 @@ class DocumentPermissionResolverService {
       };
     }
 
-    const typePolicy = await this.getDocumentTypePolicy(tenantId, document.document_type_id);
-    const workflowParticipation = await this.getWorkflowParticipation(userId, user.email, documentId);
+    const typePolicy = preloaded?.typePolicy ?? await this.getDocumentTypePolicy(tenantId, document.document_type_id);
+    const workflowParticipation = preloaded?.workflowParticipation ?? await this.getWorkflowParticipation(userId, user.email, documentId);
     const currentStatus = String(document.status || "").toUpperCase();
-    const aclSnapshot = await this.resolveAclSnapshotPermissions(documentId, user, currentStatus);
+    const aclSnapshot = preloaded
+      ? this.resolveAclSnapshotPolicies(preloaded.aclPolicies, currentStatus)
+      : await this.resolveAclSnapshotPermissions(documentId, user, currentStatus);
 
     const visibilityDecision = this.matchesVisibilityScope(
       document.visibility_scope,
@@ -532,9 +571,11 @@ class DocumentPermissionResolverService {
         }
 
         reasons.push(`Advanced policy matched: ${policy.name}`);
-        const permissionKeys = Array.isArray((policy.permission_json as any)?.permissions)
-          ? (policy.permission_json as any).permissions.map((item: unknown) => String(item).toUpperCase())
-          : Object.entries(policy.permission_json || {})
+        const permissionJson = asRecord(policy.permission_json);
+        const permissionList = permissionJson?.permissions;
+        const permissionKeys = Array.isArray(permissionList)
+          ? permissionList.map((item) => String(item).toUpperCase())
+          : Object.entries(permissionJson || {})
               .filter(([, value]) => value === true)
               .map(([key]) => key.toUpperCase());
 
@@ -593,6 +634,90 @@ class DocumentPermissionResolverService {
     }
 
     return { ...resolved, reasons };
+  }
+
+  async resolveDocumentPermissionsBatch(
+    userId: number,
+    tenantId: number,
+    documents: ResolverDocument[],
+  ): Promise<Map<number, ResolvedDocumentPermissions>> {
+    const results = new Map<number, ResolvedDocumentPermissions>();
+    if (documents.length === 0) return results;
+
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      include: { position: true, user_roles: true },
+    });
+    if (!user || user.tenant_id !== tenantId) {
+      for (const document of documents) {
+        results.set(document.id, { ...createBlankPermissions(), reasons: ["USER_NOT_FOUND_OR_TENANT_MISMATCH"] });
+      }
+      return results;
+    }
+
+    const documentIds = documents.map((document) => document.id);
+    const documentTypeIds = Array.from(new Set(documents.flatMap((document) => document.document_type_id ? [document.document_type_id] : [])));
+    const roleIds = user.user_roles.map((item) => item.role_id);
+    const aclSubjects = [
+      { subject_type: "user", subject_id: user.id },
+      ...(user.department_id ? [{ subject_type: "department", subject_id: user.department_id }] : []),
+      ...(user.position_id && user.department_id ? [{ subject_type: "position_in_department", subject_id: user.position_id, scope_department_id: user.department_id }] : []),
+      ...roleIds.map((roleId) => ({ subject_type: "role", subject_id: roleId })),
+    ];
+
+    const [settings, approvals, signers, ccEntries, aclPolicies] = await Promise.all([
+      documentTypeIds.length
+        ? prisma.tenant_settings.findMany({
+            where: { tenant_id: tenantId, setting_key: { in: documentTypeIds.map((id) => `doc_type_policy:${id}`) } },
+            select: { setting_key: true, setting_value: true },
+          })
+        : Promise.resolve([]),
+      prisma.document_approvals.findMany({
+        where: { document_id: { in: documentIds }, approver_user_id: userId },
+        select: { document_id: true },
+      }),
+      prisma.signers.findMany({
+        where: { sign_request: { document_id: { in: documentIds } }, OR: [{ user_id: userId }, { email: user.email }] },
+        select: { sign_request: { select: { document_id: true } } },
+      }),
+      prisma.document_cc_emails.findMany({
+        where: { document_id: { in: documentIds }, email: user.email },
+        select: { document_id: true },
+      }),
+      prisma.document_permissions.findMany({
+        where: { document_id: { in: documentIds }, OR: aclSubjects },
+      }),
+    ]);
+
+    const typePolicies = new Map<number, DocumentTypePolicyV2>();
+    for (const setting of settings) {
+      const typeId = Number(setting.setting_key.slice("doc_type_policy:".length));
+      if (Number.isInteger(typeId)) typePolicies.set(typeId, normalizeDocumentTypePolicyV2(setting.setting_value));
+    }
+    const approverDocumentIds = new Set(approvals.map((approval) => approval.document_id));
+    const signerDocumentIds = new Set(signers.map((signer) => signer.sign_request.document_id));
+    const ccDocumentIds = new Set(ccEntries.map((entry) => entry.document_id));
+    const policiesByDocument = new Map<number, document_permissions[]>();
+    for (const policy of aclPolicies) {
+      const policies = policiesByDocument.get(policy.document_id) ?? [];
+      policies.push(policy);
+      policiesByDocument.set(policy.document_id, policies);
+    }
+
+    for (const document of documents) {
+      const isApprover = approverDocumentIds.has(document.id);
+      const isSigner = signerDocumentIds.has(document.id);
+      const isCc = ccDocumentIds.has(document.id);
+      results.set(document.id, await this.resolveDocumentPermission(userId, tenantId, document.id, {
+        user,
+        document,
+        typePolicy: document.document_type_id ? typePolicies.get(document.document_type_id) ?? null : null,
+        workflowParticipation: { isApprover, isSigner, isCc, isParticipant: isApprover || isSigner || isCc },
+        aclPolicies: policiesByDocument.get(document.id) ?? [],
+      }));
+    }
+
+    return results;
   }
 }
 

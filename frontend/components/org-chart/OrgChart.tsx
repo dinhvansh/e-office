@@ -58,13 +58,9 @@ export function OrgChart({ departments, selectedDepartmentId, onDepartmentSelect
     const dept = node.data as Department;
     const userCount = dept._count?.users || 0;
     const childCount = dept._count?.children || 0;
-    const [showActions, setShowActions] = React.useState(false);
-
     return (
       <div 
         className="flex items-center justify-between gap-2 min-w-0 group"
-        onMouseEnter={() => setShowActions(true)}
-        onMouseLeave={() => setShowActions(false)}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <Folder className={cn(
@@ -93,8 +89,7 @@ export function OrgChart({ departments, selectedDepartmentId, onDepartmentSelect
           )}
           
           {/* Quick Actions - Show on hover */}
-          {showActions && (
-            <div className="flex items-center gap-0.5 ml-1">
+            <div className="hidden group-hover:flex items-center gap-0.5 ml-1">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -126,7 +121,6 @@ export function OrgChart({ departments, selectedDepartmentId, onDepartmentSelect
                 <Trash2 className="h-3 w-3" />
               </button>
             </div>
-          )}
         </div>
       </div>
     );

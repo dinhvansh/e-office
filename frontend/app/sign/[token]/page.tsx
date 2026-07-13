@@ -614,9 +614,9 @@ export default function PublicSigningPage() {
                 </p>
                 <p className="text-xs text-blue-700">
                   1️⃣ Nhập mã OTP từ email<br/>
-                  2️⃣ Click "Xác thực OTP" để xác nhận<br/>
+                  2️⃣ Click &quot;Xác thực OTP&quot; để xác nhận<br/>
                   3️⃣ Bắt đầu ký tài liệu<br/>
-                  🔄 Nếu không tìm thấy hoặc hết hạn, nhấn "Gửi lại OTP"
+                  🔄 Nếu không tìm thấy hoặc hết hạn, nhấn &quot;Gửi lại OTP&quot;
                 </p>
               </div>
             </div>

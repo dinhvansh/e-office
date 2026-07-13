@@ -242,7 +242,7 @@ export class PermissionsService {
         document_id: documentId,
         OR: [
           { subject_type: "user", subject_id: userId },
-          ...(roleIds.length ? [{ subject_type: "role", subject_id: { in: roleIds } as any }] : []),
+          ...(roleIds.length ? [{ subject_type: "role", subject_id: { in: roleIds } }] : []),
           { subject_type: "department", subject_id: user.department_id || 0 },
           ...(user.position_id && user.department_id ? [{
             subject_type: "position_in_department",

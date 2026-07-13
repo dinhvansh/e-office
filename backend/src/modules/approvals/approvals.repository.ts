@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma';
-import { resolveAssigneeType } from '../workflows/workflowStepAssignment';
+import { isWorkflowAssigneeType, resolveAssigneeType } from '../workflows/workflowStepAssignment';
 
 export class ApprovalsRepository {
   // Workflow Instances
@@ -190,7 +190,14 @@ export class ApprovalsRepository {
     }
 
     const approverIds: number[] = [];
-    const assigneeType = resolveAssigneeType(step as any);
+    const assigneeType = resolveAssigneeType({
+      approver_type: step.approver_type ?? undefined,
+      approver_id: step.approver_id ?? undefined,
+      assignee_type: isWorkflowAssigneeType(step.assignee_type) ? step.assignee_type : undefined,
+      assignee_user_id: step.assignee_user_id ?? undefined,
+      assignee_department_id: step.assignee_department_id ?? undefined,
+      assignee_position_id: step.assignee_position_id ?? undefined,
+    });
 
     if (assigneeType === 'specific_user' && (step.assignee_user_id || step.approver_id)) {
       approverIds.push(step.assignee_user_id || step.approver_id);

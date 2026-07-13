@@ -124,7 +124,7 @@ export function AttachmentsSection({ files, onChange }: AttachmentsSectionProps)
 
       {files.length === 0 && (
         <div className="text-center py-6 text-sm text-muted-foreground">
-          Chưa có file đính kèm. Click "Thêm file" để upload.
+          Chưa có file đính kèm. Click &quot;Thêm file&quot; để upload.
         </div>
       )}
 

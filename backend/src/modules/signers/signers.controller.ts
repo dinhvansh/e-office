@@ -13,15 +13,20 @@ const createSchema = z.object({
 
 const signSchema = z.object({
   otp: z.string().min(4),
-  signature_data: z.record(z.any()).optional(),
+  signature_data: z.record(z.unknown()).optional(),
 });
 
 const idSchema = z.coerce.number().int().positive();
 
 export class SignersController {
   addSigner = async (req: Request, res: Response): Promise<void> => {
-    const body = createSchema.parse(req.body) as any;
-    await signersService.addSigner(req.auth!.tenantId, req.auth!.userId, body);
+    const body = createSchema.parse(req.body);
+    await signersService.addSigner(req.auth!.tenantId, req.auth!.userId, {
+      sign_request_id: body.sign_request_id!,
+      email: body.email!,
+      name: body.name!,
+      role: body.role,
+    });
     res.status(201).json(ok({ created: true }));
   };
 

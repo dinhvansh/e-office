@@ -13,11 +13,19 @@ import { notificationsService } from "../notifications/notifications.service";
 import { NotificationType } from "../notifications/notifications.types";
 import { authorizationService } from "../authorization/authorization.service";
 import { documentWorkflowOrchestratorService } from "../documents/documentWorkflowOrchestrator.service";
-import { getDefaultCompletionMode, resolveAssigneeType, type WorkflowCompletionMode } from "../workflows/workflowStepAssignment";
+import {
+  getDefaultCompletionMode,
+  isWorkflowAssigneeType,
+  isWorkflowCompletionMode,
+  resolveAssigneeType,
+  type WorkflowCompletionMode,
+} from "../workflows/workflowStepAssignment";
 import { canSignerActInOrder, findNextWaitingSigningOrder } from "./signingOrder.policy";
 import { workflowStateService } from "../workflows/workflowState.service";
 import { buildSignRequestFlowHints, canSendSignRequestStatus, isEditableSignRequestStatus } from "./signRequestFlow.policy";
 import { signRequestQueriesService } from "./signRequestQueries.service";
+import type { SignRequestFlowSigner } from "./signRequestFlow.policy";
+import bcrypt from "bcrypt";
 
 export interface SignerInput {
   email: string;
@@ -72,7 +80,7 @@ class SignRequestsService {
 
     if (!signer) {
       throw ApiError.notFound(
-        "Báº¡n khÃ´ng pháº£i lÃ  ngÆ°á»i kÃ½ cá»§a tÃ i liá»‡u nÃ y",
+        "Báº¡n khÃ´ng pháº£i lÃ  ngÆ°á»i kÃ½ cá»§a tÃ i liá»‡u nÃ y",
         "SIGNER_NOT_FOUND"
       );
     }
@@ -94,9 +102,8 @@ class SignRequestsService {
     return signRequest;
   }
 
-  private buildFlowHints(signRequest: any) {
-    const signers = Array.isArray(signRequest?.signers) ? signRequest.signers : [];
-    return buildSignRequestFlowHints(signRequest?.status, signers);
+  private buildFlowHints(signRequest: { status?: string | null; signers?: SignRequestFlowSigner[] | null }) {
+    return buildSignRequestFlowHints(signRequest.status, signRequest.signers ?? []);
   }
 
   async listSignRequests(tenantId: number, userId: number) {
@@ -124,7 +131,7 @@ class SignRequestsService {
   }
 
   async listComments(signRequestId: number, tenantId: number, userId: number) {
-    const signRequest = await this.getSignRequest(signRequestId, tenantId, userId);
+    await this.getSignRequest(signRequestId, tenantId, userId);
 
     return prisma.sign_request_comments.findMany({
       where: {
@@ -386,7 +393,6 @@ class SignRequestsService {
   async createInternalSignersFromWorkflow(
     signRequestId: number,
     workflowId: number,
-    tenantId: number
   ): Promise<void> {
     // Get workflow steps with participant_role = 'signer'
     const workflowSteps = await prisma.workflow_steps.findMany({
@@ -500,10 +506,15 @@ class SignRequestsService {
       },
     });
 
-    const assigneeType = step ? resolveAssigneeType(step as any) : null;
-    const completionMode =
-      (step?.completion_mode as WorkflowCompletionMode | null) ||
-      getDefaultCompletionMode(assigneeType);
+    const assigneeType = step
+      ? resolveAssigneeType({
+          approver_type: step.approver_type ?? undefined,
+          assignee_type: isWorkflowAssigneeType(step.assignee_type) ? step.assignee_type : undefined,
+        })
+      : null;
+    const completionMode = step && isWorkflowCompletionMode(step.completion_mode)
+      ? step.completion_mode
+      : getDefaultCompletionMode(assigneeType ?? 'specific_user');
 
     return {
       completionMode,
@@ -625,7 +636,6 @@ class SignRequestsService {
     const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
     const { emailService } = await import("../common/email.service");
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-    const bcrypt = require("bcrypt");
 
     let approvalsReminded = 0;
     let internalSignersReminded = 0;
@@ -749,8 +759,11 @@ class SignRequestsService {
           });
 
           externalSignersReminded += 1;
-        } catch (error: any) {
-          console.error(`Failed to send signer reminder email to ${signer.email}:`, error?.message || error);
+        } catch (error: unknown) {
+          console.error(
+            `Failed to send signer reminder email to ${signer.email}:`,
+            error instanceof Error ? error.message : error,
+          );
         }
       }
     }
@@ -859,8 +872,21 @@ class SignRequestsService {
   }
 
   private async notifyPendingSigners(
-    signRequest: any,
-    signersWithTokens: any[],
+    signRequest: {
+      id: number;
+      title: string | null;
+      message: string | null;
+      document?: { title: string | null; document_number: string | null } | null;
+    },
+    signersWithTokens: Array<{
+      id: number;
+      status: string | null;
+      is_internal: boolean;
+      user_id: number | null;
+      signing_token: string | null;
+      email: string | null;
+      name: string | null;
+    }>,
     tenantId: number,
     userId: number
   ) {
@@ -889,7 +915,6 @@ class SignRequestsService {
       if (!signer.is_internal && signer.signing_token) {
         const signUrl = `${frontendUrl}/sign/${signer.signing_token}`;
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const bcrypt = require("bcrypt");
         const otpHash = await bcrypt.hash(otp, 10);
         const otpExpire = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -912,8 +937,8 @@ class SignRequestsService {
             otp_expire: otpExpire,
             status: "otp_sent"
           });
-        } catch (error: any) {
-          console.error(`Failed to send email to ${signer.email}:`, error?.message || error);
+        } catch (error: unknown) {
+          console.error(`Failed to send email to ${signer.email}:`, error instanceof Error ? error.message : error);
         }
       }
     }
@@ -934,14 +959,6 @@ class SignRequestsService {
     }
 
     // Get user info for email
-    const user = await prisma.users.findUnique({
-      where: { id: userId },
-      select: { full_name: true, email: true }
-    });
-
-    // Get all signers to notify
-    const signers = await signersRepository.findBySignRequest(id);
-
     // Update sign request status with cancellation info
     await prisma.sign_requests.update({
       where: { id, tenant_id: tenantId },
@@ -1298,21 +1315,21 @@ class SignRequestsService {
 
     if (signer.status === "signed" || signer.status === "completed") {
       throw ApiError.badRequest(
-        "Báº¡n Ä‘Ã£ kÃ½ tÃ i liá»‡u nÃ y rá»“i",
+        "Báº¡n Ä‘Ã£ kÃ½ tÃ i liá»‡u nÃ y rá»“i",
         "ALREADY_SIGNED"
       );
     }
 
     if (signer.status === "rejected") {
       throw ApiError.badRequest(
-        "Báº¡n Ä‘Ã£ tá»« chá»‘i tÃ i liá»‡u nÃ y",
+        "Báº¡n Ä‘Ã£ tá»« chá»‘i tÃ i liá»‡u nÃ y",
         "ALREADY_REJECTED"
       );
     }
 
     if (signer.status !== "pending") {
       throw ApiError.badRequest(
-        "ChÆ°a Ä‘áº¿n lÆ°á»£t báº¡n xá»­ lÃ½ tÃ i liá»‡u nÃ y",
+        "ChÆ°a Ä‘áº¿n lÆ°á»£t báº¡n xá»­ lÃ½ tÃ i liá»‡u nÃ y",
         "SIGNER_NOT_ACTIVE"
       );
     }
@@ -1326,7 +1343,7 @@ class SignRequestsService {
         ...(typeof signer.position_data === "object" && signer.position_data ? signer.position_data as Record<string, unknown> : {}),
         rejection_reason: reason,
         rejected_at: new Date().toISOString(),
-      } as any,
+      } as Prisma.InputJsonValue,
     });
 
     await prisma.sign_requests.update({
@@ -1385,28 +1402,28 @@ class SignRequestsService {
         tenantId,
         userId: document.owner.id,
         type: NotificationType.APPROVAL_REJECTED,
-        title: "TÃ i liá»‡u bá»‹ tá»« chá»‘i kÃ½",
-        message: `TÃ i liá»‡u "${document.title || signRequest.title || "Untitled"}" Ä‘Ã£ bá»‹ tá»« chá»‘i bá»Ÿi ${actor?.full_name || actor?.email || "ngÆ°á»i kÃ½"}`,
+        title: "TÃ i liá»‡u bá»‹ tá»« chá»‘i kÃ½",
+        message: `TÃ i liá»‡u "${document.title || signRequest.title || "Untitled"}" Ä‘Ã£ bá»‹ tá»« chá»‘i bá»Ÿi ${actor?.full_name || actor?.email || "ngÆ°á»i kÃ½"}`,
         link: `/documents/${document.id}/flow`,
       }).catch((error) => console.error("Failed to create sign rejection notification:", error));
     }
 
     return {
       success: true,
-      message: "ÄÃ£ tá»« chá»‘i kÃ½ tÃ i liá»‡u",
+      message: "ÄÃ£ tá»« chá»‘i kÃ½ tÃ i liá»‡u",
       signer_id: signer.id,
       status: "rejected",
     };
   }
 
   async getSigners(signRequestId: number, tenantId: number) {
-    const signRequest = await this.getSignRequest(signRequestId, tenantId);
+    await this.getSignRequest(signRequestId, tenantId);
     return await signersRepository.findBySignRequest(signRequestId);
   }
 
   // ✅ Phase 2: Remove Signer
   async removeSignerFromRequest(signRequestId: number, signerId: number, tenantId: number, userId: number) {
-    await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
+    const signRequest = await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
 
     // Remove fields assigned to this signer
     await prisma.sign_request_fields.deleteMany({
@@ -1432,11 +1449,12 @@ class SignRequestsService {
     try {
       await auditService.record({
         tenantId,
-        documentId: null as any,
-        event: 'sign_request.signer_removed'
-      } as any);
-    } catch (error: any) {
-      console.error('⚠️ Audit log failed (non-critical):', error.message);
+        documentId: signRequest.document_id,
+        event: 'sign_request.signer_removed',
+        userId,
+      });
+    } catch (error: unknown) {
+      console.error('⚠️ Audit log failed (non-critical):', error instanceof Error ? error.message : error);
     }
   }
 
@@ -1468,8 +1486,10 @@ class SignRequestsService {
       });
 
       // Update is_internal and user relation based on new email
-      const updateData: any = {
-        ...updates,
+      const { position_data, ...otherUpdates } = updates;
+      const updateData: Prisma.signersUpdateInput = {
+        ...otherUpdates,
+        ...(position_data ? { position_data: position_data as Prisma.InputJsonValue } : {}),
         is_internal: !!internalUser,
       };
 
@@ -1484,18 +1504,23 @@ class SignRequestsService {
       await signersRepository.update(signerId, updateData);
     } else {
       // Just update other fields
-      await signersRepository.update(signerId, updates as any);
+      const { position_data, ...otherUpdates } = updates;
+      await signersRepository.update(signerId, {
+        ...otherUpdates,
+        ...(position_data ? { position_data: position_data as Prisma.InputJsonValue } : {}),
+      });
     }
 
     // Audit log (optional - may fail if audit service has issues)
     try {
       await auditService.record({
         tenantId,
-        documentId: null as any,
-        event: 'sign_request.signer_updated'
-      } as any);
-    } catch (error: any) {
-      console.error('⚠️ Audit log failed (non-critical):', error.message);
+        documentId: signRequest.document_id,
+        event: 'sign_request.signer_updated',
+        userId,
+      });
+    } catch (error: unknown) {
+      console.error('⚠️ Audit log failed (non-critical):', error instanceof Error ? error.message : error);
     }
 
     return await signersRepository.findById(signerId);
@@ -1779,7 +1804,7 @@ class SignRequestsService {
               ? (existingSigner.position_data as Record<string, unknown>)
               : {}),
             external_org_id: signerInput.external_org_id || null,
-          } as any,
+          } as Prisma.InputJsonValue,
         });
         continue;
       }
@@ -1795,7 +1820,7 @@ class SignRequestsService {
         position_data: signerInput.external_org_id
           ? ({
               external_org_id: signerInput.external_org_id,
-            } as any)
+            } as Prisma.InputJsonValue)
           : undefined,
       });
     }
@@ -1824,11 +1849,12 @@ class SignRequestsService {
     try {
       await auditService.record({
         tenantId,
-        documentId: null as any,
-        event: 'sign_request.signers_reordered'
-      } as any);
-    } catch (error: any) {
-      console.error('⚠️ Audit log failed (non-critical):', error.message);
+        documentId: signRequest.document_id,
+        event: 'sign_request.signers_reordered',
+        userId,
+      });
+    } catch (error: unknown) {
+      console.error('⚠️ Audit log failed (non-critical):', error instanceof Error ? error.message : error);
     }
 
     return { success: true };

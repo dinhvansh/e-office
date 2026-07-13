@@ -1,4 +1,4 @@
-import { expect, request as playwrightRequest, test } from "@playwright/test";
+import { expect, type APIRequestContext, test } from "@playwright/test";
 
 const API_BASE = process.env.PLAYWRIGHT_API_BASE_URL ?? "http://127.0.0.1:4000/api/v1";
 const creds = {
@@ -6,7 +6,7 @@ const creds = {
   password: process.env.PLAYWRIGHT_PASSWORD ?? "secret123",
 };
 
-async function authenticate(api = playwrightRequest) {
+async function authenticate(api: APIRequestContext) {
   const response = await api.post(`${API_BASE}/auth/login`, {
     data: {
       email: creds.email,
@@ -118,7 +118,9 @@ test.describe("Document Types + Numbering Integration", () => {
     expect(documentTypes.length).toBeGreaterThan(0);
 
     // Find a document type with numbering
-    const typeWithNumbering = documentTypes.find((t: any) => t.require_numbering === true);
+    const typeWithNumbering = documentTypes.find(
+      (documentType: { require_numbering: boolean }) => documentType.require_numbering,
+    );
     expect(typeWithNumbering).toBeDefined();
 
     // Upload document with document_type_id
@@ -158,7 +160,9 @@ test.describe("Document Types + Numbering Integration", () => {
       headers: authHeaders,
     });
     const typesJson = await typesResponse.json();
-    const typeWithNumbering = typesJson.data.find((t: any) => t.require_numbering === true);
+    const typeWithNumbering = typesJson.data.find(
+      (documentType: { require_numbering: boolean }) => documentType.require_numbering,
+    );
 
     const fileBase64 = "JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKL01lZGlhQm94IFswIDAgNjEyIDc5Ml0KPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovQ29udGVudHMgNCAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL0xlbmd0aCAzMwo+PgpzdHJlYW0KQlQKL0YxIDEyIFRmCjEwMCA3MDAgVGQKKFRlc3QpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDUKMDAwMDAwMDAwMCA2NTUzNSBmCjAwMDAwMDAwMDkgMDAwMDAgbgowMDAwMDAwMDU4IDAwMDAwIG4KMDAwMDAwMDEzNiAwMDAwMCBuCjAwMDAwMDAxOTYgMDAwMDAgbgp0cmFpbGVyCjw8Ci9TaXplIDUKL1Jvb3QgMSAwIFIKPj4Kc3RhcnR4cmVmCjI3OAolJUVPRg==";
 

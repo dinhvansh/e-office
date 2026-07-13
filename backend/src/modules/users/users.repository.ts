@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/prisma';
+import type { Prisma } from '@prisma/client';
 
-const prisma = new PrismaClient();
 
 export const usersRepository = {
   async findByTenant(tenantId: number | null, filters?: {
@@ -9,7 +9,7 @@ export const usersRepository = {
     status?: string;
     search?: string;
   }) {
-    const where: any = tenantId !== null ? { tenant_id: tenantId } : {};
+    const where: Prisma.usersWhereInput = tenantId !== null ? { tenant_id: tenantId } : {};
 
     if (filters?.department_id) {
       where.department_id = filters.department_id;
@@ -93,7 +93,7 @@ export const usersRepository = {
     });
   },
 
-  async create(data: any) {
+  async create(data: Prisma.usersUncheckedCreateInput) {
     return prisma.users.create({
       data,
       include: {
@@ -108,7 +108,7 @@ export const usersRepository = {
     });
   },
 
-  async update(id: number, data: any) {
+  async update(id: number, data: Prisma.usersUncheckedUpdateInput) {
     return prisma.users.update({
       where: { id },
       data,

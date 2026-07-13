@@ -78,7 +78,7 @@ export function ApproveRejectDialog({ open, onClose, user, action, onConfirm }: 
               <li>Tài khoản sẽ được kích hoạt</li>
               <li>Người dùng có thể đăng nhập vào hệ thống</li>
               <li>Email thông báo sẽ được gửi tự động</li>
-              <li>Vai trò mặc định "User" sẽ được gán</li>
+                <li>Vai trò mặc định &quot;User&quot; sẽ được gán</li>
             </ul>
           </div>
         ) : (
@@ -88,7 +88,7 @@ export function ApproveRejectDialog({ open, onClose, user, action, onConfirm }: 
                 <strong>Sau khi từ chối:</strong>
               </p>
               <ul className="text-sm text-red-700 mt-2 space-y-1 list-disc list-inside">
-                <li>Tài khoản sẽ bị đánh dấu là "rejected"</li>
+                <li>Tài khoản sẽ bị đánh dấu là &quot;rejected&quot;</li>
                 <li>Người dùng không thể đăng nhập</li>
                 <li>Email thông báo lý do từ chối sẽ được gửi</li>
                 <li>Có thể đăng ký lại sau 24 giờ</li>

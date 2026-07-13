@@ -64,7 +64,7 @@ export class AppError extends Error {
     public code: string,
     public message: string,
     public statusCode: number = 400,
-    public details?: any
+    public details?: unknown
   ) {
     super(message);
     this.name = 'AppError';
@@ -72,7 +72,7 @@ export class AppError extends Error {
 }
 
 // Helper functions
-export const throwError = (code: keyof typeof ErrorCodes, details?: any): never => {
+export const throwError = (code: keyof typeof ErrorCodes, details?: unknown): never => {
   throw new AppError(code, ErrorCodes[code], 400, details);
 };
 

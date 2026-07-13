@@ -557,7 +557,7 @@ export default function UsersPage() {
                 ))}
               </select>
               <p className="text-xs text-muted-foreground">
-                Dùng cho workflow "Quản lý trực tiếp"
+                Dùng cho workflow &quot;Quản lý trực tiếp&quot;
               </p>
             </div>
 

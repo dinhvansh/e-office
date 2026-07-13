@@ -1,4 +1,4 @@
-import { sign_request_fields } from '@prisma/client';
+import { sign_request_fields, sign_requests, signers } from '@prisma/client';
 import { DbClient, prisma } from '../../config/prisma';
 import { normalizeStoredFieldBox } from './coordinate.helper';
 
@@ -53,12 +53,17 @@ export interface SignRequestFieldDto {
   placeholder?: string | null;
   read_only: boolean;
   created_at: Date;
-  assigned_signer?: any;
-  sign_request?: any;
+  assigned_signer?: Pick<signers, 'id' | 'name' | 'email' | 'role'> | signers | null;
+  sign_request?: sign_requests | null;
 }
 
+type FieldRecord = sign_request_fields & {
+  assigned_signer?: Pick<signers, 'id' | 'name' | 'email' | 'role'> | signers | null;
+  sign_request?: sign_requests | null;
+};
+
 export class SignRequestFieldsRepository {
-  private mapFieldRecord(field: any): SignRequestFieldDto {
+  private mapFieldRecord(field: FieldRecord): SignRequestFieldDto {
     const normalized = normalizeStoredFieldBox(field);
     return {
       id: field.id,

@@ -376,9 +376,15 @@ function validateAclTemplates(templates: DocumentTypeAclTemplate[]) {
   }
 }
 
-export function normalizeDocumentTypePolicyV2(policy: any): DocumentTypePolicyV2 {
-  const source = policy && typeof policy === "object" ? policy : {};
-  const visibility = source.visibility && typeof source.visibility === "object" ? source.visibility : {};
+type PolicyRecord = Record<string, unknown>;
+
+function asPolicyRecord(value: unknown): PolicyRecord {
+  return value !== null && typeof value === "object" ? value as PolicyRecord : {};
+}
+
+export function normalizeDocumentTypePolicyV2(policy: unknown): DocumentTypePolicyV2 {
+  const source = asPolicyRecord(policy);
+  const visibility = asPolicyRecord(source.visibility);
   const legacyDetailPermissions = normalizeLegacyDetailPermissions(source.detail_permissions);
   const aclTemplates = normalizeAclTemplates(source.acl_templates);
   const advancedPolicies = normalizeAdvancedPolicies(source.advanced_policies);
