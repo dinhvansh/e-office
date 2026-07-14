@@ -1,18 +1,18 @@
 # UI/UX Backlog
 
-Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** source review, **E2** local HTTP runtime, **E3** browser unavailable; source-informed items require browser replay before implementation.
+Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** source review, **E2** Playwright runtime, **E3** authenticated-flow limitation; source-informed items require role-based browser replay before implementation.
 
-## P0 — public-beta blockers
+## P0 — public-beta readiness
 
-### UX-001 — Repair corrupt Vietnamese text encoding
+### UX-001 — Publish usable legal links from registration
 
-- **Screen/flow:** Dashboard shell, sidebar, mobile navigation, external OTP signing, notification dropdown, PDF signing modal.
-- **Problem:** Vietnamese labels and instructions render as mojibake, for example `XÃ¡c thá»±c OTP`, `ThÃ´ng bÃ¡o`, and `Äang táº£i workspace...`. This makes sign, error and navigation instructions unreadable.
-- **Severity:** Critical.
-- **Affected role:** All roles; especially external signers.
-- **Evidence:** E1: `frontend/app/(dashboard)/layout.tsx`, `frontend/constants/sidebarItems.ts`, `frontend/components/ui/mobile-nav.tsx`, `frontend/app/sign/[token]/page.tsx`, `frontend/components/notifications/NotificationDropdown.tsx`, and `frontend/components/pdf/PDFSigningViewer.tsx`; E2 login endpoint available; E3 no screenshot session.
-- **Recommended fix:** Normalize affected source files to UTF-8, add a repository encoding guard/test, and review all user-facing Vietnamese and English copy together.
-- **Acceptance criteria:** Every listed surface renders valid Vietnamese; no mojibake sequences remain in frontend user-facing source; login, OTP, notification, sidebar and signing walkthrough screenshots are reviewed in a real browser.
+- **Screen/flow:** `/register`.
+- **Problem:** A user must accept Terms of Use and Privacy Policy, but both links resolve to `#`. The agreement cannot be reviewed before consent.
+- **Severity:** High.
+- **Affected role:** First-time user/workspace owner.
+- **Evidence:** E2 Playwright accessibility snapshot of `/register` shows both links with `/url: "#"`; see `docs/ux/evidence/register-mobile-375.png`.
+- **Recommended fix:** Publish versioned Terms and Privacy pages, link to them from registration, and record the accepted policy version with the registration where required by policy.
+- **Acceptance criteria:** Both links resolve to accessible, non-placeholder pages; pages work at mobile width; acceptance copy identifies the current policy version/effective date; registration remains keyboard-operable.
 
 ### UX-002 — Make external OTP signing recoverable and mobile-friendly
 
@@ -76,14 +76,14 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - **Recommended fix:** Add a status timeline and contextual action panel driven by stable status/next-action API fields.
 - **Acceptance criteria:** Every state has plain-language label, actor/owner, next action and deadline/ETA when applicable; artifact failure explains retry eligibility; no raw internal enum is shown.
 
-### UX-008 — Complete notification destination and restore readable copy
+### UX-008 — Complete and verify the notification destination
 
 - **Screen/flow:** Notification bell/dropdown.
-- **Problem:** Dropdown copy is corrupted and its footer links to `/notifications`, while no `app/**/notifications/page.tsx` route was found. Loading is a generic spinner without an accessible loading announcement.
+- **Problem:** The footer links to `/notifications`, while no `app/**/notifications/page.tsx` route was found in the initial mapping. Loading is a generic spinner without an accessible loading announcement.
 - **Severity:** Medium.
 - **Affected role:** All authenticated users.
 - **Evidence:** E1: `frontend/components/notifications/NotificationDropdown.tsx`; route scan of `frontend/app` found no notifications page.
-- **Recommended fix:** Repair copy, provide a tested notification-history destination or remove the unsupported link, and add an accessible loading/empty/read-state pattern.
+- **Recommended fix:** Provide a tested notification-history destination or remove the unsupported link, and add an accessible loading/empty/read-state pattern.
 - **Acceptance criteria:** “View all notifications” resolves to a working route; empty/loading/read/unread states are readable; mark-read/delete actions show a result and are keyboard-operable.
 
 ### UX-009 — Standardize loading, empty, error and success recovery
@@ -106,17 +106,27 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - **Recommended fix:** Add meaningful accessible names, visible focus states, appropriate image alt text, responsive overflow tests, and a keyboard test matrix.
 - **Acceptance criteria:** All icon-only controls have accessible names; focus is visible at keyboard navigation; 375 px and 768 px screenshots have no obscured primary action; PDF fields have meaningful labels.
 
+### UX-011 — Do not expose local configuration variable names in login errors
+
+- **Screen/flow:** `/login` when the frontend API base URL is not configured.
+- **Problem:** A failed sign-in displayed `NEXT_PUBLIC_API_BASE_URL environment variable is required` below the generic failure heading. This is technical deployment detail, not an actionable user message.
+- **Severity:** Medium.
+- **Affected role:** First-time user, support staff.
+- **Evidence:** E2 Playwright invalid-credential submission against the unconfigured local frontend. Re-running the frontend with its local API base configured correctly showed the safe message “Email hoặc mật khẩu không đúng”.
+- **Recommended fix:** Validate required public runtime configuration at startup/deployment and show a generic service-unavailable message with a support/retry path if configuration is absent; log diagnostic detail only server-side/developer-side.
+- **Acceptance criteria:** No public page exposes environment variable names, stack traces or internal endpoint details; a missing configuration condition is observable in deployment health checks; the UI gives a non-sensitive retry/support action.
+
 ## Implementation classification
 
 | Frontend-only | Requires/benefits from backend/API |
 | --- | --- |
-| UX-001, UX-003 baseline, UX-004, UX-005 stepper baseline, UX-006, UX-009 visual states, UX-010 | UX-002 resend/expiry/attempt metadata, UX-005 durable drafts, UX-007 next-action/SLA data, UX-008 paginated notification history |
+| UX-001 legal pages/links, UX-003 baseline, UX-004, UX-005 stepper baseline, UX-006, UX-009 visual states, UX-010 | UX-002 resend/expiry/attempt metadata, UX-005 durable drafts, UX-007 next-action/SLA data, UX-008 paginated notification history |
 
 ## Verification checklist for every backlog item
 
 - Test requester, approver, signer and administrator permissions.
 - Test keyboard-only path and visible focus.
 - Test at 375 px, 768 px and desktop widths.
-- Validate Vietnamese and English copy intentionally, without encoding corruption.
+- Validate Vietnamese and English copy intentionally, including mobile rendering.
 - Capture before/after screenshots and link them from the implementation PR.
 - Preserve existing authorization and signing security behavior.

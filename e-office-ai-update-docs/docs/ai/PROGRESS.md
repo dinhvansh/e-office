@@ -1826,11 +1826,12 @@ and tasks, internal/external signing, status tracking, notifications,
 administration/settings and responsive/accessibility sources were inspected.
 The local login endpoint and backend health endpoint returned HTTP 200.
 
-Key finding: User-facing Vietnamese text is mojibake in the dashboard shell,
-sidebar/mobile navigation, external OTP flow, notification dropdown and PDF
-signing components. This is recorded as release-blocking UX-001. The audit also
-prioritizes accessible OTP/PDF signing, permission-consistent mobile navigation,
-guided request creation and standardized destructive confirmations.
+Initial source-informed concern: Vietnamese source encoding looked suspicious in
+several files. This was later checked through Playwright and was **not**
+reproduced in the rendered login and registration UI; the runtime supplement
+below supersedes that preliminary finding. The audit continues to prioritize
+accessible OTP/PDF signing, permission-consistent mobile navigation, guided
+request creation and standardized destructive confirmations.
 
 Validation limitation: Browser automation had no available browser session in
 this environment, so screenshots, authenticated workflows, real OTP delivery,
@@ -1850,3 +1851,30 @@ Migration impact: None.
 
 Next recommended issue: UX-001 — normalize frontend user-facing text to UTF-8
 and add a regression check before changing interaction design.
+
+## 2026-07-14 — UI/UX audit runtime evidence supplement
+
+Status: Playwright runtime evidence added; no production code changed.
+
+Playwright/Chromium ran the configured local frontend at `http://localhost:3000`.
+It captured desktop login, 375 px registration, and invalid external-sign-link
+screenshots under `docs/ux/evidence/`. Login, registration, password reset and
+invalid external-link states rendered valid Vietnamese. The earlier
+source-informed encoding concern was not reproduced and has been removed from
+the P0 backlog.
+
+Runtime findings: registration requires agreement to Terms and Privacy links
+that both resolve to `#` (UX-001, High); a new workspace registration displays
+a clear pending-administrator-approval confirmation; with an omitted local API
+base environment variable, login exposed the raw variable name to the user.
+
+Limitation: the freshly registered user correctly remains pending approval, so
+approved requester, approver, internal signer, external OTP signer, and
+administrator flows still require role-based browser replay.
+
+Files added/updated: `docs/ux/UI-UX-AUDIT.md`, `docs/ux/UI-UX-BACKLOG.md`,
+`docs/ux/evidence/*.png`, and this progress record.
+
+Next recommended issue: UX-001 — replace placeholder registration legal links
+with published, versioned Terms and Privacy pages; then supply approved test
+accounts to complete authenticated browser coverage.
