@@ -1,5 +1,17 @@
 # Verification Progress
 
+## 2026-07-14 — P2-OPS-019 file storage abstraction
+
+Status: Completed and validated. A stream-based `FileStorage` now backs original-document, attachment, public-download, generated-artifact, and outbox-worker operations.
+
+Files changed: local and S3-compatible storage adapters, runtime driver factory, document/public/PDF/worker reads, safe upload-key generation, Compose/environment examples, [storage operations documentation](../../../docs/operations/file-storage.md), regression tests, and this progress record.
+
+Compatibility and security: new database values are portable `storage/<tenant>/<random-safe-name>` keys; existing relative values retain local-volume compatibility. Keys reject traversal, absolute paths, empty segments, and unsafe names. APIs continue not to expose storage keys or paths. Local deletion is idempotent; cleanup is best-effort.
+
+Configuration: `FILE_STORAGE_DRIVER=local|s3` (default `local`). S3 requires `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and optional `S3_FORCE_PATH_STYLE`; invalid drivers and incomplete S3 config fail startup. Default Docker Compose does not require S3.
+
+Migration impact: none. Tests: local put/get/exists/delete, traversal/missing-file/duplicate-delete behavior, S3 command delegation, invalid-driver validation, public download, and artifact worker. `backend npm test` passed 79/79; backend lint/build and frontend build/typecheck/lint passed (existing frontend warnings only). Docker Compose config and backend/worker image builds passed. A clean Docker PostgreSQL workflow E2E with the outbox worker passed: migration/seed, signing, artifact download (826126 bytes), audit events, and refresh rotation. Live MinIO coverage and normalization of legacy absolute paths remain future follow-up work.
+
 ## 2026-07-14 — P1-PERF-016 document permission pagination and N+1 queries
 
 Status: Completed and validated. Document authorization now runs against the

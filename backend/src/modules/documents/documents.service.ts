@@ -4,6 +4,7 @@ import path from "node:path";
 import crypto from "crypto";
 import { ApiError } from "../../core/errors/api-error";
 import { saveBase64Document } from "../../core/utils/fileStorage";
+import { readStoredFile } from "../../core/storage/fileStorage";
 import { storageService } from "../../core/storage/storage.service";
 import { auditService } from "../audit/audit.service";
 import { licenseService } from "../licenses/license.service";
@@ -407,7 +408,7 @@ class DocumentsService {
     try {
       const fileBytes = path.isAbsolute(attachment.file_path)
         ? await fs.readFile(attachment.file_path)
-        : await storageService.get(attachment.file_path);
+        : await readStoredFile(storageService, attachment.file_path);
       return {
         fileBytes: Buffer.from(fileBytes),
         fileName: attachment.file_name,
@@ -454,7 +455,7 @@ class DocumentsService {
       }
       
       filePath = storagePath;
-      const buffer = await storageService.get(filePath);
+      const buffer = await readStoredFile(storageService, filePath);
       hash = crypto.createHash("sha256").update(buffer).digest("hex");
     }
 
@@ -671,7 +672,7 @@ class DocumentsService {
         ...(input.base64 ? [filePath] : []),
         ...createdAttachmentPaths,
       ];
-      await Promise.all(cleanupPaths.map((path) => storageService.remove(path).catch(() => undefined)));
+      await Promise.all(cleanupPaths.map((key) => storageService.delete(key).catch(() => undefined)));
       throw error;
     }
     
@@ -1098,7 +1099,7 @@ class DocumentsService {
     try {
       const fileBytes = path.isAbsolute(document.file_path)
         ? await fs.readFile(document.file_path)
-        : await storageService.get(document.file_path);
+        : await readStoredFile(storageService, document.file_path);
       return { fileBytes: Buffer.from(fileBytes), fileName, mimeType, documentStatus: document.status || null, tenantId: document.tenant_id };
     } catch (error) {
       throw ApiError.notFound("File not found on disk", "FILE_NOT_FOUND");
@@ -1142,7 +1143,7 @@ class DocumentsService {
     try {
       const fileBytes = path.isAbsolute(document.signed_file_path)
         ? await fs.readFile(document.signed_file_path)
-        : await storageService.get(document.signed_file_path);
+        : await readStoredFile(storageService, document.signed_file_path);
       return { fileBytes: Buffer.from(fileBytes), fileName, mimeType, documentStatus: document.status || null, tenantId: document.tenant_id };
     } catch (error) {
       throw ApiError.notFound("Signed file not found on disk", "FILE_NOT_FOUND");

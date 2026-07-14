@@ -56,8 +56,14 @@ services:
       NODE_ENV: production
       CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
       APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL is required}
-      STORAGE_BUCKET: ${STORAGE_BUCKET:-local}
+      FILE_STORAGE_DRIVER: ${FILE_STORAGE_DRIVER:-local}
       STORAGE_BASE_PATH: ${STORAGE_BASE_PATH:-./storage}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       PDF_UNICODE_FONT_PATH: ${PDF_UNICODE_FONT_PATH:-/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf}
       PDF_UNICODE_BOLD_FONT_PATH: ${PDF_UNICODE_BOLD_FONT_PATH:-/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf}
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
@@ -90,9 +96,19 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?REFRESH_TOKEN_SECRET is required}
       NODE_ENV: production
-      STORAGE_BUCKET: ${STORAGE_BUCKET:-local}
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
+      APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL is required}
+      FILE_STORAGE_DRIVER: ${FILE_STORAGE_DRIVER:-local}
       STORAGE_BASE_PATH: ${STORAGE_BASE_PATH:-./storage}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       PDF_UNICODE_FONT_PATH: ${PDF_UNICODE_FONT_PATH:-/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf}
       PDF_UNICODE_BOLD_FONT_PATH: ${PDF_UNICODE_BOLD_FONT_PATH:-/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf}
       OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-2000}

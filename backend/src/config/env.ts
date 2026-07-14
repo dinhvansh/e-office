@@ -3,6 +3,11 @@ import { z } from "zod";
 
 dotenv.config();
 
+// Preserve the former spelling for deployments that already configured it.
+if (!process.env.FILE_STORAGE_DRIVER && process.env.STORAGE_DRIVER) {
+  process.env.FILE_STORAGE_DRIVER = process.env.STORAGE_DRIVER;
+}
+
 const knownWeakSecrets = new Set([
   "change-me",
   "secret",
@@ -25,6 +30,15 @@ const strongSecret = (name: string) =>
         && !normalized.includes("your-secret");
     }, `${name} must not use a known placeholder or weak secret`);
 
+const optionalNonEmptyString = () => z.preprocess(
+  (value) => value === "" ? undefined : value,
+  z.string().min(1).optional(),
+);
+const optionalUrl = () => z.preprocess(
+  (value) => value === "" ? undefined : value,
+  z.string().url().optional(),
+);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.string().default("4000"),
@@ -38,8 +52,17 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().optional(),
   APP_BASE_URL: z.string().url().optional(),
   STORAGE_BUCKET: z.string().default("local"),
-  STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
+  FILE_STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
+  // Deprecated alias retained only for existing local deployments. New config
+  // must use FILE_STORAGE_DRIVER.
+  STORAGE_DRIVER: z.enum(["local", "s3"]).optional(),
   STORAGE_BASE_PATH: z.string().default("./storage"),
+  S3_ENDPOINT: optionalUrl(),
+  S3_REGION: z.string().default("us-east-1"),
+  S3_BUCKET: optionalNonEmptyString(),
+  S3_ACCESS_KEY_ID: optionalNonEmptyString(),
+  S3_SECRET_ACCESS_KEY: optionalNonEmptyString(),
+  S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).default("true"),
   // Email configuration
   SMTP_HOST: z.string().default("smtp.gmail.com"),
   SMTP_PORT: z.string().default("587"),

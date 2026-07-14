@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
+import { Readable } from "node:stream";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { Request, Response } from "express";
@@ -62,7 +63,7 @@ const controllerRequest = (cookie?: string) => ({
 test("an invitation token cannot fetch the original PDF before OTP verification", async () => {
   let storageReads = 0;
   replaceFindUnique(async () => signer);
-  replaceStorageGet(async () => { storageReads += 1; return Buffer.from("pdf"); });
+  replaceStorageGet(async () => { storageReads += 1; return Readable.from(Buffer.from("pdf")); });
 
   await assert.rejects(new PublicSignController().getDocument(controllerRequest(), response() as unknown as Response), (error: unknown) =>
     error instanceof ApiError && error.code === "SIGNING_SESSION_INVALID",
@@ -72,7 +73,7 @@ test("an invitation token cannot fetch the original PDF before OTP verification"
 
 test("a verified signing session can fetch the original PDF", async () => {
   replaceFindUnique(async () => signer);
-  replaceStorageGet(async () => Buffer.from("pdf"));
+  replaceStorageGet(async () => Readable.from(Buffer.from("pdf")));
   const res = response();
   const session = createSigningSession(signer.id, signer.sign_request_id, signer.otp);
 
@@ -84,7 +85,7 @@ test("a verified signing session can fetch the original PDF", async () => {
 test("an expired signing session cannot fetch the original PDF", async () => {
   let storageReads = 0;
   replaceFindUnique(async () => signer);
-  replaceStorageGet(async () => { storageReads += 1; return Buffer.from("pdf"); });
+  replaceStorageGet(async () => { storageReads += 1; return Readable.from(Buffer.from("pdf")); });
   const expired = jwt.sign(
     { signerId: signer.id, signRequestId: signer.sign_request_id, otpFingerprint: signer.otp, purpose: "external_signing" },
     env.JWT_SECRET,

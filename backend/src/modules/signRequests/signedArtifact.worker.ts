@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { prisma } from "../../config/prisma";
 import { storageService } from "../../core/storage/storage.service";
+import { readStoredFile } from "../../core/storage/fileStorage";
 import { workflowStateService } from "../workflows/workflowState.service";
 import { pdfGenerationService } from "./pdfGeneration.service";
 
@@ -59,7 +60,7 @@ export async function processSignedArtifactEvent(event: ArtifactEvent): Promise<
     }
 
     const signedFilePath = await pdfGenerationService.generateSignedPdf(signRequestId);
-    const artifactBytes = await storageService.get(signedFilePath);
+    const artifactBytes = await readStoredFile(storageService, signedFilePath);
     if (artifactBytes.byteLength === 0) throw new Error("Generated signed artifact is empty");
     const hash = crypto.createHash("sha256").update(artifactBytes).digest("hex");
 

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
+import { Readable } from "node:stream";
 import { documentsService } from "../src/modules/documents/documents.service";
 import { documentsRepository } from "../src/modules/documents/documents.repository";
 import { documentWorkflowOrchestratorService } from "../src/modules/documents/documentWorkflowOrchestrator.service";
@@ -38,7 +39,7 @@ afterEach(() => {
 
 function installDocumentCreation(documentId = 30) {
   replace(licenseService, "enforceDocumentLimit", async () => undefined);
-  replace(storageService, "get", async () => Buffer.from("source"));
+  replace(storageService, "get", async () => Readable.from(Buffer.from("source")));
   replace(documentsRepository, "create", async () => ({
     id: documentId,
     title: "Synthetic document",

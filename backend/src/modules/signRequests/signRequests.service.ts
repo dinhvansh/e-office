@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import * as crypto from "crypto";
 import { prisma } from "../../config/prisma";
 import { storageService } from "../../core/storage/storage.service";
+import { readStoredFile } from "../../core/storage/fileStorage";
 import { ApiError } from "../../core/errors/api-error";
 import { auditService } from "../audit/audit.service";
 import { documentsRepository } from "../documents/documents.repository";
@@ -1181,7 +1182,7 @@ class SignRequestsService {
           addWatermark: true,
         }
       );
-      const artifactBytes = await storageService.get(signedPdfPath);
+      const artifactBytes = await readStoredFile(storageService, signedPdfPath);
       const artifactHash = crypto.createHash("sha256").update(artifactBytes).digest("hex");
       
       await prisma.$transaction((tx) => workflowStateService.transitionSigningPair(tx, {

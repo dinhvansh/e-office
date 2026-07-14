@@ -5,6 +5,7 @@ import { prisma } from '../../config/prisma';
 import * as fs from 'fs';
 import * as path from 'path';
 import { storageService } from '../../core/storage/storage.service';
+import { readStoredFile } from '../../core/storage/fileStorage';
 import { normalizeStoredFieldBox, pctToPdfBox } from './coordinate.helper';
 import {
   applyWatermarkToPdfBytes,
@@ -129,7 +130,7 @@ export class PdfGenerationService {
     // 4. Load original PDF
     let originalPdfBytes: Uint8Array;
     try {
-      originalPdfBytes = await storageService.get(signRequest.document.file_path);
+      originalPdfBytes = await readStoredFile(storageService, signRequest.document.file_path);
     } catch {
       throw new Error(`Original PDF not found: ${signRequest.document.file_path}`);
     }
@@ -229,40 +230,18 @@ export class PdfGenerationService {
    */
   private async cleanupOldSigningFiles(documentId: number, currentFilePath: string): Promise<void> {
     try {
-      // Get document to find tenant folder
       const document = await prisma.documents.findUnique({
         where: { id: documentId },
-        select: { file_path: true, signed_file_path: true }
+        select: { signed_file_path: true }
       });
 
-      if (!document) return;
-
-      // Extract tenant ID
-      const pathParts = document.file_path.split(/[/\\]/);
-      const tenantId = pathParts[1] || '1';
-      const storageDir = path.resolve(__dirname, '../../../storage', tenantId);
-
-      if (!fs.existsSync(storageDir)) return;
-
-      // Find all signing_* files for this document
-      const files = fs.readdirSync(storageDir);
-      const signingFiles = files.filter(f => 
-        f.startsWith(`signing_`) && 
-        f.endsWith(`_${documentId}.pdf`) &&
-        !currentFilePath.includes(f) // Don't delete current file
-      );
-
-      // Delete old files
-      for (const file of signingFiles) {
-        const filePath = path.join(storageDir, file);
-        fs.unlinkSync(filePath);
-        console.log(`[Progressive PDF] Deleted old file: ${file}`);
+      const previousKey = document?.signed_file_path;
+      if (previousKey && previousKey !== currentFilePath && !path.isAbsolute(previousKey)) {
+        await storageService.delete(previousKey);
       }
-
-      console.log(`[Progressive PDF] Cleaned up ${signingFiles.length} old files`);
     } catch (error: unknown) {
       console.error(`[Progressive PDF] Cleanup error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      // Don't throw - cleanup is not critical
+      // Cleanup is best-effort; object stores cannot join the document transaction.
     }
   }
 
@@ -344,7 +323,7 @@ export class PdfGenerationService {
     // 4. Load original PDF
     let originalPdfBytes: Uint8Array;
     try {
-      originalPdfBytes = await storageService.get(signRequest.document.file_path);
+      originalPdfBytes = await readStoredFile(storageService, signRequest.document.file_path);
     } catch {
       throw new Error(`Original PDF not found: ${signRequest.document.file_path}`);
     }

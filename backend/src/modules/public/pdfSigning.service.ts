@@ -1,11 +1,10 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import * as fs from 'fs';
-import * as path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/prisma';
 import { ApiError } from '../../core/errors/api-error';
+import { readStoredFile } from '../../core/storage/fileStorage';
+import { storageService } from '../../core/storage/storage.service';
 import { normalizeStoredFieldBox, pctToPdfBox } from '../signRequests/coordinate.helper';
 
-const prisma = new PrismaClient();
 
 export class PdfSigningService {
   private readonly fieldPaddingPt = 2;
@@ -39,13 +38,12 @@ export class PdfSigningService {
       throw ApiError.notFound('Sign request not found');
     }
 
-    // Read original PDF
-    const originalPdfPath = path.resolve(signRequest.document.file_path);
-    if (!fs.existsSync(originalPdfPath)) {
+    let originalPdfBytes: Buffer;
+    try {
+      originalPdfBytes = await readStoredFile(storageService, signRequest.document.file_path);
+    } catch {
       throw ApiError.notFound('Original PDF file not found');
     }
-
-    const originalPdfBytes = fs.readFileSync(originalPdfPath);
     const pdfDoc = await PDFDocument.load(originalPdfBytes);
 
     // Embed font

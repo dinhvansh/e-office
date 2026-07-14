@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
+import { Readable } from "node:stream";
 import { prisma } from "../src/config/prisma";
 import { pdfGenerationService } from "../src/modules/signRequests/pdfGeneration.service";
 import { signedArtifactWorker } from "../src/modules/signRequests/signedArtifact.worker";
@@ -63,7 +64,7 @@ test("worker success persists one readable, hashed artifact and duplicate proces
     document: { id: 30, status: "generating_artifact", signed_file_path: null, hash: null },
   });
   (pdfGenerationService as unknown as { generateSignedPdf: unknown }).generateSignedPdf = async () => { generationCalls += 1; return "storage/1/signed_30.pdf"; };
-  (storageService as unknown as { get: unknown }).get = async () => Buffer.from("signed-pdf");
+  (storageService as unknown as { get: unknown }).get = async () => Readable.from(Buffer.from("signed-pdf"));
 
   await signedArtifactWorker.processSignedArtifactEvent({ payload: { sign_request_id: 20 } });
   assert.deepEqual(transitions, ["document:completed", "request:completed", "artifact.generation_succeeded"]);

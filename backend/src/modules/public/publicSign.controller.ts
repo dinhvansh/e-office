@@ -6,6 +6,7 @@ import { ApiError } from "../../core/errors/api-error";
 import { FieldValueInput, signRequestFieldValuesService } from "../signRequests/signRequestFieldValues.service";
 import { signersService } from "../signers/signers.service";
 import { storageService } from "../../core/storage/storage.service";
+import { readStoredFile } from "../../core/storage/fileStorage";
 import { prisma } from "../../config/prisma";
 import { createSigningSession, getSigningSessionErrorCode, isSigningSessionValid, PUBLIC_SIGNING_COOKIE_PATH, SIGNING_SESSION_COOKIE, SIGNING_SESSION_TTL_SECONDS } from "./signingSession.service";
 import { publicSigningCommandService } from "./publicSigningCommand.service";
@@ -129,7 +130,7 @@ export class PublicSignController {
     requireSigningSession(req, signer.id, signer.sign_request_id, signer.otp);
     let pdfBuffer: Uint8Array;
     try {
-      pdfBuffer = await storageService.get(document.file_path);
+      pdfBuffer = await readStoredFile(storageService, document.file_path);
     } catch {
       throw ApiError.notFound("Document file not found");
     }
@@ -220,7 +221,7 @@ export class PublicSignController {
 
     let pdfBuffer: Uint8Array;
     try {
-      pdfBuffer = await storageService.get(document.signed_file_path);
+      pdfBuffer = await readStoredFile(storageService, document.signed_file_path);
     } catch {
       throw ApiError.notFound("Signed PDF file not found");
     }
