@@ -1,5 +1,35 @@
 # Verification Progress
 
+## 2026-07-14 — P1-AUTH-011 refresh-session rotation
+
+Status: Completed. Server-side sessions, SHA-256 refresh-token hashes,
+single-use rotation, logout revocation, and user/tenant status revocation were
+already implemented. This change closes the remaining cookie-boundary gap:
+refresh tokens are now emitted only as HttpOnly cookies and never in JSON.
+
+Files changed:
+
+- `backend/src/modules/auth/auth.controller.ts`
+- `backend/tests/auth.controller.test.ts`
+- `backend/tests/auth.refresh-session.test.ts`
+- `e-office-ai-update-docs/docs/ai/PROGRESS.md`
+
+Tests added: cookie-only login/refresh response; persisted rotation and old-token
+reuse rejection; logout revocation; expired session rejection; malformed token
+rejection. Existing status tests cover disabled-user session revocation and
+inactive-tenant refresh rejection.
+
+Commands run:
+
+- `cd backend && npm test` — passed, 69/69.
+- `cd backend && npm run lint` and `npm run build` — passed.
+- `cd frontend && npm run build`, `npm run typecheck`, and `npm run lint` —
+  passed; existing lint warnings only.
+
+Known limitations: Session reuse is rejected at the individual rotated session;
+there is no refresh-token family-wide compromise response because the current
+schema has no family identifier.
+
 ## 2026-07-14 — P1-ARCH-010 phase 1 signed-artifact outbox
 
 Status: Implemented and locally validated, including the isolated Docker

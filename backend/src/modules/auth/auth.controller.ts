@@ -54,12 +54,21 @@ const clearRefreshCookie = (res: Response) => {
   res.setHeader("Set-Cookie", parts.join("; "));
 };
 
+const respondWithCookieAuth = (res: Response, result: Awaited<ReturnType<typeof authService.login>>): void => {
+  setRefreshCookie(res, result.tokens.refreshToken);
+  // The refresh token is intentionally cookie-only. Returning it in the body
+  // defeats the HttpOnly storage boundary and makes it easy to persist in JS.
+  res.json(ok({
+    ...result,
+    tokens: { accessToken: result.tokens.accessToken },
+  }));
+};
+
 export class AuthController {
   login = async (req: Request, res: Response): Promise<void> => {
     const body = loginSchema.parse(req.body) as { email: string; password: string };
     const result = await authService.login(body);
-    setRefreshCookie(res, result.tokens.refreshToken);
-    res.json(ok(result));
+    respondWithCookieAuth(res, result);
   };
 
   refresh = async (req: Request, res: Response): Promise<void> => {
@@ -70,8 +79,7 @@ export class AuthController {
       throw ApiError.unauthorized("Missing refresh token", "REFRESH_TOKEN_REQUIRED");
     }
     const result = await authService.refresh(refreshToken);
-    setRefreshCookie(res, result.tokens.refreshToken);
-    res.json(ok(result));
+    respondWithCookieAuth(res, result);
   };
 
   logout = async (req: Request, res: Response): Promise<void> => {

@@ -18,6 +18,7 @@ const PUBLIC_BASE = process.env.E2E_PUBLIC_BASE || "http://localhost:4000/public
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "admin@acme.local";
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD;
 const INTERNAL_SIGNER_EMAIL = process.env.E2E_INTERNAL_SIGNER_EMAIL || "admin@acme.local";
+const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "esign_rt";
 
 if (!ADMIN_PASSWORD) {
   throw new Error("E2E_ADMIN_PASSWORD is required; do not rely on a shared demo password");
@@ -31,6 +32,13 @@ const MINIMAL_PDF_BASE64 =
 async function login(email, password) {
   const response = await axios.post(`${API_BASE}/auth/login`, { email, password });
   return response.data.data.tokens.accessToken;
+}
+
+function refreshTokenFromCookie(response) {
+  const cookies = response.headers?.["set-cookie"] || [];
+  const refreshCookie = cookies.find((cookie) => cookie.startsWith(`${AUTH_COOKIE_NAME}=`));
+  if (!refreshCookie) throw new Error("Auth response did not set a refresh cookie");
+  return decodeURIComponent(refreshCookie.split(";")[0].slice(AUTH_COOKIE_NAME.length + 1));
 }
 
 async function ensureApprovalWorkflowAndDocType(tenantId, adminUserId) {
@@ -498,22 +506,22 @@ async function run() {
       email: ADMIN_EMAIL,
       password: ADMIN_PASSWORD,
     });
-    const refreshToken = refreshLogin.data.data.tokens.refreshToken;
-    const rotatedRefresh = await axios.post(`${API_BASE}/auth/refresh`, { refresh_token: refreshToken });
-    const rotatedRefreshToken = rotatedRefresh.data.data.tokens.refreshToken;
+    const refreshToken = refreshTokenFromCookie(refreshLogin);
+    const rotatedRefresh = await axios.post(`${API_BASE}/auth/refresh`, {}, { headers: { Cookie: `${AUTH_COOKIE_NAME}=${encodeURIComponent(refreshToken)}` } });
+    const rotatedRefreshToken = refreshTokenFromCookie(rotatedRefresh);
     const reusedRefresh = await axios.post(
       `${API_BASE}/auth/refresh`,
-      { refresh_token: refreshToken },
-      { validateStatus: () => true },
+      {},
+      { headers: { Cookie: `${AUTH_COOKIE_NAME}=${encodeURIComponent(refreshToken)}` }, validateStatus: () => true },
     );
     if (reusedRefresh.status !== 401 || reusedRefresh.data?.error?.code !== "INVALID_REFRESH_TOKEN") {
       throw new Error(`Rotated refresh token was reusable: ${reusedRefresh.status}`);
     }
-    await axios.post(`${API_BASE}/auth/logout`, { refresh_token: rotatedRefreshToken });
+    await axios.post(`${API_BASE}/auth/logout`, {}, { headers: { Cookie: `${AUTH_COOKIE_NAME}=${encodeURIComponent(rotatedRefreshToken)}` } });
     const revokedRefresh = await axios.post(
       `${API_BASE}/auth/refresh`,
-      { refresh_token: rotatedRefreshToken },
-      { validateStatus: () => true },
+      {},
+      { headers: { Cookie: `${AUTH_COOKIE_NAME}=${encodeURIComponent(rotatedRefreshToken)}` }, validateStatus: () => true },
     );
     if (revokedRefresh.status !== 401 || revokedRefresh.data?.error?.code !== "INVALID_REFRESH_TOKEN") {
       throw new Error(`Logged-out refresh token was accepted: ${revokedRefresh.status}`);
@@ -523,14 +531,14 @@ async function run() {
       email: ADMIN_EMAIL,
       password: ADMIN_PASSWORD,
     });
-    const disabledRefreshToken = disabledSessionLogin.data.data.tokens.refreshToken;
+    const disabledRefreshToken = refreshTokenFromCookie(disabledSessionLogin);
     const disabledSessionId = JSON.parse(Buffer.from(disabledRefreshToken.split(".")[1], "base64url").toString("utf8")).jti;
     try {
       await prisma.users.update({ where: { id: userId }, data: { status: "disabled" } });
       const disabledRefresh = await axios.post(
         `${API_BASE}/auth/refresh`,
-        { refresh_token: disabledRefreshToken },
-        { validateStatus: () => true },
+        {},
+        { headers: { Cookie: `${AUTH_COOKIE_NAME}=${encodeURIComponent(disabledRefreshToken)}` }, validateStatus: () => true },
       );
       if (disabledRefresh.status !== 403 || disabledRefresh.data?.error?.code !== "ACCOUNT_NOT_ACTIVE") {
         throw new Error(`Disabled-user refresh was not rejected: ${disabledRefresh.status}`);
