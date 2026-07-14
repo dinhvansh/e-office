@@ -1809,3 +1809,44 @@ Results:
 No build/lint suppression, ignore flag, or `ts-ignore` was added. Remaining
 frontend warnings need separate UI/behavior review, especially hook dependency
 warnings in approval and signing screens.
+
+## 2026-07-14 — Frontend UI/UX audit
+
+Status: Completed as a documentation-only, source-informed audit; no production
+or backend code changed.
+
+Files changed:
+
+- `docs/ux/UI-UX-AUDIT.md`
+- `docs/ux/UI-UX-BACKLOG.md`
+- `e-office-ai-update-docs/docs/ai/PROGRESS.md`
+
+Coverage: Login/entry, dashboard/navigation, sign-request creation, approval
+and tasks, internal/external signing, status tracking, notifications,
+administration/settings and responsive/accessibility sources were inspected.
+The local login endpoint and backend health endpoint returned HTTP 200.
+
+Key finding: User-facing Vietnamese text is mojibake in the dashboard shell,
+sidebar/mobile navigation, external OTP flow, notification dropdown and PDF
+signing components. This is recorded as release-blocking UX-001. The audit also
+prioritizes accessible OTP/PDF signing, permission-consistent mobile navigation,
+guided request creation and standardized destructive confirmations.
+
+Validation limitation: Browser automation had no available browser session in
+this environment, so screenshots, authenticated workflows, real OTP delivery,
+and responsive viewport replay must be completed during the first UX fix PR.
+
+Commands run:
+
+- `cd frontend && npm run lint` — passed with existing warnings (React hook
+  dependencies, unoptimized images, and one missing image alt text).
+- `cd frontend && npm run typecheck` — passed.
+- `cd frontend && npm run build` — passed with the same existing warnings.
+
+Security impact: Documentation only. UX fixes must preserve current tenant and
+authorization checks, OTP controls and signing policies.
+
+Migration impact: None.
+
+Next recommended issue: UX-001 — normalize frontend user-facing text to UTF-8
+and add a regression check before changing interaction design.
