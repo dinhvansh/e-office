@@ -13,6 +13,7 @@ import ConfirmationDialog from '@/components/ui/confirmation-dialog';
 import ThankYouPage from '@/components/signing/ThankYouPage';
 import { toast } from 'sonner';
 import { CheckCircle, FileText, Mail, User, Clock, Play } from 'lucide-react';
+import { getPublicApiBaseUrl } from '@/lib/env';
 
 interface SigningData {
   signer: {
@@ -73,6 +74,10 @@ export default function PublicSigningPage() {
   const [otpVerified, setOtpVerified] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [otpExpiresAt, setOtpExpiresAt] = useState<string | null>(null);
+  const [resendAvailableAt, setResendAvailableAt] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  const [otpFeedback, setOtpFeedback] = useState('');
   
   // Guided flow state
   const [guidedMode, setGuidedMode] = useState(false);
@@ -87,13 +92,15 @@ export default function PublicSigningPage() {
     fetchSigningData();
   }, [token]);
 
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const fetchSigningData = async (): Promise<SigningData | null> => {
     setLoadError(null);
     try {
-      if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
-        throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
-      }
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
+      const apiBase = getPublicApiBaseUrl();
       const res = await fetch(`${apiBase}/public/sign/${token}`, { credentials: 'include' });
       const result = await res.json();
 
@@ -123,11 +130,9 @@ export default function PublicSigningPage() {
   };
 
   const handleSendOtp = async () => {
+    if (Date.now() < resendAvailableAt) return;
     try {
-      if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
-        throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
-      }
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
+      const apiBase = getPublicApiBaseUrl();
       const res = await fetch(
         `${apiBase}/public/sign/${token}/send-otp`,
         {
@@ -141,6 +146,17 @@ export default function PublicSigningPage() {
       const result = await res.json();
 
       if (!res.ok) {
+        const code = result.error?.code;
+        const retryAfter = Number(result.error?.details?.retry_after_seconds ?? 0);
+        const recoveryMessages: Record<string, string> = {
+          OTP_RESEND_COOLDOWN: `Vui lòng chờ ${Math.max(1, retryAfter)} giây trước khi gửi lại mã.`,
+          OTP_DELIVERY_UNAVAILABLE: 'Không thể gửi mã lúc này. Vui lòng thử lại sau hoặc liên hệ quản trị viên.',
+          SIGNING_REQUEST_EXPIRED: 'Yêu cầu ký đã hết hạn hoặc không còn hiệu lực. Vui lòng liên hệ người gửi.',
+          INVALID_SIGNING_LINK: 'Liên kết ký không hợp lệ hoặc đã hết hạn. Vui lòng liên hệ người gửi.',
+          SIGNER_EMAIL_MISMATCH: 'Email không khớp với người ký. Vui lòng liên hệ người gửi.',
+        };
+        if (code === 'OTP_RESEND_COOLDOWN' && retryAfter > 0) setResendAvailableAt(Date.now() + retryAfter * 1000);
+        if (recoveryMessages[code]) throw new Error(recoveryMessages[code]);
         // Backend returns error in format: { success: false, error: { message: "...", code: "..." } }
         const errorMsg = result.error?.message || result.message || 'Không thể gửi OTP';
         let errorMessage = errorMsg;
@@ -159,8 +175,12 @@ export default function PublicSigningPage() {
       }
 
       setOtpSent(true);
+      setOtpExpiresAt(result.data?.otp_expires_at ?? null);
+      setResendAvailableAt(Date.now() + Number(result.data?.resend_cooldown_seconds ?? 30) * 1000);
+      setOtpFeedback('Mã OTP đã được gửi. Hãy kiểm tra email của bạn.');
       toast.success('📧 Mã OTP đã được gửi đến email của bạn');
     } catch (error: any) {
+      setOtpFeedback(error.message || 'Không thể gửi OTP');
       toast.error(error.message || 'Không thể gửi OTP');
     }
   };
@@ -180,10 +200,7 @@ export default function PublicSigningPage() {
 
     setVerifying(true);
     try {
-      if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
-        throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
-      }
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
+      const apiBase = getPublicApiBaseUrl();
       const res = await fetch(`${apiBase}/public/sign/${token}/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -203,6 +220,8 @@ export default function PublicSigningPage() {
           errorMessage = '❌ Mã OTP không đúng. Vui lòng kiểm tra lại mã OTP trong email.';
         } else if (result.error?.code === 'OTP_NOT_ISSUED') {
           errorMessage = '📧 Chưa có mã OTP. Vui lòng click "Gửi lại OTP" trước.';
+        } else if (result.error?.code === 'OTP_ATTEMPTS_EXCEEDED' || result.error?.code === 'TOO_MANY_REQUESTS') {
+          errorMessage = 'Bạn đã thử quá nhiều lần. Vui lòng chờ một lúc rồi yêu cầu mã mới.';
         }
         
         throw new Error(errorMessage);
@@ -217,6 +236,7 @@ export default function PublicSigningPage() {
       setOtpVerified(true);
       toast.success('✅ Xác thực thành công! Bạn có thể bắt đầu ký tài liệu.');
     } catch (error: any) {
+      setOtpFeedback(error.message || 'Không thể xác thực OTP');
       toast.error(error.message || 'Không thể xác thực OTP');
       setOtpVerified(false);
     } finally {
@@ -616,7 +636,15 @@ export default function PublicSigningPage() {
               <Input
                 id="otp"
                 type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]*"
                 value={otp}
+                onPaste={(event) => {
+                  event.preventDefault();
+                  setOtp(event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6));
+                  setOtpVerified(false);
+                }}
                 onChange={(e) => {
                   setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
                   setOtpVerified(false); // Reset verified when OTP changes
@@ -626,6 +654,9 @@ export default function PublicSigningPage() {
                 className="mt-1"
                 disabled={otpVerified}
               />
+              <p className="mt-2 text-sm text-slate-600" aria-live="polite">
+                {otpExpiresAt ? `Mã hết hạn sau ${Math.max(0, Math.ceil((new Date(otpExpiresAt).getTime() - now) / 1000))} giây.` : 'Yêu cầu mã OTP để bắt đầu xác thực.'}
+              </p>
               <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-900 font-medium mb-1">
                   📧 Mã OTP đã được gửi trong email yêu cầu ký
@@ -652,10 +683,13 @@ export default function PublicSigningPage() {
                 onClick={handleSendOtp} 
                 variant="outline"
                 className="w-full"
+                disabled={now < resendAvailableAt}
               >
                 {otpSent ? '🔄 Gửi lại OTP' : '📧 Gửi lại OTP'}
               </Button>
             </div>
+            {now < resendAvailableAt && <p className="text-sm text-slate-600" aria-live="polite">Bạn có thể gửi lại mã sau {Math.ceil((resendAvailableAt - now) / 1000)} giây.</p>}
+            <p className="sr-only" aria-live="polite">{otpFeedback}</p>
             
             {otpVerified && (
               <div className="p-3 bg-green-50 border border-green-200 rounded-lg">

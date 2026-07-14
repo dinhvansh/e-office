@@ -7,6 +7,7 @@ type AuthUser = {
   email: string;
   role?: string | null;
   full_name?: string | null;
+  phone?: string | null;
 };
 
 type UserPermission = {
@@ -58,6 +59,13 @@ type ApiEnvelope<T> = {
   success?: boolean;
   data?: T;
   error?: string | { message?: string };
+};
+
+const getLocalizedLoginError = (code?: string): string => {
+  if (code === 'ACCOUNT_NOT_ACTIVE') return 'Tài khoản của bạn đang chờ được kích hoạt. Vui lòng liên hệ quản trị viên hoặc thử lại sau khi tài khoản được phê duyệt.';
+  if (code === 'TENANT_NOT_ACTIVE') return 'Workspace hiện chưa hoạt động. Vui lòng liên hệ quản trị viên của workspace.';
+  if (code === 'INVALID_CREDENTIALS') return 'Email hoặc mật khẩu không đúng.';
+  return 'Không thể đăng nhập lúc này. Vui lòng thử lại sau.';
 };
 
 const readStoredSession = (): StoredSession | undefined => {
@@ -167,6 +175,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const payload = await res.json();
     
     if (!res.ok) {
+      const errorCode = typeof payload.error === 'object' ? payload.error?.code : undefined;
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(getLocalizedLoginError(errorCode));
+      }
       // Handle different error cases
       if (res.status === 401) {
         const errorCode = payload.error?.code;

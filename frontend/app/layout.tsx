@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "@/components/providers/app-providers";
 import { Toaster } from "@/components/ui/sonner";
+import { ApiConfigurationGuard } from "@/components/system/api-configuration-guard";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -20,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={inter.variable}>
       <body className="bg-slate-50 text-slate-900">
-        <AppProviders>{children}</AppProviders>
+        <ApiConfigurationGuard><AppProviders>{children}</AppProviders></ApiConfigurationGuard>
         <Toaster 
           position="bottom-right"
           toastOptions={{

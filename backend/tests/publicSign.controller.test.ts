@@ -11,9 +11,11 @@ import { storageService } from "../src/core/storage/storage.service";
 import { PublicSignController } from "../src/modules/public/publicSign.controller";
 import { PublicSigningCommandService } from "../src/modules/public/publicSigningCommand.service";
 import { createSigningSession, SIGNING_SESSION_COOKIE } from "../src/modules/public/signingSession.service";
+import { signersService } from "../src/modules/signers/signers.service";
 
 const originalFindUnique = prisma.signers.findUnique;
 const originalStorageGet = storageService.get;
+const originalSendOtp = signersService.sendOtp;
 
 const replaceFindUnique = (value: unknown) => {
   (prisma.signers as unknown as { findUnique: unknown }).findUnique = value;
@@ -26,6 +28,7 @@ const replaceStorageGet = (value: unknown) => {
 afterEach(() => {
   replaceFindUnique(originalFindUnique);
   replaceStorageGet(originalStorageGet);
+  (signersService as unknown as { sendOtp: unknown }).sendOtp = originalSendOtp;
 });
 
 const signer = {
@@ -151,4 +154,21 @@ test("expired OTP verification returns the stable OTP_EXPIRED code", async () =>
     params: { token: signer.signing_token },
     body: { otp: "123456" },
   } as unknown as Request, response() as unknown as Response), (error: unknown) => error instanceof ApiError && error.code === "OTP_EXPIRED");
+});
+
+test("OTP resend returns expiry and cooldown metadata without exposing delivery details", async () => {
+  replaceFindUnique(async () => ({ ...signer, email: "signer@example.test" }));
+  (signersService as unknown as { sendOtp: unknown }).sendOtp = async () => ({
+    otp: "123456",
+    expiresAt: new Date("2026-07-14T10:00:00.000Z"),
+    cooldownSeconds: 30,
+  });
+  const res = response();
+
+  await new PublicSignController().sendOtp({
+    params: { token: signer.signing_token },
+    body: { email: "signer@example.test" },
+  } as unknown as Request, res as unknown as Response);
+
+  assert.deepEqual(res.body, { success: true, data: { otp_sent: true, otp_expires_at: "2026-07-14T10:00:00.000Z", resend_cooldown_seconds: 30 } });
 });

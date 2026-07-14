@@ -64,3 +64,30 @@ test.describe('critical external signing recovery', () => {
     });
   }
 });
+
+test.describe('OTP recovery controls', () => {
+  test('accepts a pasted six-digit code and exposes mobile/autofill attributes', async ({ page }) => {
+    await mockSigningApi(page, { success: false, error: { code: 'OTP_INVALID' } });
+    await page.goto(`/sign/${token}`);
+    const input = page.getByPlaceholder('Nhập mã OTP');
+    await expect(input).toHaveAttribute('inputmode', 'numeric');
+    await expect(input).toHaveAttribute('autocomplete', 'one-time-code');
+    await input.evaluate((element) => {
+      const event = new Event('paste', { bubbles: true }) as Event & { clipboardData: { getData: () => string } };
+      Object.defineProperty(event, 'clipboardData', { value: { getData: () => '12 34-56' } });
+      element.dispatchEvent(event);
+    });
+    await expect(input).toHaveValue('123456');
+    await expect(page.getByRole('button', { name: /xác thực otp/i })).toBeEnabled();
+  });
+
+  test('shows cooldown and safe delivery recovery after resend responses', async ({ page }) => {
+    await page.route(new RegExp(`/public/sign/${token}$`), route => route.fulfill({ json: preOtpResponse }));
+    await page.route(`**/public/sign/${token}/send-otp`, route => route.fulfill({ json: { success: true, data: { otp_sent: true, otp_expires_at: new Date(Date.now() + 60_000).toISOString(), resend_cooldown_seconds: 30 } } }));
+    await page.goto(`/sign/${token}`);
+    await page.getByRole('button', { name: /gửi lại otp/i }).click();
+    await expect(page.getByText(/Mã hết hạn sau/)).toBeVisible();
+    await expect(page.getByText(/Bạn có thể gửi lại mã sau/)).toBeVisible();
+    await expect(page.getByRole('button', { name: /gửi lại otp/i })).toBeDisabled();
+  });
+});

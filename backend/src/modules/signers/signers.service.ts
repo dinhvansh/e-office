@@ -12,6 +12,7 @@ import { notificationsService } from "../notifications/notifications.service";
 import { NotificationType } from "../notifications/notifications.types";
 
 const OTP_EXPIRY_MINUTES = 10;
+const OTP_RESEND_COOLDOWN_SECONDS = 30;
 
 class SignersService {
   async notifyNextPendingSigner(signRequestId: number, tenantId: number): Promise<void> {
@@ -63,12 +64,18 @@ class SignersService {
     });
   }
 
-  async sendOtp(signerId: number, tenantId: number, userId?: number): Promise<string> {
+  async sendOtp(signerId: number, tenantId: number, userId?: number): Promise<{ otp: string; expiresAt: Date; cooldownSeconds: number }> {
     const signer = typeof userId === "number"
       ? await this.ensureCanManageSigner(signerId, tenantId, userId)
       : await signersRepository.findById(signerId);
     if (!signer || signer.sign_request.tenant_id !== tenantId) {
       throw ApiError.notFound("Signer not found", "SIGNER_NOT_FOUND");
+    }
+
+    const sentAt = signer.otp_expire ? signer.otp_expire.getTime() - OTP_EXPIRY_MINUTES * 60 * 1000 : 0;
+    const retryAfterSeconds = Math.ceil((sentAt + OTP_RESEND_COOLDOWN_SECONDS * 1000 - Date.now()) / 1000);
+    if (retryAfterSeconds > 0) {
+      throw ApiError.badRequest("Please wait before requesting another code", "OTP_RESEND_COOLDOWN", { retry_after_seconds: retryAfterSeconds });
     }
 
     const otp = this.generateOtp();
@@ -86,7 +93,7 @@ class SignersService {
       });
     } catch (error) {
       console.error("Failed to send OTP email:", error);
-      throw ApiError.internal("Kh?ng th? g?i l?i OTP. Vui l?ng th? l?i sau.", "OTP_SEND_FAILED");
+      throw ApiError.internal("OTP delivery is temporarily unavailable", "OTP_DELIVERY_UNAVAILABLE");
     }
 
     await signersRepository.update(signerId, {
@@ -95,7 +102,7 @@ class SignersService {
       status: "otp_sent",
     });
 
-    return otp;
+    return { otp, expiresAt: otpExpire, cooldownSeconds: OTP_RESEND_COOLDOWN_SECONDS };
   }
 
   async submitSignature(

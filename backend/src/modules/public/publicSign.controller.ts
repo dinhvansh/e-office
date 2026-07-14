@@ -74,7 +74,7 @@ export class PublicSignController {
     });
 
     if (!signer) {
-      throw ApiError.notFound("Invalid signing link");
+      throw ApiError.notFound("Invalid signing link", "INVALID_SIGNING_LINK");
     }
 
     if (!hasSigningSession(req, signer.id, signer.sign_request_id, signer.otp)) {
@@ -158,11 +158,15 @@ export class PublicSignController {
       throw ApiError.notFound("Invalid signing link");
     }
     if (signer.email !== body.email) {
-      throw ApiError.badRequest("Email does not match");
+      throw ApiError.badRequest("Email does not match", "SIGNER_EMAIL_MISMATCH");
     }
 
-    await signersService.sendOtp(signer.id, signer.sign_request.tenant_id);
-    res.json(ok({ otp_sent: true }));
+    if (["signed", "completed", "cancelled", "rejected", "expired"].includes(signer.status || "")) {
+      throw ApiError.badRequest("Signing request is no longer active", "SIGNING_REQUEST_EXPIRED");
+    }
+
+    const sent = await signersService.sendOtp(signer.id, signer.sign_request.tenant_id);
+    res.json(ok({ otp_sent: true, otp_expires_at: sent.expiresAt.toISOString(), resend_cooldown_seconds: sent.cooldownSeconds }));
   };
 
   verifyOtp = async (req: Request, res: Response): Promise<void> => {

@@ -17,7 +17,7 @@ export function getApiBaseUrl(): string {
   
   // In browser, validate and throw error if not set
   if (!value) {
-    throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
+    throw new Error('Dịch vụ hiện chưa sẵn sàng. Vui lòng thử lại sau.');
   }
   
   return value;
@@ -28,7 +28,7 @@ export function getApiBaseUrl(): string {
  * @throws Error if NEXT_PUBLIC_API_URL is not set (only in browser)
  */
 export function getApiUrl(): string {
-  const value = process.env.NEXT_PUBLIC_API_URL;
+  const value = process.env.NEXT_PUBLIC_API_BASE_URL;
   
   // During build/SSR, return value or empty string
   if (typeof window === 'undefined') {
@@ -37,10 +37,14 @@ export function getApiUrl(): string {
   
   // In browser, validate and throw error if not set
   if (!value) {
-    throw new Error('NEXT_PUBLIC_API_URL environment variable is required');
+    throw new Error('Dịch vụ hiện chưa sẵn sàng. Vui lòng thử lại sau.');
   }
   
   return value;
+}
+
+export function isApiConfigurationAvailable(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_API_BASE_URL);
 }
 
 /**

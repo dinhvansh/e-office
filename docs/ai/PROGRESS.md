@@ -7,3 +7,9 @@
 - **UX-014 fixed:** PDF field placement uses the rendered canvas bounds and retains normalized coordinates through persistence, reload and signer rendering. Coordinate tests cover three non-edge positions.
 
 Verification evidence is stored in `docs/ux/evidence/`.
+
+## 2026-07-14 — Authentication and OTP recovery
+
+- **UX-002 / UX-018 fixed:** OTP input supports numeric keyboards, browser one-time-code autofill and sanitized six-digit paste. Resend now shows an expiry countdown, cooldown, accessible live feedback and localized recovery for delivery, expiry and attempts errors.
+- **UX-011 fixed:** the frontend uses one public API base setting and a localized configuration guard prevents blank routes or exposed configuration names.
+- **UX-012 fixed:** login maps account and workspace activation codes to localized, non-enumerating recovery guidance.
