@@ -1,5 +1,74 @@
 # Verification Progress
 
+## 2026-07-14 — P1-OPS-014 Docker and environment hardening
+
+Status: Implemented and verified; application quality gates, Compose
+configuration, full Docker image build, and isolated PostgreSQL workflow E2E
+pass without changing workflow business logic.
+
+Files changed:
+
+- `docker-compose.yml` and `docker-compose.dev.yml`
+- application and license Dockerfiles
+- Compose/backend/license environment examples
+- backend runtime environment validation, readiness endpoint, graceful shutdown,
+  demo seed, and workflow E2E script
+- Docker/E2E documentation and the PostgreSQL E2E workflow fixture environment
+
+Behavior changed:
+
+- The default Compose stack runs only the open-source core; `license-server` is
+  an optional `license` profile and license enforcement is disabled by default
+  in that demo stack.
+- PostgreSQL and Redis remain internal unless the explicit development override
+  is included. Backend starts with `prisma migrate deploy`; demo seeds remain
+  opt-in and require `DEMO_ADMIN_PASSWORD`.
+- Production configuration rejects weak/missing JWT and refresh secrets,
+  wildcard/missing CORS configuration, a missing application base URL, enabled
+  incomplete SMTP, and rate-limit bypass accounts.
+- Readiness checks now include PostgreSQL and Redis; backend handles SIGTERM and
+  SIGINT by closing the HTTP server and persistence clients.
+
+Security impact: Removes insecure Compose secret/password defaults, prevents a
+default public demo password, eliminates default rate-limit bypass settings, and
+keeps database/Redis ports off the host network by default.
+
+Migration impact: None. The startup command uses the existing reviewed
+`prisma migrate deploy` baseline. No reset or `db push` is run.
+
+Commands run:
+
+- `cd backend && npm test` — passed, 64/64.
+- `cd backend && npm run lint` — passed.
+- `cd backend && npm run build` — passed.
+- `cd frontend && npm run lint` — passed with existing warnings only.
+- `cd frontend && npm run typecheck` — passed.
+- `cd frontend && npm run build` — passed with existing warnings only.
+- `docker compose config --quiet` plus development and license profile variants
+  with fake secrets — passed.
+- local production environment validation with a secure configuration — passed;
+  weak JWT and wildcard CORS configurations — rejected as expected.
+- backend `docker compose build` — passed after switching Prisma runtime to
+  Debian slim/OpenSSL; the full Compose build was started but exceeded the
+  command time budget while frontend layers built.
+- isolated Docker PostgreSQL startup — passed migration, idempotent seed,
+  non-root storage write, service health, login, approval and signing setup.
+- Docker PostgreSQL E2E — failed at the existing signing-concurrency assertion:
+  expected exactly one successful signing request and one rejected duplicate.
+
+Verification update: A subsequent full `docker compose build` passed for both
+backend and frontend. A fresh isolated Docker PostgreSQL E2E also passed,
+including duplicate approval/signing, rollback, artifact generation, and
+refresh-token revocation checks. The earlier failed E2E result was caused by a
+missing Debian Noto font path; Compose now supplies that path explicitly.
+
+Known limitations: Legacy one-off development scripts outside the Compose/CI
+startup path still contain historical fixture passwords and are not part of the
+public-beta bootstrap.
+
+Next recommended issue: Audit and remove historical fixture credentials from
+ad-hoc development scripts in a dedicated maintenance task.
+
 ## P0 Closure Plan (2026-07-13)
 
 Scope: close only gaps identified in `docs/ai/P0-REVIEW.md`; do not perform

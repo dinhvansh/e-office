@@ -1,17 +1,16 @@
 services:
   db:
     image: postgres:16
-    container_name: eoffice-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-eoffice}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-db-password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:-eoffice_db}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    expose:
+      - "5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eoffice}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eoffice} -d ${POSTGRES_DB:-eoffice_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -19,9 +18,8 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: eoffice-redis
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    expose:
+      - "6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -31,30 +29,37 @@ services:
 
   license-server:
     build: ./license-server
-    container_name: eoffice-license
+    profiles: ["license"]
     environment:
       PORT: 5000
-      LICENSE_SIGNING_SECRET: ${LICENSE_SIGNING_SECRET:-replace-me-license-secret}
+      LICENSE_SIGNING_SECRET: ${LICENSE_SIGNING_SECRET:-}
       NODE_ENV: production
-    ports:
-      - "${LICENSE_SERVER_PORT:-5000}:5000"
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   backend:
     build: ./backend
-    container_name: eoffice-backend
-    command: sh -c "node scripts/init-db.js && node dist/server.js"
+    command: sh -c "npx prisma migrate deploy && node scripts/init-db.js && exec node dist/server.js"
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://eoffice:change-me-db-password@db:5432/eoffice_db}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       PORT: 4000
-      JWT_SECRET: ${JWT_SECRET:-replace-me-jwt-secret-with-32-chars-minimum}
-      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-replace-me-refresh-secret-with-32-chars-minimum}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?REFRESH_TOKEN_SECRET is required}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      LICENSE_SERVER_URL: ${LICENSE_SERVER_URL:-http://license-server:5000/api/v1}
+      LICENSE_SERVER_URL: ${LICENSE_SERVER_URL:-}
       NODE_ENV: production
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
+      APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL is required}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-local}
       STORAGE_BASE_PATH: ${STORAGE_BASE_PATH:-./storage}
+      PDF_UNICODE_FONT_PATH: ${PDF_UNICODE_FONT_PATH:-/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf}
+      PDF_UNICODE_BOLD_FONT_PATH: ${PDF_UNICODE_BOLD_FONT_PATH:-/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf}
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
@@ -62,21 +67,21 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@example.local}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-E-Office}
-      AUTO_INIT_DB: ${AUTO_INIT_DB:-true}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      AUTO_INIT_DB: ${AUTO_INIT_DB:-false}
+      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-}
       DISABLE_LICENSE_CHECK: ${DISABLE_LICENSE_CHECK:-true}
       RATE_LIMIT_BYPASS_EMAILS: ${RATE_LIMIT_BYPASS_EMAILS:-}
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     volumes:
-      - ./backend/storage:/app/storage
-      - ./backend/backups:/app/backups
+      - backend_storage:/app/storage
+      - backend_backups:/app/backups
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      license-server:
-        condition: service_started
     restart: unless-stopped
 
   frontend:
@@ -85,7 +90,6 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api/v1}
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4000/api/v1}
-    container_name: eoffice-frontend
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api/v1}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4000/api/v1}
@@ -93,8 +97,11 @@ services:
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
   db_data:
+  backend_storage:
+  backend_backups:

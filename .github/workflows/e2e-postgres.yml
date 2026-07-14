@@ -56,7 +56,8 @@ jobs:
       E2E_API_BASE: http://localhost:4000/api/v1
       E2E_PUBLIC_BASE: http://localhost:4000/public
       E2E_ADMIN_EMAIL: admin@acme.local
-      E2E_ADMIN_PASSWORD: secret123
+      DEMO_ADMIN_PASSWORD: ci-only-demo-password-not-for-production
+      E2E_ADMIN_PASSWORD: ci-only-demo-password-not-for-production
       E2E_INTERNAL_SIGNER_EMAIL: admin@acme.local
 
     steps:

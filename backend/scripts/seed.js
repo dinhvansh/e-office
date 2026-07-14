@@ -4,6 +4,11 @@ const bcrypt = require("bcryptjs");
 const prisma = new PrismaClient();
 
 async function main() {
+  const demoAdminPassword = process.env.DEMO_ADMIN_PASSWORD;
+  if (!demoAdminPassword || demoAdminPassword.length < 16 || ["secret123", "password123"].includes(demoAdminPassword.toLowerCase())) {
+    throw new Error("DEMO_ADMIN_PASSWORD must be set to a unique value of at least 16 characters before running the demo seed");
+  }
+
   const tenant = await prisma.tenants.upsert({
     where: { id: 1 },
     update: {
@@ -20,7 +25,7 @@ async function main() {
     },
   });
 
-  const hash = bcrypt.hashSync("secret123", 10);
+  const hash = bcrypt.hashSync(demoAdminPassword, 10);
 
   await prisma.users.upsert({
     where: { email: "admin@acme.local" },

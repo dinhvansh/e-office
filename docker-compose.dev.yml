@@ -1,0 +1,17 @@
+# Development-only override. Keep this file out of production deployments.
+#
+# Run with:
+# docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+services:
+  db:
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+  redis:
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  backend:
+    volumes:
+      - ./backend/storage:/app/storage
+      - ./backend/backups:/app/backups

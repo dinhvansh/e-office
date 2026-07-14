@@ -16,8 +16,12 @@ const prisma = new PrismaClient();
 const API_BASE = process.env.E2E_API_BASE || "http://localhost:4000/api/v1";
 const PUBLIC_BASE = process.env.E2E_PUBLIC_BASE || "http://localhost:4000/public";
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "admin@acme.local";
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "secret123";
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD;
 const INTERNAL_SIGNER_EMAIL = process.env.E2E_INTERNAL_SIGNER_EMAIL || "admin@acme.local";
+
+if (!ADMIN_PASSWORD) {
+  throw new Error("E2E_ADMIN_PASSWORD is required; do not rely on a shared demo password");
+}
 
 const PNG_SIGNATURE =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
@@ -421,7 +425,10 @@ async function run() {
     const successfulSigns = [firstSign, duplicateSign].filter((result) => result.status === "fulfilled");
     const rejectedSigns = [firstSign, duplicateSign].filter((result) => result.status === "rejected");
     if (successfulSigns.length !== 1 || rejectedSigns.length !== 1) {
-      throw new Error("Expected exactly one successful signing request and one rejected duplicate");
+      const outcomes = [firstSign, duplicateSign].map((result) => result.status === "fulfilled"
+        ? `fulfilled:${result.value.status}`
+        : `rejected:${result.reason.response?.status || result.reason.code || result.reason.message}`);
+      throw new Error(`Expected exactly one successful signing request and one rejected duplicate; outcomes=${outcomes.join(",")}`);
     }
     const duplicateError = rejectedSigns[0].reason;
     if (duplicateError.response?.status !== 409) {

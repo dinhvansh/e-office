@@ -46,14 +46,16 @@ export POSTGRES_PASSWORD=eoffice-local-test-password
 export JWT_SECRET=local-only-jwt-secret-with-at-least-thirty-two-characters
 export REFRESH_TOKEN_SECRET=local-only-refresh-secret-with-at-least-thirty-two-characters
 export LICENSE_SIGNING_SECRET=local-only-license-secret-with-at-least-thirty-two-characters
+export DEMO_ADMIN_PASSWORD=local-only-demo-password-not-for-production
+export E2E_ADMIN_PASSWORD=local-only-demo-password-not-for-production
 export DATABASE_URL=postgresql://eoffice:eoffice-local-test-password@db:5432/eoffice_db
 docker compose up -d --build
-docker exec eoffice-backend npx prisma migrate deploy
-docker exec eoffice-backend node scripts/seed.js
-docker exec eoffice-backend node scripts/seed-rbac.js
-docker exec eoffice-backend node scripts/seed-document-types.js
-docker exec eoffice-backend node scripts/seed-workflows-simple.js
-docker exec eoffice-backend node scripts/e2e-workflow-refactor.js
+docker compose exec backend npx prisma migrate deploy
+docker compose exec backend node scripts/seed.js
+docker compose exec backend node scripts/seed-rbac.js
+docker compose exec backend node scripts/seed-document-types.js
+docker compose exec backend node scripts/seed-workflows-simple.js
+docker compose exec backend node scripts/e2e-workflow-refactor.js
 ```
 
 GitHub Actions runs the equivalent command in
