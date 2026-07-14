@@ -6,7 +6,7 @@ Scope: initial source review plus Playwright runtime review; no production code 
 ## Evidence and confidence
 
 - **E1 — source review:** application routes, navigation, signing, and shared UI components were mapped in the initial review.
-- **E2 — Playwright runtime:** Chromium ran the configured local application at `http://localhost:3000`; public authentication routes, invalid external-sign link, keyboard order, mobile registration, and unauthenticated redirects for `/`, `/documents`, `/sign-requests/create`, `/approvals`, `/my-tasks`, and `/settings/system` were exercised. Screenshots: [`login-desktop.png`](evidence/login-desktop.png), [`register-mobile-375.png`](evidence/register-mobile-375.png), [`external-sign-invalid-token.png`](evidence/external-sign-invalid-token.png), and [`protected-settings-system.png`](evidence/protected-settings-system.png).
+- **E2 — Playwright runtime:** Chromium ran the configured local application at `http://localhost:3000`; public authentication routes, pending-account login, invalid external-sign link, keyboard order, mobile registration, and unauthenticated redirects for `/`, `/documents`, `/sign-requests/create`, `/approvals`, `/my-tasks`, and `/settings/system` were exercised. Screenshots: [`login-desktop.png`](evidence/login-desktop.png), [`login-pending-account.png`](evidence/login-pending-account.png), [`register-mobile-375.png`](evidence/register-mobile-375.png), [`external-sign-invalid-token.png`](evidence/external-sign-invalid-token.png), and [`protected-settings-system.png`](evidence/protected-settings-system.png).
 - **E3 — authenticated-flow limitation:** a fresh workspace registration correctly remains pending administrator approval. No approved requester, approver, internal signer, external signer, or administrator test account was available, so those flows remain source-informed and need a role-based browser replay.
 
 ## Overall assessment
@@ -15,7 +15,7 @@ Scope: initial source review plus Playwright runtime review; no production code 
 
 | Major flow | Score | Assessment |
 | --- | ---: | --- |
-| Login and first entry | 7.0 | Login, registration, password reset and pending-registration confirmation render correctly in Playwright; legal links and missing-environment error handling need work. |
+| Login and first entry | 6.0 | Registration and reset-password surfaces render correctly, but a pending account receives raw English status copy with no recovery guidance when it attempts login. |
 | Dashboard and navigation | 5.5 | Permission-aware desktop sidebar and dashboard skeletons exist; mobile role behavior still needs an authenticated browser replay. |
 | Create sign request | 5.5 | Covers document, workflow and signer setup, but is a long, dense, one-page decision flow. |
 | Approval workflow | 6.0 | Dedicated approval/task routes and status UI exist; action context needs validation in a browser. |
@@ -59,18 +59,17 @@ Scope: initial source review plus Playwright runtime review; no production code 
 5. **UX-005:** Creation of a sign request combines upload, classification, workflow selection/customization and signer setup in one dense flow (High).
 6. **UX-006:** Destructive actions use browser-native `confirm()` in many screens rather than a consistent, accessible application dialog (High).
 7. **UX-007:** Status tracking shows state but does not consistently identify the owner, required next action, or expected completion time (Medium).
-8. **UX-008:** Notification history needs route/API confirmation; the dropdown’s “View all” destination was not verified in an authenticated browser session (Medium).
-9. **UX-009:** Loading and error recovery patterns are inconsistent: some screens use skeletons; notifications use a spinner; many operations depend on transient toasts (Medium).
-10. **UX-010:** Several interactive icon controls and signing inputs do not expose accessible names/instructions; image usage also lacks a consistent optimized/accessible strategy (Medium).
-11. **UX-011:** Inconsistent required API environment-variable names can expose raw technical errors and render a settings route blank (High).
+8. **UX-011:** Inconsistent required API environment-variable names can expose raw technical errors and render a settings route blank (High).
+9. **UX-012:** A pending user gets raw English “Account is not active” after an otherwise clear Vietnamese pending-approval registration flow (High).
+10. **UX-009:** Loading and error recovery patterns are inconsistent: some screens use skeletons; notifications use a spinner; many operations depend on transient toasts (Medium).
 
 ## Critical issues required before public beta
 
-No Critical issue was confirmed in the public Playwright run. The following High issues should be completed or browser-verified before public beta: UX-001, UX-002, UX-003, UX-004, UX-005, UX-006 and UX-011.
+No Critical issue was confirmed in the public Playwright run. The following High issues should be completed or browser-verified before public beta: UX-001, UX-002, UX-003, UX-004, UX-005, UX-006, UX-011 and UX-012.
 
 ## Suggested implementation order
 
-1. **P0 public onboarding, runtime failure handling and signing accessibility:** UX-001, UX-011, UX-002, UX-003.
+1. **P0 public onboarding, account-state and runtime failure handling:** UX-001, UX-012, UX-011, UX-002, UX-003.
 2. **P1 navigation and safety:** UX-004, UX-006, UX-008.
 3. **P1 completion clarity:** UX-005, UX-007, UX-009.
 4. **P2 consistency polish:** UX-010 and responsive/table refinements after device-based replay.
@@ -89,6 +88,7 @@ No Critical issue was confirmed in the public Playwright run. The following High
 | UX-008 notification route | Possibly | A dedicated page needs pagination/history API if not already available. |
 | UX-009 recovery states | No for visual states | Retry metadata/errors may need stable API codes. |
 | UX-011 configuration failure handling | No business API change | Consolidate the public API base configuration and fail with a safe startup/deployment message. |
+| UX-012 pending-account recovery | Possibly | Prefer a stable user/account status code and an activation/support path returned by the auth API. |
 
 ## Audit follow-up
 

@@ -116,6 +116,16 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - **Recommended fix:** Consolidate on one documented public API base variable, validate it in startup/deployment checks, and render a safe service-unavailable screen with a support/retry path if configuration is absent; retain diagnostic detail only in developer/server logs.
 - **Acceptance criteria:** No public page exposes environment variable names, stack traces or internal endpoint details; one documented variable configures all frontend API clients; missing configuration is caught by deployment health checks; protected routes never render blank because of configuration absence.
 
+### UX-012 — Give pending accounts a localized recovery path
+
+- **Screen/flow:** New-workspace registration followed by `/login`.
+- **Problem:** Registration says the account is awaiting administrator approval. Logging in with that same valid account instead shows the raw English message `Account is not active`, without explaining that the account is pending, who can activate it, or what the user should do next.
+- **Severity:** High.
+- **Affected role:** First-time workspace owner/user awaiting approval.
+- **Evidence:** E2 Playwright registration created a pending account, then its login attempt produced the message; see `docs/ux/evidence/login-pending-account.png`.
+- **Recommended fix:** Map pending/inactive account codes to localized, user-safe messages with clear next actions. If the tenant has no administrator who can act, provide an appropriate support/contact route without exposing account details.
+- **Acceptance criteria:** A pending account receives Vietnamese (or selected locale) copy that says approval is pending; message identifies the next action and support route; disabled/rejected/unknown accounts remain safely distinguishable without account enumeration.
+
 ## Implementation classification
 
 | Frontend-only | Requires/benefits from backend/API |

@@ -1865,7 +1865,9 @@ the P0 backlog.
 
 Runtime findings: registration requires agreement to Terms and Privacy links
 that both resolve to `#` (UX-001, High); a new workspace registration displays
-a clear pending-administrator-approval confirmation. The frontend expects both
+a clear pending-administrator-approval confirmation, but logging in with that
+same pending account shows raw English `Account is not active` without recovery
+guidance (UX-012, High). The frontend expects both
 `NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_API_URL` in different runtime paths:
 when the first is absent, login exposed its raw variable name; when the second
 is absent, `/settings/system` failed hydration and rendered a blank page
