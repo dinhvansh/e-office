@@ -26,8 +26,8 @@ type StoredDocument = Pick<documents, 'id' | 'file_path'>;
 
 export class PdfGenerationService {
   private readonly fieldPaddingPt = 2;
-  private readonly unicodeFontPath = process.env.PDF_UNICODE_FONT_PATH || '/usr/share/fonts/noto/NotoSans-Regular.ttf';
-  private readonly unicodeBoldFontPath = process.env.PDF_UNICODE_BOLD_FONT_PATH || '/usr/share/fonts/noto/NotoSans-Bold.ttf';
+  private readonly unicodeFontPath = process.env.PDF_UNICODE_FONT_PATH || '/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf';
+  private readonly unicodeBoldFontPath = process.env.PDF_UNICODE_BOLD_FONT_PATH || '/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf';
 
   private async embedUnicodeFont(pdfDoc: PDFDocument, bold = false) {
     const fontPath = bold ? this.unicodeBoldFontPath : this.unicodeFontPath;
@@ -494,19 +494,19 @@ export class PdfGenerationService {
       : new Date().toLocaleString('vi-VN');
     
     // Left column
-    page.drawText('Ten tai lieu:', { x: 40, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText('Tên tài liệu:', { x: 40, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
     page.drawText(docTitle.substring(0, 40), { x: 110, y: y, size: 7, font: font, color: rgb(0.2, 0.2, 0.2) });
     
     y -= 10;
-    page.drawText('Ngay tao:', { x: 40, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText('Ngày tạo:', { x: 40, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
     page.drawText(createdDate, { x: 110, y: y, size: 7, font: font, color: rgb(0.2, 0.2, 0.2) });
     
     y -= 10;
-    page.drawText('So trang:', { x: 40, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText('Số trang:', { x: 40, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
     page.drawText(pdfDoc.getPageCount().toString(), { x: 110, y: y, size: 7, font: font, color: rgb(0.2, 0.2, 0.2) });
     
     y -= 10;
-    page.drawText('Nguoi tao:', { x: 40, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText('Người tạo:', { x: 40, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
     const ownerName = signRequest.document.owner 
       ? (signRequest.document.owner.full_name || signRequest.document.owner.email)
       : 'Unknown';
@@ -514,16 +514,16 @@ export class PdfGenerationService {
     
     // Right column
     y += 30;
-    page.drawText('Ma tai lieu:', { x: 300, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText('Mã tài liệu:', { x: 300, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
     page.drawText(docNumber, { x: 370, y: y, size: 7, font: font, color: rgb(0.2, 0.2, 0.2) });
     
     y -= 10;
-    page.drawText('Ngay gui:', { x: 300, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText('Ngày gửi:', { x: 300, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
     page.drawText(createdDate, { x: 370, y: y, size: 7, font: font, color: rgb(0.2, 0.2, 0.2) });
     
     y -= 10;
-    page.drawText('Trang thai:', { x: 300, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
-    page.drawText('Hoan thanh', { x: 370, y: y, size: 7, font: font, color: rgb(0, 0.6, 0) });
+    page.drawText('Trạng thái:', { x: 300, y: y, size: 7, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText('Hoàn thành', { x: 370, y: y, size: 7, font: font, color: rgb(0, 0.6, 0) });
     
     y -= 20;
 
@@ -547,7 +547,7 @@ export class PdfGenerationService {
         color: rgb(0, 0.4, 0.8) // Blue
       });
       
-      page.drawText('LICH SU PHE DUYET', {
+      page.drawText('LỊCH SỬ PHÊ DUYỆT', {
         x: 40, y: y - 9, size: 8, font: boldFont, color: rgb(1, 1, 1)
       });
       y -= 15;
@@ -567,11 +567,11 @@ export class PdfGenerationService {
 
       // Column headers - same layout as signing table
       const cols = [
-        { x: 40, width: 120, label: 'Nguoi phe duyet' },
+        { x: 40, width: 120, label: 'Người phê duyệt' },
         { x: 165, width: 140, label: 'Email' },
-        { x: 310, width: 60, label: 'Trang thai' },
-        { x: 375, width: 70, label: 'Ngay gio' },
-        { x: 450, width: 110, label: 'Ghi chu' }
+        { x: 310, width: 60, label: 'Trạng thái' },
+        { x: 375, width: 70, label: 'Ngày giờ' },
+        { x: 450, width: 110, label: 'Ghi chú' }
       ];
 
       // Draw headers
@@ -659,7 +659,7 @@ export class PdfGenerationService {
       color: rgb(0, 0.6, 0) // Green
     });
     
-    page.drawText('LICH SU KY', {
+    page.drawText('LỊCH SỬ KÝ', {
       x: 40, y: y - 9, size: 8, font: boldFont, color: rgb(1, 1, 1)
     });
     y -= 15;
@@ -679,10 +679,10 @@ export class PdfGenerationService {
 
     // Column headers - same as approval table
     const signerCols = [
-      { x: 40, width: 120, label: 'Nguoi ky' },
+      { x: 40, width: 120, label: 'Người ký' },
       { x: 165, width: 140, label: 'Email' },
-      { x: 310, width: 60, label: 'Trang thai' },
-      { x: 375, width: 70, label: 'Ngay gio' },
+      { x: 310, width: 60, label: 'Trạng thái' },
+      { x: 375, width: 70, label: 'Ngày giờ' },
       { x: 450, width: 110, label: 'IP / Auth' }
     ];
 

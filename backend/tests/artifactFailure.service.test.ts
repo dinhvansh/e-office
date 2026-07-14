@@ -36,7 +36,7 @@ function installArtifactTransactionHarness(initialStatus: string, transitions: s
     (operation as (client: typeof tx) => unknown)(tx);
 }
 
-test("worker failure marks the artifact failed without completing the document", async () => {
+test("a missing Unicode font marks the artifact failed without completing the document", async () => {
   const transitions: string[] = [];
   installArtifactTransactionHarness("generating_artifact", transitions);
   (prisma.sign_requests as unknown as { findUnique: unknown }).findUnique = async () => ({
@@ -44,7 +44,9 @@ test("worker failure marks the artifact failed without completing the document",
     status: "generating_artifact",
     document: { id: 30, status: "generating_artifact", signed_file_path: null, hash: null },
   });
-  (pdfGenerationService as unknown as { generateSignedPdf: unknown }).generateSignedPdf = async () => { throw new Error("injected PDF failure"); };
+  (pdfGenerationService as unknown as { generateSignedPdf: unknown }).generateSignedPdf = async () => {
+    throw new Error("Unicode PDF font is unavailable: configured path");
+  };
 
   await assert.rejects(signedArtifactWorker.processSignedArtifactEvent({ payload: { sign_request_id: 20 } }));
   assert.deepEqual(transitions, ["document:artifact_failed", "request:artifact_failed", "artifact.generation_failed"]);

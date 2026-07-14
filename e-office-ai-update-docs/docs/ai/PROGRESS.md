@@ -1,5 +1,32 @@
 # Verification Progress
 
+## 2026-07-14 — P1-PDF-015 Vietnamese Unicode PDF rendering
+
+Status: Completed and validated. Audit-page transliteration was removed and the
+runtime Noto path was corrected to the Debian image layout.
+
+Files changed: signed-PDF generator, Unicode generation/failure tests, font
+documentation, and this progress entry.
+
+Font: Noto Sans Regular/Bold from Debian `fonts-noto-core`, embedded via
+`pdf-lib` and `fontkit`; Noto Sans is licensed under SIL OFL 1.1. No font files
+are committed to the repository.
+
+Commands run:
+
+- `cd backend && npm test` — passed, 71/71.
+- `cd backend && npm run lint` and `npm run build` — passed.
+- `cd frontend && npm run build`, `npm run typecheck`, and `npm run lint` —
+  passed; existing lint warnings only.
+- `docker compose build backend outbox-worker` — passed.
+- Isolated Docker PostgreSQL E2E with outbox worker — passed.
+- Docker Noto fixture with all required Vietnamese strings — generated,
+  readable by `pdf-lib`, one page, 277,170 bytes.
+
+Known limitation: Watermark configuration still uses the legacy StandardFonts
+selector; use image watermarks or ASCII text until that configurable subsystem
+is migrated to Unicode fonts in a dedicated task.
+
 ## 2026-07-14 — P1-AUTH-011 refresh-session rotation
 
 Status: Completed. Server-side sessions, SHA-256 refresh-token hashes,
