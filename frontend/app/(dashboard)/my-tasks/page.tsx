@@ -43,7 +43,7 @@ export default function MyTasksPage() {
   const [limit, setLimit] = useState(10);
 
   // Fetch combined tasks
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['my-tasks', page, limit, search, taskType, status, documentTypeId, sortBy, sortOrder],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -260,6 +260,11 @@ export default function MyTasksPage() {
       <div className="bg-white rounded-lg border">
         {isLoading ? (
           <div className="p-8 text-center text-muted-foreground">Đang tải...</div>
+        ) : isError ? (
+          <div className="p-8 text-center text-muted-foreground">
+            <p className="mb-3">{error instanceof Error ? error.message : 'Không thể tải công việc.'}</p>
+            <Button variant="outline" onClick={() => void refetch()}>Thử lại</Button>
+          </div>
         ) : tasks.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">Không có công việc nào</div>
         ) : (

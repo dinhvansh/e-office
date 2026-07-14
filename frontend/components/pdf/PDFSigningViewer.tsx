@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import SignatureCanvas from '@/components/signature/SignatureCanvas';
 import PDFCoreViewer from '@/components/pdf/PDFCoreViewer';
 import { pctToPx } from '@/lib/coordinate.helper';
-import { getResolvedFieldLabel, getResolvedFieldPlaceholder } from '@/lib/sign-field.helper';
+import { getResolvedFieldLabel, getResolvedFieldPlaceholder, type SignFieldType } from '@/lib/sign-field.helper';
 import { toast } from 'sonner';
 
 interface SignatureField {
   id: number;
-  type: string;
+  type: SignFieldType;
   pageIndex: number;
   page?: number;
   xPct: number;

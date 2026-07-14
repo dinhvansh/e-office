@@ -122,3 +122,33 @@ test("OTP verification reports the stable OTP_INVALID code", async () => {
     body: { otp: "000000" },
   } as unknown as Request, response() as unknown as Response), (error: unknown) => error instanceof ApiError && error.code === "OTP_INVALID");
 });
+
+test("OTP verification creates a short-lived signing session for a valid OTP", async () => {
+  replaceFindUnique(async () => ({
+    ...signer,
+    otp: await bcrypt.hash("123456", 4),
+    otp_expire: new Date(Date.now() + 60_000),
+  }));
+  const res = response();
+
+  await new PublicSignController().verifyOtp({
+    params: { token: signer.signing_token },
+    body: { otp: "123456" },
+  } as unknown as Request, res as unknown as Response);
+
+  assert.deepEqual(res.body, { success: true, data: { verified: true, message: "OTP verified successfully" } });
+  assert.match(res.headers.get("Set-Cookie") || "", new RegExp(`${SIGNING_SESSION_COOKIE}=`));
+});
+
+test("expired OTP verification returns the stable OTP_EXPIRED code", async () => {
+  replaceFindUnique(async () => ({
+    ...signer,
+    otp: await bcrypt.hash("123456", 4),
+    otp_expire: new Date(Date.now() - 60_000),
+  }));
+
+  await assert.rejects(new PublicSignController().verifyOtp({
+    params: { token: signer.signing_token },
+    body: { otp: "123456" },
+  } as unknown as Request, response() as unknown as Response), (error: unknown) => error instanceof ApiError && error.code === "OTP_EXPIRED");
+});

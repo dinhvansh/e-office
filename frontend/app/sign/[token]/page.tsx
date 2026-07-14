@@ -72,6 +72,7 @@ export default function PublicSigningPage() {
   const [submitting, setSubmitting] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   // Guided flow state
   const [guidedMode, setGuidedMode] = useState(false);
@@ -86,13 +87,14 @@ export default function PublicSigningPage() {
     fetchSigningData();
   }, [token]);
 
-  const fetchSigningData = async () => {
+  const fetchSigningData = async (): Promise<SigningData | null> => {
+    setLoadError(null);
     try {
       if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
         throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
       }
       const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
-      const res = await fetch(`${apiBase}/public/sign/${token}`);
+      const res = await fetch(`${apiBase}/public/sign/${token}`, { credentials: 'include' });
       const result = await res.json();
 
       if (!res.ok) {
@@ -101,15 +103,20 @@ export default function PublicSigningPage() {
         throw new Error(errorMsg);
       }
 
-      setData(result.data);
-      setEmail(result.data.signer.email);
+      const signingData = result.data as SigningData;
+      setData(signingData);
+      setEmail(signingData.signer.email || '');
 
       // Check if already signed
-      if (result.data.already_signed) {
+      if (signingData.already_signed) {
         toast.success('Bạn đã ký tài liệu này rồi');
       }
+      return signingData;
     } catch (error: any) {
-      toast.error(error.message || 'Không thể tải dữ liệu');
+      const message = error.message || 'Không thể tải dữ liệu';
+      setLoadError(message);
+      toast.error(message);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -127,6 +134,7 @@ export default function PublicSigningPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email }),
+          credentials: 'include',
         }
       );
 
@@ -180,6 +188,7 @@ export default function PublicSigningPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ otp }),
+        credentials: 'include',
       });
 
       const result = await res.json();
@@ -190,7 +199,7 @@ export default function PublicSigningPage() {
         
         if (result.error?.code === 'OTP_EXPIRED') {
           errorMessage = '⏰ Mã OTP đã hết hạn. Vui lòng click "Gửi lại OTP" để nhận mã mới.';
-        } else if (result.error?.code === 'INVALID_OTP') {
+        } else if (result.error?.code === 'OTP_INVALID') {
           errorMessage = '❌ Mã OTP không đúng. Vui lòng kiểm tra lại mã OTP trong email.';
         } else if (result.error?.code === 'OTP_NOT_ISSUED') {
           errorMessage = '📧 Chưa có mã OTP. Vui lòng click "Gửi lại OTP" trước.';
@@ -199,6 +208,12 @@ export default function PublicSigningPage() {
         throw new Error(errorMessage);
       }
 
+      const verifiedData = await fetchSigningData();
+      if (!verifiedData?.document || !verifiedData?.sign_request) {
+        setData(null);
+        setLoadError('Không thể tải tài liệu sau khi xác thực. Vui lòng thử lại.');
+        return;
+      }
       setOtpVerified(true);
       toast.success('✅ Xác thực thành công! Bạn có thể bắt đầu ký tài liệu.');
     } catch (error: any) {
@@ -464,7 +479,10 @@ export default function PublicSigningPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <p className="text-red-600">Không tìm thấy tài liệu</p>
+          <p className="text-red-600">{loadError || 'Không tìm thấy tài liệu'}</p>
+          <Button className="mt-4" onClick={() => { setLoading(true); void fetchSigningData(); }}>
+            Thử lại
+          </Button>
         </div>
       </div>
     );

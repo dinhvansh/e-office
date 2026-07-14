@@ -915,7 +915,8 @@ class ApprovalsService {
 
     // Build where clause - simplified to avoid nested complexity
     const where: Prisma.document_approvalsWhereInput = {
-      approver_user_id: userId
+      approver_user_id: userId,
+      document: { tenant_id: tenantId },
     };
 
     // Filter by status
@@ -941,9 +942,6 @@ class ApprovalsService {
         approver: { select: { id: true, email: true, full_name: true } }
       }
     });
-
-    // Filter by tenant
-    allApprovals = allApprovals.filter(a => a.document.tenant_id === tenantId);
 
     // Filter by document type
     if (options?.documentTypeId) {
@@ -995,18 +993,16 @@ class ApprovalsService {
 
     // Calculate statistics from filtered approvals
     const allApprovalsForUser = await prisma.document_approvals.findMany({
-      where: { approver_user_id: userId },
-      include: { document: { select: { tenant_id: true } } }
+      where: { approver_user_id: userId, document: { tenant_id: tenantId } },
+      select: { action: true },
     });
     
-    const tenantApprovals = allApprovalsForUser.filter(a => a.document.tenant_id === tenantId);
-    
     const statistics = {
-      total: tenantApprovals.length,
-      pending: tenantApprovals.filter(a => a.action === 'pending').length,
-      approved: tenantApprovals.filter(a => a.action === 'approved').length,
-      rejected: tenantApprovals.filter(a => a.action === 'rejected').length,
-      info_requested: tenantApprovals.filter(a => a.action === 'info_requested').length
+      total: allApprovalsForUser.length,
+      pending: allApprovalsForUser.filter(a => a.action === 'pending').length,
+      approved: allApprovalsForUser.filter(a => a.action === 'approved').length,
+      rejected: allApprovalsForUser.filter(a => a.action === 'rejected').length,
+      info_requested: allApprovalsForUser.filter(a => a.action === 'info_requested').length
     };
 
     return {
@@ -1093,7 +1089,7 @@ class ApprovalsService {
     // Get approvals if taskType is 'approval' or undefined (all)
     if (!options?.taskType || options.taskType === 'approval') {
       const approvals = await prisma.document_approvals.findMany({
-        where: { approver_user_id: userId },
+        where: { approver_user_id: userId, document: { tenant_id: tenantId } },
         include: {
           document: {
             include: {
@@ -1105,11 +1101,8 @@ class ApprovalsService {
         }
       });
 
-      // Filter by tenant
-      const tenantApprovals = approvals.filter(a => a.document.tenant_id === tenantId);
-
       // Map to unified task format
-      tenantApprovals.forEach(approval => {
+      approvals.forEach(approval => {
         allTasks.push({
           task_type: 'approval',
           task_id: approval.id,
@@ -1132,6 +1125,7 @@ class ApprovalsService {
       // ✅ Only get signers that are ready to sign (pending, otp_sent)
       // ❌ Exclude waiting_signing (waiting for their turn)
       const signRequests = await prisma.sign_requests.findMany({
+        where: { tenant_id: tenantId },
         include: {
           signers: {
             where: {
@@ -1156,7 +1150,7 @@ class ApprovalsService {
 
       // Filter by tenant and map to tasks
       signRequests.forEach((signRequest) => {
-        if (signRequest.document.tenant_id === tenantId && signRequest.signers.length > 0) {
+        if (signRequest.signers.length > 0) {
           signRequest.signers.forEach((signer) => {
             allTasks.push({
               task_type: 'signing',

@@ -87,8 +87,10 @@ export function PDFCanvasViewer({
       canvasCursor={selectedSignerId ? 'crosshair' : 'default'}
       onCanvasClick={({ event, pageNumber, pageWidth, pageHeight }) => {
         if (!selectedSignerId) return;
+        if (pageWidth <= 0 || pageHeight <= 0) return;
 
         const pageRect = event.currentTarget.getBoundingClientRect();
+        if (pageRect.width <= 0 || pageRect.height <= 0) return;
         const pointerLeft = event.clientX - pageRect.left;
         const pointerTop = event.clientY - pageRect.top;
         const defaultSize = DEFAULT_FIELD_SIZE_PX[selectedFieldType];
@@ -100,8 +102,8 @@ export function PDFCanvasViewer({
             width: defaultSize.width,
             height: defaultSize.height,
           },
-          pageWidth,
-          pageHeight
+          pageRect.width,
+          pageRect.height
         );
 
         const signer = signers.find((item) => item.id === selectedSignerId);

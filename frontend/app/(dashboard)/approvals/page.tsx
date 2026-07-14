@@ -93,7 +93,7 @@ export default function ApprovalsPage() {
   const [creatorSearch, setCreatorSearch] = useState('');
 
   // Fetch approvals
-  const { data, isLoading, refetch } = useQuery<ApiResponse>({
+  const { data, isLoading, isError, error, refetch } = useQuery<ApiResponse>({
     queryKey: ['approvals', page, limit, search, status, documentTypeId, sortBy, sortOrder, creatorSearch],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -320,6 +320,12 @@ export default function ApprovalsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        ) : isError ? (
+          <div className="p-12 text-center">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Không thể tải yêu cầu phê duyệt</h3>
+            <p className="text-gray-500 mb-4">{error instanceof Error ? error.message : 'Vui lòng thử lại.'}</p>
+            <Button onClick={() => void refetch()}>Thử lại</Button>
           </div>
         ) : approvals.length === 0 ? (
           <div className="p-12 text-center">

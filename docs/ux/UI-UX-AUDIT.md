@@ -11,6 +11,12 @@ Scope: initial source review plus Playwright runtime review; no production code 
 
 ## Overall assessment
 
+## Critical blocker remediation — 2026-07-14
+
+- **UX-013 — Fixed and browser verified:** the verified OTP session is now included in the public-sign contract, the client refreshes verified metadata before opening the signing surface, and absent document/request data renders a Vietnamese retry state rather than a runtime overlay. Playwright covered valid, missing-data, invalid and expired OTP responses; see `evidence/external-otp-after-fix.png`.
+- **Approval list / My Tasks — Fixed and browser verified:** pending approvals are filtered by both assigned approver and document tenant; the combined task query scopes signing requests by tenant. React Query failures now produce an inline retry state instead of an indefinite loading message. See `evidence/approvals-after-fix.png` and `evidence/my-tasks-after-fix.png`.
+- **UX-014 — Fixed and browser verified:** PDF field insertion now uses the rendered canvas rectangle, so display zoom and responsive sizing cannot collapse non-edge click coordinates to `0,0`. Editor reload and signer rendering consume the same normalized values. Desktop and 375 px captures: `evidence/sign-request-editor-mobile-after-fix.png` and `evidence/sign-editor-mobile-restart.png`.
+
 Runtime supplement: An isolated approver could authenticate, but its locally
 seeded pending approval did not appear in `Phê duyệt của tôi` (all counters
 remained zero), and `Công việc của tôi` remained at `Đang tải...`; therefore

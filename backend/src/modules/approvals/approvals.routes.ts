@@ -18,14 +18,12 @@ router.get(
 // Get my pending approvals (MUST be before /:id)
 router.get(
   '/my-pending',
-  requirePermission('approvals', 'read'),
   asyncHandler(approvalsController.getMyPending)
 );
 
 // Get my combined tasks (approvals + signing) (MUST be before /:id)
 router.get(
   '/my-tasks',
-  requirePermission('approvals', 'read'),
   asyncHandler(approvalsController.getMyCombinedTasks)
 );
 

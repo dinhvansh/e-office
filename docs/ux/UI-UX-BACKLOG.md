@@ -128,6 +128,8 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 
 ### UX-013 — Prevent the verified external signer from hitting a runtime crash
 
+- **Status: Fixed (browser verified 2026-07-14).** Valid, missing-data, invalid and expired OTP paths were replayed in Playwright. Evidence: `evidence/external-otp-after-fix.png`.
+
 - **Screen/flow:** External `/sign/[token]` after successful OTP verification.
 - **Problem:** A valid OTP for the isolated signer produced an “Unhandled Runtime Error” instead of the signing screen: `TypeError: Cannot read properties of undefined (reading 'title')`.
 - **Severity:** Critical.
@@ -137,6 +139,8 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - **Acceptance criteria:** Valid OTP reaches the PDF signing surface; missing document data displays a localized recovery state; no client exception, source excerpt, or stack information is rendered; success, expired and invalid OTP cases have browser coverage.
 
 ### UX-014 — Preserve the field location selected on the PDF
+
+- **Status: Fixed (browser verified 2026-07-14).** Three non-edge locations persist as normalized coordinates; editor reload and signer rendering agree at desktop and 375 px. Evidence: `evidence/sign-request-editor-mobile-after-fix.png`, `evidence/sign-editor-mobile-restart.png`.
 
 - **Screen/flow:** Sign-request editor `/sign-requests/79/editor`.
 - **Problem:** A signature field was placed by clicking inside the PDF and initially showed fractional coordinates near the click. After save, the editor listed the same field at `x 0.000 • y 0.000`, causing it to appear at the top-left rather than the chosen location.
