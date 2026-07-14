@@ -126,6 +126,56 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - **Recommended fix:** Map pending/inactive account codes to localized, user-safe messages with clear next actions. If the tenant has no administrator who can act, provide an appropriate support/contact route without exposing account details.
 - **Acceptance criteria:** A pending account receives Vietnamese (or selected locale) copy that says approval is pending; message identifies the next action and support route; disabled/rejected/unknown accounts remain safely distinguishable without account enumeration.
 
+### UX-013 — Prevent the verified external signer from hitting a runtime crash
+
+- **Screen/flow:** External `/sign/[token]` after successful OTP verification.
+- **Problem:** A valid OTP for the isolated signer produced an “Unhandled Runtime Error” instead of the signing screen: `TypeError: Cannot read properties of undefined (reading 'title')`.
+- **Severity:** Critical.
+- **Affected role:** External signer.
+- **Evidence:** E2 Playwright with an active local sign request and valid audit OTP; see `docs/ux/evidence/external-otp-verified.png`.
+- **Recommended fix:** Make the token/signing API response and view contract consistent; render a safe recoverable error if required document data is absent, never a framework error overlay.
+- **Acceptance criteria:** Valid OTP reaches the PDF signing surface; missing document data displays a localized recovery state; no client exception, source excerpt, or stack information is rendered; success, expired and invalid OTP cases have browser coverage.
+
+### UX-014 — Preserve the field location selected on the PDF
+
+- **Screen/flow:** Sign-request editor `/sign-requests/79/editor`.
+- **Problem:** A signature field was placed by clicking inside the PDF and initially showed fractional coordinates near the click. After save, the editor listed the same field at `x 0.000 • y 0.000`, causing it to appear at the top-left rather than the chosen location.
+- **Severity:** High.
+- **Affected role:** Requester/editor and external signer.
+- **Evidence:** E2 Playwright create → editor path; `docs/ux/evidence/sign-request-editor-saved-coordinate.png` and saved-editor browser snapshot.
+- **Recommended fix:** Trace the UI-to-API coordinate transform and persistence contract; persist normalized coordinates exactly and validate both dimensions are non-zero when a non-edge click is made.
+- **Acceptance criteria:** A field placed at three distinct PDF locations remains at each location after save/reload; coordinates remain correct across zoom and 375 px/desktop viewports; editor and signer preview agree.
+
+### UX-015 — Make super-admin navigation consistent across desktop and mobile
+
+- **Screen/flow:** Super-admin dashboard at desktop and 375 px.
+- **Problem:** The authenticated `super_admin` can directly open `/users`, `/roles`, `/document-types`, and `/settings/system`, but desktop sidebar only shows three Workspace links. Mobile shows a different fixed set. This hides needed destinations and makes role navigation unpredictable.
+- **Severity:** High.
+- **Affected role:** Administrator/super-admin, mobile administrator.
+- **Evidence:** E2 `auth-dashboard.png` and `dashboard-mobile-super-admin.png`; direct Playwright navigation to the admin routes succeeded.
+- **Recommended fix:** Build desktop and mobile navigation from the same permission-aware model, with a mobile overflow for less-frequent admin destinations.
+- **Acceptance criteria:** Super-admin sees every permitted admin destination through both navigation modes; restricted roles do not see unauthorized destinations; desktop/mobile destination sets are intentionally documented and tested.
+
+### UX-016 — Keep approval workflow preview in one consistent Vietnamese locale
+
+- **Screen/flow:** Create sign request with an approval-required document type.
+- **Problem:** The workflow preview rendered `Quy trinh phe duyet`, `1 buoc 1`, and `Nguoi dung 3 ngay` while surrounding product copy uses accented Vietnamese. This makes a key confirmation step look unfinished and harder to scan.
+- **Severity:** Medium.
+- **Affected role:** Requester/administrator.
+- **Evidence:** E2 Playwright local audit workflow preview; see `docs/ux/evidence/approval-request-create.png`.
+- **Recommended fix:** Move preview labels into the same locale resource/translation path as the rest of the request flow and add a Vietnamese snapshot or UI test.
+- **Acceptance criteria:** Approval preview labels are grammatically correct Vietnamese with diacritics; English is used only when the selected locale is English; preview remains readable at 375 px and desktop.
+
+### UX-018 — Give external OTP resend a usable failure and recovery state
+
+- **Screen/flow:** External `/sign/[token]`, “Gửi lại OTP”.
+- **Problem:** Resending OTP failed and showed only `🔧 Lỗi hệ thống. Vui lòng thử lại sau.` The flow does not tell the signer whether the request expired, email delivery is unavailable, or what safe next action to take.
+- **Severity:** High.
+- **Affected role:** External signer.
+- **Evidence:** E2 Playwright isolated external signer; `docs/ux/evidence/external-otp-resent.png`.
+- **Recommended fix:** Return a stable safe error code and present localized retry/support guidance; pair this with SMTP/delivery readiness monitoring and a resend cooldown/expiry display.
+- **Acceptance criteria:** A delivery failure names a safe next action without infrastructure detail; resend state has cooldown and expiry information; valid resend delivers/records an OTP; failure and retry behavior is browser-tested.
+
 ## Implementation classification
 
 | Frontend-only | Requires/benefits from backend/API |

@@ -6,35 +6,46 @@ Scope: initial source review plus Playwright runtime review; no production code 
 ## Evidence and confidence
 
 - **E1 — source review:** application routes, navigation, signing, and shared UI components were mapped in the initial review.
-- **E2 — Playwright runtime:** Chromium ran the configured local application at `http://localhost:3000`; public authentication routes, pending-account login, invalid external-sign link, keyboard order, mobile registration, and unauthenticated redirects for `/`, `/documents`, `/sign-requests/create`, `/approvals`, `/my-tasks`, and `/settings/system` were exercised. Screenshots: [`login-desktop.png`](evidence/login-desktop.png), [`login-pending-account.png`](evidence/login-pending-account.png), [`register-mobile-375.png`](evidence/register-mobile-375.png), [`external-sign-invalid-token.png`](evidence/external-sign-invalid-token.png), and [`protected-settings-system.png`](evidence/protected-settings-system.png).
-- **E3 — authenticated-flow limitation:** a fresh workspace registration correctly remains pending administrator approval. No approved requester, approver, internal signer, external signer, or administrator test account was available, so those flows remain source-informed and need a role-based browser replay.
+- **E2 — Playwright runtime:** Chromium ran the configured local application at `http://localhost:3000`; public authentication routes, pending-account login, invalid external-sign link, keyboard order, mobile registration, unauthenticated redirects, super-admin dashboard/admin surfaces, sign-request creation/editor, an external OTP resend failure, and an OTP-success crash were exercised. Key screenshots: [`dashboard-super-admin.png`](evidence/auth-dashboard.png), [`sign-request-create-configured.png`](evidence/auth-sign-requests-create.png), [`sign-request-editor-saved-coordinate.png`](evidence/sign-request-editor-saved-coordinate.png), [`external-otp-verified.png`](evidence/external-otp-verified.png), and [`dashboard-mobile-super-admin.png`](evidence/dashboard-mobile-super-admin.png).
+- **E3 — remaining limitation:** requester, approver and internal-signer role variants remain untested. The super-admin and isolated external-signer paths were tested with database records created solely in the local audit tenant.
 
 ## Overall assessment
 
-**Overall UX score: 5.8 / 10 (medium confidence).** The public login, registration and reset-password screens render clear Vietnamese copy at desktop and 375 px, and registration has a distinct pending-approval success state. The product has a meaningful route surface, permission-filtered desktop navigation, reusable skeleton/empty-state primitives, and an explicit external signing flow. Signing/PDF interactions, role-aware mobile navigation, and authenticated workflow clarity still need a role-based browser replay before public beta.
+Runtime supplement: An isolated approver could authenticate, but its locally
+seeded pending approval did not appear in `Phê duyệt của tôi` (all counters
+remained zero), and `Công việc của tôi` remained at `Đang tải...`; therefore
+an approve/reject action could not be replayed. The approval-required request
+preview also rendered unaccented Vietnamese labels. This is evidence of an
+incomplete runtime path, not attributed to user error.
+
+Supporting approver captures: `approvals-pending-task.png` shows the empty
+approval counters for the isolated approver, and `approver-my-tasks.png` shows
+the persistent loading state.
+
+**Overall UX score: 4.9 / 10 (medium confidence).** Public authentication screens render clear Vietnamese copy at desktop and 375 px, and empty states are generally understandable. However, a valid external OTP causes a runtime crash before signing, API configuration gaps can blank a protected route, and the navigation/status model differs across desktop and mobile. These must be corrected before public beta.
 
 | Major flow | Score | Assessment |
 | --- | ---: | --- |
 | Login and first entry | 6.0 | Registration and reset-password surfaces render correctly, but a pending account receives raw English status copy with no recovery guidance when it attempts login. |
-| Dashboard and navigation | 5.5 | Permission-aware desktop sidebar and dashboard skeletons exist; mobile role behavior still needs an authenticated browser replay. |
-| Create sign request | 5.5 | Covers document, workflow and signer setup, but is a long, dense, one-page decision flow. |
+| Dashboard and navigation | 4.5 | Empty dashboard is understandable, but a super-admin sees only three desktop sidebar destinations while direct admin routes work; mobile shows a different fixed set. |
+| Create sign request | 5.0 | End-to-end creation and editor transition work, but configuration is dense and the UI does not direct an admin with no document types to the prerequisite screen. |
 | Approval workflow | 6.0 | Dedicated approval/task routes and status UI exist; action context needs validation in a browser. |
 | Internal signing | 4.5 | PDF signing fields rely on pointer/canvas interaction without an equivalent keyboard path. |
-| External signing with OTP | 4.5 | Invalid-token state is compact and readable; real OTP validation, retry and expiry need a test invitation. |
-| Document detail and tracking | 6.0 | Status badges and artifact retry exist; next action and timeline clarity need browser confirmation. |
+| External signing with OTP | 2.0 | Invalid-token state is readable, but resend gives a generic system error and a valid OTP crashes the page before signing. |
+| Document detail and tracking | 5.0 | Editor shows participant/field counts and request status, but saved field coordinates became `0,0` after a click elsewhere and mobile dashboard displays raw `pending_signature`. |
 | Notifications | 4.5 | Bell/dropdown, loading and empty state exist; a full notification-history route needs browser/API confirmation. |
 | Admin/settings | 5.5 | Broad configuration surface with permission-filtered desktop entry; destructive confirms are inconsistent. |
-| Mobile, responsive and accessibility | 5.0 | The public registration screen fits and remains legible at 375 px; signed-in navigation, dialogs and signing controls need remediation and browser validation. |
+| Mobile, responsive and accessibility | 4.5 | Public registration fits at 375 px, but authenticated mobile navigation omits admin destinations and dashboard exposes raw internal status values. |
 
 ## Flows and screens mapped
 
 | Flow | Routes/components inspected | Evidence |
 | --- | --- | --- |
 | Authentication | `/login`, `/forgot-password`, `/register` | E2: Playwright desktop/mobile snapshots; valid pending-registration success and invalid-credential failure |
-| Dashboard/navigation | `/`, dashboard layout, `sidebarItems.ts`, `mobile-nav.tsx` | E1 |
-| Documents and requests | `/documents`, `/sign-requests`, `/sign-requests/create`, `/sign-requests/[id]`, editor and sign routes | E1 |
-| Approval/work | `/approvals`, `/approvals/[id]`, `/my-tasks` | E1 |
-| Internal/external signing | internal/sign routes, `/sign/[token]`, `PDFSigningViewer.tsx` | E1; E2 invalid external token state |
+| Dashboard/navigation | `/`, `/documents`, `/sign-requests`, `/approvals`, `/my-tasks`, `/settings/system`, `/users`, `/roles` | E2 super-admin desktop/mobile plus E1 |
+| Documents and requests | `/documents`, `/sign-requests`, `/sign-requests/create`, `/sign-requests/79/editor` | E2 isolated audit request creation/editor plus E1 |
+| Approval/work | `/approvals`, `/approvals/[id]`, `/my-tasks` | E2 empty-state routes plus E1 |
+| Internal/external signing | internal/sign routes, `/sign/[token]`, `PDFSigningViewer.tsx` | E2 external invalid token, resend and OTP-success error; E1 internal |
 | Tracking/audit | request detail, `/documents/[id]/flow`, `/audit/[documentId]` | E1 |
 | Notifications | `NotificationBell`, `NotificationDropdown`, `NotificationItem` | E1 |
 | Administration | users, roles, departments, positions, types, workflows, webhooks, tenant/system/billing settings | E1 |
@@ -49,29 +60,33 @@ Scope: initial source review plus Playwright runtime review; no production code 
 - Public Vietnamese copy was verified visually on login and registration; the earlier source-encoding concern was not reproduced in the running application.
 - Registration clearly explains that a new workspace/account is pending administrator approval and retains the registered email/workspace in the confirmation.
 - With both required local API variables supplied, all six sampled unauthenticated protected routes redirected to `/login` after hydration.
+- An isolated request was created through the full upload → type → external signer → editor → send path; its editor correctly showed field and participant counts before submission.
 
 ## Top 10 UX problems
 
-1. **UX-001:** Registration’s Terms of Use and Privacy Policy links resolve to `#`, leaving a public user unable to read the agreement they must accept (High).
-2. **UX-002:** External OTP is a single free-text input with no numeric mobile keypad, paste/autofocus segmentation, resend timer, or remaining-attempt feedback (High).
-3. **UX-003:** Signing PDF field completion is pointer/canvas-centric and lacks keyboard semantics and accessible labels (High).
-4. **UX-004:** Mobile bottom navigation is fixed and not permission-filtered, unlike the desktop sidebar (High).
-5. **UX-005:** Creation of a sign request combines upload, classification, workflow selection/customization and signer setup in one dense flow (High).
-6. **UX-006:** Destructive actions use browser-native `confirm()` in many screens rather than a consistent, accessible application dialog (High).
-7. **UX-007:** Status tracking shows state but does not consistently identify the owner, required next action, or expected completion time (Medium).
-8. **UX-011:** Inconsistent required API environment-variable names can expose raw technical errors and render a settings route blank (High).
-9. **UX-012:** A pending user gets raw English “Account is not active” after an otherwise clear Vietnamese pending-approval registration flow (High).
-10. **UX-009:** Loading and error recovery patterns are inconsistent: some screens use skeletons; notifications use a spinner; many operations depend on transient toasts (Medium).
+1. **UX-013:** A valid external OTP produces an unhandled runtime error before signing (Critical).
+2. **UX-011:** Inconsistent required API environment-variable names can expose raw technical errors and render a settings route blank (High).
+3. **UX-012:** A pending user gets raw English “Account is not active” after an otherwise clear Vietnamese pending-approval registration flow (High).
+4. **UX-015:** Super-admin desktop and mobile navigation omit direct admin destinations despite those routes working (High).
+5. **UX-014:** A signature field placed on the PDF persisted at `x=0, y=0`, not at the selected location (High).
+6. **UX-018:** OTP resend fails with a generic system error and no actionable recovery guidance (High).
+7. **UX-001:** Registration’s Terms of Use and Privacy Policy links resolve to `#` (High).
+8. **UX-002:** External OTP is a single free-text input with no numeric mobile keypad, paste/autofocus segmentation, resend timer, or remaining-attempt feedback (High).
+9. **UX-005:** Creation of a sign request combines upload, classification, workflow selection/customization and signer setup in one dense flow (High).
+10. **UX-009:** Loading and error recovery patterns are inconsistent across list and mutation flows (Medium).
 
 ## Critical issues required before public beta
 
-No Critical issue was confirmed in the public Playwright run. The following High issues should be completed or browser-verified before public beta: UX-001, UX-002, UX-003, UX-004, UX-005, UX-006, UX-011 and UX-012.
+- **UX-013 — external OTP success must not crash.** A verified external signer cannot reach the signing surface, so this is release-blocking.
+
+The following High issues should be completed or browser-verified before public beta: UX-001, UX-002, UX-003, UX-005, UX-006, UX-011, UX-012, UX-014, UX-015 and UX-018.
 
 ## Suggested implementation order
 
-1. **P0 public onboarding, account-state and runtime failure handling:** UX-001, UX-012, UX-011, UX-002, UX-003.
-2. **P1 navigation and safety:** UX-004, UX-006, UX-008.
-3. **P1 completion clarity:** UX-005, UX-007, UX-009.
+1. **P0 external signing and runtime failure handling:** UX-013, UX-011, UX-014, UX-018.
+2. **P0 onboarding/account state:** UX-001, UX-012, UX-002.
+3. **P1 navigation and safety:** UX-015, UX-004, UX-006, UX-008.
+4. **P1 completion clarity:** UX-005, UX-007, UX-009.
 4. **P2 consistency polish:** UX-010 and responsive/table refinements after device-based replay.
 
 ## Backend/API dependencies
@@ -89,6 +104,11 @@ No Critical issue was confirmed in the public Playwright run. The following High
 | UX-009 recovery states | No for visual states | Retry metadata/errors may need stable API codes. |
 | UX-011 configuration failure handling | No business API change | Consolidate the public API base configuration and fail with a safe startup/deployment message. |
 | UX-012 pending-account recovery | Possibly | Prefer a stable user/account status code and an activation/support path returned by the auth API. |
+| UX-013 external OTP success crash | Yes | The sign-token response must include the document data expected by the signing view, or the view must handle its absence safely. |
+| UX-014 saved signature coordinate | Possibly | Verify API field-coordinate serialization and the PDF coordinate transform together. |
+| UX-015 role-aware navigation | No | Reuse current role/permission data consistently in desktop and mobile navigation. |
+| UX-016 approval-preview language consistency | No | Correct localized frontend copy and add locale rendering coverage. |
+| UX-018 OTP resend recovery | Yes | Return a safe, specific delivery/configuration status and make SMTP readiness observable. |
 
 ## Audit follow-up
 

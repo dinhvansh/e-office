@@ -1884,3 +1884,43 @@ Files added/updated: `docs/ux/UI-UX-AUDIT.md`, `docs/ux/UI-UX-BACKLOG.md`,
 Next recommended issue: UX-001 — replace placeholder registration legal links
 with published, versioned Terms and Privacy pages; then supply approved test
 accounts to complete authenticated browser coverage.
+
+## 2026-07-14 — Authenticated Playwright audit supplement
+
+Status: Local audit tenant was approved and used only for Playwright coverage.
+No production logic changed.
+
+Runtime evidence now covers super-admin dashboard/admin routes, document-type
+creation, upload/sign-request creation, PDF field placement, submission, and
+external OTP. The most severe findings are:
+
+- **UX-013 (Critical):** a valid external OTP crashes the client with an
+  unhandled error before the signing surface opens;
+- **UX-014 (High):** a saved signature field moved to normalized coordinate
+  `0,0` after a non-edge PDF click;
+- **UX-015 (High):** super-admin desktop/mobile navigation hides working admin
+  destinations;
+- **UX-018 (High):** OTP resend gives only a generic system error;
+- **UX-011 (High):** inconsistent API environment-variable requirements can
+  expose raw configuration errors or blank a protected route.
+
+The audit tenant contains only `ux.audit.*@example.invalid` accounts, a
+`UXAUD` document type, test PDF documents and test sign requests. It can be
+removed after audit follow-up if desired.
+
+Remaining coverage: requester and internal-signer role variants are not yet
+replayed. The approver login/list replay is recorded in the newer supplement.
+
+Next recommended issue: UX-013 — fix the external OTP success contract before
+any public-beta external signing test.
+## 2026-07-14 — Approver runtime replay supplement
+
+Status: Isolated local audit data was used; no production behavior changed.
+
+An isolated approver could authenticate. Its local pending approval was not
+shown in `Phê duyệt của tôi` (all counters were zero), and `Công việc của tôi`
+remained at `Đang tải...`; an approve/reject action could not be exercised.
+The approval-required request preview also rendered unaccented Vietnamese
+labels (UX-016, Medium). This is recorded as a runtime coverage limitation, not
+attributed to user error. Requester and internal-signer roles remain for
+isolated test-data replay.
