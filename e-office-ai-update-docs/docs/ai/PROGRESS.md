@@ -1865,8 +1865,12 @@ the P0 backlog.
 
 Runtime findings: registration requires agreement to Terms and Privacy links
 that both resolve to `#` (UX-001, High); a new workspace registration displays
-a clear pending-administrator-approval confirmation; with an omitted local API
-base environment variable, login exposed the raw variable name to the user.
+a clear pending-administrator-approval confirmation. The frontend expects both
+`NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_API_URL` in different runtime paths:
+when the first is absent, login exposed its raw variable name; when the second
+is absent, `/settings/system` failed hydration and rendered a blank page
+(UX-011, High). With both variables supplied, sampled unauthenticated protected
+routes redirected safely to login.
 
 Limitation: the freshly registered user correctly remains pending approval, so
 approved requester, approver, internal signer, external OTP signer, and

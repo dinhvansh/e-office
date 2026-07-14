@@ -106,15 +106,15 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - **Recommended fix:** Add meaningful accessible names, visible focus states, appropriate image alt text, responsive overflow tests, and a keyboard test matrix.
 - **Acceptance criteria:** All icon-only controls have accessible names; focus is visible at keyboard navigation; 375 px and 768 px screenshots have no obscured primary action; PDF fields have meaningful labels.
 
-### UX-011 — Do not expose local configuration variable names in login errors
+### UX-011 — Make missing frontend API configuration safe and consistent
 
 - **Screen/flow:** `/login` when the frontend API base URL is not configured.
-- **Problem:** A failed sign-in displayed `NEXT_PUBLIC_API_BASE_URL environment variable is required` below the generic failure heading. This is technical deployment detail, not an actionable user message.
-- **Severity:** Medium.
-- **Affected role:** First-time user, support staff.
-- **Evidence:** E2 Playwright invalid-credential submission against the unconfigured local frontend. Re-running the frontend with its local API base configured correctly showed the safe message “Email hoặc mật khẩu không đúng”.
-- **Recommended fix:** Validate required public runtime configuration at startup/deployment and show a generic service-unavailable message with a support/retry path if configuration is absent; log diagnostic detail only server-side/developer-side.
-- **Acceptance criteria:** No public page exposes environment variable names, stack traces or internal endpoint details; a missing configuration condition is observable in deployment health checks; the UI gives a non-sensitive retry/support action.
+- **Problem:** An unconfigured login displayed `NEXT_PUBLIC_API_BASE_URL environment variable is required`. A direct visit to `/settings/system` then failed hydration with `NEXT_PUBLIC_API_URL environment variable is required` and rendered a blank page. The inconsistent public variable names make a deployment/configuration mistake visible to users as technical detail or an empty screen.
+- **Severity:** High.
+- **Affected role:** First-time user, support staff, administrator.
+- **Evidence:** E2 Playwright invalid-credential submission against the unconfigured local frontend; `protected-settings-system.png` captures the blank route. Re-running with both variables configured redirected the unauthenticated settings route safely to `/login`.
+- **Recommended fix:** Consolidate on one documented public API base variable, validate it in startup/deployment checks, and render a safe service-unavailable screen with a support/retry path if configuration is absent; retain diagnostic detail only in developer/server logs.
+- **Acceptance criteria:** No public page exposes environment variable names, stack traces or internal endpoint details; one documented variable configures all frontend API clients; missing configuration is caught by deployment health checks; protected routes never render blank because of configuration absence.
 
 ## Implementation classification
 

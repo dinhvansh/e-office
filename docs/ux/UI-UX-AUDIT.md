@@ -6,7 +6,7 @@ Scope: initial source review plus Playwright runtime review; no production code 
 ## Evidence and confidence
 
 - **E1 — source review:** application routes, navigation, signing, and shared UI components were mapped in the initial review.
-- **E2 — Playwright runtime:** Chromium ran the configured local application at `http://localhost:3000`; public authentication routes and invalid external-sign link were exercised. Screenshots: [`login-desktop.png`](evidence/login-desktop.png), [`register-mobile-375.png`](evidence/register-mobile-375.png), and [`external-sign-invalid-token.png`](evidence/external-sign-invalid-token.png).
+- **E2 — Playwright runtime:** Chromium ran the configured local application at `http://localhost:3000`; public authentication routes, invalid external-sign link, keyboard order, mobile registration, and unauthenticated redirects for `/`, `/documents`, `/sign-requests/create`, `/approvals`, `/my-tasks`, and `/settings/system` were exercised. Screenshots: [`login-desktop.png`](evidence/login-desktop.png), [`register-mobile-375.png`](evidence/register-mobile-375.png), [`external-sign-invalid-token.png`](evidence/external-sign-invalid-token.png), and [`protected-settings-system.png`](evidence/protected-settings-system.png).
 - **E3 — authenticated-flow limitation:** a fresh workspace registration correctly remains pending administrator approval. No approved requester, approver, internal signer, external signer, or administrator test account was available, so those flows remain source-informed and need a role-based browser replay.
 
 ## Overall assessment
@@ -48,6 +48,7 @@ Scope: initial source review plus Playwright runtime review; no production code 
 - The shared Radix dialog foundation provides a focus-ring treatment for its close control.
 - Public Vietnamese copy was verified visually on login and registration; the earlier source-encoding concern was not reproduced in the running application.
 - Registration clearly explains that a new workspace/account is pending administrator approval and retains the registered email/workspace in the confirmation.
+- With both required local API variables supplied, all six sampled unauthenticated protected routes redirected to `/login` after hydration.
 
 ## Top 10 UX problems
 
@@ -61,14 +62,15 @@ Scope: initial source review plus Playwright runtime review; no production code 
 8. **UX-008:** Notification history needs route/API confirmation; the dropdown’s “View all” destination was not verified in an authenticated browser session (Medium).
 9. **UX-009:** Loading and error recovery patterns are inconsistent: some screens use skeletons; notifications use a spinner; many operations depend on transient toasts (Medium).
 10. **UX-010:** Several interactive icon controls and signing inputs do not expose accessible names/instructions; image usage also lacks a consistent optimized/accessible strategy (Medium).
+11. **UX-011:** Inconsistent required API environment-variable names can expose raw technical errors and render a settings route blank (High).
 
 ## Critical issues required before public beta
 
-No Critical issue was confirmed in the public Playwright run. The following High issues should be completed or browser-verified before public beta: UX-001, UX-002, UX-003, UX-004, UX-005 and UX-006.
+No Critical issue was confirmed in the public Playwright run. The following High issues should be completed or browser-verified before public beta: UX-001, UX-002, UX-003, UX-004, UX-005, UX-006 and UX-011.
 
 ## Suggested implementation order
 
-1. **P0 public onboarding and signing accessibility:** UX-001, UX-002, UX-003.
+1. **P0 public onboarding, runtime failure handling and signing accessibility:** UX-001, UX-011, UX-002, UX-003.
 2. **P1 navigation and safety:** UX-004, UX-006, UX-008.
 3. **P1 completion clarity:** UX-005, UX-007, UX-009.
 4. **P2 consistency polish:** UX-010 and responsive/table refinements after device-based replay.
@@ -86,6 +88,7 @@ No Critical issue was confirmed in the public Playwright run. The following High
 | UX-007 next-action/status | Likely | Reliable `next_action`, actor and SLA/expiry information should be returned by the detail API. |
 | UX-008 notification route | Possibly | A dedicated page needs pagination/history API if not already available. |
 | UX-009 recovery states | No for visual states | Retry metadata/errors may need stable API codes. |
+| UX-011 configuration failure handling | No business API change | Consolidate the public API base configuration and fail with a safe startup/deployment message. |
 
 ## Audit follow-up
 
