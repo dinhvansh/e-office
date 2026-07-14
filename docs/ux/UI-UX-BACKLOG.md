@@ -180,6 +180,13 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - **Recommended fix:** Return a stable safe error code and present localized retry/support guidance; pair this with SMTP/delivery readiness monitoring and a resend cooldown/expiry display.
 - **Acceptance criteria:** A delivery failure names a safe next action without infrastructure detail; resend state has cooldown and expiry information; valid resend delivers/records an OTP; failure and retry behavior is browser-tested.
 
+## UX-004 / UX-015 verification (Fixed — browser verified 2026-07-14)
+
+- Desktop sidebar and mobile navigation now receive the same permission-filtered group model.
+- `super_admin` receives every configured administration destination; requester, approver and signer sessions do not receive unauthorized entries.
+- Mobile exposes permitted overflow links through the keyboard-accessible “Thêm” menu. Chromium replay passed at desktop, 768 px and 375 px; an unauthenticated `/users` deep link still redirects to `/login`.
+- Evidence: `evidence/ux015-super-admin-desktop-after-fix.png`, `evidence/ux015-super-admin-tablet-after-fix.png`, `evidence/ux015-super-admin-mobile-overflow-after-fix.png`.
+
 ## Implementation classification
 
 | Frontend-only | Requires/benefits from backend/API |

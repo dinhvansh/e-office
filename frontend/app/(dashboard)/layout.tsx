@@ -72,6 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Toggle Button - Desktop only */}
           <button 
             onClick={() => setIsCollapsed(!isCollapsed)}
+            aria-label={isCollapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"}
             className="hidden md:block absolute -right-3 top-6 bg-white border border-slate-200 rounded-full p-1.5 shadow-md hover:shadow-lg hover:bg-slate-50 text-slate-600 transition-all duration-200 z-50"
             title={isCollapsed ? "Mở rộng" : "Thu gọn"}
           >
@@ -81,6 +82,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Close Button - Mobile only */}
           <button 
             onClick={() => setIsMobileMenuOpen(false)}
+            aria-label="Đóng menu điều hướng"
             className="md:hidden absolute right-4 top-4 p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
             <X className="w-5 h-5 text-slate-600" />
@@ -181,6 +183,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Mobile Hamburger Menu */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
+              aria-label="Mở menu điều hướng"
               className="md:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <Menu className="w-5 h-5 text-slate-600" />
@@ -245,7 +248,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <MobileBottomNav />
+      <MobileBottomNav groups={filteredSidebar} />
     </div>
   );
 }

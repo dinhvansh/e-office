@@ -13,3 +13,7 @@ Verification evidence is stored in `docs/ux/evidence/`.
 - **UX-002 / UX-018 fixed:** OTP input supports numeric keyboards, browser one-time-code autofill and sanitized six-digit paste. Resend now shows an expiry countdown, cooldown, accessible live feedback and localized recovery for delivery, expiry and attempts errors.
 - **UX-011 fixed and browser verified:** the frontend uses one public API base setting and a localized configuration guard prevents blank routes or exposed configuration names. An isolated Playwright server with all API URL variables removed verified `/login` and `/settings/system` at desktop and 375 px.
 - **UX-012 fixed:** login maps account and workspace activation codes to localized, non-enumerating recovery guidance.
+
+## Role-aware navigation — 2026-07-14
+
+- **UX-004 / UX-015 fixed and browser verified:** desktop sidebar and mobile navigation use the same permission-filtered groups. `super_admin` sees all configured admin destinations, restricted requester/approver/signer sessions do not see unauthorized entries, and mobile exposes permitted overflow through a keyboard-accessible “Thêm” menu. Chromium passed at desktop, 768 px and 375 px; unauthenticated `/users` still redirects to `/login`.

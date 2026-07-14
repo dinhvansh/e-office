@@ -19,10 +19,15 @@ export function hasRequiredRole(userRole: string | null | undefined, requiredRol
 }
 
 export function hasRequiredPermissions(
+  userRole: string | null | undefined,
   userPermissions: string[] | null | undefined,
   requiredPermissions?: string[],
 ): boolean {
   if (!requiredPermissions || requiredPermissions.length === 0) {
+    return true;
+  }
+
+  if (userRole?.toLowerCase() === 'super_admin') {
     return true;
   }
 
@@ -47,7 +52,7 @@ export function filterSidebarByPermissions(
       items: group.items.filter(
         (item) =>
           hasRequiredRole(userRole, item.requiredRoles) &&
-          hasRequiredPermissions(userPermissions, item.requiredPermissions),
+          hasRequiredPermissions(userRole, userPermissions, item.requiredPermissions),
       ),
     }))
     .filter((group) => group.items.length > 0); // Remove empty groups
