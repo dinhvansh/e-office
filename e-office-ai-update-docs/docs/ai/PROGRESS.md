@@ -1,5 +1,56 @@
 # Verification Progress
 
+## 2026-07-14 — P1-PERF-016 document permission pagination and N+1 queries
+
+Status: Completed and validated. Document authorization now runs against the
+complete tenant-scoped, filtered candidate set before pagination is applied.
+The response total and page count therefore describe only records the caller
+may view.
+
+Files changed:
+
+- `backend/src/modules/documents/documents.service.ts`
+- `backend/src/modules/documents/documentQueries.service.ts`
+- `backend/src/modules/documents/documentAccessPagination.ts`
+- `backend/tests/documentAccessPagination.policy.test.ts`
+- `backend/tests/documentQueries.pagination.test.ts`
+- `e-office-ai-update-docs/docs/ai/PROGRESS.md`
+
+Query strategy: the previous paginated path fetched one database page and its
+unfiltered count, then called the authorization service once for every item on
+that page. The new path loads the tenant-scoped candidates once and uses the
+existing batch resolver for user, document-type-policy, approval, signer, CC,
+and ACL data. Explicit denies are still evaluated by the same resolver after
+allows, and owner/workflow/ACL rules remain unchanged.
+
+Query-count measurement: the old path grows linearly with the number of
+documents evaluated because every document invokes the full authorization
+resolver. The new paginated path has three query-service boundaries (module
+permission, candidate query, batch resolve) for 10, 50, and 100 candidates.
+The batch resolver performs a fixed user lookup plus up to five batched
+lookups, so its database-query shape is bounded rather than per-document.
+
+Tests added: mixed visibility with owner/workflow/ACL allow and explicit deny;
+post-filter totals and page sizes; tenant predicate enforcement; non-paginated
+batch authorization; and bounded 10/50/100-candidate query-service calls.
+
+Commands run:
+
+- `cd backend && npm test` — passed, 75/75.
+- `cd backend && npm run lint` — passed.
+- `cd backend && npm run build` — passed.
+- `cd frontend && npm run build`, `npm run typecheck`, and `npm run lint` —
+  passed; existing warnings only.
+- Isolated Docker PostgreSQL E2E — passed after `prisma migrate deploy` and
+  idempotent fixtures: package creation, approval, duplicate-operation
+  protection, signing, artifact download, audit events, and refresh rotation.
+
+Known limitations: without a materialized access index this implementation
+loads all tenant-scoped filtered candidates before applying access predicates.
+It fixes correctness and removes N+1 queries, but very large tenants should be
+profiled before adding a future `document_access_index` or SQL-level access
+scope.
+
 ## 2026-07-14 — P1-PDF-015 Vietnamese Unicode PDF rendering
 
 Status: Completed and validated. Audit-page transliteration was removed and the

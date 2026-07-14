@@ -11,6 +11,7 @@ import { numberingService } from "../numbering/numbering.service";
 import { prisma } from "../../config/prisma";
 import { CreateDocumentData, documentsRepository } from "./documents.repository";
 import { authorizationService } from "../authorization/authorization.service";
+import { documentQueriesService } from "./documentQueries.service";
 import { canCancelDocumentStatus, canHardDeleteDocumentStatus } from "./documentLifecycle.policy";
 import { workflowStateService } from "../workflows/workflowState.service";
 import { documentWorkflowOrchestratorService } from "./documentWorkflowOrchestrator.service";
@@ -205,28 +206,7 @@ class DocumentsService {
   }
 
   async listDocuments(tenantId: number, userId?: number, noSigningOnly = false): Promise<documents[]> {
-    const documents = await documentsRepository.listByTenant(tenantId, noSigningOnly);
-    
-    // If no userId provided (admin context), return all documents
-    if (!userId) {
-      return documents;
-    }
-    
-    // Get user for permission check
-    const user = await prisma.users.findUnique({
-      where: { id: userId },
-    });
-    
-    if (!user || user.tenant_id !== tenantId) {
-      throw ApiError.notFound("User not found", "USER_NOT_FOUND");
-    }
-    
-    const visible: documents[] = [];
-    for (const doc of documents) {
-      const decision = await authorizationService.canAccessDocument(userId, tenantId, doc.id, "read");
-      if (decision.allowed) visible.push(doc);
-    }
-    return visible;
+    return documentQueriesService.listDocuments(tenantId, userId, noSigningOnly);
   }
 
   async listDocumentsPaginated(
@@ -240,68 +220,11 @@ class DocumentsService {
     documentTypeId?: number,
     confidentialLevel?: string
   ) {
-    const result = await documentsRepository.listByTenantPaginated(
-      tenantId, 
-      { page, limit }, 
-      noSigningOnly, 
-      status, 
-      search,
-      documentTypeId,
-      confidentialLevel
-    );
-    
-    // If no userId provided (admin context), return all documents
-    if (!userId) {
-      return result;
-    }
-    
-    // Get user for permission check
-    const user = await prisma.users.findUnique({
-      where: { id: userId },
-    });
-    
-    if (!user || user.tenant_id !== tenantId) {
-      throw ApiError.notFound("User not found", "USER_NOT_FOUND");
-    }
-    
-    const filteredData: documents[] = [];
-    for (const doc of result.data) {
-      const decision = await authorizationService.canAccessDocument(userId, tenantId, doc.id, "read");
-      if (decision.allowed) filteredData.push(doc);
-    }
-    
-    return {
-      data: filteredData,
-      pagination: result.pagination,
-    };
+    return documentQueriesService.listDocumentsPaginated(tenantId, userId, page, limit, noSigningOnly, status, search, documentTypeId, confidentialLevel);
   }
 
   async getDocument(documentId: number, tenantId: number, userId?: number): Promise<documents> {
-    const document = await documentsRepository.findById(documentId, tenantId);
-    if (!document) {
-      throw ApiError.notFound("Document not found", "DOCUMENT_NOT_FOUND");
-    }
-    
-    // If no userId provided (admin context), return document
-    if (!userId) {
-      return document;
-    }
-    
-    // Get user for permission check
-    const user = await prisma.users.findUnique({
-      where: { id: userId },
-    });
-    
-    if (!user || user.tenant_id !== tenantId) {
-      throw ApiError.notFound("User not found", "USER_NOT_FOUND");
-    }
-    
-    const decision = await authorizationService.canAccessDocument(userId, tenantId, documentId, "read");
-    if (!decision.allowed) {
-      throw ApiError.forbidden("You do not have access to this document", "DOCUMENT_ACCESS_DENIED");
-    }
-    
-    return await documentsRepository.findById(document.id, tenantId) || document;
+    return documentQueriesService.getDocument(documentId, tenantId, userId);
   }
 
   async listAttachments(documentId: number, tenantId: number, userId: number) {
