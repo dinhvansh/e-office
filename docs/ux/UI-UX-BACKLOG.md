@@ -200,3 +200,4 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - **UX-002 / UX-018:** numeric/autofill/paste OTP input, expiry and resend cooldown feedback, plus stable localized recovery codes.
 - **UX-011:** missing API configuration renders a safe localized service-unavailable screen.
 - **UX-012:** inactive-account codes map to localized approval/support guidance without revealing account state to unknown users.
+- **UX-011:** isolated Chromium verification starts a dedicated server with every API URL variable removed and a dedicated `.next-ux011` directory; `/login` and `/settings/system` render the safe guard at desktop and 375 px.

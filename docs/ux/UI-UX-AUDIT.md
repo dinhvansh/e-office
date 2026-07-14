@@ -13,7 +13,7 @@ Scope: initial source review plus Playwright runtime review; no production code 
 
 ## Critical blocker remediation — 2026-07-14
 
-- **UX-002, UX-011, UX-012 and UX-018 — Fixed and browser verified:** OTP now supports numeric/autofill/paste input, expiry and resend cooldown feedback, and safe localized recovery states. Missing API configuration renders a service-unavailable screen, while inactive account codes receive localized activation guidance.
+- **UX-002, UX-011, UX-012 and UX-018 — Fixed and browser verified:** OTP now supports numeric/autofill/paste input, expiry and resend cooldown feedback, and safe localized recovery states. Missing API configuration renders a service-unavailable screen for `/login` and protected routes in an isolated Playwright server, while inactive account codes receive localized activation guidance. See `evidence/ux011-login-desktop-after-fix.png` and `evidence/ux011-protected-desktop-after-fix.png`.
 
 - **UX-013 — Fixed and browser verified:** the verified OTP session is now included in the public-sign contract, the client refreshes verified metadata before opening the signing surface, and absent document/request data renders a Vietnamese retry state rather than a runtime overlay. Playwright covered valid, missing-data, invalid and expired OTP responses; see `evidence/external-otp-after-fix.png`.
 - **Approval list / My Tasks — Fixed and browser verified:** pending approvals are filtered by both assigned approver and document tenant; the combined task query scopes signing requests by tenant. React Query failures now produce an inline retry state instead of an indefinite loading message. See `evidence/approvals-after-fix.png` and `evidence/my-tasks-after-fix.png`.

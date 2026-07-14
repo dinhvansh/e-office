@@ -15,9 +15,11 @@ export function getApiBaseUrl(): string {
     return value || '';
   }
   
-  // In browser, validate and throw error if not set
+  // A route-level configuration guard owns the user-facing unavailable state.
+  // Returning an empty base here prevents eager API-client imports from crashing
+  // before that guard can render.
   if (!value) {
-    throw new Error('Dịch vụ hiện chưa sẵn sàng. Vui lòng thử lại sau.');
+    return '';
   }
   
   return value;
@@ -37,7 +39,7 @@ export function getApiUrl(): string {
   
   // In browser, validate and throw error if not set
   if (!value) {
-    throw new Error('Dịch vụ hiện chưa sẵn sàng. Vui lòng thử lại sau.');
+    return '';
   }
   
   return value;

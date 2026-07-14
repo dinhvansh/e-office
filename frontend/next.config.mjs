@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone', // Enable standalone output for Docker
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   typescript: {
     // Skip type checking during build for Docker
     ignoreBuildErrors: true,
