@@ -1,12 +1,9 @@
-import { createHash } from "crypto";
 import bcrypt from "bcryptjs";
 import { ApiError } from "../../core/errors/api-error";
 import { prisma } from "../../config/prisma";
-import { storageService } from "../../core/storage/storage.service";
 import { emailService } from "../common/email.service";
 import { notificationsService } from "../notifications/notifications.service";
 import { NotificationType } from "../notifications/notifications.types";
-import { pdfGenerationService } from "../signRequests/pdfGeneration.service";
 import {
   FieldValueInput,
   signRequestFieldValuesService,
@@ -112,6 +109,18 @@ export class PublicSigningCommandService {
         documentStatus: allSigned ? "generating_artifact" : "in_progress",
         signRequestStatus: allSigned ? "generating_artifact" : "in_progress",
       });
+      if (allSigned) {
+        await tx.outbox_events.create({
+          data: {
+            tenant_id: signer.sign_request.tenant_id,
+            aggregate_type: "sign_request",
+            aggregate_id: String(signer.sign_request_id),
+            event_type: "SIGNED_ARTIFACT_REQUESTED",
+            payload: { sign_request_id: signer.sign_request_id, document_id: signer.sign_request.document_id },
+            deduplication_key: `signed-artifact:${signer.sign_request_id}`,
+          },
+        });
+      }
       if (!allSigned && signer.sign_request.workflow_type === "sequential") {
         const nextOrder = findNextWaitingSigningOrder(currentSigners);
         if (nextOrder !== null) {
@@ -139,45 +148,11 @@ export class PublicSigningCommandService {
       throw ApiError.conflict("Signing request was already processed", "CONCURRENT_MODIFICATION");
     }
 
-    if (signingCommand.allSigned) {
-      await this.completeArtifact(signer.sign_request_id, signer.sign_request.document_id);
-      await this.notifyCompletion({
-        invitationToken: input.invitationToken,
-        signerEmail: signer.email,
-        signerName: signer.name,
-        tenantId: signer.sign_request.tenant_id,
-        documentId: signer.sign_request.document_id,
-        title: signer.sign_request.title,
-      });
-    } else {
+    if (!signingCommand.allSigned) {
       await signersService.notifyNextPendingSigner(signer.sign_request_id, signer.sign_request.tenant_id);
     }
 
     return { allSigned: signingCommand.allSigned };
-  }
-
-  private async completeArtifact(signRequestId: number, documentId: number): Promise<void> {
-    try {
-      const signedFilePath = await pdfGenerationService.generateSignedPdf(signRequestId);
-      const artifactHash = createHash("sha256").update(await storageService.get(signedFilePath)).digest("hex");
-      await prisma.$transaction((tx) => workflowStateService.transitionSigningPair(tx, {
-        documentId,
-        signRequestId,
-        documentStatus: "completed",
-        signRequestStatus: "completed",
-        signedFilePath,
-        hash: artifactHash,
-      }));
-    } catch (error) {
-      console.error("Failed to generate signed PDF:", error);
-      await prisma.$transaction((tx) => workflowStateService.transitionSigningPair(tx, {
-        documentId,
-        signRequestId,
-        documentStatus: "artifact_failed",
-        signRequestStatus: "artifact_failed",
-      }));
-      throw ApiError.internal("Signed document generation failed", "ARTIFACT_GENERATION_FAILED");
-    }
   }
 
   private async notifyCompletion(input: {

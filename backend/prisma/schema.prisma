@@ -72,6 +72,7 @@ model documents {
   original_file_name String?
   signed_file_path   String?
   hash               String?
+  artifact_metadata  Json?
   status             String?
   version            Int           @default(1)
   document_number    String?

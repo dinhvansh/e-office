@@ -1,7 +1,9 @@
 import { prisma } from "../config/prisma";
+import { signedArtifactWorker } from "../modules/signRequests/signedArtifact.worker";
 import { webhookService } from "../modules/webhooks/webhooks.service";
 
-const MAX_ATTEMPTS = 10;
+const MAX_ATTEMPTS = 5;
+const STALE_LOCK_MS = 5 * 60 * 1000;
 
 export function retryAt(attemptCount: number): Date {
   const delaySeconds = Math.min(3600, 2 ** Math.min(attemptCount, 12));
@@ -9,6 +11,11 @@ export function retryAt(attemptCount: number): Date {
 }
 
 async function dispatch(event: { tenant_id: number | null; event_type: string; payload: unknown }): Promise<void> {
+  if (event.event_type === "SIGNED_ARTIFACT_REQUESTED") {
+    await signedArtifactWorker.processSignedArtifactEvent(event);
+    return;
+  }
+
   if (event.event_type === "SIGN_REQUEST_CREATED") {
     if (event.tenant_id === null) throw new Error("SIGN_REQUEST_CREATED requires a tenant");
     await webhookService.emit(event.tenant_id, "sign.started", event.payload);
@@ -49,6 +56,13 @@ async function dispatch(event: { tenant_id: number | null; event_type: string; p
 }
 
 export async function processOutboxBatch(limit = 20): Promise<number> {
+  // A process can die after claiming an event. Release only old claims so a
+  // live worker is never stolen by another worker.
+  await prisma.outbox_events.updateMany({
+    where: { status: "processing", locked_at: { lt: new Date(Date.now() - STALE_LOCK_MS) } },
+    data: { status: "pending", locked_at: null },
+  });
+
   let processed = 0;
   for (let index = 0; index < limit; index += 1) {
     const event = await prisma.outbox_events.findFirst({
@@ -79,7 +93,9 @@ export async function processOutboxBatch(limit = 20): Promise<number> {
           attempt_count: attemptCount,
           available_at: retryAt(attemptCount),
           locked_at: null,
-          last_error: error instanceof Error ? error.message : "Unknown outbox dispatch error",
+          last_error: event.event_type === "SIGNED_ARTIFACT_REQUESTED"
+            ? "Signed artifact generation failed"
+            : "Outbox dispatch failed",
         },
       });
     }
@@ -87,8 +103,24 @@ export async function processOutboxBatch(limit = 20): Promise<number> {
   return processed;
 }
 
+export async function runOutboxWorker(): Promise<void> {
+  const pollInterval = Math.max(250, Number(process.env.OUTBOX_POLL_INTERVAL_MS || 2000));
+  let stopping = false;
+  const stop = () => { stopping = true; };
+  process.once("SIGTERM", stop);
+  process.once("SIGINT", stop);
+
+  while (!stopping) {
+    const processed = await processOutboxBatch();
+    if (processed === 0) await new Promise((resolve) => setTimeout(resolve, pollInterval));
+  }
+}
+
 if (require.main === module) {
-  processOutboxBatch()
-    .then((processed) => console.log(`Processed ${processed} outbox event(s)`))
+  runOutboxWorker()
+    .catch((error) => {
+      console.error("Outbox worker stopped unexpectedly", error);
+      process.exitCode = 1;
+    })
     .finally(() => prisma.$disconnect());
 }

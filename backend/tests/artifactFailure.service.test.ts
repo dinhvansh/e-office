@@ -1,99 +1,82 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
-import { ApiError } from "../src/core/errors/api-error";
 import { prisma } from "../src/config/prisma";
 import { pdfGenerationService } from "../src/modules/signRequests/pdfGeneration.service";
+import { signedArtifactWorker } from "../src/modules/signRequests/signedArtifact.worker";
 import { signRequestsService } from "../src/modules/signRequests/signRequests.service";
-import { PublicSigningCommandService } from "../src/modules/public/publicSigningCommand.service";
-
-type Transition = { documentStatus?: string; signRequestStatus?: string; event?: string };
+import { storageService } from "../src/core/storage/storage.service";
 
 const originalTransaction = prisma.$transaction;
+const originalFindSignRequest = prisma.sign_requests.findUnique;
 const originalGenerateSignedPdf = pdfGenerationService.generateSignedPdf;
-const originalConsoleError = console.error;
-
-const replaceTransaction = (value: unknown) => {
-  (prisma as unknown as { $transaction: unknown }).$transaction = value;
-};
-
-const replaceGenerateSignedPdf = (value: unknown) => {
-  (pdfGenerationService as unknown as { generateSignedPdf: unknown }).generateSignedPdf = value;
-};
+const originalStorageGet = storageService.get;
 
 afterEach(() => {
-  replaceTransaction(originalTransaction);
-  replaceGenerateSignedPdf(originalGenerateSignedPdf);
-  console.error = originalConsoleError;
+  (prisma as unknown as { $transaction: unknown }).$transaction = originalTransaction;
+  (prisma.sign_requests as unknown as { findUnique: unknown }).findUnique = originalFindSignRequest;
+  (pdfGenerationService as unknown as { generateSignedPdf: unknown }).generateSignedPdf = originalGenerateSignedPdf;
+  (storageService as unknown as { get: unknown }).get = originalStorageGet;
 });
 
-function installTransactionHarness(initialStatus: string, transitions: Transition[]) {
-  let documentStatus = initialStatus;
+function installArtifactTransactionHarness(initialStatus: string, transitions: string[]) {
+  let status = initialStatus;
   const tx = {
     documents: {
-      findUnique: async () => ({ status: documentStatus }),
-      update: async (input: { data: { status: string } }) => {
-        documentStatus = input.data.status;
-        transitions.push({ documentStatus });
-      },
+      findUnique: async () => ({ status }),
+      update: async ({ data }: { data: { status: string } }) => { status = data.status; transitions.push(`document:${status}`); },
     },
     sign_requests: {
-      update: async (input: { data: { status: string } }) => {
-        transitions.push({ signRequestStatus: input.data.status });
-      },
+      findUnique: async () => ({ document_id: 30, status, document: { status, signed_file_path: null, hash: null } }),
+      update: async ({ data }: { data: { status: string } }) => { status = data.status; transitions.push(`request:${status}`); },
     },
-    audit_logs: {
-      create: async (input: { data: { event: string } }) => {
-        transitions.push({ event: input.data.event });
-      },
-    },
-    outbox_events: {
-      create: async (input: { data: { event_type: string } }) => {
-        transitions.push({ event: input.data.event_type });
-      },
-    },
+    audit_logs: { create: async ({ data }: { data: { event: string } }) => { transitions.push(data.event); } },
+    outbox_events: { create: async () => undefined },
   };
-  replaceTransaction(async (operation: unknown) => (operation as (client: typeof tx) => unknown)(tx));
+  (prisma as unknown as { $transaction: unknown }).$transaction = async (operation: unknown) =>
+    (operation as (client: typeof tx) => unknown)(tx);
 }
 
-test("PDF generation failure stores artifact_failed and never completed", async () => {
-  const transitions: Transition[] = [];
-  installTransactionHarness("generating_artifact", transitions);
-  replaceGenerateSignedPdf(async () => { throw new Error("injected PDF failure"); });
-  console.error = () => undefined;
-  const command = new PublicSigningCommandService() as unknown as {
-    completeArtifact(signRequestId: number, documentId: number): Promise<void>;
-  };
+test("worker failure marks the artifact failed without completing the document", async () => {
+  const transitions: string[] = [];
+  installArtifactTransactionHarness("generating_artifact", transitions);
+  (prisma.sign_requests as unknown as { findUnique: unknown }).findUnique = async () => ({
+    document_id: 30,
+    status: "generating_artifact",
+    document: { id: 30, status: "generating_artifact", signed_file_path: null, hash: null },
+  });
+  (pdfGenerationService as unknown as { generateSignedPdf: unknown }).generateSignedPdf = async () => { throw new Error("injected PDF failure"); };
 
-  await assert.rejects(command.completeArtifact(20, 30), (error: unknown) =>
-    error instanceof ApiError && error.code === "ARTIFACT_GENERATION_FAILED",
-  );
-  assert.deepEqual(transitions, [
-    { documentStatus: "artifact_failed" },
-    { signRequestStatus: "artifact_failed" },
-  ]);
-  assert.equal(transitions.some((item) => item.documentStatus === "completed" || item.signRequestStatus === "completed"), false);
+  await assert.rejects(signedArtifactWorker.processSignedArtifactEvent({ payload: { sign_request_id: 20 } }));
+  assert.deepEqual(transitions, ["document:artifact_failed", "request:artifact_failed", "artifact.generation_failed"]);
+  assert.equal(transitions.some((entry) => entry.includes("completed")), false);
 });
 
-test("an artifact_failed request can enter retry and returns to artifact_failed when retry generation fails", async () => {
-  const transitions: Transition[] = [];
-  installTransactionHarness("artifact_failed", transitions);
-  replaceGenerateSignedPdf(async () => { throw new Error("injected retry PDF failure"); });
-  console.error = () => undefined;
+test("worker success persists one readable, hashed artifact and duplicate processing is a no-op", async () => {
+  const transitions: string[] = [];
+  installArtifactTransactionHarness("generating_artifact", transitions);
+  let generationCalls = 0;
+  (prisma.sign_requests as unknown as { findUnique: unknown }).findUnique = async () => ({
+    document_id: 30,
+    status: "generating_artifact",
+    document: { id: 30, status: "generating_artifact", signed_file_path: null, hash: null },
+  });
+  (pdfGenerationService as unknown as { generateSignedPdf: unknown }).generateSignedPdf = async () => { generationCalls += 1; return "storage/1/signed_30.pdf"; };
+  (storageService as unknown as { get: unknown }).get = async () => Buffer.from("signed-pdf");
+
+  await signedArtifactWorker.processSignedArtifactEvent({ payload: { sign_request_id: 20 } });
+  assert.deepEqual(transitions, ["document:completed", "request:completed", "artifact.generation_succeeded"]);
+  assert.equal(generationCalls, 1);
+});
+
+test("retry action only requeues a failed artifact", async () => {
+  const transitions: string[] = [];
+  installArtifactTransactionHarness("artifact_failed", transitions);
   const command = signRequestsService as unknown as {
     ensureCanManageSignRequest(signRequestId: number, tenantId: number, userId: number): Promise<unknown>;
     retrySignedArtifactGeneration(signRequestId: number, tenantId: number, userId: number): Promise<unknown>;
   };
   command.ensureCanManageSignRequest = async () => ({ document_id: 30, status: "artifact_failed" });
-
-  await assert.rejects(command.retrySignedArtifactGeneration(20, 1, 2), (error: unknown) =>
-    error instanceof ApiError && error.code === "ARTIFACT_GENERATION_FAILED",
-  );
-  assert.deepEqual(transitions, [
-    { documentStatus: "generating_artifact" },
-    { signRequestStatus: "generating_artifact" },
-    { event: "SIGNED_ARTIFACT_REQUESTED" },
-    { documentStatus: "artifact_failed" },
-    { signRequestStatus: "artifact_failed" },
-    { event: "artifact.retry_failed" },
-  ]);
+  const result = await command.retrySignedArtifactGeneration(20, 1, 2);
+  assert.deepEqual(result, { status: "generating_artifact" });
+  assert.deepEqual(transitions.slice(0, 2), ["document:generating_artifact", "request:generating_artifact"]);
 });

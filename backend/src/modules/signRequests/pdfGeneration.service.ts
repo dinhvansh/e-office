@@ -783,7 +783,9 @@ export class PdfGenerationService {
     document: StoredDocument,
   ): Promise<string> {
     // Create filename
-    const signedFileName = `signed_${Date.now()}_${document.id}.pdf`;
+    // A completed sign request has one canonical artifact. A deterministic key
+    // makes retries safe if generation succeeds but the following DB update fails.
+    const signedFileName = `signed_${document.id}.pdf`;
 
     // Extract tenant ID from file path
     const pathParts = document.file_path.split(/[/\\]/);

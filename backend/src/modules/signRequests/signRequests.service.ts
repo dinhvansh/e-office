@@ -1151,6 +1151,18 @@ class SignRequestsService {
           deduplication_key: `signature-submitted:${signRequestId}:${signer.id}`,
         },
       });
+      if (allSignedInTransaction) {
+        await tx.outbox_events.create({
+          data: {
+            tenant_id: tenantId,
+            aggregate_type: "sign_request",
+            aggregate_id: String(signRequestId),
+            event_type: "SIGNED_ARTIFACT_REQUESTED",
+            payload: { sign_request_id: signRequestId, document_id: signRequest.document_id },
+            deduplication_key: `signed-artifact:${signRequestId}`,
+          },
+        });
+      }
     });
 
     // Check if all signers have signed
@@ -1158,15 +1170,15 @@ class SignRequestsService {
     const allSigned = allSigners.every((s) => this.isSignerStatusComplete(s.status));
 
     // ✅ PROGRESSIVE PDF: Generate PDF after each signature
-    try {
+    if (!allSigned) try {
       console.log(`[Internal Signing] Generating progressive PDF for sign request ${signRequestId}`);
       const { pdfGenerationService } = await import('./pdfGeneration.service');
       
       const signedPdfPath = await pdfGenerationService.generateProgressivePdf(
         signRequestId,
         {
-          includeAuditTrail: allSigned,  // Only add audit trail when completed
-          addWatermark: !allSigned        // Add watermark if not completed
+          includeAuditTrail: false,
+          addWatermark: true,
         }
       );
       const artifactBytes = await storageService.get(signedPdfPath);
@@ -1175,8 +1187,8 @@ class SignRequestsService {
       await prisma.$transaction((tx) => workflowStateService.transitionSigningPair(tx, {
         documentId: signRequest.document_id,
         signRequestId,
-        documentStatus: allSigned ? "completed" : "in_progress",
-        signRequestStatus: allSigned ? "completed" : "in_progress",
+        documentStatus: "in_progress",
+        signRequestStatus: "in_progress",
         signedFilePath: signedPdfPath,
         hash: artifactHash,
       }));
@@ -1185,15 +1197,6 @@ class SignRequestsService {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown artifact generation error";
       console.error(`[Internal Signing] Failed to generate progressive PDF: ${message}`);
-      if (allSigned) {
-        await prisma.$transaction((tx) => workflowStateService.transitionSigningPair(tx, {
-          documentId: signRequest.document_id,
-          signRequestId,
-          documentStatus: "artifact_failed",
-          signRequestStatus: "artifact_failed",
-        }));
-        throw ApiError.internal('Signed document generation failed', 'ARTIFACT_GENERATION_FAILED');
-      }
     }
 
     if (allSigned) {
@@ -1261,39 +1264,7 @@ class SignRequestsService {
       });
     });
 
-    try {
-      const { pdfGenerationService } = await import("./pdfGeneration.service");
-      const signedFilePath = await pdfGenerationService.generateSignedPdf(signRequestId);
-      const artifactBytes = await storageService.get(signedFilePath);
-      const artifactHash = crypto.createHash("sha256").update(artifactBytes).digest("hex");
-      await prisma.$transaction(async (tx) => {
-        await workflowStateService.transitionSigningPair(tx, {
-          documentId: signRequest.document_id,
-          signRequestId,
-          documentStatus: "completed",
-          signRequestStatus: "completed",
-          signedFilePath,
-          hash: artifactHash,
-        });
-        await tx.audit_logs.create({
-          data: { document_id: signRequest.document_id, event: "artifact.retry_succeeded", user_id: userId },
-        });
-      });
-      return { status: "completed", signed_file_path: signedFilePath };
-    } catch (error) {
-      await prisma.$transaction(async (tx) => {
-        await workflowStateService.transitionSigningPair(tx, {
-          documentId: signRequest.document_id,
-          signRequestId,
-          documentStatus: "artifact_failed",
-          signRequestStatus: "artifact_failed",
-        });
-        await tx.audit_logs.create({
-          data: { document_id: signRequest.document_id, event: "artifact.retry_failed", user_id: userId },
-        });
-      });
-      throw ApiError.internal("Signed document generation failed", "ARTIFACT_GENERATION_FAILED");
-    }
+    return { status: "generating_artifact" };
   }
 
   // ✅ Phase 2: Get Signers

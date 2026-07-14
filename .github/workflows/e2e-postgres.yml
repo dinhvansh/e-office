@@ -98,6 +98,9 @@ jobs:
       - name: Start backend
         run: nohup npm run start > "$RUNNER_TEMP/eoffice-backend.log" 2>&1 &
 
+      - name: Start signed-artifact outbox worker
+        run: nohup npm run worker:outbox > "$RUNNER_TEMP/eoffice-outbox-worker.log" 2>&1 &
+
       - name: Wait for backend health
         run: |
           for attempt in {1..30}; do
@@ -108,6 +111,7 @@ jobs:
           done
           echo "Backend did not become healthy in time"
           cat "$RUNNER_TEMP/eoffice-backend.log" || true
+          cat "$RUNNER_TEMP/eoffice-outbox-worker.log" || true
           exit 1
 
       - name: Run PostgreSQL workflow E2E

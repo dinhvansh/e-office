@@ -434,7 +434,7 @@ async function run() {
     if (duplicateError.response?.status !== 409) {
       throw new Error(`Expected duplicate signing request to return 409, got ${duplicateError.response?.status || duplicateError.message}`);
     }
-    const [signatureAuditCount, signatureOutboxCount] = await Promise.all([
+    const [signatureAuditCount, signatureOutboxCount, artifactOutboxCount] = await Promise.all([
       prisma.audit_logs.count({
         where: { document_id: document.id, event: "sign.internal_signed" },
       }),
@@ -445,18 +445,30 @@ async function run() {
           event_type: "SIGNATURE_SUBMITTED",
         },
       }),
+      prisma.outbox_events.count({
+        where: {
+          aggregate_type: "sign_request",
+          aggregate_id: String(signRequestId),
+          event_type: "SIGNED_ARTIFACT_REQUESTED",
+        },
+      }),
     ]);
-    if (signatureAuditCount !== 1 || signatureOutboxCount !== 1) {
-      throw new Error(`Duplicate signing created side effects: audits=${signatureAuditCount}, outbox=${signatureOutboxCount}`);
+    if (signatureAuditCount !== 1 || signatureOutboxCount !== 1 || artifactOutboxCount !== 1) {
+      throw new Error(`Duplicate signing created side effects: audits=${signatureAuditCount}, signature_outbox=${signatureOutboxCount}, artifact_outbox=${artifactOutboxCount}`);
     }
     console.log("Concurrent duplicate signing rejected without duplicate side effects");
 
-    const finalStateResponse = await axios.get(`${API_BASE}/sign-requests/${signRequestId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const finalState = finalStateResponse.data.data.sign_request;
-    if (finalState.flow_state !== "COMPLETED") {
-      throw new Error(`Expected COMPLETED, got ${finalState.flow_state}`);
+    let finalState;
+    for (let attempt = 1; attempt <= 20; attempt += 1) {
+      const finalStateResponse = await axios.get(`${API_BASE}/sign-requests/${signRequestId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      finalState = finalStateResponse.data.data.sign_request;
+      if (finalState.flow_state === "COMPLETED") break;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    if (finalState?.flow_state !== "COMPLETED") {
+      throw new Error(`Expected worker to reach COMPLETED, got ${finalState?.flow_state}`);
     }
     console.log("Flow -> COMPLETED");
 

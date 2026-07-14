@@ -1,5 +1,36 @@
 # Verification Progress
 
+## 2026-07-14 — P1-ARCH-010 phase 1 signed-artifact outbox
+
+Status: Implemented and locally validated, including the isolated Docker
+PostgreSQL workflow E2E with API and worker containers.
+
+Files changed: Prisma artifact metadata migration/schema, signing commands,
+outbox worker, Docker Compose worker service, worker tests, and
+`docs/operations/outbox-worker.md`.
+
+Workflow: `SIGNED_ARTIFACT_REQUESTED` is deduplicated per sign request. The
+worker claims events, generates/verifies the PDF outside the transaction,
+persists storage key/SHA-256/metadata, and transitions to completed. Failures
+record `artifact_failed` and use bounded retry.
+
+Commands run:
+
+- `cd backend && npm test` — passed, 65/65.
+- `cd backend && npm run lint` and `npm run build` — passed.
+- `cd frontend && npm run lint`, `npm run typecheck`, and `npm run build` —
+  passed (existing frontend warnings only).
+- `docker compose config --quiet` with fake CI secrets — passed.
+- `docker compose build backend outbox-worker` — passed.
+- Blank isolated Docker PostgreSQL: `prisma migrate deploy`, `migrate status`,
+  and `prisma migrate diff --exit-code` — passed; no schema drift.
+- Isolated Docker PostgreSQL workflow E2E — passed: signing wrote one artifact
+  event, the worker completed the artifact, and the signed PDF downloaded.
+
+Known limitations: Current outbox polling is intentionally database-based and
+single-event sequential per process; email and webhook delivery remain on their
+existing event paths and were not migrated in this phase.
+
 ## 2026-07-14 — P1-OPS-014 Docker and environment hardening
 
 Status: Implemented and verified; application quality gates, Compose

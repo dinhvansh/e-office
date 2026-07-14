@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import type { DbClient } from "../../config/prisma";
 import { ApiError } from "../../core/errors/api-error";
 import { assertDocumentStatusTransition } from "./workflowState.policy";
@@ -5,7 +6,7 @@ import { assertDocumentStatusTransition } from "./workflowState.policy";
 class WorkflowStateService {
   async transitionDocument(
     db: DbClient,
-    input: { documentId: number; status: string; signedFilePath?: string; hash?: string },
+    input: { documentId: number; status: string; signedFilePath?: string; hash?: string; artifactMetadata?: Prisma.InputJsonValue },
   ): Promise<void> {
     const document = await db.documents.findUnique({
       where: { id: input.documentId },
@@ -23,6 +24,7 @@ class WorkflowStateService {
         status: input.status,
         ...(input.signedFilePath ? { signed_file_path: input.signedFilePath } : {}),
         ...(input.hash ? { hash: input.hash } : {}),
+        ...(input.artifactMetadata ? { artifact_metadata: input.artifactMetadata } : {}),
       },
     });
   }
@@ -36,6 +38,7 @@ class WorkflowStateService {
       signRequestStatus: string;
       signedFilePath?: string;
       hash?: string;
+      artifactMetadata?: Prisma.InputJsonValue;
     },
   ): Promise<void> {
     await this.transitionDocument(db, {
@@ -43,6 +46,7 @@ class WorkflowStateService {
       status: input.documentStatus,
       signedFilePath: input.signedFilePath,
       hash: input.hash,
+      artifactMetadata: input.artifactMetadata,
     });
     await db.sign_requests.update({
       where: { id: input.signRequestId },

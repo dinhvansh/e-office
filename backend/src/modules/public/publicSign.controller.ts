@@ -5,7 +5,6 @@ import { ok } from "../../core/utils/response";
 import { ApiError } from "../../core/errors/api-error";
 import { FieldValueInput, signRequestFieldValuesService } from "../signRequests/signRequestFieldValues.service";
 import { signersService } from "../signers/signers.service";
-import { pdfGenerationService } from "../signRequests/pdfGeneration.service";
 import { storageService } from "../../core/storage/storage.service";
 import { prisma } from "../../config/prisma";
 import { createSigningSession, getSigningSessionErrorCode, isSigningSessionValid, PUBLIC_SIGNING_COOKIE_PATH, SIGNING_SESSION_COOKIE, SIGNING_SESSION_TTL_SECONDS } from "./signingSession.service";
@@ -216,19 +215,7 @@ export class PublicSignController {
 
     const document = signer.sign_request.document;
     if (!document.signed_file_path) {
-      const allSigners = await prisma.signers.findMany({
-        where: { sign_request_id: signer.sign_request_id },
-      });
-      const allSigned = allSigners.every((s) => s.status === "signed" || s.status === "completed");
-      if (!allSigned) {
-        throw ApiError.badRequest("Document signing is not complete yet");
-      }
-      const signedFilePath = await pdfGenerationService.generateSignedPdf(signer.sign_request_id);
-      await prisma.documents.update({
-        where: { id: document.id },
-        data: { signed_file_path: signedFilePath },
-      });
-      document.signed_file_path = signedFilePath;
+      throw ApiError.conflict("Signed PDF is still being generated", "SIGNED_ARTIFACT_NOT_READY");
     }
 
     let pdfBuffer: Uint8Array;
