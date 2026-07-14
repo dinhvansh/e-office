@@ -18,7 +18,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { StatusTag } from "@/components/ui/status-tag";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SelectWithIcon } from "@/components/ui/select-with-icon";
 import { WorkflowPreview } from "@/components/workflow/WorkflowPreview";
 import { WorkflowCustomizer } from "@/components/workflow/WorkflowCustomizer";
@@ -29,6 +28,7 @@ import { CCEmailsSection } from "@/components/documents/CCEmailsSection";
 import { AttachmentsSection } from "@/components/documents/AttachmentsSection";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
+import { useDestructiveConfirmation } from "@/components/providers/destructive-confirmation-provider";
 
 
 export default function DocumentsPage() {
@@ -40,6 +40,7 @@ export default function DocumentsPage() {
   const canUpdateDocuments = hasPermission("documents:update");
   const canDeleteDocuments = hasPermission("documents:delete");
   const canUpdateSignRequests = hasPermission("sign_requests:update");
+  const confirmDestructive = useDestructiveConfirmation();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [selectedDocumentTypeId, setSelectedDocumentTypeId] = useState<number | null>(null);
@@ -335,11 +336,6 @@ export default function DocumentsPage() {
     },
   });
 
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({
-    open: false,
-    id: null,
-  });
-
   const [submitApprovalDialog, setSubmitApprovalDialog] = useState<{
     open: boolean;
     documentId: number | null;
@@ -355,7 +351,13 @@ export default function DocumentsPage() {
       toast.error("Bạn không có quyền xóa tài liệu");
       return;
     }
-    setDeleteConfirm({ open: true, id });
+    confirmDestructive({
+      title: 'Xóa tài liệu',
+      targetName: `Tài liệu #${id}`,
+      description: 'Tài liệu sẽ bị xóa và không thể khôi phục từ màn hình này.',
+      confirmLabel: 'Xóa tài liệu',
+      errorMessage: 'Không thể xóa tài liệu. Vui lòng thử lại.',
+    }, () => deleteMutation.mutateAsync(id));
   };
 
   const handleView = (id: number) => {
@@ -436,12 +438,6 @@ export default function DocumentsPage() {
     } catch (error: any) {
       const message = error?.message || 'Không thể tải tài liệu';
       toast.error(message);
-    }
-  };
-
-  const confirmDelete = () => {
-    if (deleteConfirm.id) {
-      deleteMutation.mutate(deleteConfirm.id);
     }
   };
 
@@ -556,9 +552,13 @@ export default function DocumentsPage() {
       toast.error("Bạn không có quyền cập nhật tài liệu");
       return;
     }
-    if (confirm('Bạn có chắc muốn thanh lý tài liệu này?')) {
-      archiveDocumentMutation.mutate(documentId);
-    }
+    confirmDestructive({
+      title: 'Thanh lý tài liệu',
+      targetName: `Tài liệu #${documentId}`,
+      description: 'Tài liệu sẽ được chuyển sang trạng thái thanh lý và không còn trong danh sách đang hoạt động.',
+      confirmLabel: 'Thanh lý tài liệu',
+      errorMessage: 'Không thể thanh lý tài liệu. Vui lòng thử lại.',
+    }, () => archiveDocumentMutation.mutateAsync(documentId));
   };
 
   const handleCancelDocument = (documentId: number) => {
@@ -566,9 +566,13 @@ export default function DocumentsPage() {
       toast.error("Bạn không có quyền cập nhật tài liệu");
       return;
     }
-    if (confirm('Bạn có chắc muốn hủy tài liệu này?')) {
-      cancelDocumentMutation.mutate(documentId);
-    }
+    confirmDestructive({
+      title: 'Hủy tài liệu',
+      targetName: `Tài liệu #${documentId}`,
+      description: 'Tài liệu sẽ bị hủy và các bước xử lý tiếp theo sẽ không thể tiếp tục.',
+      confirmLabel: 'Hủy tài liệu',
+      errorMessage: 'Không thể hủy tài liệu. Vui lòng thử lại.',
+    }, () => cancelDocumentMutation.mutateAsync(documentId));
   };
 
   return (
@@ -1314,19 +1318,6 @@ export default function DocumentsPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Confirm Delete Dialog */}
-      <ConfirmDialog
-        open={deleteConfirm.open}
-        onOpenChange={(open) => setDeleteConfirm({ open, id: null })}
-        onConfirm={confirmDelete}
-        title="Xác nhận xóa tài liệu"
-        description="Bạn có chắc chắn muốn xóa tài liệu này? Hành động này không thể hoàn tác."
-        confirmText="Xóa tài liệu"
-        cancelText="Hủy bỏ"
-        variant="danger"
-        icon="trash"
-      />
 
       {/* Submit for Approval Dialog */}
       {submitApprovalDialog.open && (

@@ -17,10 +17,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import ConfirmationDialog from '@/components/ui/confirmation-dialog';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
+import { useDestructiveConfirmation } from '@/components/providers/destructive-confirmation-provider';
 
 interface SignRequest {
   id: number;
@@ -63,25 +63,12 @@ export default function SignRequestsPage() {
   const { fetchJson, user } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const confirmDestructive = useDestructiveConfirmation();
   const [filter, setFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   
-  // Confirmation dialog state
-  const [confirmDialog, setConfirmDialog] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-    confirmText?: string;
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => {},
-  });
-
   // Cancel dialog with reason
   const [cancelDialog, setCancelDialog] = useState<{ 
     open: boolean; 
@@ -119,10 +106,15 @@ export default function SignRequestsPage() {
   };
 
   // Resend email to external signers
-  const handleResendEmail = async (signRequestId: number) => {
-    if (!confirm('Gửi lại email cho người ký bên ngoài?')) return;
-    
-    try {
+  const handleResendEmail = (signRequestId: number) => {
+    confirmDestructive({
+      title: 'Gửi lại email ký',
+      targetName: `Yêu cầu ký #${signRequestId}`,
+      description: 'Email mời ký sẽ được gửi lại cho người ký bên ngoài.',
+      confirmLabel: 'Gửi lại email',
+      errorMessage: 'Không thể gửi lại email. Vui lòng thử lại.',
+      destructive: false,
+    }, async () => {
       const res = await fetchJson<{ sign_request?: { flow_state?: string } }>(`/sign-requests/${signRequestId}/send`, {
         method: 'POST',
       });
@@ -132,10 +124,7 @@ export default function SignRequestsPage() {
       } else {
         toast.success('Đã gửi lại email thành công!');
       }
-    } catch (error: any) {
-      console.error('Resend email error:', error);
-      toast.error('Lỗi: ' + (error.message || 'Không thể gửi email'));
-    }
+    });
   };
 
   // Delete mutation
@@ -187,13 +176,13 @@ export default function SignRequestsPage() {
 
   // Delete handler
   const handleDelete = (signRequestId: number, documentId: number) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Xóa văn bản',
-      message: 'Bạn có chắc muốn xóa yêu cầu ký này?\n\nHành động này không thể hoàn tác!',
-      confirmText: 'Xóa',
-      onConfirm: () => deleteMutation.mutate({ signRequestId, documentId }),
-    });
+    confirmDestructive({
+      title: 'Xóa yêu cầu ký',
+      targetName: `Yêu cầu ký #${signRequestId}`,
+      description: 'Yêu cầu ký và văn bản liên quan sẽ bị xóa. Hành động này không thể hoàn tác.',
+      confirmLabel: 'Xóa yêu cầu ký',
+      errorMessage: 'Không thể xóa yêu cầu ký. Vui lòng thử lại.',
+    }, () => deleteMutation.mutateAsync({ signRequestId, documentId }));
   };
 
   // Cancel handler - open dialog with reason input
@@ -213,13 +202,13 @@ export default function SignRequestsPage() {
 
   // Revoke handler
   const handleRevoke = (signRequestId: number) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Thu hồi văn bản',
-      message: 'Bạn có chắc muốn thu hồi văn bản đã thanh lý?\n\nVăn bản sẽ chuyển về trạng thái nháp và cần ký lại!',
-      confirmText: 'Thu hồi',
-      onConfirm: () => revokeMutation.mutate(signRequestId),
-    });
+    confirmDestructive({
+      title: 'Thu hồi yêu cầu ký',
+      targetName: `Yêu cầu ký #${signRequestId}`,
+      description: 'Yêu cầu sẽ trở về trạng thái nháp và cần được ký lại.',
+      confirmLabel: 'Thu hồi yêu cầu',
+      errorMessage: 'Không thể thu hồi yêu cầu ký. Vui lòng thử lại.',
+    }, () => revokeMutation.mutateAsync(signRequestId));
   };
 
   // Check if current user is a pending internal signer
@@ -805,17 +794,6 @@ export default function SignRequestsPage() {
           </Card>
         )}
       </div>
-
-      {/* Confirmation Dialog */}
-      <ConfirmationDialog
-        isOpen={confirmDialog.isOpen}
-        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
-        onConfirm={confirmDialog.onConfirm}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        confirmText={confirmDialog.confirmText}
-        cancelText="Hủy"
-      />
 
       {/* Cancel Dialog with Reason */}
       {cancelDialog.open && (

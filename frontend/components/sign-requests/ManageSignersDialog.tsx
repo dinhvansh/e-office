@@ -9,6 +9,7 @@ import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { useDestructiveConfirmation } from '../providers/destructive-confirmation-provider';
 
 interface Signer {
   id: number;
@@ -57,6 +58,7 @@ export function ManageSignersDialog({
   fetchJson,
   allowReorder = false,
 }: ManageSignersDialogProps) {
+  const confirmDestructive = useDestructiveConfirmation();
   const [newEmail, setNewEmail] = useState('');
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState<string>('signer');
@@ -271,9 +273,14 @@ export function ManageSignersDialog({
       return;
     }
 
-    if (confirm('Bạn có chắc muốn xóa người ký này?\n\nCác vị trí ký đã gán cho người này sẽ bị xóa.')) {
-      removeSignerMutation.mutate(signerId);
-    }
+    const signer = localSigners.find((item) => item.id === signerId);
+    confirmDestructive({
+      title: 'Xóa người ký',
+      targetName: signer?.name || signer?.email || 'Người ký đã chọn',
+      description: 'Người ký và các vị trí ký đã gán cho họ sẽ bị xóa khỏi yêu cầu ký.',
+      confirmLabel: 'Xóa người ký',
+      errorMessage: 'Không thể xóa người ký. Vui lòng thử lại.',
+    }, () => removeSignerMutation.mutateAsync(signerId));
   };
 
   return (

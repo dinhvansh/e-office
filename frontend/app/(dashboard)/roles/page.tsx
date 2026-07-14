@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/components/providers/auth-provider';
 import { DocumentTypePermissionsTab } from '@/components/roles/DocumentTypePermissionsTab';
 import { toast } from 'sonner';
+import { useDestructiveConfirmation } from '@/components/providers/destructive-confirmation-provider';
 
 interface Role {
   id: number;
@@ -99,6 +100,7 @@ export default function RolesPage() {
   });
   const queryClient = useQueryClient();
   const { fetchJson } = useAuth();
+  const confirmDestructive = useDestructiveConfirmation();
 
   const createRoleMutation = useMutation({
     mutationFn: (data: { name: string; description?: string; permission_ids?: number[] }) => {
@@ -546,9 +548,13 @@ export default function RolesPage() {
                             toast.error('Không thể xóa vai trò đang được sử dụng');
                             return;
                           }
-                          if (confirm(`Bạn có chắc muốn xóa vai trò "${role.name}"?`)) {
-                            deleteRoleMutation.mutate(role.id);
-                          }
+                          confirmDestructive({
+                            title: 'Xóa vai trò',
+                            targetName: role.name,
+                            description: 'Vai trò này sẽ bị xóa và không thể khôi phục từ màn hình này.',
+                            confirmLabel: 'Xóa vai trò',
+                            errorMessage: 'Không thể xóa vai trò. Vui lòng thử lại.',
+                          }, () => deleteRoleMutation.mutateAsync(role.id));
                         }}
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
@@ -604,12 +610,16 @@ export default function RolesPage() {
                         size="icon"
                         className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive transition-colors"
                         onClick={() => {
-                          if (confirm(`Xóa quyền "${rp.permission.action}" khỏi vai trò "${selectedRole.name}"?`)) {
-                            removePermissionMutation.mutate({
+                          confirmDestructive({
+                            title: 'Xóa quyền khỏi vai trò',
+                            targetName: `${rp.permission.action} — ${selectedRole.name}`,
+                            description: 'Quyền này sẽ không còn được cấp qua vai trò đã chọn.',
+                            confirmLabel: 'Xóa quyền',
+                            errorMessage: 'Không thể xóa quyền. Vui lòng thử lại.',
+                          }, () => removePermissionMutation.mutateAsync({
                               roleId: selectedRole.id,
                               permissionId: rp.permission.id
-                            });
-                          }
+                            }));
                         }}
                         title="Xóa quyền"
                       >

@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Users, Briefcase, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useDestructiveConfirmation } from '@/components/providers/destructive-confirmation-provider';
 
 interface Position {
   id: number;
@@ -75,6 +76,7 @@ function getSecurityAccessMeta(level?: number) {
 export default function PositionsPage() {
   const { fetchJson } = useAuth();
   const queryClient = useQueryClient();
+  const confirmDestructive = useDestructiveConfirmation();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
@@ -245,9 +247,13 @@ export default function PositionsPage() {
       return;
     }
     
-    if (confirm(`Xác nhận xóa chức danh "${position.name}"?`)) {
-      deleteMutation.mutate(position.id);
-    }
+    confirmDestructive({
+      title: 'Xóa chức danh',
+      targetName: position.name,
+      description: 'Chức danh này sẽ bị xóa và không thể khôi phục từ màn hình này.',
+      confirmLabel: 'Xóa chức danh',
+      errorMessage: 'Không thể xóa chức danh. Vui lòng thử lại.',
+    }, () => deleteMutation.mutateAsync(position.id));
   };
 
   if (isLoading) {

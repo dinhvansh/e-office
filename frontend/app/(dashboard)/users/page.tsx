@@ -16,6 +16,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { ApproveRejectDialog } from '@/components/users/ApproveRejectDialog';
+import { useDestructiveConfirmation } from '@/components/providers/destructive-confirmation-provider';
 
 interface User {
   id: number;
@@ -62,6 +63,7 @@ export default function UsersPage() {
   const queryClient = useQueryClient();
 
   const { fetchJson } = useAuth();
+  const confirmDestructive = useDestructiveConfirmation();
 
   const { data: usersData, isLoading } = useQuery({
     queryKey: ['users', search, statusFilter],
@@ -393,9 +395,13 @@ export default function UsersPage() {
                               size="icon"
                               className="hover:bg-destructive/10 hover:text-destructive transition-colors"
                               onClick={() => {
-                                if (confirm('Bạn có chắc muốn xóa người dùng này?')) {
-                                  deleteUserMutation.mutate(user.id);
-                                }
+                                confirmDestructive({
+                                  title: 'Xóa người dùng',
+                                  targetName: user.full_name || user.email,
+                                  description: 'Người dùng sẽ bị xóa khỏi workspace và không thể khôi phục từ màn hình này.',
+                                  confirmLabel: 'Xóa người dùng',
+                                  errorMessage: 'Không thể xóa người dùng. Vui lòng thử lại.',
+                                }, () => deleteUserMutation.mutateAsync(user.id));
                               }}
                             >
                               <Trash2 className="w-4 h-4 text-destructive" />

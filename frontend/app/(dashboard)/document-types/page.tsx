@@ -13,6 +13,7 @@ import { SelectWithIcon } from '@/components/ui/select-with-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { DocumentType, DocumentTypePolicy } from '@/lib/types';
+import { useDestructiveConfirmation } from '@/components/providers/destructive-confirmation-provider';
 
 type VisibilityScope =
   | 'private'
@@ -123,6 +124,7 @@ const statusLimitOptions = ['DRAFT', 'REJECTED', 'SUBMITTED', 'APPROVED', 'SIGNE
 
 export default function DocumentTypesPage() {
   const { fetchJson } = useAuth();
+  const confirmDestructive = useDestructiveConfirmation();
   const queryClient = useQueryClient();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -651,9 +653,13 @@ export default function DocumentTypesPage() {
       return;
     }
 
-    if (confirm(`Xóa loại văn bản "${type.name}"?`)) {
-      deleteTypeMutation.mutate(type.id);
-    }
+    confirmDestructive({
+      title: 'Xóa loại văn bản',
+      targetName: type.name,
+      description: 'Loại văn bản này sẽ bị xóa và không thể khôi phục từ màn hình này.',
+      confirmLabel: 'Xóa loại văn bản',
+      errorMessage: 'Không thể xóa loại văn bản. Vui lòng thử lại.',
+    }, () => deleteTypeMutation.mutateAsync(type.id));
   };
 
   return (

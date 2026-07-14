@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode, useState } from 'react';
 import { AuthProvider } from './auth-provider';
+import { DestructiveConfirmationProvider } from './destructive-confirmation-provider';
 
 export const AppProviders = ({ children }: { children: ReactNode }) => {
   const [queryClient] = useState(
@@ -17,7 +18,7 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
   );
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>{children}</AuthProvider>
+      <AuthProvider><DestructiveConfirmationProvider>{children}</DestructiveConfirmationProvider></AuthProvider>
     </QueryClientProvider>
   );
 };

@@ -187,6 +187,11 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - Mobile exposes permitted overflow links through the keyboard-accessible “Thêm” menu. Chromium replay passed at desktop, 768 px and 375 px; an unauthenticated `/users` deep link still redirects to `/login`.
 - Evidence: `evidence/ux015-super-admin-desktop-after-fix.png`, `evidence/ux015-super-admin-tablet-after-fix.png`, `evidence/ux015-super-admin-mobile-overflow-after-fix.png`.
 
+## UX-006 verification (Fixed — browser verified 2026-07-14)
+
+- The shared destructive confirmation dialog replaces all product `confirm()`/`window.confirm()` usage. It names the action and target, keeps an inline localized failure state for retry, disables duplicate submit, supports Cancel/Escape and restores focus to the invoking control.
+- Chromium coverage verifies cancel without API call, a single pending request under double-click, failure/retry, keyboard focus, desktop, 768 px and 375 px. Evidence: `evidence/ux006-confirmation-normal-after-fix.png`, `evidence/ux006-confirmation-pending-after-fix.png`, `evidence/ux006-confirmation-error-after-fix.png`, `evidence/ux006-confirmation-mobile-after-fix.png`.
+
 ## Implementation classification
 
 | Frontend-only | Requires/benefits from backend/API |

@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MetricCard } from '@/components/ui/metric-card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useDestructiveConfirmation } from '@/components/providers/destructive-confirmation-provider';
 
 type ExternalOrg = {
   id: number;
@@ -47,6 +48,7 @@ export default function ExternalOrgsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const queryClient = useQueryClient();
   const { fetchJson } = useAuth();
+  const confirmDestructive = useDestructiveConfirmation();
 
   const { data: response, isLoading } = useQuery({
     queryKey: ['external-orgs', currentPage, itemsPerPage, filter],
@@ -285,6 +287,7 @@ export default function ExternalOrgsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              aria-label={`Sửa tổ chức ngoài: ${org.name}`}
                               className="h-8 w-8"
                               onClick={() => { setEditingOrg(org); setShowModal(true); }}
                             >
@@ -293,11 +296,16 @@ export default function ExternalOrgsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              aria-label={`Xóa tổ chức ngoài: ${org.name}`}
                               className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
                               onClick={() => {
-                                if (confirm('Xóa tổ chức này?')) {
-                                  deleteMutation.mutate(org.id);
-                                }
+                                confirmDestructive({
+                                  title: 'Xóa tổ chức ngoài',
+                                  targetName: org.name,
+                                  description: 'Tổ chức này sẽ bị xóa và không thể khôi phục từ màn hình này.',
+                                  confirmLabel: 'Xóa tổ chức',
+                                  errorMessage: 'Không thể xóa tổ chức. Vui lòng thử lại.',
+                                }, () => deleteMutation.mutateAsync(org.id));
                               }}
                             >
                               <Trash2 className="h-4 w-4" />

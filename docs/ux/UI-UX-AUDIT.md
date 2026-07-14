@@ -15,6 +15,10 @@ Scope: initial source review plus Playwright runtime review; no production code 
 
 - **UX-004 / UX-015 — Fixed and browser verified:** desktop and mobile now consume the same permission-filtered navigation groups. `super_admin` receives the complete configured administration set, while restricted roles only receive permitted destinations; mobile provides additional items through an accessible “Thêm” overflow. Chromium replay covered requester, approver, signer and super-admin at desktop, 768 px and 375 px. See `evidence/ux015-super-admin-desktop-after-fix.png` and `evidence/ux015-super-admin-mobile-overflow-after-fix.png`.
 
+### Destructive confirmation remediation (2026-07-14)
+
+- **UX-006 — Fixed and browser verified:** every product `confirm()` call now opens the shared accessible confirmation dialog with action-specific Vietnamese copy, target identity, pending protection, inline retryable errors and focus restoration. Chromium verified Cancel/Escape, single API submission under double-click, retryable failure and desktop/768px/375px layouts. See `evidence/ux006-confirmation-normal-after-fix.png`, `evidence/ux006-confirmation-pending-after-fix.png`, `evidence/ux006-confirmation-error-after-fix.png` and `evidence/ux006-confirmation-mobile-after-fix.png`.
+
 ## Critical blocker remediation — 2026-07-14
 
 - **UX-002, UX-011, UX-012 and UX-018 — Fixed and browser verified:** OTP now supports numeric/autofill/paste input, expiry and resend cooldown feedback, and safe localized recovery states. Missing API configuration renders a service-unavailable screen for `/login` and protected routes in an isolated Playwright server, while inactive account codes receive localized activation guidance. See `evidence/ux011-login-desktop-after-fix.png` and `evidence/ux011-protected-desktop-after-fix.png`.

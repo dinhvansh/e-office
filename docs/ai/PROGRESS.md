@@ -17,3 +17,7 @@ Verification evidence is stored in `docs/ux/evidence/`.
 ## Role-aware navigation — 2026-07-14
 
 - **UX-004 / UX-015 fixed and browser verified:** desktop sidebar and mobile navigation use the same permission-filtered groups. `super_admin` sees all configured admin destinations, restricted requester/approver/signer sessions do not see unauthorized entries, and mobile exposes permitted overflow through a keyboard-accessible “Thêm” menu. Chromium passed at desktop, 768 px and 375 px; unauthenticated `/users` still redirects to `/login`.
+
+## Destructive confirmations — 2026-07-14
+
+- **UX-006 fixed and browser verified:** a single Radix-based confirmation provider now replaces all native confirmation prompts across users, roles, documents, positions, external organizations, sign requests, document types and signer management. It provides Vietnamese action/target copy, pending duplicate protection, safe inline retry errors, Escape/focus behavior and responsive Chromium coverage.
