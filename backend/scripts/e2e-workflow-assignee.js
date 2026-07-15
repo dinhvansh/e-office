@@ -154,6 +154,19 @@ async function ensureDocType(tenantId, workflowId) {
   return docType;
 }
 
+async function waitForCompletedSignRequest(signRequestId, headers, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastStatus = "unknown";
+  while (Date.now() < deadline) {
+    const response = await axios.get(`${API_BASE}/sign-requests/${signRequestId}`, { headers });
+    lastStatus = response.data.data.sign_request.status;
+    if (lastStatus === "completed") return response.data.data.sign_request;
+    if (lastStatus === "failed" || lastStatus === "cancelled") break;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`Expected completed sign request, got ${lastStatus}`);
+}
+
 async function run() {
   const { token, password } = await login();
   console.log(`[${CASE_LABEL}] Logged in as ${ADMIN_EMAIL} with password ${password}`);
@@ -429,11 +442,7 @@ async function run() {
   );
   console.log(`[${CASE_LABEL}] Admin internal signing completed`);
 
-  const finalSignRequest = await axios.get(`${API_BASE}/sign-requests/${signRequestId}`, { headers });
-  const finalStatus = finalSignRequest.data.data.sign_request.status;
-  if (finalStatus !== "completed") {
-    throw new Error(`Expected completed sign request, got ${finalStatus}`);
-  }
+  await waitForCompletedSignRequest(signRequestId, headers);
 
   console.log(`[${CASE_LABEL}] E2E assignee flow passed`);
 }

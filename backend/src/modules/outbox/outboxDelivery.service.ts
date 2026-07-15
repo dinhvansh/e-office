@@ -15,16 +15,21 @@ export class OutboxDeliveryService {
       deduplicationKey: string;
     },
   ): Promise<void> {
-    await db.outbox_events.create({
-      data: {
-        tenant_id: input.tenantId,
-        aggregate_type: input.aggregateType,
-        aggregate_id: String(input.aggregateId),
-        event_type: "EMAIL_DELIVERY_REQUESTED",
-        payload: { template: input.template, data: input.data } as unknown as Prisma.InputJsonValue,
-        deduplication_key: input.deduplicationKey,
-      },
-    });
+    try {
+      await db.outbox_events.create({
+        data: {
+          tenant_id: input.tenantId,
+          aggregate_type: input.aggregateType,
+          aggregate_id: String(input.aggregateId),
+          event_type: "EMAIL_DELIVERY_REQUESTED",
+          payload: { template: input.template, data: input.data } as unknown as Prisma.InputJsonValue,
+          deduplication_key: input.deduplicationKey,
+        },
+      });
+    } catch (error: unknown) {
+      if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") return;
+      throw error;
+    }
   }
 }
 

@@ -27,3 +27,11 @@ test("fresh RBAC seed grants the documented document-type permissions", () => {
     assert.match(source, new RegExp(`resource: 'document_types', action: '${action}'`));
   }
 });
+
+test("multi-approval E2E waits for asynchronous artifact completion", () => {
+  const backendRoot = path.resolve(__dirname, "../..");
+  const source = fs.readFileSync(path.join(backendRoot, "scripts", "e2e-workflow-assignee.js"), "utf8");
+
+  assert.match(source, /async function waitForCompletedSignRequest/);
+  assert.match(source, /await waitForCompletedSignRequest\(signRequestId, headers\)/);
+});

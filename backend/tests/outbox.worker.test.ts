@@ -62,7 +62,7 @@ test("repeating an email business action keeps one delivery event and its stable
   };
 
   await outboxDeliveryService.enqueueEmail(db as never, input);
-  await assert.rejects(outboxDeliveryService.enqueueEmail(db as never, input), { code: "P2002" });
+  await outboxDeliveryService.enqueueEmail(db as never, input);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].deduplication_key, "sign-completed-owner:42");
   assert.equal(rows[0].event_type, "EMAIL_DELIVERY_REQUESTED");
