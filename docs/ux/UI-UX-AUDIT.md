@@ -138,6 +138,10 @@ The following High issues should be completed or browser-verified before public 
 
 - **Fixed and browser verified:** dashboard, documents, sign requests, approvals, My Tasks, notifications, public signing loading and create-request mutations now expose explicit loading, empty, persistent error and retry feedback. Shared async-state primitives provide `aria-live` announcements; errors shown to users are safe recovery copy. Chromium covered desktop, 768 px and 375 px, including My Tasks retry/empty recovery and create-request double-submit protection. Evidence: `evidence/ux009-notifications-loading-after-fix.png`, `evidence/ux009-dashboard-error-after-fix.png`, `evidence/ux009-documents-retry-after-fix.png`, `evidence/ux009-my-tasks-empty-after-fix.png` and `evidence/ux009-notifications-mobile-after-fix.png`.
 
+## UX-008 verification — 2026-07-15
+
+- **Fixed and browser verified:** `/notifications` provides authenticated paginated history with read/read-all/delete actions, safe internal destinations, accessible loading/empty/error/retry feedback and keyboard-operable controls. The existing API scopes every list and mutation to the authenticated user and tenant. Chromium evidence: `evidence/ux008-history-desktop.png`, `evidence/ux008-history-tablet.png`, `evidence/ux008-history-mobile.png`.
+
 ## Audit follow-up
 
 Before closing the remaining authenticated findings, replay the listed flows in Chromium at desktop and 375 px / 768 px widths with approved requester, approver, signer and administrator accounts. Capture screenshots for each high-severity item and test real OTP delivery, keyboard-only signing, screen-reader labels, and destructive confirmation focus restoration.

@@ -1,0 +1,2 @@
+import { defineConfig, devices } from '@playwright/test';
+export default defineConfig({ testDir: './tests', testMatch: 'notification-history.spec.ts', timeout: 60_000, use: { baseURL: 'http://127.0.0.1:3018', viewport: { width: 1280, height: 720 } }, projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }], globalTeardown: './scripts/cleanup-ux008-output.mjs', webServer: { command: 'node scripts/start-ux008-test-server.mjs', url: 'http://127.0.0.1:3018/login', reuseExistingServer: false, timeout: 60_000 } });

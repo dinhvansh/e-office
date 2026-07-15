@@ -36,4 +36,8 @@ Verification evidence is stored in `docs/ux/evidence/`.
 
 ## Async recovery states — 2026-07-15
 
+## 2026-07-15 — Notification history
+
+- **UX-008 fixed:** added the authenticated `/notifications` history route with server-backed pagination, read/read-all/delete actions, safe authorized navigation, persistent retryable errors and accessible feedback. Existing notification API already scopes data and mutations to the authenticated user and tenant. Chromium verified desktop, tablet and mobile; evidence: `docs/ux/evidence/ux008-*.png`.
+
 - **UX-009 fixed and browser verified:** shared async-state primitives now standardize loading, empty, persistent error/retry, success and `aria-live` feedback across dashboard, documents, sign requests, approvals, My Tasks, notifications, external signing loading and create-request submission. The create form keeps values after failure and blocks duplicate concurrent submissions. Chromium Playwright passed desktop, 768 px and 375 px recovery scenarios; evidence is stored in `docs/ux/evidence/`.

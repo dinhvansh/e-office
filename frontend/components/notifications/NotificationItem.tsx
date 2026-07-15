@@ -50,7 +50,7 @@ export function NotificationItem({ notification, onMarkAsRead, onDelete }: Notif
     if (!notification.is_read) {
       onMarkAsRead(notification.id);
     }
-    if (notification.link) {
+    if (notification.link?.startsWith('/') && !notification.link.startsWith('//')) {
       router.push(notification.link);
     }
   };
@@ -63,6 +63,15 @@ export function NotificationItem({ notification, onMarkAsRead, onDelete }: Notif
   return (
     <div
       onClick={handleClick}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          handleClick();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label={`${notification.is_read ? 'Đã đọc' : 'Chưa đọc'}: ${notification.title}`}
       className={`
         flex items-start gap-3 p-3 rounded-lg cursor-pointer
         transition-colors hover:bg-gray-50
@@ -100,6 +109,7 @@ export function NotificationItem({ notification, onMarkAsRead, onDelete }: Notif
       {/* Delete button */}
       <button
         onClick={handleDelete}
+        aria-label="Xóa thông báo"
         className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
       >
         <X className="w-4 h-4" />

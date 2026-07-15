@@ -82,6 +82,8 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 
 ### UX-008 — Complete and verify the notification destination
 
+- **Status:** Fixed — browser verified 2026-07-15.
+
 - **Screen/flow:** Notification bell/dropdown.
 - **Problem:** The footer links to `/notifications`, while no `app/**/notifications/page.tsx` route was found in the initial mapping. Loading is a generic spinner without an accessible loading announcement.
 - **Severity:** Medium.
@@ -89,6 +91,8 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - **Evidence:** E1: `frontend/components/notifications/NotificationDropdown.tsx`; route scan of `frontend/app` found no notifications page.
 - **Recommended fix:** Provide a tested notification-history destination or remove the unsupported link, and add an accessible loading/empty/read-state pattern.
 - **Acceptance criteria:** “View all notifications” resolves to a working route; empty/loading/read/unread states are readable; mark-read/delete actions show a result and are keyboard-operable.
+
+- **Verification:** Chromium covered dropdown navigation, pagination, read/read-all/delete actions, error/retry and empty state at desktop, 768 px and 375 px. Evidence is stored in `docs/ux/evidence/ux008-*.png`.
 
 ### UX-009 — Standardize loading, empty, error and success recovery
 
