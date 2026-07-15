@@ -16,6 +16,7 @@ storage/*
 backups/*
 !backups/.gitkeep
 scripts/test-*.js
+!scripts/test-authorization-matrix.js
 scripts/check-*.js
 scripts/debug-*.js
 test-output

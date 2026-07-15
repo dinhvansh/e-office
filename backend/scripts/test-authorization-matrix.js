@@ -8,7 +8,7 @@ const dotenv = require("dotenv");
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 dotenv.config({ path: path.resolve(__dirname, "../.env"), override: false });
 dotenv.config({ path: path.resolve(__dirname, "../../.env.compose"), override: false });
-if (process.env.DATABASE_URL && process.env.DATABASE_URL.includes("@db:")) {
+if (process.env.E2E_USE_LOCAL_DB === "1" && process.env.DATABASE_URL && process.env.DATABASE_URL.includes("@db:")) {
   process.env.DATABASE_URL = process.env.DATABASE_URL.replace("@db:", "@localhost:");
 }
 

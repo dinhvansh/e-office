@@ -29,6 +29,11 @@ async function seedRBAC() {
     { resource: 'documents', action: 'delete', description: 'Delete documents' },
     { resource: 'documents', action: 'share', description: 'Share documents' },
 
+    { resource: 'document_types', action: 'create', description: 'Create document types' },
+    { resource: 'document_types', action: 'read', description: 'View document types' },
+    { resource: 'document_types', action: 'update', description: 'Update document types' },
+    { resource: 'document_types', action: 'delete', description: 'Delete document types' },
+
     { resource: 'sign_requests', action: 'create', description: 'Create sign requests' },
     { resource: 'sign_requests', action: 'read', description: 'View sign requests' },
     { resource: 'sign_requests', action: 'update', description: 'Update sign requests' },
