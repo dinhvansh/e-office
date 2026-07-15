@@ -105,7 +105,7 @@ export default function MyTasksPage() {
         case 'approved': return <Badge className="bg-green-500 text-xs whitespace-nowrap">Đã duyệt</Badge>;
         case 'rejected': return <Badge className="bg-red-500 text-xs whitespace-nowrap">Từ chối</Badge>;
         case 'info_requested': return <Badge className="bg-blue-500 text-xs whitespace-nowrap">Yêu cầu BS</Badge>;
-        default: return <Badge className="text-xs">{task.status}</Badge>;
+        default: return <Badge className="text-xs">Đang cập nhật</Badge>;
       }
     } else {
       switch (task.status) {
@@ -113,7 +113,7 @@ export default function MyTasksPage() {
         case 'otp_sent': return <Badge className="bg-orange-500 text-xs whitespace-nowrap">Chờ ký</Badge>;
         case 'signed': return <Badge className="bg-green-500 text-xs whitespace-nowrap">Đã ký</Badge>;
         case 'rejected': return <Badge className="bg-red-500 text-xs whitespace-nowrap">Từ chối</Badge>;
-        default: return <Badge className="text-xs">{task.status}</Badge>;
+        default: return <Badge className="text-xs">Đang cập nhật</Badge>;
       }
     }
   };

@@ -126,7 +126,7 @@ export default function SignRequestDetailPage() {
       case 'pending':
         return 'Chờ ký';
       default:
-        return status;
+        return 'Đang cập nhật trạng thái';
     }
   };
 

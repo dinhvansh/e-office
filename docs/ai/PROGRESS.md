@@ -1,5 +1,9 @@
 # Implementation Progress
 
+## 2026-07-15 — Final accessibility and responsive pass
+
+- **UX-010 partial:** removed remaining raw task/sign-request status fallbacks and localized the shared dialog close control for screen readers. `docs/ux/UI-UX-FINAL-REVIEW.md` records remaining non-blocking admin keyboard and responsive coverage debt.
+
 ## 2026-07-14 — Critical signing and approval blockers
 
 ## 2026-07-15 — Workflow status and next action
