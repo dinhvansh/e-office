@@ -1,5 +1,25 @@
 # E-Office
 
+## Project governance
+
+This is source-available Fair-Code software, not OSI open source. Internal
+self-hosting and internal modifications are allowed under the draft
+[Community Source License](LICENSE); redistribution, white-labeling and hosted
+resale require a commercial license. Terms require legal review before public
+release. See [COMMERCIAL-LICENSING.md](COMMERCIAL-LICENSING.md),
+[TRADEMARK.md](TRADEMARK.md), [CONTRIBUTING.md](CONTRIBUTING.md), and
+[SECURITY.md](SECURITY.md).
+
+## PDF Unicode fonts
+
+PDF annotations use Noto Sans so Vietnamese text is embedded without
+transliteration. Noto fonts are licensed under the SIL Open Font License 1.1.
+The backend Docker image installs the Alpine `font-noto` package. For custom
+deployments, mount an approved Noto Sans font and set
+`PDF_UNICODE_FONT_PATH` (and optionally `PDF_UNICODE_BOLD_FONT_PATH`); do not
+replace it with a font whose redistribution licence is incompatible with the
+deployment.
+
 Monorepo cho hệ thống quản lý tài liệu, phê duyệt nội bộ và ký điện tử.
 
 ## Thành phần
@@ -27,15 +47,12 @@ Flow hiện tại:
   - tạo nháp trước
   - gửi xong mới chuyển sang `pending_signature`
 
-## Tài khoản mẫu
+## Tài khoản demo an toàn
 
 Sau khi seed dữ liệu:
 
-- Admin:
-  - email: `admin@acme.local`
-  - password: `secret123`
-- Các tài khoản mẫu tổ chức:
-  - password mặc định: `password123`
+Seed demo yêu cầu `DEMO_ADMIN_PASSWORD` rõ ràng (ít nhất 16 ký tự). Không có
+mật khẩu mặc định cho production; chỉ seed vào database demo/local riêng biệt.
 
 ## Chạy bằng Docker
 
@@ -53,7 +70,9 @@ cp .env.compose.example .env
 docker compose up -d --build
 ```
 
-4. Backend sẽ tự động khởi tạo DB khi container start (`prisma db push` + seed mặc định).
+4. Backend không tự động khởi tạo hoặc seed DB theo mặc định. Với một database demo
+   cô lập, đặt `AUTO_INIT_DB=true` trước khi khởi động container; thao tác này chạy
+   `prisma db push --accept-data-loss` và seed dữ liệu mẫu, nên không dùng cho môi trường có dữ liệu cần giữ.
 
 Nếu cần chạy lại seed thủ công:
 

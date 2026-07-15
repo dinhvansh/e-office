@@ -15,13 +15,13 @@ Refactor phần cấu hình phân quyền trong màn `Loại văn bản` để:
 - Đang lưu trong `tenant_settings`
 - Key hiện tại: `doc_type_policy:{documentTypeId}`
 - File chính:
-  - [backend/src/modules/settings/settings.service.ts](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/backend/src/modules/settings/settings.service.ts:1)
-  - [backend/src/modules/settings/settings.controller.ts](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/backend/src/modules/settings/settings.controller.ts:1)
+  - `backend/src/modules/settings/settings.service.ts`
+  - `backend/src/modules/settings/settings.controller.ts`
 
 ### UI loại văn bản
 - Màn `/document-types` đang gộp nhiều ý vào cùng một form
 - File:
-  - [frontend/app/(dashboard)/document-types/page.tsx](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/frontend/app/(dashboard)/document-types/page.tsx:1)
+  - `frontend/app/(dashboard)/document-types/page.tsx`
 
 ### Snapshot quyền khi tạo document
 - Khi tạo document, hệ thống đã đọc policy loại văn bản và snapshot một phần sang document
@@ -31,12 +31,12 @@ Refactor phần cấu hình phân quyền trong màn `Loại văn bản` để:
   - `department_id`
   - baseline ACL từ `detail_permissions`
 - File:
-  - [backend/src/modules/documents/documents.service.ts](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/backend/src/modules/documents/documents.service.ts:1)
+  - `backend/src/modules/documents/documents.service.ts`
 
 ### Resolver quyền hiện tại
 - Logic quyền đang nằm chủ yếu trong:
-  - [backend/src/modules/authorization/authorization.service.ts](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/backend/src/modules/authorization/authorization.service.ts:1)
-  - [backend/src/modules/documents/permissions.service.ts](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/backend/src/modules/documents/permissions.service.ts:1)
+  - `backend/src/modules/authorization/authorization.service.ts`
+  - `backend/src/modules/documents/permissions.service.ts`
 - Chưa có service riêng kiểu `resolveDocumentPermission(...)`
 - Chưa trả về đầy đủ `final permissions + reasons`
 

@@ -1,5 +1,16 @@
 # Implementation Progress
 
+## 2026-07-15 — Public source alpha packaging
+
+- Added a draft Fair-Code/source-available license package, commercial
+  licensing and trademark notices. It is explicitly not OSI open source and
+  requires legal review before publication.
+- Public onboarding now requires explicit demo passwords and documents that
+  signing is not automatically qualified PKI/PAdES signing.
+- Public scan found historical Public Workspace/Example Organization absolute documentation links and
+  debug artifacts; exclude or remediate them before publishing the full docs
+  archive.
+
 ## 2026-07-15 — Security cleanup (in progress)
 
 - Added refresh-token family replay revocation, webhook SSRF blocking and

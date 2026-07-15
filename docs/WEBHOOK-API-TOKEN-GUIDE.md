@@ -555,6 +555,6 @@ Nếu cần triển khai nhanh, chỉ cần nhớ:
 
 ## 14. Tài liệu liên quan
 
-- API tổng quan: [docs/api-spec.md](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/docs/api-spec.md:1)
-- Flow nghiệp vụ: [docs/business-flows.md](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/docs/business-flows.md:1)
-- Màn hình quản lý: [frontend/app/(dashboard)/webhooks/page.tsx](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/frontend/app/(dashboard)/webhooks/page.tsx:237)
+- API tổng quan: `docs/api-spec.md`
+- Flow nghiệp vụ: `docs/business-flows.md`
+- Màn hình quản lý: `frontend/app/(dashboard)/webhooks/page.tsx`
