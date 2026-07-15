@@ -192,6 +192,11 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - The shared destructive confirmation dialog replaces all product `confirm()`/`window.confirm()` usage. It names the action and target, keeps an inline localized failure state for retry, disables duplicate submit, supports Cancel/Escape and restores focus to the invoking control.
 - Chromium coverage verifies cancel without API call, a single pending request under double-click, failure/retry, keyboard focus, desktop, 768 px and 375 px. Evidence: `evidence/ux006-confirmation-normal-after-fix.png`, `evidence/ux006-confirmation-pending-after-fix.png`, `evidence/ux006-confirmation-error-after-fix.png`, `evidence/ux006-confirmation-mobile-after-fix.png`.
 
+## UX-001 verification (Fixed — browser verified 2026-07-15)
+
+- Registration links now open public `/terms` and `/privacy` pages with draft-public-beta legal language, version/effective-date metadata, support contact and return links. The registration draft persists in session storage while policy pages are viewed.
+- Backend registration currently records only `terms_accepted: boolean`; it does not persist accepted policy versions. This is a backend/schema follow-up and no migration was added in this UI task. Evidence: `evidence/ux001-privacy-mobile-after-fix.png`.
+
 ## Implementation classification
 
 | Frontend-only | Requires/benefits from backend/API |

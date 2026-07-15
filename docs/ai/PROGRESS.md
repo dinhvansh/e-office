@@ -21,3 +21,7 @@ Verification evidence is stored in `docs/ux/evidence/`.
 ## Destructive confirmations — 2026-07-14
 
 - **UX-006 fixed and browser verified:** a single Radix-based confirmation provider now replaces all native confirmation prompts across users, roles, documents, positions, external organizations, sign requests, document types and signer management. It provides Vietnamese action/target copy, pending duplicate protection, safe inline retry errors, Escape/focus behavior and responsive Chromium coverage.
+
+## Public legal pages — 2026-07-15
+
+- **UX-001 fixed and browser verified:** registration now links to public `/terms` and `/privacy` pages using centralized versions/effective date. Pages deliberately state that legal review is pending, work at 375 px and preserve registration values on return. Registration persistence currently records acceptance as a boolean only; recording policy versions remains a backend/schema follow-up.

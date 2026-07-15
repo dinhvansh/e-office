@@ -7,17 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert } from '@/components/ui/alert';
 import { ArrowLeft, Mail, Lock, User, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
+import { policyMetadata } from '@/lib/policy-metadata';
+
+const REGISTER_DRAFT_KEY = 'eoffice.register-draft';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    full_name: '',
-    company_name: '',
-    create_tenant: false,
-    terms_accepted: false
+  const [formData, setFormData] = useState(() => {
+    if (typeof window === 'undefined') return { email: '', password: '', confirmPassword: '', full_name: '', company_name: '', create_tenant: false, terms_accepted: false };
+    try {
+      return { email: '', password: '', confirmPassword: '', full_name: '', company_name: '', create_tenant: false, terms_accepted: false, ...JSON.parse(window.sessionStorage.getItem(REGISTER_DRAFT_KEY) || '{}') };
+    } catch {
+      return { email: '', password: '', confirmPassword: '', full_name: '', company_name: '', create_tenant: false, terms_accepted: false };
+    }
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -41,6 +43,10 @@ export default function RegisterPage() {
       number: /\d/.test(formData.password)
     });
   }, [formData.password]);
+
+  useEffect(() => {
+    window.sessionStorage.setItem(REGISTER_DRAFT_KEY, JSON.stringify(formData));
+  }, [formData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +96,7 @@ export default function RegisterPage() {
       }
 
       setSuccess(true);
+      window.sessionStorage.removeItem(REGISTER_DRAFT_KEY);
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
     } finally {
@@ -320,13 +327,14 @@ export default function RegisterPage() {
               />
               <label htmlFor="terms" className="ml-2 text-sm text-gray-600">
                 Tôi đồng ý với{' '}
-                <a href="#" className="text-indigo-600 hover:text-indigo-700 font-medium">
+                <Link href="/terms" className="text-indigo-600 hover:text-indigo-700 font-medium underline underline-offset-2">
                   điều khoản sử dụng
-                </a>{' '}
+                </Link>{' '}
                 và{' '}
-                <a href="#" className="text-indigo-600 hover:text-indigo-700 font-medium">
+                <Link href="/privacy" className="text-indigo-600 hover:text-indigo-700 font-medium underline underline-offset-2">
                   chính sách bảo mật
-                </a>
+                </Link>{' '}
+                <span className="block mt-1 text-xs text-gray-500">Phiên bản {policyMetadata.termsVersion}/{policyMetadata.privacyVersion}, hiệu lực {policyMetadata.effectiveDate}.</span>
               </label>
             </div>
 
