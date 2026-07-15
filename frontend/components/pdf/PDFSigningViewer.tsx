@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import SignatureCanvas from '@/components/signature/SignatureCanvas';
 import SignatureModal from '@/components/signature/SignatureModal';
 import PDFCoreViewer from '@/components/pdf/PDFCoreViewer';
@@ -241,7 +242,7 @@ export default function PDFSigningViewer({
                     )
                   ) : hasSigned ? (
                     field.type === 'signature' ? (
-                      <img src={fieldValues[field.id]} alt="Signature" className="h-full w-full object-contain p-1" />
+                      <Image src={fieldValues[field.id]} alt="Chữ ký đã hoàn thành" width={Math.max(1, Math.round(boxPx.width))} height={Math.max(1, Math.round(boxPx.height))} unoptimized className="h-full w-full object-contain p-1" />
                     ) : (
                       <div className="flex h-full items-center justify-center p-1 text-sm font-semibold text-gray-800">
                         {fieldValues[field.id]}

@@ -126,7 +126,7 @@ export default function SignRequestEditorPage() {
       const firstSignerParticipant = participants.find((participant) => participant.kind === 'signer' && participant.signer_id);
       return firstSignerParticipant?.signer_id || null;
     });
-  }, [editorData, signRequestId]);
+  }, [editorData, participants, signRequestId]);
 
   const saveFieldsMutation = useMutation({
     mutationFn: async (fieldsToSave: Field[]) =>
@@ -227,7 +227,7 @@ export default function SignRequestEditorPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="sticky top-0 z-10 border-b bg-white">
+      <div className="border-b bg-white md:sticky md:top-0 md:z-10">
         <div className="mx-auto max-w-[1800px] px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">

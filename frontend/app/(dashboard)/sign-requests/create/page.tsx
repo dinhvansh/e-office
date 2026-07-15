@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { InlineActionFeedback } from '@/components/ui/async-state';
+import { AsyncErrorState, InlineActionFeedback } from '@/components/ui/async-state';
 
 interface DocumentType {
   id: number;
@@ -101,6 +101,7 @@ export default function CreateSignRequestPage() {
   const [ccEmails, setCcEmails] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
   const submittingRef = useRef(false);
+  const [submissionLocked, setSubmissionLocked] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
@@ -390,30 +391,34 @@ export default function CreateSignRequestPage() {
 
       return response.document;
     },
-    onSuccess: (document: any) => {
-      setSubmitSuccess(isEditMode ? 'Đã lưu cấu hình trình ký.' : 'Đã tạo trình ký thành công.');
-      const signRequestId = Number(document?.sign_request_id);
-      if (Number.isFinite(signRequestId) && signRequestId > 0) {
-        toast.success(
-          isEditMode
-            ? 'Đã cập nhật cấu hình trình ký. Đang quay lại editor...'
-            : 'Đã chốt cấu hình trình ký. Đang chuyển sang editor để đặt vị trí ký...',
-        );
-        router.replace(`/sign-requests/${signRequestId}/editor`);
-        return;
-      }
-
-      toast.error('Đã tạo tài liệu nhưng chưa lấy được luồng trình ký. Vui lòng mở lại từ danh sách.');
-      router.replace('/sign-requests');
-    },
     onError: (error: any) => {
       setSubmitError('Không thể lưu cấu hình trình ký. Vui lòng thử lại. Dữ liệu bạn đã nhập vẫn được giữ nguyên.');
       toast.error(error.message || 'Không thể lưu cấu hình trình ký');
     },
-    onSettled: () => {
+    onSuccess: (document: any) => {
+      setSubmissionLocked(false);
+      setSubmitSuccess(isEditMode ? 'Đã lưu cấu hình trình ký.' : 'Đã tạo trình ký thành công.');
+      const signRequestId = Number(document?.sign_request_id);
+      if (Number.isFinite(signRequestId) && signRequestId > 0) {
+        toast.success(isEditMode ? 'Đã cập nhật cấu hình trình ký. Đang quay lại editor...' : 'Đã chốt cấu hình trình ký. Đang chuyển sang editor để đặt vị trí ký...');
+        router.replace(`/sign-requests/${signRequestId}/editor`);
+        return;
+      }
+      toast.error('Đã tạo tài liệu nhưng chưa lấy được luồng trình ký. Vui lòng mở lại từ danh sách.');
+      router.replace('/sign-requests');
+    },
+    onSettled: (_data, error) => {
+      if (!error) setSubmissionLocked(false);
       submittingRef.current = false;
     },
   });
+
+  const retryCreate = () => {
+    if (createMutation.isPending) return;
+    submittingRef.current = true;
+    setSubmissionLocked(true);
+    createMutation.mutate();
+  };
 
   useEffect(() => {
     const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
@@ -438,12 +443,14 @@ export default function CreateSignRequestPage() {
         className="mx-auto max-w-5xl space-y-6 pb-24 sm:pb-6"
         onSubmit={(event) => {
           event.preventDefault();
-          if (submittingRef.current || createMutation.isPending) return;
+          if (submittingRef.current || submissionLocked || createMutation.isPending) return;
           submittingRef.current = true;
+          setSubmissionLocked(true);
           createMutation.mutate();
         }}
       >
         <InlineActionFeedback error={submitError} success={submitSuccess} />
+        {submitError && <AsyncErrorState message="Không thể lưu cấu hình. Dữ liệu đã nhập vẫn được giữ nguyên." onRetry={retryCreate} />}
         <nav aria-label="Các bước tạo trình ký" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {steps.map((label, index) => { const step = index + 1; return <button key={label} type="button" onClick={() => { if (step <= currentStep) setCurrentStep(step); }} disabled={step > currentStep} className={`rounded-lg border p-3 text-left text-sm focus-visible:ring-2 focus-visible:ring-ring ${step === currentStep ? 'border-blue-600 bg-blue-50 font-semibold' : step < currentStep ? 'border-emerald-300 bg-emerald-50' : 'text-muted-foreground'}`}><span className="mr-2">{step < currentStep ? '✓' : step}.</span>{label}</button>; })}
         </nav>
@@ -586,13 +593,9 @@ export default function CreateSignRequestPage() {
                     </Select>
                   </div>}
 
-                  {false ? (
-                    <WorkflowPreview workflowId={selectedWorkflowId} />
-                  ) : (
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                      Loại văn bản này chưa gắn workflow mặc định. Anh có thể chọn một workflow có sẵn hoặc tự tạo luồng ad-hoc bên dưới.
-                    </div>
-                  )}
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    Loại văn bản này chưa gắn workflow mặc định. Anh có thể chọn một workflow có sẵn hoặc tự tạo luồng ad-hoc bên dưới.
+                  </div>
 
                   {true && (
                     <AdhocWorkflowBuilder
@@ -673,7 +676,7 @@ export default function CreateSignRequestPage() {
           ) : (
           <Button
             type="submit"
-            disabled={createMutation.isPending || isLoadingExisting}
+            disabled={submissionLocked || createMutation.isPending || (isEditMode && isLoadingExisting)}
             className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto"
           >
             {createMutation.isPending

@@ -1,6 +1,7 @@
 'use client';
 
-import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle, Download, FileText, MessageSquare, Paperclip, RefreshCw, Send, Upload, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -103,18 +104,7 @@ export default function ApprovalDetailPage() {
   const isProcessed = approval ? approval.action !== 'pending' : false;
   const hasDiscussion = Boolean(approval?.document.sign_request_id);
 
-  useEffect(() => {
-    fetchApprovalDetail();
-  }, [approvalId]);
-
-  useEffect(() => {
-    if (approval) {
-      fetchComments();
-      fetchAttachments();
-    }
-  }, [approval?.id, approval?.document.sign_request_id]);
-
-  const fetchApprovalDetail = async () => {
+  const fetchApprovalDetail = useCallback(async () => {
     try {
       setLoading(true);
       const data = await fetchJson<ApprovalDetail>(`/approvals/${approvalId}`);
@@ -125,26 +115,37 @@ export default function ApprovalDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [approvalId, fetchJson, router]);
 
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     try {
       const data = await fetchJson<{ comments: DiscussionComment[] }>(`/approvals/${approvalId}/comments`);
       setComments(data.comments || []);
     } catch {
       setComments([]);
     }
-  };
+  }, [approvalId, fetchJson]);
 
-  const fetchAttachments = async () => {
-    if (!approval?.document.id) return;
+  const fetchAttachments = useCallback(async (documentId: number) => {
     try {
-      const data = await fetchJson<{ attachments: DocumentAttachment[] }>(`/documents/${approval.document.id}/attachments`);
+      const data = await fetchJson<{ attachments: DocumentAttachment[] }>(`/documents/${documentId}/attachments`);
       setAttachments(data.attachments || []);
     } catch {
       setAttachments([]);
     }
-  };
+  }, [fetchJson]);
+
+  useEffect(() => {
+    fetchApprovalDetail();
+  }, [fetchApprovalDetail]);
+
+  useEffect(() => {
+    const documentId = approval?.document.id;
+    if (documentId) {
+      fetchComments();
+      fetchAttachments(documentId);
+    }
+  }, [approval?.id, approval?.document.id, approval?.document.sign_request_id, fetchAttachments, fetchComments]);
 
   const fileToBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -174,7 +175,7 @@ export default function ApprovalDetailPage() {
           file_type: file.type || 'application/octet-stream',
         }),
       });
-      await fetchAttachments();
+      await fetchAttachments(approval.document.id);
       toast.success('Đã thêm file đính kèm');
     } catch (error: any) {
       toast.error(error.message || 'Không thể tải file đính kèm');
@@ -428,7 +429,7 @@ export default function ApprovalDetailPage() {
                 {selectedAction === 'approve' && signatureData && (
                   <div className="rounded-xl border p-4">
                     <Label>Chữ ký phê duyệt</Label>
-                    <img src={signatureData} alt="Signature" className="mx-auto mt-3 max-h-24" />
+                    <Image src={signatureData} alt="Signature" width={500} height={96} unoptimized className="mx-auto mt-3 max-h-24" />
                     <Button onClick={() => setShowSignatureModal(true)} variant="outline" size="sm" className="mt-3 w-full">
                       Thay đổi chữ ký
                     </Button>

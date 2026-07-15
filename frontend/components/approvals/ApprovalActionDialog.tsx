@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -148,9 +149,12 @@ export default function ApprovalActionDialog({
                 {signatureData ? (
                   <div className="mt-2 space-y-2">
                     <div className="border border-gray-300 rounded-lg p-4 bg-white">
-                      <img
+                      <Image
                         src={signatureData}
                         alt="Signature"
+                        width={500}
+                        height={128}
+                        unoptimized
                         className="max-w-full h-auto max-h-32 mx-auto"
                       />
                     </div>

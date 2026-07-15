@@ -29,7 +29,7 @@ export function AdhocWorkflowBuilder({ onBuild }: AdhocWorkflowBuilderProps) {
 
   useEffect(() => {
     onBuild(steps.length > 0 ? steps : null);
-  }, [steps]);
+  }, [onBuild, steps]);
 
   const handleAddStep = () => {
     setSteps([

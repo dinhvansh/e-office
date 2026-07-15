@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { Button } from '@/components/ui/button';
@@ -9,12 +9,13 @@ import SignatureCanvas from 'react-signature-canvas';
 import InternalSigningSidebar from '@/components/signing/InternalSigningSidebar';
 import PDFSigningViewer from '@/components/pdf/PDFSigningViewer';
 import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
+import type { SignFieldType } from '@/lib/sign-field.helper';
 import { toast } from 'sonner';
 
 
 interface SignatureField {
   id: number;
-  type: string;
+  type: SignFieldType;
   pageIndex: number;
   page?: number;
   xPct: number;
@@ -77,20 +78,7 @@ export default function InternalSigningPage() {
   const [completedFields, setCompletedFields] = useState<number[]>([]);
   const [fieldSignatures, setFieldSignatures] = useState<Record<number, string>>({});
 
-  useEffect(() => {
-    fetchSigningData();
-    
-    // Auto-refresh every 10 seconds if sign request is in progress
-    const interval = setInterval(() => {
-      if (data?.sign_request?.status === 'in_progress') {
-        fetchSigningData(true); // Pass true to allow refresh
-      }
-    }, 10000);
-    
-    return () => clearInterval(interval);
-  }, [signRequestId, data?.sign_request?.status]);
-
-  const fetchSigningData = async (forceRefresh = false) => {
+  const fetchSigningData = useCallback(async (forceRefresh = false) => {
     // Guard: only fetch once unless force refresh
     if (data && !forceRefresh) return;
     
@@ -170,7 +158,19 @@ export default function InternalSigningPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [data, fetchJson, pdfUrl, router, signRequestId, tokens?.accessToken, user?.id]);
+
+  useEffect(() => {
+    fetchSigningData();
+
+    const interval = setInterval(() => {
+      if (data?.sign_request?.status === 'in_progress') {
+        fetchSigningData(true);
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [data?.sign_request?.status, fetchSigningData]);
 
   const handleClear = () => {
     sigCanvasRef.current?.clear();

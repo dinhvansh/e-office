@@ -11,6 +11,10 @@ Scope: initial source review plus Playwright runtime review; no production code 
 
 ## Overall assessment
 
+### Final remediation (2026-07-15)
+
+- **UX-009 / UX-010 — Fixed and browser verified:** shared recovery states preserve form input, provide persistent localized retry feedback and prevent duplicate submissions. Frontend lint has zero errors and warnings; dependency closures and image accessibility were corrected. Chromium replay covered PDF keyboard signing, dialog Escape/focus return, notifications, create-request recovery, and desktop/768px/375px layouts.
+
 ### Navigation remediation (2026-07-14)
 
 - **UX-004 / UX-015 — Fixed and browser verified:** desktop and mobile now consume the same permission-filtered navigation groups. `super_admin` receives the complete configured administration set, while restricted roles only receive permitted destinations; mobile provides additional items through an accessible “Thêm” overflow. Chromium replay covered requester, approver, signer and super-admin at desktop, 768 px and 375 px. See `evidence/ux015-super-admin-desktop-after-fix.png` and `evidence/ux015-super-admin-mobile-overflow-after-fix.png`.

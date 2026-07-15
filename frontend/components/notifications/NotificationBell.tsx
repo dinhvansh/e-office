@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell } from 'lucide-react';
 import { useAuth } from '@/components/providers/auth-provider';
 import { 
@@ -25,14 +25,14 @@ export function NotificationBell() {
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Fetch unread count
-  const fetchUnreadCount = async () => {
+  const fetchUnreadCount = useCallback(async () => {
     try {
       const count = await getUnreadCount(fetchJson);
       setUnreadCount(count);
     } catch (error) {
       console.error('Failed to fetch unread count:', error);
     }
-  };
+  }, [fetchJson]);
 
   // Fetch notifications
   const fetchNotifications = async () => {
@@ -130,7 +130,7 @@ export function NotificationBell() {
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchUnreadCount]);
 
   return (
     <div className="relative">

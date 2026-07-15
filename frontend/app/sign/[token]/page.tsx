@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -90,15 +91,11 @@ export default function PublicSigningPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   useEffect(() => {
-    fetchSigningData();
-  }, [token]);
-
-  useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
   }, []);
 
-  const fetchSigningData = async (): Promise<SigningData | null> => {
+  const fetchSigningData = useCallback(async (): Promise<SigningData | null> => {
     setLoadError(null);
     try {
       const apiBase = getPublicApiBaseUrl();
@@ -128,7 +125,11 @@ export default function PublicSigningPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    fetchSigningData();
+  }, [fetchSigningData]);
 
   const handleSendOtp = async () => {
     if (Date.now() < resendAvailableAt) return;
@@ -834,9 +835,12 @@ export default function PublicSigningPage() {
             {signatureData ? (
               <div className="space-y-4">
                 <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
-                  <img
+                  <Image
                     src={signatureData}
                     alt="Signature"
+                    width={500}
+                    height={128}
+                    unoptimized
                     className="max-w-full h-auto max-h-32 mx-auto"
                   />
                 </div>

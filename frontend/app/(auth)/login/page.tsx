@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 
@@ -43,7 +44,7 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit} className="relative w-full max-w-lg rounded-[32px] border border-white/60 bg-white/80 p-10 shadow-[0_25px_70px_rgba(15,23,42,0.15)] backdrop-blur">
         <div className="mb-8 space-y-4">
           <div className="flex justify-center">
-            <img src="/logo.png" alt="Logo" className="h-16 w-auto object-contain" />
+            <Image src="/logo.png" alt="Logo" width={128} height={64} className="h-16 w-auto object-contain" priority />
           </div>
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-semibold text-slate-900">Đăng nhập Workspace</h1>

@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react';
+import { ReactNode, MouseEvent as ReactMouseEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -76,7 +76,7 @@ export default function PDFCoreViewer({
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
   const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
 
-  const getAvailableWidth = () => {
+  const getAvailableWidth = useCallback(() => {
     const container = containerRef.current;
     if (!container) return 280;
 
@@ -84,7 +84,7 @@ export default function PDFCoreViewer({
     const paddingLeft = Number.parseFloat(styles.paddingLeft || '0') || 0;
     const paddingRight = Number.parseFloat(styles.paddingRight || '0') || 0;
     return Math.max(280, container.clientWidth - paddingLeft - paddingRight - fitPadding);
-  };
+  }, [fitPadding]);
 
   useEffect(() => {
     isAutoFitEnabledRef.current = isAutoFitEnabled;
@@ -169,7 +169,7 @@ export default function PDFCoreViewer({
         fitFrameRef.current = null;
       }
     };
-  }, [autoFitTick, currentPage, fitPadding, isAutoFitEnabled, maxScale, minScale, pdfDoc]);
+  }, [autoFitTick, currentPage, getAvailableWidth, isAutoFitEnabled, maxScale, minScale, pdfDoc]);
 
   useEffect(() => {
     if (!pdfDoc || !canvasRef.current) return;

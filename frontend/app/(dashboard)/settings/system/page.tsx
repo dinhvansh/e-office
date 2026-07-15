@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
-import { Image, Loader2, Mail, Save, Settings, TestTube } from "lucide-react";
+import NextImage from "next/image";
+import { Image as ImageIcon, Loader2, Mail, Save, Settings, TestTube } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { PageHeader } from "@/components/ui/page-header";
@@ -304,7 +305,7 @@ export default function SystemSettingsPage() {
             Email SMTP
           </TabsTrigger>
           <TabsTrigger value="watermark">
-            <Image className="mr-2 h-4 w-4" />
+            <ImageIcon aria-hidden="true" className="mr-2 h-4 w-4" />
             Watermark
           </TabsTrigger>
         </TabsList>
@@ -467,7 +468,7 @@ export default function SystemSettingsPage() {
 
                                 <div className="rounded-lg border bg-white p-3">
                                   {imageData ? (
-                                    <img src={imageData} alt={`${status} watermark`} className="h-36 w-full rounded object-contain" />
+                                    <NextImage src={imageData} alt={`${status} watermark`} width={576} height={144} unoptimized className="h-36 w-full rounded object-contain" />
                                   ) : (
                                     <div className="flex h-36 items-center justify-center rounded bg-slate-100 text-xs text-slate-400">
                                       Chưa có watermark ảnh
@@ -643,9 +644,12 @@ function resolvePreviewVariant(config: WatermarkConfig, status: WatermarkStatusK
 function renderPreviewImage(imageData: string, config: WatermarkConfig, positionClass: string, size: number) {
   if (!imageData) return null;
   return (
-    <img
+    <NextImage
       src={imageData}
       alt="Watermark preview"
+      width={size}
+      height={size}
+      unoptimized
       className={`pointer-events-none absolute ${positionClass} object-contain`}
       style={{
         opacity: config.opacity,

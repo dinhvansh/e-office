@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Clock, Plus, Trash2, User } from 'lucide-react';
 
@@ -54,19 +54,19 @@ export function WorkflowCustomizer({ defaultWorkflowId, initialSteps, onCustomiz
   const [steps, setSteps] = useState<WorkflowStepInput[]>([]);
   const stepsRef = useRef<WorkflowStepInput[]>([]);
 
-  const syncSteps = (nextSteps: WorkflowStepInput[] | null, emit = true) => {
+  const syncSteps = useCallback((nextSteps: WorkflowStepInput[] | null, emit = true) => {
     const normalized = (nextSteps || []).map((step, index) => normalizeStep(step, index));
     stepsRef.current = normalized;
     setSteps(normalized);
     if (emit) {
       onCustomize(normalized.length ? normalized : null);
     }
-  };
+  }, [onCustomize]);
 
-  const updateSteps = (updater: (current: WorkflowStepInput[]) => WorkflowStepInput[] | null) => {
+  const updateSteps = useCallback((updater: (current: WorkflowStepInput[]) => WorkflowStepInput[] | null) => {
     const nextSteps = updater(stepsRef.current);
     syncSteps(nextSteps);
-  };
+  }, [syncSteps]);
 
   const { data: workflowData, isLoading: isLoadingWorkflow } = useQuery({
     queryKey: ['workflow', defaultWorkflowId, 'customizer'],
@@ -110,7 +110,7 @@ export function WorkflowCustomizer({ defaultWorkflowId, initialSteps, onCustomiz
     if (!areStepsEqual(stepsRef.current, templateSteps)) {
       syncSteps(templateSteps);
     }
-  }, [restoredSteps, templateSteps]);
+  }, [restoredSteps, syncSteps, templateSteps]);
 
   const handleAddStep = () => {
     updateSteps((current) => [

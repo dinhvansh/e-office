@@ -110,14 +110,18 @@ test('UX-009 create request keeps form input after failure and prevents duplicat
   await page.locator('#file-upload').setInputFiles({ name: 'hop-dong.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
   await page.getByRole('combobox').click();
   await page.getByRole('option', { name: 'Hợp đồng kiểm thử (HD)' }).click();
+  for (let step = 0; step < 3; step += 1) {
+    await page.getByRole('button', { name: 'Tiếp tục', exact: true }).click();
+  }
   const submit = page.getByRole('button', { name: 'Tiếp tục sang editor' });
-  await submit.dblclick();
+  await submit.click({ force: true });
+  await expect(submit).toBeDisabled();
   const submitError = page.getByRole('alert').filter({ hasText: 'Dữ liệu bạn đã nhập vẫn được giữ nguyên' });
   await expect(submitError).toBeVisible();
   await expect(page.getByText('hop-dong.pdf')).toBeVisible();
   await expect.poll(() => createAttempts).toBe(1);
   shouldFail = false;
-  await submit.click();
+  await page.getByRole('button', { name: 'Thử lại' }).click();
   await expect(submitError).toHaveCount(0);
 });
 

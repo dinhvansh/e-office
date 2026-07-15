@@ -2,6 +2,10 @@
 
 Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** source review, **E2** Playwright runtime, **E3** authenticated-flow limitation; source-informed items require role-based browser replay before implementation.
 
+## Final status — 2026-07-15
+
+All current public-beta audit items are **Fixed** and browser verified. In particular, **UX-009** now provides persistent localized recovery feedback, input preservation and keyboard-accessible retry, while **UX-010** has zero project-owned frontend lint warnings and representative keyboard/responsive Chromium coverage at desktop, 768 px and 375 px.
+
 ## P0 — public-beta readiness
 
 ### UX-001 — Publish usable legal links from registration

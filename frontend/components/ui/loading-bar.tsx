@@ -26,11 +26,9 @@ export function LoadingBar() {
   }, []);
 
   useEffect(() => {
-    if (!loading) {
-      // Start loading when pathname changes (fallback)
-      setLoading(true);
-      setProgress(20);
-    }
+    // Start loading when pathname changes (fallback).
+    setLoading(true);
+    setProgress(20);
 
     // Simulate progress
     const timer1 = setTimeout(() => setProgress(40), 100);

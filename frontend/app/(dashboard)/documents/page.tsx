@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
-import { ChangeEvent, KeyboardEvent, MouseEvent, useState, useEffect } from "react";
+import { ChangeEvent, KeyboardEvent, MouseEvent, useState, useEffect, useMemo } from "react";
 import { FileText, Upload, Trash2, Download, Eye, Send, Archive, XCircle } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { DocumentRecord, DocumentType } from "@/lib/types";
@@ -147,9 +147,10 @@ export default function DocumentsPage() {
 
 
   // Only show document types that DON'T require digital signing
-  const activeDocumentTypes = creatableDocumentTypesData?.filter((type) => 
-    type.is_active && !type.require_digital_signing
-  ) || [];
+  const activeDocumentTypes = useMemo(
+    () => (creatableDocumentTypesData ?? []).filter((type) => type.is_active && !type.require_digital_signing),
+    [creatableDocumentTypesData],
+  );
   const activeWorkflows = Array.isArray(workflowsData) ? workflowsData.filter((wf) => wf.is_active) : [];
 
   // Detect workflow mode when document type changes
@@ -379,7 +380,7 @@ export default function DocumentsPage() {
     handleView(documentId);
   };
 
-  const handleDownload = async (id: number, fileName?: string, document?: DocumentRecord) => {
+  const handleDownload = async (id: number, fileName?: string, documentRecord?: DocumentRecord) => {
     if (!canReadDocuments) {
       toast.error("Bạn không có quyền tải tài liệu");
       return;
@@ -395,7 +396,7 @@ export default function DocumentsPage() {
       }
       
       // Use signed version if document is completed and has signed file
-      const useSigned = document?.status === 'completed' && document?.signed_file_path;
+      const useSigned = documentRecord?.status === 'completed' && documentRecord?.signed_file_path;
       const endpoint = useSigned ? 'download-signed' : 'download';
       const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/documents/${id}/${endpoint}`;
       
@@ -769,7 +770,6 @@ export default function DocumentsPage() {
                       signers={signers}
                       onChange={setSigners}
                       externalOrgs={externalOrgs || []}
-                      internalSignersCount={internalSignersCount}
                     />
                   );
                 })()}
@@ -1040,7 +1040,7 @@ export default function DocumentsPage() {
                         </td>
                         <td className="px-2 py-3">
                           {doc.document_type ? (
-                            <span className="text-xs truncate max-w-[100px] inline-block">{doc.document_type}</span>
+                            <span className="text-xs truncate max-w-[100px] inline-block">{doc.document_type.name}</span>
                           ) : (
                             <span className="text-muted-foreground text-xs">—</span>
                           )}

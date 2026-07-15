@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -10,6 +11,37 @@ import { ArrowLeft, PenTool, Check, FileText, CheckCircle, Clock } from 'lucide-
 import SignatureCanvas from 'react-signature-canvas';
 import { toast } from 'sonner';
 import ApprovalHistory from '@/components/signing/ApprovalHistory';
+
+type InternalSignRequest = {
+  status: string | null;
+  workflow_type: string | null;
+  signers: Array<{
+    id: number;
+    signing_order: number | null;
+    name: string | null;
+    email: string | null;
+    status: string | null;
+  }>;
+  document: {
+    id: number;
+    title: string | null;
+    original_file_name: string | null;
+    document_number: string | null;
+    approvals: Array<{
+      id: number;
+      status: string;
+      comments?: string | null;
+      approved_at?: string | null;
+      rejected_at?: string | null;
+      approver: {
+        id: number;
+        full_name: string;
+        email: string;
+        avatar_url?: string | null;
+      };
+    }>;
+  } | null;
+};
 
 export default function InternalSigningPage() {
   const params = useParams();
@@ -30,7 +62,7 @@ export default function InternalSigningPage() {
   const { data: signRequest, isLoading } = useQuery({
     queryKey: ['sign-request', signRequestId],
     queryFn: async () => {
-      const res = await fetchJson<any>(`/sign-requests/${signRequestId}`);
+      const res = await fetchJson<{ sign_request: InternalSignRequest }>(`/sign-requests/${signRequestId}`);
       return res.sign_request;
     }
   });
@@ -243,8 +275,8 @@ export default function InternalSigningPage() {
                       ref={sigCanvasRef}
                       canvasProps={{
                         className: 'w-full h-48 cursor-crosshair',
+                        style: { backgroundColor: 'white' },
                       }}
-                      backgroundColor="white"
                     />
                   </div>
 
@@ -273,9 +305,12 @@ export default function InternalSigningPage() {
                     <div className="mt-4">
                       <p className="text-sm text-gray-600 mb-2">Xem trước:</p>
                       <div className="border rounded-lg p-4 bg-gray-50">
-                        <img
+                        <Image
                           src={signatureData}
                           alt="Signature preview"
+                          width={500}
+                          height={96}
+                          unoptimized
                           className="max-h-24 mx-auto"
                         />
                       </div>

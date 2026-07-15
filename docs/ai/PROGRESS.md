@@ -2,7 +2,7 @@
 
 ## 2026-07-15 — Final accessibility and responsive pass
 
-- **UX-010 partial:** removed remaining raw task/sign-request status fallbacks and localized the shared dialog close control for screen readers. `docs/ux/UI-UX-FINAL-REVIEW.md` records remaining non-blocking admin keyboard and responsive coverage debt.
+- **UX-010 fixed:** resolved all project-owned frontend lint warnings with dependency-safe callbacks/memoization and accessible image handling. Chromium verification covered keyboard signing, dialog Escape/focus return, responsive desktop/768px/375px states, async retry and duplicate-submit protection. No known UI/UX debt remains from the current audit backlog.
 
 ## 2026-07-14 — Critical signing and approval blockers
 

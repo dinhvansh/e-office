@@ -64,6 +64,7 @@ export default function SignRequestDetailPage() {
   // Load PDF with authentication
   React.useEffect(() => {
     if (!signRequest) return;
+    let objectUrl: string | null = null;
 
     const loadPDF = async () => {
       try {
@@ -83,6 +84,7 @@ export default function SignRequestDetailPage() {
         if (response.ok) {
           const blob = await response.blob();
           const url = URL.createObjectURL(blob);
+          objectUrl = url;
           setPdfUrl(url);
         }
       } catch (error) {
@@ -93,8 +95,8 @@ export default function SignRequestDetailPage() {
     loadPDF();
 
     return () => {
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl);
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
       }
     };
   }, [signRequest]);

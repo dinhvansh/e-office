@@ -73,10 +73,10 @@ export default function DocumentFlowPage() {
       const response = await fetchJson(`/documents/${documentId}/flow`);
       return response;
     },
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Auto-refresh every 10 seconds if document is in progress
       // Stop refreshing when completed or rejected
-      const status = data?.document?.status;
+      const status = query.state.data?.document?.status;
       if (
         status === 'in_progress' ||
         status === 'pending' ||
@@ -92,7 +92,8 @@ export default function DocumentFlowPage() {
 
   // Set PDF URL - use progressive/signed version if available
   useEffect(() => {
-    if (typeof window !== 'undefined' && documentId && flowData) {
+    const document = flowData?.document;
+    if (typeof window !== 'undefined' && documentId && document) {
       if (!process.env.NEXT_PUBLIC_API_URL) {
         throw new Error('NEXT_PUBLIC_API_URL environment variable is required');
       }
@@ -100,7 +101,7 @@ export default function DocumentFlowPage() {
       
       // Priority: Use signed_file_path if exists (progressive or completed)
       // This shows the latest PDF with signatures as they are added
-      const hasSignedFile = flowData?.document?.signed_file_path;
+      const hasSignedFile = document.signed_file_path;
       const endpoint = hasSignedFile ? 'view-signed' : 'view';
       
       // Add timestamp to force reload when signed_file_path changes
@@ -110,7 +111,7 @@ export default function DocumentFlowPage() {
       
       setPdfUrl(`${apiUrl}/documents/${documentId}/${endpoint}${cacheBuster}`);
     }
-  }, [documentId, flowData?.document?.signed_file_path, flowData?.document?.status]);
+  }, [documentId, flowData]);
 
   const isCompleted = (flowData?.document?.status || '').toLowerCase() === 'completed';
 

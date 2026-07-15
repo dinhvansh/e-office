@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -93,10 +94,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             isCollapsed && "flex justify-center"
           )}>
             {isCollapsed ? (
-              <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain" />
+              <Image src="/logo.png" alt="Logo" width={40} height={40} className="w-10 h-10 object-contain" />
             ) : (
               <div className="flex items-center gap-3">
-                <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain" />
+                <Image src="/logo.png" alt="Logo" width={40} height={40} className="w-10 h-10 object-contain" />
                 <div>
                   <p className="text-lg font-bold text-slate-900">{tenant?.name ?? "WP Sign"}</p>
                   <p className="text-xs text-slate-500">{tenant?.plan ?? "Enterprise"}</p>

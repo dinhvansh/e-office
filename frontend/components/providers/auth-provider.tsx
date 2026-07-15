@@ -243,7 +243,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       return false;
     }
-  }, [logout]);
+  }, [fetchPermissions, logout]);
 
   const hasPermission = useCallback(
     (permission: string | string[]) => {

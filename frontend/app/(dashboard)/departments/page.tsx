@@ -32,6 +32,8 @@ interface Department {
   created_at: string;
 }
 
+const EMPTY_DEPARTMENTS: Department[] = [];
+
 export default function DepartmentsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
@@ -50,7 +52,7 @@ export default function DepartmentsPage() {
     refetchOnMount: 'always',
   });
 
-  const departments: Department[] = (deptData as any) || [];
+  const departments: Department[] = (deptData as Department[] | undefined) ?? EMPTY_DEPARTMENTS;
 
   // Flatten tree for table view
   const flattenDepartments = (depts: Department[]): Department[] => {

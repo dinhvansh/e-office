@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Shield, Users, Edit, Trash2, Search, FileText, User, Building2, Briefcase } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
@@ -199,7 +199,7 @@ export default function RolesPage() {
     enabled: !!viewingRoleUsers && showUsersDialog,
   });
 
-  const documents = (documentsData || []) as DocumentItem[];
+  const documents = useMemo(() => (documentsData ?? []) as DocumentItem[], [documentsData]);
   const permissionUsers = (usersData || []) as UserOption[];
   const permissionDepartments = (departmentsData || []) as DepartmentOption[];
   const permissionPositions = ((positionsData || []) as PositionOption[]).filter((position) => position.is_active !== false);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -172,9 +173,12 @@ export default function SignatureModal({
 
                 {uploadedImage && (
                   <div className="mt-4 border border-gray-300 rounded-lg p-4 bg-white">
-                    <img
+                    <Image
                       src={uploadedImage}
                       alt="Signature preview"
+                      width={500}
+                      height={200}
+                      unoptimized
                       className="max-w-full h-auto max-h-48"
                     />
                   </div>
