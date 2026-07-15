@@ -29,7 +29,7 @@ Bạn sẽ thấy:
 
 **Mở CMD window 1:**
 ```cmd
-cd E:\2.CODE\PROJECT WP SIGN\backend
+cd <repository-root>\backend
 npm run dev
 ```
 
@@ -44,7 +44,7 @@ npm run dev
 
 **Mở CMD window 2:**
 ```cmd
-cd E:\2.CODE\PROJECT WP SIGN\frontend
+cd <repository-root>\frontend
 npm run dev
 ```
 

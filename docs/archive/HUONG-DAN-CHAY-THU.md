@@ -60,7 +60,7 @@ docker ps
 ### Bước 3: Chạy Script Setup
 ```powershell
 # Mở PowerShell tại thư mục dự án
-cd C:\Users\MrVanNguyen\Public Workspace\Documents\GitHub\e-office
+# Run this command from the cloned repository root.
 
 # Chạy script
 .\setup-and-run.ps1

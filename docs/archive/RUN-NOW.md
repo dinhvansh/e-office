@@ -4,7 +4,7 @@
 
 Nếu bạn gặp lỗi:
 ```
-npm : File C:\Program Files\nodejs\npm.ps1 cannot be loaded
+npm.ps1 cannot be loaded (PowerShell execution-policy error)
 ```
 
 → **Dùng CMD thay vì PowerShell!**
@@ -34,7 +34,7 @@ Bạn sẽ thấy PostgreSQL và Redis đang chạy. ✅
 
 **CMD Window 1:**
 ```cmd
-cd E:\2.CODE\PROJECT WP SIGN\backend
+cd <repository-root>\backend
 npm run dev
 ```
 
@@ -50,7 +50,7 @@ npm run dev
 
 **CMD Window 2:**
 ```cmd
-cd E:\2.CODE\PROJECT WP SIGN\frontend
+cd <repository-root>\frontend
 npm run dev
 ```
 

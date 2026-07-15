@@ -14,7 +14,7 @@
 
 ## Bước 2: Chạy Các Lệnh Sau (Copy từng dòng)
 
-Mở PowerShell tại thư mục `E:\2.CODE\PROJECT WP SIGN`:
+Open PowerShell from the cloned repository root:
 
 ```powershell
 # 1. Init git repository

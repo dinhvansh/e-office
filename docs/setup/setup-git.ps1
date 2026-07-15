@@ -1,5 +1,5 @@
 # Script để setup Git và push lên GitHub
-# Chạy từ thư mục root: E:\2.CODE\PROJECT WP SIGN
+# Run from the cloned repository root.
 
 Write-Host "🚀 Setting up Git repository..." -ForegroundColor Cyan
 Write-Host ""

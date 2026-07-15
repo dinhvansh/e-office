@@ -155,7 +155,7 @@ export function toDocumentDTO(doc: documents): DocumentResponseDTO {
 - `~/sensitive-file.txt` ❌ Blocked
 - `storage/../../../etc/passwd` ❌ Blocked
 - `/tmp/malicious.pdf` ❌ Blocked
-- `C:\\Windows\\System32\\malicious.pdf` ❌ Blocked
+- `<absolute-path>\\malicious.pdf` ❌ Blocked
 
 ---
 

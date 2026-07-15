@@ -26,7 +26,7 @@
 ### Cách 2: Dùng Command Line
 ```bash
 # Vào thư mục project
-cd "E:\2.CODE\PROJECT WP SIGN"
+cd <repository-root>
 
 # Khởi động database
 docker-compose up -d postgres redis

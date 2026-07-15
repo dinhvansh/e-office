@@ -25,7 +25,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "! Docker Desktop is not running" -ForegroundColor Yellow
     Write-Host "`nAttempting to start Docker Desktop..." -ForegroundColor Cyan
     
-    $dockerPath = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+    $dockerPath = Join-Path ${env:ProgramFiles} 'Docker\Docker\Docker Desktop.exe'
     if (Test-Path $dockerPath) {
         Start-Process $dockerPath
         Write-Host "Docker Desktop is starting..." -ForegroundColor Cyan
