@@ -9,6 +9,6 @@ export const policyMetadata = {
   copyrightHolder: 'Nguyễn Đình Văn',
   trademarkOwner: 'Nguyễn Đình Văn',
   productName: 'FlowDocker E-Office',
-  legalEntity: '[TO BE CONFIRMED BY MAINTAINER]',
+  legalEntity: 'Nguyễn Đình Văn (individual copyright holder and proposed contracting party)',
   governingLaw: '[TO BE CONFIRMED BY MAINTAINER]',
 } as const;

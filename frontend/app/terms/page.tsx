@@ -13,6 +13,6 @@ export default function TermsPage() {
     { heading: 'No regulated-signature claim', content: 'The alpha signing flow is not represented as a qualified electronic signature, certified trust service, PKI service, PAdES compliance solution, or substitute for organization-specific legal review.' },
     { heading: 'Warranty disclaimer', content: 'The service and software are provided as is and as available, without warranties of merchantability, fitness for a particular purpose, non-infringement, availability, accuracy, security, or regulatory compliance, to the maximum extent permitted by law.' },
     { heading: 'Limitation of liability', content: 'To the maximum extent permitted by law, the project maintainers and contributors are not liable for indirect, incidental, special, consequential, exemplary, or punitive damages, lost profits, lost data, business interruption, or similar losses arising from use of the software or service.' },
-    { heading: 'Governing law', content: `Governing law, venue, legal entity, and contracting party are ${policyMetadata.governingLaw}. These items must be confirmed by the maintainer before final publication. Commercial licensing contact: ${policyMetadata.commercialEmail}.` },
+    { heading: 'Governing law', content: `Governing law and venue are ${policyMetadata.governingLaw}. Proposed contracting party: ${policyMetadata.legalEntity}. Governing law and venue must be confirmed by the maintainer before final publication. Commercial licensing contact: ${policyMetadata.commercialEmail}.` },
   ]} />;
 }

@@ -100,8 +100,7 @@ License:
   trust-service compliance claim is made;
 - warranty disclaimer and limitation of liability language are present;
 - commercial, privacy, and security contacts are vanqn95@gmail.com;
-- governing law and contracting legal entity remain explicit maintainer
-  placeholders.
+- governing law and venue remain explicit maintainer placeholders.
 
 The registration acceptance language links the current Terms and Privacy Notice
 versions and clarifies that accepting them does not grant commercial resale,
@@ -135,7 +134,6 @@ Classification: READY AS DRAFT
 
 Classification: NEEDS MAINTAINER DECISION
 
-- contracting legal entity;
 - approved logo and brand asset rules;
 - supported versions and vulnerability disclosure timeline;
 - governing law and venue;
@@ -164,8 +162,8 @@ enforcement or broad publication:
 
 Classification: NEEDS MAINTAINER DECISION
 
-- The package is coherent as a draft. Governing law, venue, and contracting
-  legal entity remain unresolved before final public publication.
+- The package is coherent as a draft. Governing law and venue remain unresolved
+  before final public publication.
 - If the project markets commercial hosting or managed services, the Terms and
   Privacy Notice must be updated for the actual operator, subprocessors,
   support commitments, billing terms, and incident process.
@@ -192,7 +190,7 @@ Classification: NEEDS MAINTAINER DECISION
   identity, retention, and subprocessors; NEEDS EXTERNAL
   LEGAL COUNSEL for production privacy compliance.
 - policy-metadata.ts: READY AS DRAFT; NEEDS MAINTAINER DECISION for governing
-  law and legal-entity placeholders.
+  law and venue placeholders.
 - registration acceptance language: READY AS DRAFT.
 
 Overall draft publication readiness: READY AS DRAFT, subject to maintainer

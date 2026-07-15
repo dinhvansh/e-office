@@ -73,7 +73,7 @@ Commercial licensing contact: vanqn95@gmail.com.
 
 Copyright holder: Nguyễn Đình Văn.
 
-Legal entity / contracting party: [TO BE CONFIRMED BY MAINTAINER].
+Proposed contracting party: Nguyễn Đình Văn (individual copyright holder).
 
 Governing law and venue: [TO BE CONFIRMED BY MAINTAINER].
 

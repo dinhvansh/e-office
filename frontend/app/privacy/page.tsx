@@ -12,6 +12,6 @@ export default function PrivacyPage() {
     { heading: 'Access control', content: 'Workspace administrators manage users, roles, permissions, tenants, and document access. Operators should review tenant isolation and access control before enabling multi-tenant production use.' },
     { heading: 'Security', content: 'The project provides security-oriented defaults and guidance, but operators remain responsible for secrets, TLS, network controls, monitoring, incident response, backups, and compliance review.' },
     { heading: 'User requests', content: 'Users should direct access, correction, deletion, export, or retention questions to their workspace administrator or the organization operating the deployment. Self-hosted operators are responsible for responding under their applicable policies and laws.' },
-    { heading: 'Contact', content: `Privacy contact: ${policyMetadata.privacyEmail}. Commercial licensing contact: ${policyMetadata.commercialEmail}. The legal entity, governing law, venue, retention schedule, and subprocessor list remain ${policyMetadata.governingLaw} until the maintainer confirms them.` },
+    { heading: 'Contact', content: `Privacy contact: ${policyMetadata.privacyEmail}. Commercial licensing contact: ${policyMetadata.commercialEmail}. Proposed contracting party: ${policyMetadata.legalEntity}. Governing law and venue remain ${policyMetadata.governingLaw} until the maintainer confirms them. Self-hosted operators define their own retention schedules and subprocessors.` },
   ]} />;
 }
