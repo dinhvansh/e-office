@@ -20,6 +20,7 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -36,12 +37,14 @@ export function NotificationBell() {
   // Fetch notifications
   const fetchNotifications = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const response = await getNotifications(fetchJson, 1, 10);
       setNotifications(response.notifications);
       setUnreadCount(response.notifications.filter(n => !n.is_read).length);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
+      setLoadError('Không thể tải thông báo. Vui lòng thử lại.');
       toast.error('Không thể tải thông báo');
     } finally {
       setLoading(false);
@@ -136,6 +139,7 @@ export function NotificationBell() {
         ref={buttonRef}
         onClick={handleToggle}
         className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+        aria-label="Mở thông báo"
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
@@ -154,6 +158,8 @@ export function NotificationBell() {
           <NotificationDropdown
             notifications={notifications}
             loading={loading}
+            error={loadError}
+            onRetry={() => void fetchNotifications()}
             onMarkAsRead={handleMarkAsRead}
             onMarkAllAsRead={handleMarkAllAsRead}
             onDelete={handleDelete}

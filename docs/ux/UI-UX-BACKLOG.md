@@ -217,6 +217,11 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - Workflow preview copy is centralized and rendered in Vietnamese Unicode for the title, step count, approver type, duration and missing-approver state.
 - Chromium Playwright verified a strict default workflow with two realistic approval steps at desktop and 375 px. Evidence: `evidence/ux016-workflow-preview-desktop-after-fix.png` and `evidence/ux016-workflow-preview-mobile-after-fix.png`.
 
+## UX-009 — Fixed (browser verified 2026-07-15)
+
+- Shared loading, empty, error/retry, success and live-status primitives now cover the audited critical flows. Create-request submission preserves entered values after failure and rejects duplicate concurrent submits.
+- Chromium Playwright covered recovery for dashboard, documents, sign requests, approvals, My Tasks and notifications, plus create-request failure/resubmit at desktop, 768 px and 375 px.
+
 ## Verified fixes — 2026-07-14
 
 - **UX-002 / UX-018:** numeric/autofill/paste OTP input, expiry and resend cooldown feedback, plus stable localized recovery codes.

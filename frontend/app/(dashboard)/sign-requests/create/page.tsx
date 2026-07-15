@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { InlineActionFeedback } from '@/components/ui/async-state';
 
 interface DocumentType {
   id: number;
@@ -99,6 +100,9 @@ export default function CreateSignRequestPage() {
   const [signers, setSigners] = useState<Signer[]>([]);
   const [ccEmails, setCcEmails] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const submittingRef = useRef(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const customizedStepsRef = useRef<any[] | null>(null);
   const adhocStepsRef = useRef<any[] | null>(null);
 
@@ -253,6 +257,8 @@ export default function CreateSignRequestPage() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
+      setSubmitError(null);
+      setSubmitSuccess(null);
       if (!documentTypeId) {
         throw new Error('Vui lòng chọn loại văn bản');
       }
@@ -370,6 +376,7 @@ export default function CreateSignRequestPage() {
       return response.document;
     },
     onSuccess: (document: any) => {
+      setSubmitSuccess(isEditMode ? 'Đã lưu cấu hình trình ký.' : 'Đã tạo trình ký thành công.');
       const signRequestId = Number(document?.sign_request_id);
       if (Number.isFinite(signRequestId) && signRequestId > 0) {
         toast.success(
@@ -385,7 +392,11 @@ export default function CreateSignRequestPage() {
       router.replace('/sign-requests');
     },
     onError: (error: any) => {
+      setSubmitError('Không thể lưu cấu hình trình ký. Vui lòng thử lại. Dữ liệu bạn đã nhập vẫn được giữ nguyên.');
       toast.error(error.message || 'Không thể lưu cấu hình trình ký');
+    },
+    onSettled: () => {
+      submittingRef.current = false;
     },
   });
 
@@ -402,9 +413,12 @@ export default function CreateSignRequestPage() {
         className="mx-auto max-w-5xl space-y-6 pb-24 sm:pb-6"
         onSubmit={(event) => {
           event.preventDefault();
+          if (submittingRef.current || createMutation.isPending) return;
+          submittingRef.current = true;
           createMutation.mutate();
         }}
       >
+        <InlineActionFeedback error={submitError} success={submitSuccess} />
         <Card>
           <CardContent className="space-y-5 p-6">
             {isEditMode && (

@@ -4,10 +4,13 @@ import { Notification } from '@/lib/notifications';
 import { NotificationItem } from './NotificationItem';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { AsyncEmptyState, AsyncErrorState, AsyncListSkeleton } from '@/components/ui/async-state';
 
 interface NotificationDropdownProps {
   notifications: Notification[];
   loading: boolean;
+  error?: string | null;
+  onRetry?: () => void;
   onMarkAsRead: (id: number) => void;
   onMarkAllAsRead: () => void;
   onDelete: (id: number) => void;
@@ -16,6 +19,8 @@ interface NotificationDropdownProps {
 export function NotificationDropdown({
   notifications,
   loading,
+  error,
+  onRetry,
   onMarkAsRead,
   onMarkAllAsRead,
   onDelete,
@@ -23,11 +28,13 @@ export function NotificationDropdown({
   if (loading) {
     return (
       <div className="w-96 p-4">
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+        <AsyncListSkeleton rows={3} label="Đang tải thông báo..." />
       </div>
     );
+  }
+
+  if (error && onRetry) {
+    return <div className="w-96"><AsyncErrorState message={error} onRetry={onRetry} /></div>;
   }
 
   if (!notifications || notifications.length === 0) {

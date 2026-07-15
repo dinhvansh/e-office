@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
+import { AsyncStatus } from '@/components/ui/async-state';
 
 interface Task {
   task_type: 'approval' | 'signing';
@@ -258,11 +259,12 @@ export default function MyTasksPage() {
 
       {/* Tasks Table */}
       <div className="bg-white rounded-lg border">
+        <AsyncStatus message={isLoading ? 'Đang tải công việc...' : isError ? 'Không thể tải công việc.' : tasks.length === 0 ? 'Không có công việc.' : `${tasks.length} công việc đã tải.`} />
         {isLoading ? (
           <div className="p-8 text-center text-muted-foreground">Đang tải...</div>
         ) : isError ? (
           <div className="p-8 text-center text-muted-foreground">
-            <p className="mb-3">{error instanceof Error ? error.message : 'Không thể tải công việc.'}</p>
+            <p className="mb-3">Không thể tải công việc. Vui lòng thử lại.</p>
             <Button variant="outline" onClick={() => void refetch()}>Thử lại</Button>
           </div>
         ) : tasks.length === 0 ? (

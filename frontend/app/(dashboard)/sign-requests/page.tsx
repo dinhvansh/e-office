@@ -21,6 +21,7 @@ import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import { useDestructiveConfirmation } from '@/components/providers/destructive-confirmation-provider';
+import { AsyncErrorState } from '@/components/ui/async-state';
 
 interface SignRequest {
   id: number;
@@ -245,7 +246,7 @@ export default function SignRequestsPage() {
     return previousSigners.every(s => s.status === 'signed' || s.status === 'completed');
   };
 
-  const { data: response, isLoading } = useQuery({
+  const { data: response, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['my-sign-requests', filter, currentPage, itemsPerPage],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -419,6 +420,8 @@ export default function SignRequestsPage() {
                       Đang tải...
                     </td>
                   </tr>
+                ) : isError ? (
+                  <tr><td colSpan={8}><AsyncErrorState message="Không thể tải trình ký. Vui lòng thử lại." onRetry={() => void refetch()} /></td></tr>
                 ) : filteredData && filteredData.length > 0 ? (
                   filteredData.map((request) => (
                     <tr 
@@ -669,6 +672,8 @@ export default function SignRequestsPage() {
               Đang tải...
             </CardContent>
           </Card>
+        ) : isError ? (
+          <AsyncErrorState message="Không thể tải trình ký. Vui lòng thử lại." onRetry={() => void refetch()} />
         ) : filteredData && filteredData.length > 0 ? (
           <>
             {filteredData.map((request) => (

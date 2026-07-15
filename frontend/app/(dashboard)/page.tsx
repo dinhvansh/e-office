@@ -32,6 +32,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AsyncErrorState, AsyncStatus } from "@/components/ui/async-state";
 
 dayjs.extend(relativeTime);
 
@@ -45,7 +46,7 @@ export default function DashboardPage() {
   const canViewAnyMetric =
     canReadDocuments || canReadApprovals || canReadSignRequests || canReadUsers;
 
-  const { data: documents, isLoading: isLoadingDocs } = useQuery({
+  const { data: documents, isLoading: isLoadingDocs, isError: isDocumentsError, error: documentsError, refetch: refetchDocuments } = useQuery({
     queryKey: ["documents"],
     enabled: canReadDocuments,
     queryFn: async () => {
@@ -54,7 +55,7 @@ export default function DashboardPage() {
     },
   });
 
-  const { data: tenantProfile, isLoading: isLoadingTenant } = useQuery({
+  const { data: tenantProfile, isLoading: isLoadingTenant, isError: isTenantError, error: tenantError, refetch: refetchTenant } = useQuery({
     queryKey: ["tenant-profile"],
     queryFn: async () => {
       const data = await fetchJson<{ tenant: TenantProfile }>("/tenants/me");
@@ -112,6 +113,10 @@ export default function DashboardPage() {
     { name: "Người dùng", value: canReadUsers ? stats?.totalUsers ?? 0 : 0 },
   ].filter((item) => item.value > 0 || canViewAnyMetric);
 
+  if (isDocumentsError || isTenantError) {
+    return <div className="space-y-3 p-3 md:space-y-6 md:p-6"><PageHeader icon={TrendingUp} title="Tổng quan" description="Số liệu hệ thống" iconColor="text-blue-600" /><AsyncErrorState message="Không thể tải tổng quan. Vui lòng thử lại." onRetry={() => { void refetchDocuments(); void refetchTenant(); }} /></div>;
+  }
+
   return (
     <div className="space-y-3 p-3 md:space-y-6 md:p-6">
       <PageHeader
@@ -120,6 +125,7 @@ export default function DashboardPage() {
         description="Số liệu hệ thống và hoạt động gần đây theo quyền hiện có"
         iconColor="text-blue-600"
       />
+      <AsyncStatus message={isLoadingDocs || isLoadingStats || isLoadingTenant ? 'Đang tải tổng quan...' : isDocumentsError || isTenantError ? 'Không thể tải tổng quan.' : 'Tổng quan đã tải.'} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 md:gap-4">
         {isLoadingDocs || isLoadingStats ? (

@@ -29,6 +29,7 @@ import { AttachmentsSection } from "@/components/documents/AttachmentsSection";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
 import { useDestructiveConfirmation } from "@/components/providers/destructive-confirmation-provider";
+import { AsyncErrorState } from "@/components/ui/async-state";
 
 
 export default function DocumentsPage() {
@@ -74,7 +75,7 @@ export default function DocumentsPage() {
   const [documentTypeFilter, setDocumentTypeFilter] = useState<string>('all');
   const [confidentialLevelFilter, setConfidentialLevelFilter] = useState<string>('all');
 
-  const { data: documentsData, isLoading } = useQuery({
+  const { data: documentsData, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["documents", page, limit, statusFilter, searchQuery, documentTypeFilter, confidentialLevelFilter],
     enabled: canReadDocuments,
     queryFn: async () => {
@@ -991,6 +992,8 @@ export default function DocumentsPage() {
                 ))}
               </div>
             </>
+          ) : isError ? (
+            <AsyncErrorState message="Không thể tải tài liệu. Vui lòng thử lại." onRetry={() => void refetch()} />
           ) : documents && documents.length > 0 ? (
             <>
             <div className="rounded-lg border hidden md:block overflow-hidden">

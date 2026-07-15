@@ -29,3 +29,7 @@ Verification evidence is stored in `docs/ux/evidence/`.
 ## Workflow preview localization — 2026-07-15
 
 - **UX-016 fixed and browser verified:** the default approval-workflow preview now renders centralized Vietnamese Unicode labels for the title, step count, approver type, duration and missing approver. Chromium Playwright used a realistic two-step workflow at desktop and 375 px; evidence is stored in `docs/ux/evidence/`.
+
+## Async recovery states — 2026-07-15
+
+- **UX-009 fixed and browser verified:** shared async-state primitives now standardize loading, empty, persistent error/retry, success and `aria-live` feedback across dashboard, documents, sign requests, approvals, My Tasks, notifications, external signing loading and create-request submission. The create form keeps values after failure and blocks duplicate concurrent submissions. Chromium Playwright passed desktop, 768 px and 375 px recovery scenarios; evidence is stored in `docs/ux/evidence/`.

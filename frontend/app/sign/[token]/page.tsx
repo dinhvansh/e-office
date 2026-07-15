@@ -14,6 +14,7 @@ import ThankYouPage from '@/components/signing/ThankYouPage';
 import { toast } from 'sonner';
 import { CheckCircle, FileText, Mail, User, Clock, Play } from 'lucide-react';
 import { getPublicApiBaseUrl } from '@/lib/env';
+import { AsyncListSkeleton } from '@/components/ui/async-state';
 
 interface SigningData {
   signer: {
@@ -488,7 +489,7 @@ export default function PublicSigningPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <AsyncListSkeleton rows={2} label="Đang tải yêu cầu ký..." />
           <p className="mt-4 text-gray-600">Đang tải...</p>
         </div>
       </div>

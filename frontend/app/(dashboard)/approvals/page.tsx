@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { AsyncStatus } from '@/components/ui/async-state';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -295,6 +296,7 @@ export default function ApprovalsPage() {
 
       {/* Approvals List */}
       <div className="bg-white rounded-lg shadow-sm">
+        <AsyncStatus message={isLoading ? 'Đang tải yêu cầu phê duyệt...' : isError ? 'Không thể tải yêu cầu phê duyệt.' : approvals.length === 0 ? 'Không có yêu cầu phê duyệt.' : `${approvals.length} yêu cầu phê duyệt đã tải.`} />
         {isLoading ? (
           <div className="divide-y">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -324,7 +326,7 @@ export default function ApprovalsPage() {
         ) : isError ? (
           <div className="p-12 text-center">
             <h3 className="text-lg font-medium text-gray-900 mb-2">Không thể tải yêu cầu phê duyệt</h3>
-            <p className="text-gray-500 mb-4">{error instanceof Error ? error.message : 'Vui lòng thử lại.'}</p>
+            <p className="text-gray-500 mb-4">Không thể tải yêu cầu phê duyệt. Vui lòng thử lại.</p>
             <Button onClick={() => void refetch()}>Thử lại</Button>
           </div>
         ) : approvals.length === 0 ? (
