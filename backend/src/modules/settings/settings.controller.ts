@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { settingsService } from './settings.service';
 import { z } from 'zod';
+const errorMessage = (error: unknown): string => error instanceof Error ? error.message : 'Unexpected error';
 
 const documentTypeIdSchema = z.coerce.number().int().positive();
 const aclTemplateSchema = z.object({
@@ -70,8 +71,8 @@ export const settingsController = {
       const tenantId = req.auth!.tenantId;
       const config = await settingsService.getEmailConfig(tenantId);
       res.json({ success: true, data: config });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: errorMessage(error) });
     }
   },
 
@@ -83,8 +84,8 @@ export const settingsController = {
 
       await settingsService.saveEmailConfig(tenantId, config, userId);
       res.json({ success: true, message: 'Email config saved successfully' });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: errorMessage(error) });
     }
   },
 
@@ -103,8 +104,8 @@ export const settingsController = {
         success: true,
         message: `Test email sent to ${testEmail}`,
       });
-    } catch (error: any) {
-      res.status(400).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ success: false, error: errorMessage(error) });
     }
   },
 
@@ -113,8 +114,8 @@ export const settingsController = {
       const tenantId = req.auth!.tenantId;
       const config = await settingsService.getWatermarkConfig(tenantId);
       res.json({ success: true, data: config });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: errorMessage(error) });
     }
   },
 
@@ -126,8 +127,8 @@ export const settingsController = {
 
       await settingsService.saveWatermarkConfig(tenantId, config, userId);
       res.json({ success: true, message: 'Watermark config saved successfully' });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: errorMessage(error) });
     }
   },
 
@@ -136,8 +137,8 @@ export const settingsController = {
       const tenantId = req.auth!.tenantId;
       const settings = await settingsService.getAllSettings(tenantId);
       res.json({ success: true, data: settings });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: errorMessage(error) });
     }
   },
 
@@ -147,8 +148,8 @@ export const settingsController = {
       const documentTypeId = documentTypeIdSchema.parse(req.params.documentTypeId);
       const data = await settingsService.getDocumentTypePolicy(tenantId, documentTypeId);
       res.json({ success: true, data });
-    } catch (error: any) {
-      res.status(400).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ success: false, error: errorMessage(error) });
     }
   },
 
@@ -160,8 +161,8 @@ export const settingsController = {
       const policy = documentTypePolicySchema.parse(req.body);
       await settingsService.saveDocumentTypePolicy(tenantId, documentTypeId, policy, userId);
       res.json({ success: true, message: "Document type policy saved" });
-    } catch (error: any) {
-      res.status(400).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ success: false, error: errorMessage(error) });
     }
   },
 
@@ -171,8 +172,8 @@ export const settingsController = {
       const documentTypeId = documentTypeIdSchema.parse(req.params.documentTypeId);
       await settingsService.deleteDocumentTypePolicy(tenantId, documentTypeId);
       res.json({ success: true, message: "Document type policy deleted" });
-    } catch (error: any) {
-      res.status(400).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ success: false, error: errorMessage(error) });
     }
   }
 };

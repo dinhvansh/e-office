@@ -1,10 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { rolesService } from '../modules/roles/roles.service';
 
+const errorMessage = (error: unknown): string => error instanceof Error ? error.message : 'Unexpected error';
+
 export const requirePermission = (resource: string, action: string) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userId = (req as any).auth?.userId;
+      const userId = req.auth?.userId;
       
       if (!userId) {
         return res.status(401).json({ 
@@ -23,10 +25,10 @@ export const requirePermission = (resource: string, action: string) => {
       }
 
       next();
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ 
         success: false, 
-        error: error.message 
+        error: errorMessage(error)
       });
     }
   };
@@ -36,7 +38,7 @@ export const requirePermission = (resource: string, action: string) => {
 export const requireAnyPermission = (...permissions: Array<[string, string]>) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userId = (req as any).auth?.userId;
+      const userId = req.auth?.userId;
       
       if (!userId) {
         return res.status(401).json({ 
@@ -56,10 +58,10 @@ export const requireAnyPermission = (...permissions: Array<[string, string]>) =>
         success: false, 
         error: 'Permission denied' 
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ 
         success: false, 
-        error: error.message 
+        error: errorMessage(error)
       });
     }
   };

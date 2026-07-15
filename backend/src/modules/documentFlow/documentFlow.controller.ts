@@ -3,7 +3,8 @@ import { documentFlowService } from './documentFlow.service';
 import { z } from 'zod';
 
 // Response helper
-const ok = (data: any) => ({ success: true, data });
+const ok = <T>(data: T) => ({ success: true, data });
+const errorMessage = (error: unknown): string => error instanceof Error ? error.message : 'Internal server error';
 
 const idSchema = z.coerce.number().int().positive();
 
@@ -25,11 +26,11 @@ export class DocumentFlowController {
       );
 
       res.json(ok(flowData));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error getting document flow:', error);
       res.status(500).json({
         success: false,
-        error: error.message || 'Internal server error',
+        error: errorMessage(error),
       });
     }
   };

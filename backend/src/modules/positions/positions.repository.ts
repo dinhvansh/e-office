@@ -1,7 +1,12 @@
 import { prisma } from '../../config/prisma';
+import { Prisma } from '@prisma/client';
+
+export interface PositionFilters {
+  is_active?: boolean;
+}
 
 export const positionsRepository = {
-  async findByTenant(tenantId: number, filters?: any) {
+  async findByTenant(tenantId: number, filters?: PositionFilters) {
     return prisma.positions.findMany({
       where: {
         tenant_id: tenantId,
@@ -27,7 +32,7 @@ export const positionsRepository = {
     const { page, limit, is_active } = options;
     const skip = (page - 1) * limit;
 
-    const where: any = { tenant_id: tenantId };
+    const where: Prisma.positionsWhereInput = { tenant_id: tenantId };
     if (is_active !== undefined) {
       where.is_active = is_active;
     }

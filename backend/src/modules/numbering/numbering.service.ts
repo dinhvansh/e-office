@@ -26,7 +26,7 @@ export const numberingService = {
     const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
 
     // Increment number (with transaction)
-    const { number } = await numberingRepository.incrementNumber(rule.id, currentYear);
+    const { number } = await numberingRepository.incrementNumber(rule.id, tenantId, currentYear);
 
     // Format number with leading zeros (3 digits)
     const formattedNumber = String(number).padStart(3, '0');
@@ -83,7 +83,7 @@ export const numberingService = {
     const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
 
     // Increment number (with transaction)
-    const { number } = await numberingRepository.incrementNumber(rule.id, currentYear);
+    const { number } = await numberingRepository.incrementNumber(rule.id, tenantId, currentYear);
 
     // Format number with leading zeros (3 digits)
     const formattedNumber = String(number).padStart(3, '0');
@@ -147,7 +147,7 @@ export const numberingService = {
       throw new Error('Numbering rule not found');
     }
 
-    return numberingRepository.update(id, data);
+    return numberingRepository.update(id, tenantId, data);
   },
 
   async previewDocumentNumber(

@@ -1,6 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../config/prisma";
+import { ApiError } from "../../core/errors/api-error";
+import { Prisma } from "@prisma/client";
 
-const prisma = new PrismaClient();
 
 export class ExternalOrgsRepository {
   async findAll(tenantId: number) {
@@ -21,7 +22,7 @@ export class ExternalOrgsRepository {
     const { page, limit, category } = options;
     const skip = (page - 1) * limit;
 
-    const where: any = { tenant_id: tenantId };
+    const where: Prisma.external_organizationsWhereInput = { tenant_id: tenantId };
     if (category) {
       where.category = category;
     }
@@ -88,16 +89,21 @@ export class ExternalOrgsRepository {
       is_active?: boolean;
     }
   ) {
-    return prisma.external_organizations.update({
-      where: { id },
-      data: { ...data, tenant_id: tenantId },
+    const updated = await prisma.external_organizations.updateMany({
+      where: { id, tenant_id: tenantId },
+      data,
     });
+    if (updated.count !== 1) {
+      throw ApiError.notFound("External organization not found", "ORG_NOT_FOUND");
+    }
+    return prisma.external_organizations.findFirstOrThrow({ where: { id, tenant_id: tenantId } });
   }
 
   async delete(id: number, tenantId: number) {
-    return prisma.external_organizations.delete({
-      where: { id, tenant_id: tenantId },
-    });
+    const deleted = await prisma.external_organizations.deleteMany({ where: { id, tenant_id: tenantId } });
+    if (deleted.count !== 1) {
+      throw ApiError.notFound("External organization not found", "ORG_NOT_FOUND");
+    }
   }
 
   async countByCategory(tenantId: number) {

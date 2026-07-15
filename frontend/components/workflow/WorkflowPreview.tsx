@@ -36,7 +36,7 @@ export function WorkflowPreview({ workflowId }: WorkflowPreviewProps) {
       return data?.workflow ?? data;
     },
     staleTime: 0,
-    cacheTime: 0,
+    gcTime: 0,
   });
 
   if (isLoading) {

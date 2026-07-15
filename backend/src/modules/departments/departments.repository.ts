@@ -1,6 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/prisma';
+import { Prisma } from '@prisma/client';
+import { throwError, throwNotFound } from '../../utils/errors';
 
-const prisma = new PrismaClient();
 
 export const departmentsRepository = {
   async findByTenant(tenantId: number) {
@@ -44,7 +45,7 @@ export const departmentsRepository = {
     });
   },
 
-  async create(data: any) {
+  async create(data: Prisma.departmentsUncheckedCreateInput) {
     return prisma.departments.create({
       data,
       include: {
@@ -55,15 +56,15 @@ export const departmentsRepository = {
     });
   },
 
-  async update(id: number, tenantId: number, data: any) {
-    return prisma.departments.update({
-      where: { id },
+  async update(id: number, tenantId: number, data: Prisma.departmentsUpdateInput) {
+    const updated = await prisma.departments.updateMany({
+      where: { id, tenant_id: tenantId },
       data,
-      include: {
-        manager: {
-          select: { id: true, email: true, full_name: true },
-        },
-      },
+    });
+    if (updated.count !== 1) throwNotFound('DEPARTMENT_NOT_FOUND');
+    return prisma.departments.findFirstOrThrow({
+      where: { id, tenant_id: tenantId },
+      include: { manager: { select: { id: true, email: true, full_name: true } } },
     });
   },
 
@@ -79,23 +80,19 @@ export const departmentsRepository = {
     });
 
     if (!dept) {
-      const { throwNotFound } = require('../../utils/errors');
       throwNotFound('DEPARTMENT_NOT_FOUND');
     }
 
     if (dept && dept._count.users > 0) {
-      const { throwError } = require('../../utils/errors');
       throwError('DEPARTMENT_HAS_USERS');
     }
 
     if (dept && dept._count.children > 0) {
-      const { throwError } = require('../../utils/errors');
       throwError('DEPARTMENT_HAS_CHILDREN');
     }
 
-    return prisma.departments.delete({
-      where: { id },
-    });
+    const deleted = await prisma.departments.deleteMany({ where: { id, tenant_id: tenantId } });
+    if (deleted.count !== 1) throwNotFound('DEPARTMENT_NOT_FOUND');
   },
 
   async getTree(tenantId: number) {
@@ -113,8 +110,9 @@ export const departmentsRepository = {
     });
 
     // Build tree structure
-    const deptMap = new Map();
-    const roots: any[] = [];
+    type DepartmentTreeNode = (typeof departments)[number] & { children: DepartmentTreeNode[] };
+    const deptMap = new Map<number, DepartmentTreeNode>();
+    const roots: DepartmentTreeNode[] = [];
 
     departments.forEach(dept => {
       deptMap.set(dept.id, { ...dept, children: [] });

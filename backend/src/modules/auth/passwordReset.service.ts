@@ -1,9 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/prisma';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { sendEmail } from '../../config/email';
 
-const prisma = new PrismaClient();
 
 export class PasswordResetService {
   // Generate reset token and send email
@@ -83,12 +82,6 @@ export class PasswordResetService {
 
   // Reset password with token
   async resetPassword(token: string, newPassword: string): Promise<{ success: boolean; message: string }> {
-    // Verify token
-    const verification = await this.verifyResetToken(token);
-    if (!verification.valid || !verification.userId) {
-      throw new Error('Invalid or expired reset token.');
-    }
-
     // Validate password strength
     if (newPassword.length < 8) {
       throw new Error('Password must be at least 8 characters long.');
@@ -101,21 +94,34 @@ export class PasswordResetService {
     // Hash new password
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
-    // Update user password
-    await prisma.users.update({
-      where: { id: verification.userId },
-      data: { password_hash: passwordHash }
-    });
+    const userId = await prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const resetToken = await tx.password_reset_tokens.findUnique({
+        where: { token },
+        select: { id: true, user_id: true, used_at: true, expires_at: true },
+      });
+      if (!resetToken || resetToken.used_at || resetToken.expires_at <= now) {
+        throw new Error('Invalid or expired reset token.');
+      }
 
-    // Mark token as used
-    await prisma.password_reset_tokens.update({
-      where: { token },
-      data: { used_at: new Date() }
+      const claimed = await tx.password_reset_tokens.updateMany({
+        where: { id: resetToken.id, used_at: null, expires_at: { gt: now } },
+        data: { used_at: now },
+      });
+      if (claimed.count !== 1) {
+        throw new Error('Invalid or expired reset token.');
+      }
+
+      await tx.users.update({
+        where: { id: resetToken.user_id },
+        data: { password_hash: passwordHash },
+      });
+      return resetToken.user_id;
     });
 
     // Send confirmation email
     const user = await prisma.users.findUnique({
-      where: { id: verification.userId }
+      where: { id: userId }
     });
 
     if (user) {

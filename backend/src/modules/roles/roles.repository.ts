@@ -1,6 +1,10 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/prisma';
+import { Prisma } from '@prisma/client';
 
-const prisma = new PrismaClient();
+type RoleData = Pick<Prisma.rolesCreateInput, 'name' | 'description' | 'is_system'> & {
+  tenant_id: number;
+};
+
 
 export const rolesRepository = {
   async findByTenant(tenantId: number) {
@@ -40,29 +44,29 @@ export const rolesRepository = {
     });
   },
 
-  async create(data: any) {
+  async create(data: RoleData) {
     return prisma.roles.create({
       data,
     });
   },
 
-  async update(id: number, data: any) {
-    return prisma.roles.update({
-      where: { id },
+  async update(id: number, tenantId: number, data: Prisma.rolesUpdateInput) {
+    const updated = await prisma.roles.updateMany({
+      where: { id, tenant_id: tenantId },
       data,
     });
+    if (updated.count !== 1) throw new Error('Role not found');
   },
 
-  async delete(id: number) {
-    return prisma.roles.delete({
-      where: { id },
-    });
+  async delete(id: number, tenantId: number) {
+    const deleted = await prisma.roles.deleteMany({ where: { id, tenant_id: tenantId } });
+    if (deleted.count !== 1) throw new Error('Role not found');
   },
 
-  async assignPermissions(roleId: number, permissionIds: number[]) {
+  async assignPermissions(roleId: number, tenantId: number, permissionIds: number[]) {
     // Delete existing permissions
     await prisma.role_permissions.deleteMany({
-      where: { role_id: roleId },
+      where: { role_id: roleId, role: { tenant_id: tenantId } },
     });
 
     // Create new permissions
@@ -124,11 +128,12 @@ export const rolesRepository = {
     return permissions.some(p => p.resource === resource && p.action === action);
   },
 
-  async removePermission(roleId: number, permissionId: number) {
+  async removePermission(roleId: number, permissionId: number, tenantId: number) {
     return prisma.role_permissions.deleteMany({
       where: {
         role_id: roleId,
         permission_id: permissionId,
+        role: { tenant_id: tenantId },
       },
     });
   },

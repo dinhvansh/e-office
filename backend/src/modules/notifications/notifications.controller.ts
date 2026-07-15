@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { notificationsService } from './notifications.service';
 
+const isNotFoundError = (error: unknown): error is Error => error instanceof Error && error.message === 'Notification not found';
+
 export const notificationsController = {
   async getNotifications(req: Request, res: Response) {
     try {
@@ -46,9 +48,9 @@ export const notificationsController = {
       const result = await notificationsService.markAsRead(id, userId, tenantId);
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error marking notification as read:', error);
-      if (error.message === 'Notification not found') {
+      if (isNotFoundError(error)) {
         res.status(404).json({ error: error.message });
       } else {
         res.status(500).json({ error: 'Failed to mark notification as read' });
@@ -79,9 +81,9 @@ export const notificationsController = {
       const result = await notificationsService.deleteNotification(id, userId, tenantId);
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting notification:', error);
-      if (error.message === 'Notification not found') {
+      if (isNotFoundError(error)) {
         res.status(404).json({ error: error.message });
       } else {
         res.status(500).json({ error: 'Failed to delete notification' });

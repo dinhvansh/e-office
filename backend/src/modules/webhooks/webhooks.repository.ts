@@ -1,6 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../config/prisma";
+import { Prisma } from "@prisma/client";
+import { ApiError } from "../../core/errors/api-error";
 
-const prisma = new PrismaClient();
 
 export interface CreateWebhookDto {
   tenant_id: number;
@@ -44,19 +45,24 @@ class WebhooksRepository {
   }
 
   async update(id: number, tenantId: number, data: UpdateWebhookDto) {
-    return prisma.webhooks.update({
-      where: { id },
+    const updated = await prisma.webhooks.updateMany({
+      where: { id, tenant_id: tenantId },
       data: {
         ...data,
         updated_at: new Date(),
       },
     });
+    if (updated.count !== 1) {
+      throw ApiError.notFound("Webhook not found", "WEBHOOK_NOT_FOUND");
+    }
+    return prisma.webhooks.findFirstOrThrow({ where: { id, tenant_id: tenantId } });
   }
 
   async delete(id: number, tenantId: number) {
-    return prisma.webhooks.delete({
-      where: { id },
-    });
+    const deleted = await prisma.webhooks.deleteMany({ where: { id, tenant_id: tenantId } });
+    if (deleted.count !== 1) {
+      throw ApiError.notFound("Webhook not found", "WEBHOOK_NOT_FOUND");
+    }
   }
 
   async findActiveByTenantId(tenantId: number) {
@@ -73,7 +79,7 @@ class WebhooksRepository {
       data: {
         webhook_id: webhookId,
         event,
-        payload: payload as any,
+        payload: payload as Prisma.InputJsonValue,
         status_code: statusCode,
         response,
         error,

@@ -1,4 +1,5 @@
 import { users, documents } from '@prisma/client';
+import { prisma } from '../../config/prisma';
 
 type DocumentVisibilityScope = 'public' | 'department' | 'private' | null | undefined;
 type ConfidentialLevel = 'normal' | 'confidential' | 'secret' | 'top_secret' | null | undefined;
@@ -18,7 +19,7 @@ export async function canViewDocument(
 
   // Layer 2: Admin bypass (check role field)
   // Note: In full RBAC, this would check permissions table
-  const userRole = (user as any).role;
+  const userRole = user.role;
   if (userRole === 'Admin' || userRole === 'admin') {
     return true;
   }
@@ -29,7 +30,6 @@ export async function canViewDocument(
   }
 
   // Layer 3.5: Approver check - if user is assigned as approver for this document
-  const { prisma } = require('../../config/prisma');
   const approval = await prisma.document_approvals.findFirst({
     where: {
       document_id: doc.id,
@@ -63,7 +63,7 @@ export async function canViewDocument(
 
   if (scope === 'department') {
     // Check if user is in the same department
-    const docDeptId = (doc as any).department_id;
+    const docDeptId = doc.department_id;
     const userDeptId = user.department_id;
     
     // If document has no department, treat as private

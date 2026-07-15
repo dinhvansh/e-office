@@ -1,6 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/prisma';
+import { ApiError } from '../../core/errors/api-error';
+import { Prisma } from '@prisma/client';
 
-const prisma = new PrismaClient();
 
 export const numberingRepository = {
   async findByDocumentType(tenantId: number, documentTypeId: number) {
@@ -26,7 +27,7 @@ export const numberingRepository = {
     });
   },
 
-  async create(data: any) {
+  async create(data: Prisma.numbering_rulesUncheckedCreateInput) {
     return prisma.numbering_rules.create({
       data,
       include: {
@@ -35,20 +36,24 @@ export const numberingRepository = {
     });
   },
 
-  async update(id: number, data: any) {
-    return prisma.numbering_rules.update({
-      where: { id },
+  async update(id: number, tenantId: number, data: Prisma.numbering_rulesUpdateInput) {
+    const updated = await prisma.numbering_rules.updateMany({
+      where: { id, tenant_id: tenantId },
       data,
-      include: {
-        document_type: true,
-      },
+    });
+    if (updated.count !== 1) {
+      throw ApiError.notFound('Numbering rule not found', 'NUMBERING_RULE_NOT_FOUND');
+    }
+    return prisma.numbering_rules.findFirstOrThrow({
+      where: { id, tenant_id: tenantId },
+      include: { document_type: true },
     });
   },
 
-  async incrementNumber(id: number, currentYear: number) {
+  async incrementNumber(id: number, tenantId: number, currentYear: number) {
     return prisma.$transaction(async (tx) => {
-      const rule = await tx.numbering_rules.findUnique({
-        where: { id },
+      const rule = await tx.numbering_rules.findFirst({
+        where: { id, tenant_id: tenantId },
       });
 
       if (!rule) {
@@ -65,15 +70,18 @@ export const numberingRepository = {
       }
 
       // Update rule
-      const updated = await tx.numbering_rules.update({
-        where: { id },
+      const updated = await tx.numbering_rules.updateMany({
+        where: { id, tenant_id: tenantId },
         data: {
           last_number: newNumber,
           last_reset_year: newResetYear,
         },
       });
 
-      return { number: newNumber, rule: updated };
+      if (updated.count !== 1) {
+        throw ApiError.notFound('Numbering rule not found', 'NUMBERING_RULE_NOT_FOUND');
+      }
+      return { number: newNumber, rule };
     });
   },
 

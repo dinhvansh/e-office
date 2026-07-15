@@ -12,9 +12,7 @@ const resetPasswordSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters')
 });
 
-const verifyTokenSchema = z.object({
-  token: z.string().min(1, 'Token is required')
-});
+const errorMessage = (error: unknown): string => error instanceof Error ? error.message : 'Unexpected error';
 
 export class PasswordResetController {
   // POST /auth/forgot-password
@@ -25,13 +23,13 @@ export class PasswordResetController {
       const result = await passwordResetService.requestPasswordReset(email);
 
       res.json(result);
-    } catch (error: any) {
-      if (error.name === 'ZodError') {
+    } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation error', details: error.errors });
       }
 
-      if (error.message.includes('Too many reset requests')) {
-        return res.status(429).json({ error: error.message });
+      if (errorMessage(error).includes('Too many reset requests')) {
+        return res.status(429).json({ error: errorMessage(error) });
       }
 
       console.error('Forgot password error:', error);
@@ -51,7 +49,7 @@ export class PasswordResetController {
       const result = await passwordResetService.verifyResetToken(token);
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Verify token error:', error);
       res.status(500).json({ error: 'Failed to verify token' });
     }
@@ -65,17 +63,17 @@ export class PasswordResetController {
       const result = await passwordResetService.resetPassword(token, password);
 
       res.json(result);
-    } catch (error: any) {
-      if (error.name === 'ZodError') {
+    } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation error', details: error.errors });
       }
 
-      if (error.message.includes('Invalid or expired')) {
-        return res.status(400).json({ error: error.message });
+      if (errorMessage(error).includes('Invalid or expired')) {
+        return res.status(400).json({ error: errorMessage(error) });
       }
 
-      if (error.message.includes('Password must')) {
-        return res.status(400).json({ error: error.message });
+      if (errorMessage(error).includes('Password must')) {
+        return res.status(400).json({ error: errorMessage(error) });
       }
 
       console.error('Reset password error:', error);

@@ -11,6 +11,8 @@ interface MetricCardProps {
     isPositive: boolean;
   };
   iconColor?: string;
+  iconBgColor?: string;
+  description?: string;
   className?: string;
 }
 
@@ -20,6 +22,8 @@ export function MetricCard({
   icon: Icon,
   trend,
   iconColor = 'text-blue-600',
+  iconBgColor = 'bg-blue-50',
+  description,
   className,
 }: MetricCardProps) {
   return (
@@ -28,6 +32,7 @@ export function MetricCard({
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-600">{title}</p>
           <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
+          {description && <p className="text-sm text-gray-500 mt-1">{description}</p>}
           {trend && (
             <p className={cn(
               'text-sm mt-2 flex items-center gap-1',
@@ -40,7 +45,8 @@ export function MetricCard({
           )}
         </div>
         <div className={cn(
-          'p-3 rounded-full bg-blue-50',
+          'p-3 rounded-full',
+          iconBgColor,
           iconColor
         )}>
           <Icon className="w-6 h-6" />

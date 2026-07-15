@@ -34,7 +34,7 @@ export function validateTenantOwnership(
 /**
  * Helper to add tenant_id to Prisma where clause
  */
-export function withTenantId<T extends Record<string, any>>(
+export function withTenantId<T extends Record<string, unknown>>(
   where: T,
   tenantId: number
 ): T & { tenant_id: number } {

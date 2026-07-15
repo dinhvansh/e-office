@@ -1,7 +1,6 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../config/prisma";
 import { ApiError } from "../../core/errors/api-error";
 
-const prisma = new PrismaClient();
 
 export class TagsService {
   async addTag(documentId: number, tag: string, tenantId: number) {

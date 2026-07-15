@@ -27,7 +27,7 @@ export const rolesService = {
     });
 
     if (permission_ids && permission_ids.length > 0) {
-      await rolesRepository.assignPermissions(role.id, permission_ids);
+      await rolesRepository.assignPermissions(role.id, tenantId, permission_ids);
     }
 
     return rolesRepository.findById(role.id, tenantId);
@@ -50,11 +50,11 @@ export const rolesService = {
     const { permission_ids, ...roleData } = data;
 
     if (Object.keys(roleData).length > 0) {
-      await rolesRepository.update(id, roleData);
+      await rolesRepository.update(id, tenantId, roleData);
     }
 
     if (permission_ids !== undefined) {
-      await rolesRepository.assignPermissions(id, permission_ids);
+      await rolesRepository.assignPermissions(id, tenantId, permission_ids);
     }
 
     return rolesRepository.findById(id, tenantId);
@@ -74,7 +74,7 @@ export const rolesService = {
       throw new Error('Cannot delete role with assigned users');
     }
 
-    return rolesRepository.delete(id);
+    return rolesRepository.delete(id, tenantId);
   },
 
   async getAllPermissions() {
@@ -99,10 +99,11 @@ export const rolesService = {
       throw new Error('Cannot modify system role permissions');
     }
 
-    return rolesRepository.removePermission(roleId, permissionId);
+    return rolesRepository.removePermission(roleId, permissionId, tenantId);
   },
 
   async getRoleUsers(roleId: number, tenantId: number) {
+    await this.getRoleById(roleId, tenantId);
     return rolesRepository.getRoleUsers(roleId, tenantId);
   },
 };

@@ -7,11 +7,13 @@ export type DocumentRecord = {
   status: string | null;
   version: number;
   created_at: string;
-  document_type_id?: number | null;
+    document_type_id?: number | null;
+    document_type?: { name: string; code?: string } | null;
   document_number?: string | null;
   confidential_level?: string | null;
-  visibility_scope?: string | null;
-  sign_request_id?: number | null;
+    visibility_scope?: string | null;
+    sign_request_id?: number | null;
+    signed_file_path?: string | null;
 };
 
 export type DocumentType = {

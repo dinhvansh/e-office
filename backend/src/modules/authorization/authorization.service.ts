@@ -1,8 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../config/prisma";
 import { rolesService } from "../roles/roles.service";
 import { documentPermissionResolverService } from "./document-permission-resolver.service";
 
-const prisma = new PrismaClient();
 
 export type DocumentAction = "read" | "edit" | "approve" | "share" | "delete";
 

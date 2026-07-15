@@ -23,19 +23,19 @@ export function sanitizeText(dirty: string): string {
 /**
  * Sanitize object recursively
  */
-export function sanitizeObject<T extends Record<string, any>>(obj: T): T {
-  const sanitized: any = {};
+export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T {
+  const sanitized: Record<string, unknown> = {};
   
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === 'string') {
       sanitized[key] = sanitizeText(value);
     } else if (Array.isArray(value)) {
       sanitized[key] = value.map(item => 
-        typeof item === 'object' ? sanitizeObject(item) : 
+        item !== null && typeof item === 'object' && !Array.isArray(item) ? sanitizeObject(item as Record<string, unknown>) :
         typeof item === 'string' ? sanitizeText(item) : item
       );
     } else if (typeof value === 'object' && value !== null) {
-      sanitized[key] = sanitizeObject(value);
+      sanitized[key] = sanitizeObject(value as Record<string, unknown>);
     } else {
       sanitized[key] = value;
     }
@@ -48,21 +48,17 @@ export function sanitizeObject<T extends Record<string, any>>(obj: T): T {
  * Escape SQL special characters (for raw queries - use with caution)
  */
 export function escapeSql(value: string): string {
-  return value.replace(/[\0\x08\x09\x1a\n\r"'\\\%]/g, (char) => {
-    switch (char) {
-      case '\0': return '\\0';
-      case '\x08': return '\\b';
-      case '\x09': return '\\t';
-      case '\x1a': return '\\z';
-      case '\n': return '\\n';
-      case '\r': return '\\r';
-      case '"':
-      case "'":
-      case '\\':
-      case '%':
-        return '\\' + char;
-      default:
-        return char;
-    }
-  });
+  const escapedCharacters: Record<string, string> = {
+    "\0": "\\0",
+    "\b": "\\b",
+    "\t": "\\t",
+    "\x1a": "\\z",
+    "\n": "\\n",
+    "\r": "\\r",
+    '"': '\\"',
+    "'": "\\'",
+    "\\": "\\\\",
+    "%": "\\%",
+  };
+  return Array.from(value, (char) => escapedCharacters[char] ?? char).join("");
 }

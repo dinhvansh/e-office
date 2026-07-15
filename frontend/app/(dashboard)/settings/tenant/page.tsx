@@ -61,7 +61,7 @@ export default function TenantSettingsPage() {
 
   const handleEdit = () => {
     if (data) {
-      setEditForm({ name: data.name, domain: data.domain ?? '' });
+      setEditForm({ name: data.name ?? '', domain: data.domain ?? '' });
       setShowEditDialog(true);
     }
   };
@@ -76,24 +76,24 @@ export default function TenantSettingsPage() {
     setShowLicenseDialog(false);
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string | null) => {
     const variants: Record<string, { color: string; label: string }> = {
       active: { color: 'bg-green-100 text-green-700', label: 'Hoạt động' },
       suspended: { color: 'bg-yellow-100 text-yellow-700', label: 'Tạm ngưng' },
       inactive: { color: 'bg-gray-100 text-gray-700', label: 'Không hoạt động' },
     };
-    const variant = variants[status] || variants.active;
+    const variant = (status && variants[status]) || variants.active;
     return <Badge className={variant.color}>{variant.label}</Badge>;
   };
 
-  const getPlanBadge = (plan: string) => {
+  const getPlanBadge = (plan: string | null) => {
     const variants: Record<string, { color: string; label: string }> = {
       'on-prem-enterprise': { color: 'bg-purple-100 text-purple-700', label: 'On-Premise Enterprise' },
       'saas-starter': { color: 'bg-blue-100 text-blue-700', label: 'SaaS Starter' },
       'saas-professional': { color: 'bg-indigo-100 text-indigo-700', label: 'SaaS Professional' },
       'saas-enterprise': { color: 'bg-violet-100 text-violet-700', label: 'SaaS Enterprise' },
     };
-    const variant = variants[plan] || { color: 'bg-gray-100 text-gray-700', label: plan };
+    const variant = (plan && variants[plan]) || { color: 'bg-gray-100 text-gray-700', label: plan ?? 'Chưa xác định' };
     return <Badge className={variant.color}>{variant.label}</Badge>;
   };
 

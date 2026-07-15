@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/prisma';
 import { CreateNotificationData, NotificationListOptions } from './notifications.types';
 
-const prisma = new PrismaClient();
 
 export const notificationsRepository = {
   async findByUser(

@@ -1,52 +1,54 @@
 import { Request, Response } from 'express';
 import { numberingService } from './numbering.service';
 
+const errorMessage = (error: unknown): string => error instanceof Error ? error.message : 'Unexpected error';
+
 export const numberingController = {
   async getAllNumberingRules(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).auth.tenantId;
+      const tenantId = req.auth!.tenantId;
       const rules = await numberingService.getAllNumberingRules(tenantId);
       res.json({ success: true, data: rules });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: errorMessage(error) });
     }
   },
 
   async getNumberingRule(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).auth.tenantId;
+      const tenantId = req.auth!.tenantId;
       const { documentTypeId } = req.params;
       const rule = await numberingService.getNumberingRule(tenantId, parseInt(documentTypeId));
       res.json({ success: true, data: rule });
-    } catch (error: any) {
-      res.status(404).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(404).json({ success: false, error: errorMessage(error) });
     }
   },
 
   async createNumberingRule(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).auth.tenantId;
+      const tenantId = req.auth!.tenantId;
       const rule = await numberingService.createNumberingRule(tenantId, req.body);
       res.status(201).json({ success: true, data: rule });
-    } catch (error: any) {
-      res.status(400).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ success: false, error: errorMessage(error) });
     }
   },
 
   async updateNumberingRule(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).auth.tenantId;
+      const tenantId = req.auth!.tenantId;
       const { id } = req.params;
       const rule = await numberingService.updateNumberingRule(parseInt(id), tenantId, req.body);
       res.json({ success: true, data: rule });
-    } catch (error: any) {
-      res.status(400).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ success: false, error: errorMessage(error) });
     }
   },
 
   async generateNumber(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).auth.tenantId;
+      const tenantId = req.auth!.tenantId;
       const { document_type_id, department_code } = req.body;
 
       if (!document_type_id) {
@@ -63,8 +65,8 @@ export const numberingController = {
       );
 
       res.json({ success: true, data: { document_number: documentNumber } });
-    } catch (error: any) {
-      res.status(400).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ success: false, error: errorMessage(error) });
     }
   },
 
@@ -89,8 +91,8 @@ export const numberingController = {
       );
 
       res.json({ success: true, data: { preview } });
-    } catch (error: any) {
-      res.status(400).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ success: false, error: errorMessage(error) });
     }
   },
 };

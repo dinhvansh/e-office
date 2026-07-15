@@ -12,6 +12,7 @@ interface ApiErrorResponse {
 }
 
 export const errorHandler = (err: unknown, req: Request, res: Response, _next: NextFunction): void => {
+  void _next;
   if (err instanceof ApiError) {
     const payload: ApiErrorResponse = {
       success: false,

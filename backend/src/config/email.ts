@@ -4,22 +4,34 @@ import { env } from "./env";
 
 let transporter: Transporter | null = null;
 
-function normalizeTenantEmailConfig(config: any) {
-  const port = Number(config?.smtp_port || 587);
+function readConfigValue(config: unknown, key: string): unknown {
+  if (!config || typeof config !== "object" || Array.isArray(config)) return undefined;
+  return (config as Record<string, unknown>)[key];
+}
+
+function normalizeTenantEmailConfig(config: unknown) {
+  const smtpPort = readConfigValue(config, "smtp_port");
+  const smtpSecure = readConfigValue(config, "smtp_secure");
+  const smtpHost = readConfigValue(config, "smtp_host");
+  const smtpUser = readConfigValue(config, "smtp_user");
+  const smtpPassword = readConfigValue(config, "smtp_password");
+  const smtpFrom = readConfigValue(config, "smtp_from");
+  const smtpFromName = readConfigValue(config, "smtp_from_name");
+  const port = Number(smtpPort || 587);
   const secure =
-    config?.smtp_secure === true
-    || config?.smtp_secure === "true"
-    || config?.smtp_secure === 1
-    || config?.smtp_secure === "1";
+    smtpSecure === true
+    || smtpSecure === "true"
+    || smtpSecure === 1
+    || smtpSecure === "1";
 
   return {
-    host: String(config?.smtp_host || "").trim(),
+    host: String(smtpHost || "").trim(),
     port: Number.isFinite(port) && port > 0 ? port : 587,
     secure,
-    user: String(config?.smtp_user || "").trim(),
-    pass: String(config?.smtp_password || ""),
-    fromEmail: String(config?.smtp_from || config?.smtp_user || "").trim(),
-    fromName: String(config?.smtp_from_name || "E-Office").trim(),
+    user: String(smtpUser || "").trim(),
+    pass: String(smtpPassword || ""),
+    fromEmail: String(smtpFrom || smtpUser || "").trim(),
+    fromName: String(smtpFromName || "E-Office").trim(),
   };
 }
 

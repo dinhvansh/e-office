@@ -11,7 +11,7 @@
     "start:dev": "ts-node-dev --transpile-only src/server.ts",
     "prisma": "prisma",
     "lint": "eslint --ext .ts src",
-    "test": "tsc -p tsconfig.tests.json && node --env-file=tests/.env.test --test .test-dist/tests/*.test.js",
+    "test": "tsc -p tsconfig.tests.json && node --env-file=tests/.env.test.example --test .test-dist/tests/*.test.js",
     "worker:outbox": "node dist/workers/outbox.worker.js",
     "test:e2e:workflow": "node scripts/e2e-workflow-refactor.js",
     "test:auth-matrix": "node scripts/test-authorization-matrix.js"

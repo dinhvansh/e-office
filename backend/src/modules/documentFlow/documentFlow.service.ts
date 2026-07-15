@@ -1,6 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/prisma';
 
-const prisma = new PrismaClient();
 
 interface FlowStep {
   id: string;
@@ -332,25 +331,30 @@ export class DocumentFlowService {
     }
   }
 
-  private canUserApprove(document: any, userId: number): boolean {
+  private canUserApprove(document: {
+    workflow_instance?: unknown;
+    approvals?: Array<{ approver_user_id: number | null; action: string | null }>;
+  }, userId: number): boolean {
     if (!document.workflow_instance || !document.approvals) return false;
     
     // Check if user is pending approver
     const pendingApproval = document.approvals.find(
-      (a: any) => a.approver_user_id === userId && a.action === 'pending'
+      (approval) => approval.approver_user_id === userId && approval.action === 'pending'
     );
     
     return !!pendingApproval;
   }
 
-  private canUserSign(document: any, userId: number, userEmail: string | null): boolean {
+  private canUserSign(document: {
+    sign_request?: { signers: Array<{ status: string | null; user_id: number | null; email: string | null }> };
+  }, userId: number, userEmail: string | null): boolean {
     if (!document.sign_request) return false;
     
     // Check if user is pending signer
     const pendingSigner = document.sign_request.signers.find(
-      (s: any) =>
-        s.status === 'pending' &&
-        (s.user_id === userId || (!!userEmail && s.email?.toLowerCase() === userEmail.toLowerCase()))
+      (signer) =>
+        signer.status === 'pending' &&
+        (signer.user_id === userId || (!!userEmail && signer.email?.toLowerCase() === userEmail.toLowerCase()))
     );
     
     return !!pendingSigner;

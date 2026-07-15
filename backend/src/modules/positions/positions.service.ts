@@ -1,7 +1,7 @@
-import { positionsRepository } from './positions.repository';
+import { PositionFilters, positionsRepository } from './positions.repository';
 
 export const positionsService = {
-  async getPositions(tenantId: number, filters?: any) {
+  async getPositions(tenantId: number, filters?: PositionFilters) {
     return positionsRepository.findByTenant(tenantId, filters);
   },
 

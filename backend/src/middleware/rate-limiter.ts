@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { Request } from 'express';
 import { env } from '../config/env';
 
@@ -20,7 +20,8 @@ const getNormalizedEmail = (req: Request): string => {
 
 const authKeyGenerator = (req: Request): string => {
   const email = getNormalizedEmail(req);
-  return email ? `${req.ip}:${email}` : req.ip || 'unknown';
+  const ip = ipKeyGenerator(req.ip || 'unknown');
+  return email ? `${ip}:${email}` : ip;
 };
 
 // Rate limiter for authentication endpoints
@@ -54,7 +55,7 @@ export const authRefreshLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,
-  keyGenerator: (req: Request) => req.ip || 'unknown',
+  keyGenerator: (req: Request) => ipKeyGenerator(req.ip || 'unknown'),
 });
 
 // Rate limiter for general API endpoints

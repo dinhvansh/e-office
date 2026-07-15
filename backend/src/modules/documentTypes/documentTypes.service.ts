@@ -6,7 +6,7 @@ import {
 } from '../settings/document-type-policy.helper';
 
 export const documentTypesService = {
-  async getDocumentTypes(tenantId: number, filters?: any, userId?: number, purpose?: string) {
+  async getDocumentTypes(tenantId: number, filters?: { category?: string; is_active?: boolean }, userId?: number, purpose?: string) {
     const documentTypes = await documentTypesRepository.findByTenant(tenantId, filters);
 
     if (purpose !== 'create' || !userId) {
@@ -99,8 +99,6 @@ export const documentTypesService = {
 
     // Create numbering rule if required
     if (data.require_numbering && data.numbering_pattern) {
-      const { PrismaClient } = await import('@prisma/client');
-      const prisma = new PrismaClient();
       await prisma.numbering_rules.create({
         data: {
           tenant_id: tenantId,
@@ -110,7 +108,6 @@ export const documentTypesService = {
           last_number: 0,
         },
       });
-      await prisma.$disconnect();
     }
 
     return documentType;
@@ -139,7 +136,7 @@ export const documentTypesService = {
       throw new Error('Phải chọn quy trình mặc định khi cho phép tùy chỉnh');
     }
 
-    const updated = await documentTypesRepository.update(id, {
+    const updated = await documentTypesRepository.update(id, tenantId, {
       name: data.name,
       description: data.description,
       category: data.category,
@@ -153,9 +150,6 @@ export const documentTypesService = {
 
     // Update or create numbering rule
     if (data.require_numbering && data.numbering_pattern) {
-      const { PrismaClient } = await import('@prisma/client');
-      const prisma = new PrismaClient();
-      
       await prisma.numbering_rules.upsert({
         where: {
           tenant_id_document_type_id: {
@@ -174,7 +168,6 @@ export const documentTypesService = {
           last_number: 0,
         },
       });
-      await prisma.$disconnect();
     }
 
     return updated;
@@ -191,7 +184,7 @@ export const documentTypesService = {
       throw new Error('Cannot delete document type that is in use');
     }
 
-    return documentTypesRepository.delete(id);
+    return documentTypesRepository.delete(id, tenantId);
   },
 
   async getStats(tenantId: number) {
