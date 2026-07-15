@@ -1,5 +1,7 @@
 const axios = require("axios");
 const { PrismaClient } = require("@prisma/client");
+const { DeleteObjectCommand, HeadObjectCommand, S3Client } = require("@aws-sdk/client-s3");
+const bcrypt = require("bcrypt");
 const path = require("path");
 const fs = require("fs/promises");
 const dotenv = require("dotenv");
@@ -19,9 +21,51 @@ const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "admin@acme.local";
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD;
 const INTERNAL_SIGNER_EMAIL = process.env.E2E_INTERNAL_SIGNER_EMAIL || "admin@acme.local";
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "esign_rt";
+const STORAGE_MODE = process.env.E2E_STORAGE_MODE || "local";
+
+const s3 = STORAGE_MODE === "s3" ? new S3Client({
+  endpoint: process.env.S3_ENDPOINT,
+  region: process.env.S3_REGION || "us-east-1",
+  forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
+  credentials: { accessKeyId: process.env.S3_ACCESS_KEY_ID, secretAccessKey: process.env.S3_SECRET_ACCESS_KEY },
+}) : null;
 
 if (!ADMIN_PASSWORD) {
   throw new Error("E2E_ADMIN_PASSWORD is required; do not rely on a shared demo password");
+}
+
+function assertPortableStorageKey(key, label) {
+  if (!key || /^(?:[\\/]+|[A-Za-z]:[\\/])/.test(key) || key.includes("..")) {
+    throw new Error(`${label} is not a portable storage key`);
+  }
+}
+
+async function assertS3ObjectExists(key, label) {
+  assertPortableStorageKey(key, label);
+  await s3.send(new HeadObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key }));
+}
+
+async function verifyS3DocumentIsolation(documentId) {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tenant = await prisma.tenants.create({ data: { name: `E2E S3 tenant ${suffix}`, status: "active" } });
+  const password = "e2e-s3-cross-tenant-password";
+  const user = await prisma.users.create({
+    data: {
+      tenant_id: tenant.id,
+      email: `e2e-s3-${suffix}@example.test`,
+      password_hash: await bcrypt.hash(password, 10),
+      full_name: "E2E S3 isolated user",
+      status: "active",
+    },
+  });
+  const token = await login(user.email, password);
+  const response = await axios.get(`${API_BASE}/documents/${documentId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    validateStatus: () => true,
+  });
+  if (![403, 404].includes(response.status)) {
+    throw new Error(`Cross-tenant document request returned ${response.status}`);
+  }
 }
 
 const PNG_SIGNATURE =
@@ -243,6 +287,20 @@ async function run() {
       throw new Error(`Internal signer fixture was not persisted for sign request ${signRequestId}`);
     }
     console.log(`Document ${document.id} created with sign request ${signRequestId}`);
+
+    if (STORAGE_MODE === "s3") {
+      const persistedSource = await prisma.documents.findUnique({
+        where: { id: document.id },
+        select: { file_path: true },
+      });
+      await assertS3ObjectExists(persistedSource?.file_path, "source document key");
+      await assertS3ObjectExists(`storage/${tenantId}/missing-e2e-object.pdf`, "missing object check").then(
+        () => { throw new Error("Expected missing MinIO object to be absent"); },
+        () => undefined,
+      );
+      await verifyS3DocumentIsolation(document.id);
+      console.log("MinIO source object, missing-object behavior, and tenant isolation verified");
+    }
 
     const signRequestResponse = await axios.get(`${API_BASE}/sign-requests/${signRequestId}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -480,6 +538,18 @@ async function run() {
     }
     console.log("Flow -> COMPLETED");
 
+    if (STORAGE_MODE === "s3") {
+      const persistedArtifact = await prisma.documents.findUnique({
+        where: { id: document.id },
+        select: { signed_file_path: true, hash: true, artifact_metadata: true, status: true },
+      });
+      if (persistedArtifact?.status !== "completed" || !persistedArtifact.signed_file_path || !persistedArtifact.hash || !persistedArtifact.artifact_metadata) {
+        throw new Error("S3 artifact completed without persisted storage metadata/hash");
+      }
+      await assertS3ObjectExists(persistedArtifact.signed_file_path, "signed artifact key");
+      console.log("MinIO signed artifact object and persisted hash metadata verified");
+    }
+
     const downloadResponse = await axios.get(
       `${API_BASE}/documents/${document.id}/download-signed`,
       {
@@ -491,6 +561,13 @@ async function run() {
       throw new Error("Signed artifact download is empty");
     }
     console.log(`Signed artifact downloaded (${downloadResponse.data.byteLength} bytes)`);
+
+    if (STORAGE_MODE === "s3") {
+      const persistedArtifact = await prisma.documents.findUnique({ where: { id: document.id }, select: { signed_file_path: true } });
+      await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: persistedArtifact.signed_file_path }));
+      await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: persistedArtifact.signed_file_path }));
+      console.log("MinIO object delete is idempotent after completed-artifact download");
+    }
 
     const auditCount = await prisma.audit_logs.count({
       where: {

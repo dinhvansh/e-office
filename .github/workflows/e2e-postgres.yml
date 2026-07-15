@@ -1,4 +1,4 @@
-name: PostgreSQL E2E
+name: Docker Storage E2E
 
 on:
   push:
@@ -12,8 +12,22 @@ permissions:
 
 jobs:
   workflow-e2e:
-    name: Workflow E2E (Docker Compose)
+    name: Workflow E2E (${{ matrix.storage }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - storage: local
+            command: e2e:docker
+            project: eoffice-e2e
+            env_file: .env.test.example
+            compose_files: -f docker-compose.yml -f docker-compose.test.yml
+          - storage: s3-minio
+            command: e2e:s3
+            project: eoffice-e2e-s3
+            env_file: .env.s3.test.example
+            compose_files: -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.s3.test.yml
 
     steps:
       - name: Checkout
@@ -31,14 +45,14 @@ jobs:
         env:
           # Keep containers only long enough for the failure diagnostics below.
           E2E_KEEP_CONTAINERS: "1"
-        run: npm run e2e:docker
+        run: npm run ${{ matrix.command }}
 
       - name: Show Compose diagnostics on failure
         if: failure()
         run: |
-          docker compose --project-name eoffice-e2e --env-file .env.test.example -f docker-compose.yml -f docker-compose.test.yml ps || true
-          docker compose --project-name eoffice-e2e --env-file .env.test.example -f docker-compose.yml -f docker-compose.test.yml logs --no-color || true
+          docker compose --project-name ${{ matrix.project }} --env-file ${{ matrix.env_file }} ${{ matrix.compose_files }} ps || true
+          docker compose --project-name ${{ matrix.project }} --env-file ${{ matrix.env_file }} ${{ matrix.compose_files }} logs --no-color || true
 
       - name: Clean up Docker E2E stack
         if: always()
-        run: docker compose --project-name eoffice-e2e --env-file .env.test.example -f docker-compose.yml -f docker-compose.test.yml down --volumes --remove-orphans
+        run: docker compose --project-name ${{ matrix.project }} --env-file ${{ matrix.env_file }} ${{ matrix.compose_files }} down --volumes --remove-orphans

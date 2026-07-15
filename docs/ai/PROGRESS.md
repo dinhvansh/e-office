@@ -1,5 +1,19 @@
 # Implementation Progress
 
+## 2026-07-15 — MinIO/S3 FileStorage E2E
+
+- Added a test-only MinIO Compose overlay with health-gated one-shot bucket
+  initialization. Local filesystem storage remains the production default;
+  backend and outbox worker switch to S3 only for `npm run e2e:s3`.
+- The real workflow verifies portable object keys, source-object existence,
+  missing-object behavior, application-level cross-tenant denial, signed
+  artifact upload/download, persisted hash/metadata and idempotent deletion.
+  The existing forced artifact failure confirms completion is not falsely
+  recorded before artifact storage succeeds.
+- Docker CI now runs the shared local and MinIO/S3 helpers without repository
+  secrets and retains diagnostics only on failure. Verified locally:
+  `npm run e2e:s3`.
+
 ## 2026-07-15 — Reproducible Docker PostgreSQL E2E
 
 - The missing `POSTGRES_PASSWORD` blocker is resolved for local/CI E2E through a test-only Compose overlay, ignored local env names and a helper that materializes `.env.test.example` only in a temporary directory. Production Compose still requires explicit secrets.

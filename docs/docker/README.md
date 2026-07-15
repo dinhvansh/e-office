@@ -51,6 +51,30 @@ by the production Compose command. The helper never overwrites `.env`; use
 GitHub Actions invokes this exact helper with `E2E_KEEP_CONTAINERS=1`, prints
 Compose logs when it fails, then always removes its test containers and volumes.
 
+## Reproducible MinIO/S3 E2E
+
+Local filesystem storage remains the default (`FILE_STORAGE_DRIVER=local`). Run
+the S3-compatible workflow separately with a disposable MinIO stack:
+
+```powershell
+npm run e2e:s3
+```
+
+This uses `.env.s3.test.example` only to create a temporary environment file.
+It starts PostgreSQL, Redis, MinIO, a one-shot bucket initializer, backend and
+outbox worker; all application services use path-style S3 calls to
+`http://minio:9000`. The committed MinIO credentials are deterministic,
+test-only fixtures, not production credentials. No MinIO console setup is
+required. The runner verifies upload/download, tenant authorization, generated
+artifact persistence and idempotent object deletion, prints service logs on
+failure, and removes test containers and volumes afterward.
+
+Configure a real S3-compatible deployment with `FILE_STORAGE_DRIVER=s3`,
+`S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`,
+`S3_SECRET_ACCESS_KEY`, and (where required) `S3_FORCE_PATH_STYLE=true`. Do
+not put production values in either E2E env example. GitHub Actions runs both
+`npm run e2e:docker` and `npm run e2e:s3` using these same entry points.
+
 ## Network and optional services
 
 PostgreSQL and Redis use the internal Compose network by default; only frontend

@@ -59,6 +59,19 @@ test("S3-compatible adapter maps the file storage contract to its transport", as
   assert.deepEqual(calls, ["PutObjectCommand", "GetObjectCommand", "HeadObjectCommand", "DeleteObjectCommand"]);
 });
 
+test("S3-compatible storage rejects absolute and traversal keys before transport", async () => {
+  const storage = new S3CompatibleFileStorage({
+    endpoint: "http://minio.invalid",
+    region: "us-east-1",
+    bucket: "eoffice",
+    accessKeyId: "test-access-key",
+    secretAccessKey: "test-secret-key",
+  });
+  await assert.rejects(storage.put({ key: "/etc/passwd", body: Buffer.from("no") }));
+  await assert.rejects(storage.get("C:\\sensitive.pdf"));
+  await assert.rejects(storage.delete("storage/../outside.pdf"));
+});
+
 test("invalid FILE_STORAGE_DRIVER fails startup validation", () => {
   const result = spawnSync(process.execPath, ["-e", "require('./.test-dist/src/config/env.js')"], {
     cwd: process.cwd(),
