@@ -7,7 +7,7 @@ const registerSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   full_name: z.string().min(1, 'Full name is required'),
-  terms_accepted: z.boolean().refine(val => val === true, 'You must accept terms and conditions'),
+  terms_accepted: z.boolean().refine(val => val === true, 'You must accept the current Terms of Service and Privacy Notice'),
   company_name: z.string().optional(),
   create_tenant: z.boolean().optional()
 });

@@ -2,13 +2,19 @@
 
 ## Project governance
 
-This is source-available Fair-Code software, not OSI open source. Internal
-self-hosting and internal modifications are allowed under the draft
-[Community Source License](LICENSE); redistribution, white-labeling and hosted
-resale require a commercial license. Terms require legal review before public
-release. See [COMMERCIAL-LICENSING.md](COMMERCIAL-LICENSING.md),
+E-Office is source-available fair-code software, not OSI open source. The
+[Community Source License](LICENSE) allows internal self-hosting, internal
+modification, evaluation, learning, non-commercial personal use, development,
+testing, and contribution. Commercial hosted resale, managed-service resale,
+white-label resale, OEM or embedded distribution, and commercial redistribution
+as a competing product require a separate commercial license.
+
+Trademark and logo rights are not granted automatically. See
+[COMMERCIAL-LICENSING.md](COMMERCIAL-LICENSING.md),
 [TRADEMARK.md](TRADEMARK.md), [CONTRIBUTING.md](CONTRIBUTING.md), and
-[SECURITY.md](SECURITY.md).
+[SECURITY.md](SECURITY.md). The licensing and policy package is a publication
+draft subject to maintainer approval; it must not be described as external
+legal approval.
 
 ## v0.1.0-alpha scope and limitations
 

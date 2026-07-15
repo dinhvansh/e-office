@@ -1,24 +1,130 @@
-E-Office Community Source License (Draft — Legal Review Required)
+E-Office Community Source License
+Version 0.1.0-alpha draft
 
 Copyright (c) 2026 E-Office contributors.
 
-THIS IS A DRAFT SOURCE-AVAILABLE / FAIR-CODE LICENSE. IT IS NOT AN
-OSI-APPROVED OPEN-SOURCE LICENSE AND MUST BE REVIEWED AND APPROVED BY QUALIFIED
-COUNSEL BEFORE PUBLIC RELEASE.
+This license is a source-available, fair-code style license. It is not an
+OSI-approved open-source license. It is intended to allow internal self-hosting,
+evaluation, learning, contribution, and internal modification while reserving
+commercial resale, hosted resale, white-label, OEM, and competing redistribution
+rights for a separate commercial license.
 
-Subject to these terms, you may use, copy, modify, and run this software for
-your own internal personal or business operations. You may make modifications
-for that internal use.
+This draft must be approved by the project maintainer before publication. It is
+not a statement of external legal approval.
 
-You may not, without a separate commercial license from the copyright holder:
-1. distribute or sublicense the software or a derivative;
-2. offer it as a hosted, managed, SaaS, or service-bureau service to third
-   parties;
-3. white-label, resell, or embed it in a product or service sold to third
-   parties; or
-4. remove copyright, license, or proprietary notices.
+1. Definitions
 
-No trademark, logo, or brand right is granted. See TRADEMARK.md. The software
-is provided "AS IS", without warranties, to the maximum extent permitted by
-law. A commercial license may grant rights beyond these community terms; see
-COMMERCIAL-LICENSING.md.
+"Software" means the E-Office source code, documentation, packages, examples,
+and related materials distributed with this license.
+
+"Internal Business Use" means installing, running, evaluating, testing,
+modifying, and using the Software for your own internal operations, internal
+business workflows, internal users, or non-commercial personal use. Internal
+Business Use does not include offering access to the Software to third parties
+as a hosted service, managed service, white-label product, OEM component, or
+commercially redistributed product.
+
+"Commercial Hosting" means providing third parties with paid or monetized
+access to the Software, or to a service substantially based on the Software,
+where you operate, host, administer, or control the environment.
+
+"Managed Service" means operating, administering, maintaining, or supporting an
+instance of the Software for a third party in a way that effectively gives that
+third party access to the Software as the product or a substantial part of the
+product.
+
+"White-Label" means presenting the Software, or a service substantially based
+on it, under another name, brand, logo, domain, or identity in a way that hides
+or replaces E-Office as the source technology.
+
+"OEM / Embedded Distribution" means bundling, embedding, integrating, or
+including the Software or a derivative work in another product, appliance,
+platform, package, or service distributed or sold to third parties.
+
+"Redistribution" means making copies of the Software or derivative works
+available to third parties, whether modified or unmodified, including by source
+code, binary, container image, hosted download, marketplace listing, package
+registry, or similar channel.
+
+"Commercial License" means a separate written agreement with the copyright
+holder or an authorized maintainer that grants rights beyond this Community
+Source License.
+
+2. Rights granted without a Commercial License
+
+Subject to this license, you may:
+
+- view, study, and evaluate the Software;
+- install and run the Software for Internal Business Use;
+- modify the Software for Internal Business Use;
+- use the Software for development, testing, and non-commercial personal use;
+- create contributions and submit them to the project;
+- provide consulting, implementation, training, integration, migration, or
+  support services around the Software, provided those services do not amount
+  to Commercial Hosting, a Managed Service, White-Label resale, OEM / Embedded
+  Distribution, or commercial Redistribution of the Software itself.
+
+3. Rights that require a Commercial License
+
+You must obtain a Commercial License before you:
+
+- offer paid hosted access to the Software or to a service substantially based
+  on the Software;
+- provide the Software as SaaS, Commercial Hosting, a service bureau, or a
+  Managed Service to third parties;
+- White-Label, resell, or rebrand the Software or a service substantially based
+  on it;
+- distribute modified or unmodified copies commercially as a competing product;
+- use the Software for OEM / Embedded Distribution;
+- sublicense the Software or grant third parties rights beyond this license.
+
+4. Restrictions
+
+You may not:
+
+- remove, obscure, or alter copyright, license, attribution, or proprietary
+  notices;
+- use E-Office trademarks, logos, product names, or branding except as allowed
+  by TRADEMARK.md or separate written permission;
+- imply endorsement, sponsorship, affiliation, or approval by the project
+  maintainers without written permission;
+- use the Software in a way that violates applicable law.
+
+5. Commercial licensing
+
+A Commercial License may grant additional rights, including hosted resale,
+white-label resale, OEM distribution, or other commercial use cases. See
+COMMERCIAL-LICENSING.md. Contact: [TO BE CONFIRMED BY MAINTAINER].
+
+6. Ownership
+
+The Software is owned by its copyright holders. Contributions are licensed to
+the project under the contribution terms accepted by the maintainer. This
+license does not transfer ownership of the Software or any trademarks.
+
+7. Warranty disclaimer
+
+The Software is provided "AS IS" and "AS AVAILABLE", without warranties or
+conditions of any kind, express or implied, including warranties of
+merchantability, fitness for a particular purpose, title, non-infringement,
+availability, accuracy, security, or regulatory compliance, to the maximum
+extent permitted by law.
+
+8. Limitation of liability
+
+To the maximum extent permitted by law, the copyright holders, maintainers, and
+contributors will not be liable for any indirect, incidental, special,
+consequential, exemplary, or punitive damages, or for lost profits, lost
+revenue, lost data, business interruption, procurement of substitute services,
+or similar losses arising from or related to the Software or this license, even
+if advised of the possibility of such damages.
+
+9. Governing law
+
+Governing law and venue: [TO BE CONFIRMED BY MAINTAINER].
+
+10. No legal approval statement
+
+This draft is intended for maintainer review and publication readiness work. It
+must not be described as legally approved unless separately approved by
+qualified legal counsel.

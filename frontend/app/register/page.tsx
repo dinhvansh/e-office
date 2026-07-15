@@ -316,15 +316,16 @@ export default function RegisterPage() {
                 disabled={loading}
               />
               <label htmlFor="terms" className="ml-2 text-sm text-gray-600">
-                Tôi đồng ý với{' '}
+                I have read and agree to the current draft{' '}
                 <Link href="/terms" className="text-indigo-600 hover:text-indigo-700 font-medium underline underline-offset-2">
-                  điều khoản sử dụng
+                  Terms of Service
                 </Link>{' '}
-                và{' '}
+                and{' '}
                 <Link href="/privacy" className="text-indigo-600 hover:text-indigo-700 font-medium underline underline-offset-2">
-                  chính sách bảo mật
+                  Privacy Notice
                 </Link>{' '}
-                <span className="block mt-1 text-xs text-gray-500">Phiên bản {policyMetadata.termsVersion}/{policyMetadata.privacyVersion}, hiệu lực {policyMetadata.effectiveDate}.</span>
+                for this alpha deployment. This acceptance does not grant commercial resale, hosted resale, white-label, OEM, or trademark rights.
+                <span className="block mt-1 text-xs text-gray-500">Versions {policyMetadata.termsVersion}/{policyMetadata.privacyVersion}, draft effective date {policyMetadata.effectiveDate}.</span>
               </label>
             </div>
 
