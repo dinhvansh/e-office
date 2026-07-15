@@ -10,8 +10,8 @@
 ## 🔐 Thông Tin Super Admin
 
 ```
-Email:    admin@acme.local
-Password: admin123
+Email:    superadmin@example.local
+Password: set during provisioning (no default)
 Role:     super_admin
 ```
 
@@ -44,8 +44,8 @@ Role:     super_admin
 ### 1. Đăng Nhập Super Admin
 ```
 URL: http://localhost:3000/login
-Email: admin@acme.local
-Password: admin123
+Email: superadmin@example.local
+Password: set during provisioning (no default)
 ```
 
 ### 2. Xem Tất Cả Users
@@ -71,7 +71,7 @@ node scripts/create-super-admin.js
 ```sql
 UPDATE users 
 SET role = 'super_admin' 
-WHERE email = 'admin@acme.local';
+WHERE email = 'superadmin@example.local';
 ```
 
 ### Cách 3: Tạo Mới Qua Script
@@ -105,9 +105,9 @@ async function createSuperAdmin() {
 ├─────────────────────────────────────────┤
 │ User          │ Workspace  │ Status     │
 ├─────────────────────────────────────────┤
-│ Van Nguyễn    │ ét ô ét    │ ⏳ Pending │
-│ John Doe      │ Acme Corp  │ ✅ Active  │
-│ Jane Smith    │ Tech Co    │ ✅ Active  │
+│ Alex Example  │ Example Org│ ⏳ Pending │
+│ Jordan Example│ Example Org│ ✅ Active  │
+│ Taylor Example│ Example Org│ ✅ Active  │
 └─────────────────────────────────────────┘
 ```
 
@@ -118,10 +118,10 @@ async function createSuperAdmin() {
 ├─────────────────────────────────────────┤
 │ User          │ Workspace  │ Status     │
 ├─────────────────────────────────────────┤
-│ John Doe      │ Acme Corp  │ ✅ Active  │
-│ Jane Smith    │ Acme Corp  │ ✅ Active  │
+│ Jordan Example│ Example Org│ ✅ Active  │
+│ Taylor Example│ Example Org│ ✅ Active  │
 └─────────────────────────────────────────┘
-(Chỉ thấy users trong Acme Corp)
+(Chỉ thấy users trong Example Org)
 ```
 
 ## 🔍 Kiểm Tra Super Admin
@@ -144,7 +144,7 @@ WHERE role = 'super_admin';
 # Login
 curl -X POST http://localhost:4000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@acme.local","password":"admin123"}'
+  -d '{"email":"superadmin@example.local","password":"<provisioned-password>"}'
 
 # Get all users (with token)
 curl http://localhost:4000/api/v1/users \

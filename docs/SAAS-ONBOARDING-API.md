@@ -27,7 +27,7 @@ API để tạo tenant mới kèm admin user cho SaaS model. API này tự độ
   "tenant_name": "Acme Corporation",
   "tenant_domain": "acme.com",
   "admin_email": "admin@acme.com",
-  "admin_password": "Admin@123",
+"admin_password": "<provisioned-password>",
   "admin_full_name": "John Doe"
 }
 ```
@@ -112,7 +112,7 @@ curl -X POST http://localhost:4000/api/v1/tenants/create-with-admin \
     "tenant_name": "Acme Corporation",
     "tenant_domain": "acme.com",
     "admin_email": "admin@acme.com",
-    "admin_password": "Admin@123",
+"admin_password": "<provisioned-password>",
     "admin_full_name": "John Doe"
   }'
 ```
@@ -135,7 +135,7 @@ node scripts/test-create-tenant.js
   "tenant_name": "Acme Corporation",
   "tenant_domain": "acme.com",
   "admin_email": "admin@acme.com",
-  "admin_password": "Admin@123",
+"admin_password": "<provisioned-password>",
   "admin_full_name": "John Doe"
 }
 ```
@@ -191,7 +191,7 @@ After successful registration, admin can login immediately:
 ```json
 {
   "email": "admin@acme.com",
-  "password": "Admin@123"
+"password": "<provisioned-password>"
 }
 ```
 
@@ -200,7 +200,7 @@ Response:
 {
   "success": true,
   "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "token": "<access-token>",
     "user": {
       "id": 10,
       "email": "admin@acme.com",

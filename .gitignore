@@ -51,6 +51,7 @@ temp/
 tmp/
 backend/uploads/
 backend/backups/
+docs/setup-and-backup/*.json
 backend/test-output/
 backend/storage/
 backend/scripts/storage/

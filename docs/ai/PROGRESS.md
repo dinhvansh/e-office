@@ -1,5 +1,17 @@
 # Implementation Progress
 
+## 2026-07-15 — Final alpha publication remediation
+
+- Committed clean-clone source fixes, then removed private backup data,
+  obsolete token helpers, stale example secrets, and LibreSign fixture keys
+  from Git history in a controlled filter-repo mirror.
+- Full-ref Gitleaks scan now passes with zero findings. `.gitleaks.toml` has
+  narrow, commented exceptions only for CI/demo placeholders.
+- A fresh clone passed lockfile installs, migrations, backend tests/lint/build,
+  frontend lint/typecheck/build, local Docker E2E, and MinIO/S3 E2E.
+- Technical publication blockers are clear. Fair-Code/legal review remains a
+  separate non-technical publication approval before any public tag or release.
+
 ## 2026-07-15 — Public source alpha packaging
 
 - Added a draft Fair-Code/source-available license package, commercial

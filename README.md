@@ -10,6 +10,16 @@ release. See [COMMERCIAL-LICENSING.md](COMMERCIAL-LICENSING.md),
 [TRADEMARK.md](TRADEMARK.md), [CONTRIBUTING.md](CONTRIBUTING.md), and
 [SECURITY.md](SECURITY.md).
 
+## v0.1.0-alpha scope and limitations
+
+This alpha is for evaluation in an isolated environment. The built-in signing
+flow is not represented as a qualified electronic signature, a PKI service, or
+PAdES compliance. Production deployments must supply their own approved
+certificate, key-management, and compliance controls. Local filesystem storage
+is the default; S3-compatible storage and the license service are optional and
+disabled unless explicitly configured. Never commit production secrets or SMTP
+credentials; create local environment files only from the included examples.
+
 ## PDF Unicode fonts
 
 PDF annotations use Noto Sans so Vietnamese text is embedded without
@@ -24,7 +34,7 @@ Monorepo cho hệ thống quản lý tài liệu, phê duyệt nội bộ và k�
 
 ## Thành phần
 
-- `frontend`: Next.js 14, dashboard nội bộ và trang ký công khai
+- `frontend`: Next.js 16, dashboard nội bộ và trang ký công khai
 - `backend`: Express + TypeScript + Prisma
 - `license-server`: service kiểm tra license độc lập
 - `docker-compose.yml`: stack local/prod cơ bản với Postgres, Redis, backend, frontend, license server

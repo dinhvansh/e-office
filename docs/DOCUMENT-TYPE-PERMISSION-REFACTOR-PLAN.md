@@ -391,16 +391,16 @@ Phase sau nếu cần:
 ## Danh sách file dự kiến sửa
 
 ### Frontend
-- [frontend/app/(dashboard)/document-types/page.tsx](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/frontend/app/(dashboard)/document-types/page.tsx:1)
-- [frontend/lib/types.ts](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/frontend/lib/types.ts:1)
+- `frontend/app/(dashboard)/document-types/page.tsx`
+- `frontend/lib/types.ts`
 
 ### Backend
-- [backend/src/modules/settings/settings.service.ts](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/backend/src/modules/settings/settings.service.ts:1)
-- [backend/src/modules/settings/settings.controller.ts](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/backend/src/modules/settings/settings.controller.ts:1)
-- [backend/src/modules/documents/documents.service.ts](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/backend/src/modules/documents/documents.service.ts:1)
-- [backend/src/modules/documents/documents.controller.ts](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/backend/src/modules/documents/documents.controller.ts:1)
-- [backend/src/modules/documents/permissions.service.ts](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/backend/src/modules/documents/permissions.service.ts:1)
-- [backend/src/modules/authorization/authorization.service.ts](d:/Public Workspace%20-%20Example Organization/Documents/E-SIGN/e-office/backend/src/modules/authorization/authorization.service.ts:1)
+- `backend/src/modules/settings/settings.service.ts`
+- `backend/src/modules/settings/settings.controller.ts`
+- `backend/src/modules/documents/documents.service.ts`
+- `backend/src/modules/documents/documents.controller.ts`
+- `backend/src/modules/documents/permissions.service.ts`
+- `backend/src/modules/authorization/authorization.service.ts`
 - file mới dự kiến:
   - `backend/src/modules/authorization/document-permission-resolver.service.ts`
   - `backend/src/modules/settings/document-type-policy.helper.ts`
