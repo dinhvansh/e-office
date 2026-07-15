@@ -707,7 +707,7 @@ export default function PublicSigningPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {/* Option 1: Guided Mode */}
             <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-2xl shadow-2xl p-6 cursor-pointer hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
-                 onClick={handleStartGuided}>
+                 onClick={handleStartGuided} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleStartGuided(); } }}>
               <div className="relative z-10 text-white">
                 <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm mb-4">
                   <Play className="w-6 h-6 text-white" />
@@ -725,7 +725,7 @@ export default function PublicSigningPage() {
 
             {/* Option 2: Modal Mode */}
             <div className="relative overflow-hidden bg-gradient-to-br from-green-500 via-teal-500 to-cyan-500 rounded-2xl shadow-2xl p-6 cursor-pointer hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
-                 onClick={handleOpenSignatureModal}>
+                 onClick={handleOpenSignatureModal} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleOpenSignatureModal(); } }}>
               <div className="relative z-10 text-white">
                 <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm mb-4">
                   <FileText className="w-6 h-6 text-white" />

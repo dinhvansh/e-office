@@ -142,6 +142,10 @@ The following High issues should be completed or browser-verified before public 
 
 - **Fixed and browser verified:** sign-request creation now guides document selection, workflow, participants and review in four retained client-side steps. Step validation is inline, back/next preserve values, the final review summarizes submission data and submit remains single-flight. Chromium replay covered validation, keyboard progression and desktop/768px/375px evidence: `evidence/ux005-*.png`.
 
+## UX-003 verification — 2026-07-15
+
+- **Fixed and browser verified:** PDF signing exposes a keyboard-operable field list with progress and accessible overlay names. Signature fields use the existing Radix dialog with typed/upload alternatives, focus handling and Escape. Chromium verified OTP-to-signing keyboard flow and responsive evidence: `evidence/ux003-typed-signature-desktop.png`, `evidence/ux003-typed-signature-mobile.png`.
+
 ## UX-008 verification — 2026-07-15
 
 - **Fixed and browser verified:** `/notifications` provides authenticated paginated history with read/read-all/delete actions, safe internal destinations, accessible loading/empty/error/retry feedback and keyboard-operable controls. The existing API scopes every list and mutation to the authenticated user and tenant. Chromium evidence: `evidence/ux008-history-desktop.png`, `evidence/ux008-history-tablet.png`, `evidence/ux008-history-mobile.png`.

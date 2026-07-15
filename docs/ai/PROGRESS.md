@@ -6,6 +6,10 @@
 
 ## 2026-07-15 — Guided sign-request creation
 
+## 2026-07-15 — Accessible PDF signing
+
+- **UX-003 fixed:** signing PDF fields now have an accessible field list, progress announcement and keyboard-operable overlay targets. The established Radix signature dialog supplies typed/upload alternatives and focus-safe interaction. Chromium replay verified OTP, keyboard entry, typed signature and Escape at desktop/mobile; evidence: `docs/ux/evidence/ux003-*.png`.
+
 - **UX-005 fixed:** `/sign-requests/create` now has a four-step retained-state flow for document, workflow, participants and final review. Inline validation prevents incomplete progression; browser verification covered keyboard progression, back/next retention, duplicate-submit protection and desktop/tablet/mobile evidence in `docs/ux/evidence/ux005-*.png`.
 
 - **UX-007 fixed:** backend detail contracts now return a role-safe workflow status summary. The shared Vietnamese panel explains status, current responsible role, next action, progress, deadline and eligible PDF-artifact retry without revealing private participant data. Sign-request, document-flow, approval detail and My Tasks now use this context; Chromium verified failure/retry and expiry at desktop, tablet and mobile widths. Evidence: `docs/ux/evidence/ux007-*.png`.

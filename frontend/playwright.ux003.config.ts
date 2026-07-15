@@ -1,0 +1,2 @@
+import { defineConfig, devices } from '@playwright/test';
+export default defineConfig({ testDir: './tests', testMatch: 'accessible-signing.spec.ts', timeout: 60_000, use: { baseURL: 'http://127.0.0.1:3020', viewport: { width: 1280, height: 720 } }, projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }], webServer: { command: 'node scripts/start-ux003-test-server.mjs', url: 'http://127.0.0.1:3020/login', reuseExistingServer: false, timeout: 60_000 } });

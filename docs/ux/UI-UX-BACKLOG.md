@@ -26,6 +26,8 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 
 ### UX-003 — Provide accessible PDF signing-field interaction
 
+- **Status:** Fixed — browser verified 2026-07-15.
+
 - **Screen/flow:** Internal signing and signed-field completion.
 - **Problem:** Signature uses a canvas/pointer interaction and modal inputs/buttons do not expose a complete dialog/focus/keyboard contract. Fields displayed on the PDF do not provide a clear accessible field list or progress alternative.
 - **Severity:** High.
