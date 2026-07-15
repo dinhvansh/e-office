@@ -1,5 +1,7 @@
 import { sendEmail } from "../../config/email";
 import { getOtpEmailTemplate } from "./email-templates";
+import { outboxDeliveryService } from "../outbox/outboxDelivery.service";
+import { prisma } from "../../config/prisma";
 
 export interface OtpEmailData {
   tenantId?: number;
@@ -11,6 +13,17 @@ export interface OtpEmailData {
 }
 
 class EmailService {
+  async deliver(template: string, data: Record<string, unknown>): Promise<void> {
+    switch (template) {
+      case "approval_request": return this.sendApprovalRequestNotification(data as Parameters<EmailService["sendApprovalRequestNotification"]>[0]);
+      case "approval_action": return this.sendApprovalActionNotification(data as Parameters<EmailService["sendApprovalActionNotification"]>[0]);
+      case "workflow_completed": return this.sendWorkflowCompletedNotification(data as Parameters<EmailService["sendWorkflowCompletedNotification"]>[0]);
+      case "sign_completed": return this.sendSignCompletedNotification(data as Parameters<EmailService["sendSignCompletedNotification"]>[0]);
+      case "document_shared": return this.sendDocumentSharedEmail(data as Parameters<EmailService["sendDocumentSharedEmail"]>[0]);
+      case "sign_request_cancelled": return this.sendSignRequestCancelled(data as Parameters<EmailService["sendSignRequestCancelled"]>[0]);
+      default: throw new Error(`Unsupported email template: ${template}`);
+    }
+  }
   async sendOtpEmail(data: OtpEmailData): Promise<void> {
     const html = this.generateOtpEmailHtml(data);
     const text = this.generateOtpEmailText(data);
@@ -766,4 +779,34 @@ Email này được gửi tự động từ hệ thống E-Office
   }
 }
 
-export const emailService = new EmailService();
+const directEmailService = new EmailService();
+
+const queuedTemplates: Record<string, string> = {
+  sendApprovalRequestNotification: "approval_request",
+  sendApprovalActionNotification: "approval_action",
+  sendWorkflowCompletedNotification: "workflow_completed",
+  sendSignCompletedNotification: "sign_completed",
+  sendSignRequestCancelled: "sign_request_cancelled",
+  sendDocumentSharedEmail: "document_shared",
+};
+
+export const emailService = new Proxy(directEmailService, {
+  get(target, property) {
+    if (property === "deliver") return Reflect.get(target, property, target);
+    const template = typeof property === "string" ? queuedTemplates[property] : undefined;
+    const direct = Reflect.get(target, property, target);
+    if (!template || typeof direct !== "function") return direct;
+    return async (data: Record<string, unknown>) => {
+      const recipient = typeof data.recipientEmail === "string" ? data.recipientEmail.toLowerCase() : "unknown";
+      const stableReference = typeof data.documentUrl === "string" ? data.documentUrl : "";
+      await outboxDeliveryService.enqueueEmail(prisma, {
+        tenantId: typeof data.tenantId === "number" ? data.tenantId : null,
+        aggregateType: "email",
+        aggregateId: recipient,
+        template,
+        data,
+        deduplicationKey: `email:${template}:${recipient}:${stableReference}`,
+      });
+    };
+  },
+});

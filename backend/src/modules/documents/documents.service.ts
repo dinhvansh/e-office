@@ -24,6 +24,7 @@ import {
 } from "../settings/document-type-policy.helper";
 import { documentFileService, type DocumentFileResult } from "./documentFile.service";
 import { documentLifecycleService } from "./documentLifecycle.service";
+import { outboxDeliveryService } from "../outbox/outboxDelivery.service";
 
 export interface CreateDocumentInput {
   fileName: string;
@@ -356,18 +357,20 @@ class DocumentsService {
         },
       });
 
-      try {
-        const { emailService } = await import('../common/email.service');
-        await emailService.sendDocumentSharedEmail({
+      await outboxDeliveryService.enqueueEmail(prisma, {
+        tenantId,
+        aggregateType: "document",
+        aggregateId: documentId,
+        template: "document_shared",
+        data: {
           recipientEmail: email,
           documentTitle: document.title || document.original_file_name || 'Untitled',
           documentNumber: document.document_number || undefined,
           senderName: owner?.full_name || owner?.email || 'System',
           documentUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/documents/${document.id}`,
-        });
-      } catch (error) {
-        console.error(`Failed to send CC email to ${email}:`, error);
-      }
+        },
+        deduplicationKey: `document-shared:${documentId}:${email}`,
+      });
     }
 
     await auditService.record({
@@ -618,20 +621,20 @@ class DocumentsService {
           },
         });
 
-        // Send notification email to CC
-        try {
-          const { emailService } = await import('../common/email.service');
-          await emailService.sendDocumentSharedEmail({
+        await outboxDeliveryService.enqueueEmail(prisma, {
+          tenantId,
+          aggregateType: "document",
+          aggregateId: document.id,
+          template: "document_shared",
+          data: {
             recipientEmail: email,
             documentTitle: input.title || input.fileName,
             documentNumber: document.document_number || undefined,
             senderName: owner?.full_name || owner?.email || 'System',
             documentUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/documents/${document.id}`,
-          });
-        } catch (error) {
-          console.error(`Failed to send CC email to ${email}:`, error);
-          // Don't fail the whole operation if email fails
-        }
+          },
+          deduplicationKey: `document-shared:${document.id}:${email}`,
+        });
       }
     }
     

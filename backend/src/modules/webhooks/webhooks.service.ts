@@ -1,6 +1,7 @@
 import { request } from "undici";
 import crypto from "crypto";
 import { webhooksRepository } from "./webhooks.repository";
+import { DeliveryError } from "../outbox/deliveryError";
 
 class WebhookService {
   async emit(tenantId: number, event: string, payload: unknown): Promise<void> {
@@ -39,10 +40,13 @@ class WebhookService {
 
           statusCode = res.statusCode;
           response = await res.body.text();
+          if (statusCode >= 500) throw new DeliveryError("Webhook destination returned a server error", true);
+          if (statusCode >= 400) throw new DeliveryError("Webhook destination rejected the delivery", false);
         } catch (err) {
-          // eslint-disable-next-line no-console
-          console.error("Failed to deliver webhook", webhook.url, err);
-          error = err instanceof Error ? err.message : String(err);
+          error = err instanceof DeliveryError ? err.message : "Webhook delivery network error";
+          await webhooksRepository.createLog(webhook.id, event, payload, statusCode, response, error);
+          if (err instanceof DeliveryError) throw err;
+          throw new DeliveryError("Webhook delivery network error", true);
         }
 
         // Log the webhook delivery

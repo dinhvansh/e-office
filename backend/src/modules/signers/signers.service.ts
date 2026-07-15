@@ -5,7 +5,6 @@ import { ApiError } from "../../core/errors/api-error";
 import { auditService } from "../audit/audit.service";
 import { authorizationService } from "../authorization/authorization.service";
 import { emailService } from "../common/email.service";
-import { webhookService } from "../webhooks/webhooks.service";
 import { signersRepository } from "./signers.repository";
 import { pdfGenerationService } from "../signRequests/pdfGeneration.service";
 import { notificationsService } from "../notifications/notifications.service";
@@ -184,9 +183,15 @@ class SignersService {
       documentId: signer.sign_request.document_id,
       event: "sign.completed",
     });
-    await webhookService.emit(tenantId, "sign.completed", {
-      sign_request_id: signer.sign_request_id,
-      signer_id: signer.id,
+    await prisma.outbox_events.create({
+      data: {
+        tenant_id: tenantId,
+        aggregate_type: "signer",
+        aggregate_id: String(signer.id),
+        event_type: "SIGN_COMPLETED",
+        payload: { sign_request_id: signer.sign_request_id, signer_id: signer.id },
+        deduplication_key: `sign-completed:${signer.id}`,
+      },
     });
   }
 

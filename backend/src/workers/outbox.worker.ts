@@ -1,6 +1,8 @@
 import { prisma } from "../config/prisma";
 import { signedArtifactWorker } from "../modules/signRequests/signedArtifact.worker";
 import { webhookService } from "../modules/webhooks/webhooks.service";
+import { emailService } from "../modules/common/email.service";
+import { DeliveryError } from "../modules/outbox/deliveryError";
 
 const MAX_ATTEMPTS = 5;
 const STALE_LOCK_MS = 5 * 60 * 1000;
@@ -10,9 +12,16 @@ export function retryAt(attemptCount: number): Date {
   return new Date(Date.now() + delaySeconds * 1000);
 }
 
-async function dispatch(event: { tenant_id: number | null; event_type: string; payload: unknown }): Promise<void> {
+export async function dispatchOutboxEvent(event: { tenant_id: number | null; event_type: string; payload: unknown }): Promise<void> {
   if (event.event_type === "SIGNED_ARTIFACT_REQUESTED") {
     await signedArtifactWorker.processSignedArtifactEvent(event);
+    return;
+  }
+
+  if (event.event_type === "EMAIL_DELIVERY_REQUESTED") {
+    const payload = event.payload as { template?: string; data?: Record<string, unknown> };
+    if (!payload.template || !payload.data) throw new DeliveryError("Invalid email delivery event", false);
+    await emailService.deliver(payload.template, payload.data);
     return;
   }
 
@@ -31,6 +40,12 @@ async function dispatch(event: { tenant_id: number | null; event_type: string; p
   if (event.event_type === "SIGNATURE_SUBMITTED") {
     if (event.tenant_id === null) throw new Error("SIGNATURE_SUBMITTED requires a tenant");
     await webhookService.emit(event.tenant_id, "sign.signature_submitted", event.payload);
+    return;
+  }
+
+  if (event.event_type === "SIGN_COMPLETED") {
+    if (event.tenant_id === null) throw new Error("SIGN_COMPLETED requires a tenant");
+    await webhookService.emit(event.tenant_id, "sign.completed", event.payload);
     return;
   }
 
@@ -78,7 +93,7 @@ export async function processOutboxBatch(limit = 20): Promise<number> {
     if (claim.count !== 1) continue;
 
     try {
-      await dispatch(event);
+      await dispatchOutboxEvent(event);
       await prisma.outbox_events.update({
         where: { id: event.id },
         data: { status: "processed", processed_at: new Date(), last_error: null },
@@ -86,16 +101,19 @@ export async function processOutboxBatch(limit = 20): Promise<number> {
       processed += 1;
     } catch (error) {
       const attemptCount = event.attempt_count + 1;
+      const permanent = error instanceof DeliveryError && !error.retryable;
       await prisma.outbox_events.update({
         where: { id: event.id },
         data: {
-          status: attemptCount >= MAX_ATTEMPTS ? "failed" : "pending",
+          status: permanent || attemptCount >= MAX_ATTEMPTS ? "failed" : "pending",
           attempt_count: attemptCount,
           available_at: retryAt(attemptCount),
           locked_at: null,
-          last_error: event.event_type === "SIGNED_ARTIFACT_REQUESTED"
-            ? "Signed artifact generation failed"
-            : "Outbox dispatch failed",
+          last_error: error instanceof DeliveryError
+            ? error.message
+            : event.event_type === "SIGNED_ARTIFACT_REQUESTED"
+              ? "Signed artifact generation failed"
+              : "Outbox dispatch failed",
         },
       });
     }

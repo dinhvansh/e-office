@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { ApiError } from "../../core/errors/api-error";
 import { prisma } from "../../config/prisma";
-import { emailService } from "../common/email.service";
+import { outboxDeliveryService } from "../outbox/outboxDelivery.service";
 import { notificationsService } from "../notifications/notifications.service";
 import { NotificationType } from "../notifications/notifications.types";
 import {
@@ -175,27 +175,41 @@ export class PublicSigningCommandService {
         link: `/documents/${document.id}`,
       }).catch((error) => console.error("Failed to create notification:", error));
       if (document.owner.email) {
-        emailService.sendSignCompletedNotification({
+        outboxDeliveryService.enqueueEmail(prisma, {
           tenantId: document.tenant_id,
-          recipientEmail: document.owner.email,
-          recipientName: document.owner.full_name || document.owner.email,
-          documentTitle: document.title || "Untitled",
-          documentNumber: document.document_number || undefined,
-          signerName: input.signerName || input.signerEmail,
-          documentUrl: `${frontendUrl}/documents/${document.id}/flow`,
-        }).catch((error) => console.error("Failed to send owner completion email:", error));
+          aggregateType: "document",
+          aggregateId: document.id,
+          template: "sign_completed",
+          data: {
+            tenantId: document.tenant_id,
+            recipientEmail: document.owner.email,
+            recipientName: document.owner.full_name || document.owner.email,
+            documentTitle: document.title || "Untitled",
+            documentNumber: document.document_number || undefined,
+            signerName: input.signerName || input.signerEmail,
+            documentUrl: `${frontendUrl}/documents/${document.id}/flow`,
+          },
+          deduplicationKey: `sign-completed-owner:${document.id}`,
+        });
       }
     }
     if (input.signerEmail) {
-      emailService.sendSignCompletedNotification({
+      outboxDeliveryService.enqueueEmail(prisma, {
         tenantId: input.tenantId,
-        recipientEmail: input.signerEmail,
-        recipientName: input.signerName || input.signerEmail,
-        documentTitle: input.title || document?.title || "Untitled",
-        documentNumber: document?.document_number || undefined,
-        signerName: input.signerName || input.signerEmail,
-        documentUrl: `${frontendUrl}/sign/${input.invitationToken}/download-signed`,
-      }).catch((error) => console.error("Failed to send signer completion email:", error));
+        aggregateType: "document",
+        aggregateId: input.documentId,
+        template: "sign_completed",
+        data: {
+          tenantId: input.tenantId,
+          recipientEmail: input.signerEmail,
+          recipientName: input.signerName || input.signerEmail,
+          documentTitle: input.title || document?.title || "Untitled",
+          documentNumber: document?.document_number || undefined,
+          signerName: input.signerName || input.signerEmail,
+          documentUrl: `${frontendUrl}/sign/${input.invitationToken}/download-signed`,
+        },
+        deduplicationKey: `sign-completed-signer:${input.documentId}:${input.signerEmail}`,
+      });
     }
   }
 }

@@ -1,5 +1,14 @@
 # Implementation Progress
 
+## 2026-07-15 — Outbox Phase 2 delivery foundation
+
+- Email templates and webhook delivery now run through the existing outbox
+  worker; signed-artifact processing remains an isolated event handler.
+- Outbox failures use bounded retry and stale-lock recovery. Webhook network/5xx
+  failures retry, while destination 4xx failures are terminal and errors are
+  sanitized. See `OUTBOX-WORKER-ARCHITECTURE.md`.
+- Verified backend tests, local Docker workflow E2E and MinIO/S3 workflow E2E.
+
 ## 2026-07-15 — MinIO/S3 FileStorage E2E
 
 - Added a test-only MinIO Compose overlay with health-gated one-shot bucket
