@@ -13,8 +13,7 @@ import { prisma } from "../../config/prisma";
 import { CreateDocumentData, documentsRepository } from "./documents.repository";
 import { authorizationService } from "../authorization/authorization.service";
 import { documentQueriesService } from "./documentQueries.service";
-import { canCancelDocumentStatus, canHardDeleteDocumentStatus } from "./documentLifecycle.policy";
-import { workflowStateService } from "../workflows/workflowState.service";
+import { canHardDeleteDocumentStatus } from "./documentLifecycle.policy";
 import { documentWorkflowOrchestratorService } from "./documentWorkflowOrchestrator.service";
 import { permissionsService } from "./permissions.service";
 import {
@@ -23,11 +22,8 @@ import {
   mapSecurityLevelToDocumentConfidentialLevel,
   normalizeDocumentTypePolicyV2,
 } from "../settings/document-type-policy.helper";
-import {
-  applyWatermarkToPdfBytes,
-  getTenantWatermarkConfig,
-  resolveWatermarkVariantForStatus,
-} from "../settings/watermark.helper";
+import { documentFileService, type DocumentFileResult } from "./documentFile.service";
+import { documentLifecycleService } from "./documentLifecycle.service";
 
 export interface CreateDocumentInput {
   fileName: string;
@@ -1044,111 +1040,13 @@ class DocumentsService {
     });
   }
 
-  async getDocumentFile(documentId: number, tenantId: number, userId?: number): Promise<{
-      fileBytes: Buffer;
-      fileName: string;
-      mimeType: string;
-      documentStatus: string | null;
-      tenantId: number;
-    }> {
-    const document = await this.getDocument(documentId, tenantId, userId);
-    
-    // Handle different path formats:
-    // 1. "storage/1/file.pdf" -> resolve from cwd
-    // 2. "/uploads/file.pdf" -> resolve from backend/ (legacy seed data)
-    // 3. Absolute paths -> use as-is
-    if (document.file_path.startsWith('/uploads/')) {
-      // Legacy seed data - files don't exist
-      throw ApiError.notFound("File not found (seed data)", "FILE_NOT_FOUND");
-    }
-    
-    // ✅ Create meaningful filename for download (original file)
-    // Format: [DocumentNumber]_[Title]_Original.pdf
-    
-    const docNumber = document.document_number || `DOC-${document.id}`;
-    const title = document.title || document.original_file_name.replace(/\.[^/.]+$/, ''); // Remove extension
-    
-    // Sanitize filename
-    const sanitizedTitle = title
-      .replace(/[^a-zA-Z0-9\s\-_]/g, '')
-      .replace(/\s+/g, '-')
-      .substring(0, 50);
-    
-    const ext = path.extname(document.file_path);
-    const fileName = `${docNumber}_${sanitizedTitle}_Original${ext}`;
-    
-    // Determine mime type from extension
-    const extLower = ext.toLowerCase();
-    const mimeTypes: Record<string, string> = {
-      '.pdf': 'application/pdf',
-      '.doc': 'application/msword',
-      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      '.xls': 'application/vnd.ms-excel',
-      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      '.png': 'image/png',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.gif': 'image/gif',
-      '.txt': 'text/plain',
-      '.zip': 'application/zip',
-    };
-    
-    const mimeType = mimeTypes[extLower] || 'application/octet-stream';
-    
-    // Check if file exists
-    try {
-      const fileBytes = path.isAbsolute(document.file_path)
-        ? await fs.readFile(document.file_path)
-        : await readStoredFile(storageService, document.file_path);
-      return { fileBytes: Buffer.from(fileBytes), fileName, mimeType, documentStatus: document.status || null, tenantId: document.tenant_id };
-    } catch (error) {
-      throw ApiError.notFound("File not found on disk", "FILE_NOT_FOUND");
-    }
-    }
+  async getDocumentFile(documentId: number, tenantId: number, userId?: number): Promise<DocumentFileResult> {
+    return documentFileService.getOriginalFile(await this.getDocument(documentId, tenantId, userId));
+  }
 
-  async getSignedDocumentFile(documentId: number, tenantId: number, userId?: number): Promise<{
-      fileBytes: Buffer;
-      fileName: string;
-      mimeType: string;
-      documentStatus: string | null;
-      tenantId: number;
-    }> {
-    const document = await this.getDocument(documentId, tenantId, userId);
-    
-    // Check if signed file exists
-    if (!document.signed_file_path) {
-      throw ApiError.notFound("Signed file not available", "SIGNED_FILE_NOT_FOUND");
-    }
-    
-    // ✅ Create meaningful filename for download
-    // Format: [DocumentNumber]_[Title]_[Status].pdf
-    // Example: 027-2025_Giay-De-Nghi_Signed.pdf or 027-2025_Giay-De-Nghi_Draft.pdf
-    
-    const docNumber = document.document_number || `DOC-${document.id}`;
-    const title = document.title || document.original_file_name.replace('.pdf', '');
-    const status = document.status === 'completed' ? 'Signed' : 'Draft';
-    
-    // Sanitize filename (remove special chars, limit length)
-    const sanitizedTitle = title
-      .replace(/[^a-zA-Z0-9\s\-_]/g, '') // Remove special chars
-      .replace(/\s+/g, '-')               // Replace spaces with dash
-      .substring(0, 50);                  // Limit length
-    
-    const fileName = `${docNumber}_${sanitizedTitle}_${status}.pdf`;
-    
-    // Signed files are always PDF
-    const mimeType = 'application/pdf';
-    
-    // Check if file exists
-    try {
-      const fileBytes = path.isAbsolute(document.signed_file_path)
-        ? await fs.readFile(document.signed_file_path)
-        : await readStoredFile(storageService, document.signed_file_path);
-      return { fileBytes: Buffer.from(fileBytes), fileName, mimeType, documentStatus: document.status || null, tenantId: document.tenant_id };
-    } catch (error) {
-      throw ApiError.notFound("Signed file not found on disk", "FILE_NOT_FOUND");
-    }
-    }
+  async getSignedDocumentFile(documentId: number, tenantId: number, userId?: number): Promise<DocumentFileResult> {
+    return documentFileService.getSignedFile(await this.getDocument(documentId, tenantId, userId));
+  }
 
   async getWatermarkedDocumentBufferIfNeeded(input: {
     fileBytes: Uint8Array;
@@ -1156,18 +1054,7 @@ class DocumentsService {
     documentStatus: string | null;
     tenantId: number;
   }): Promise<Buffer | null> {
-    if (input.mimeType !== 'application/pdf') {
-      return null;
-    }
-
-    const config = await getTenantWatermarkConfig(input.tenantId);
-    const variant = resolveWatermarkVariantForStatus(config, input.documentStatus);
-    if (!variant) {
-      return null;
-    }
-
-    const watermarkedBytes = await applyWatermarkToPdfBytes(input.fileBytes, config, variant);
-    return Buffer.from(watermarkedBytes);
+    return documentFileService.getWatermarkedBufferIfNeeded(input);
   }
 
   /**
@@ -1223,43 +1110,11 @@ class DocumentsService {
   }
 
   async archiveDocument(documentId: number, tenantId: number, userId: number): Promise<void> {
-    const document = await this.getDocument(documentId, tenantId, userId);
-    
-    if (document.status !== 'completed') {
-      throw ApiError.badRequest('Only completed documents can be archived', 'DOCUMENT_NOT_COMPLETED');
-    }
-    
-    await prisma.documents.update({
-      where: { id: documentId },
-      data: { status: 'archived' }
-    });
+    await documentLifecycleService.archive(await this.getDocument(documentId, tenantId, userId));
   }
 
   async cancelDocument(documentId: number, tenantId: number, userId: number): Promise<void> {
-    const document = await this.getDocument(documentId, tenantId, userId);
-
-    if (!canCancelDocumentStatus(document.status)) {
-      throw ApiError.badRequest('Only active workflow documents can be cancelled', 'DOCUMENT_CANCEL_DENIED');
-    }
-
-    await prisma.$transaction(async (tx) => {
-      if (document.sign_request_id) {
-        await workflowStateService.transitionSigningPair(tx, {
-          documentId,
-          signRequestId: document.sign_request_id,
-          documentStatus: "cancelled",
-          signRequestStatus: "cancelled",
-        });
-        await tx.signers.updateMany({
-          where: { sign_request_id: document.sign_request_id, status: { in: ["pending", "waiting_approval", "waiting_signing", "otp_sent"] } },
-          data: { status: "cancelled" },
-        });
-      } else {
-        await workflowStateService.transitionDocument(tx, { documentId, status: "cancelled" });
-      }
-      await tx.workflow_instances.updateMany({ where: { document_id: documentId, status: { notIn: ["completed", "cancelled"] } }, data: { status: "cancelled", completed_at: new Date() } });
-      await tx.audit_logs.create({ data: { document_id: documentId, event: "document.cancelled", user_id: userId, ip: null, ua: null } });
-    });
+    await documentLifecycleService.cancel(await this.getDocument(documentId, tenantId, userId), userId);
   }
 }
 

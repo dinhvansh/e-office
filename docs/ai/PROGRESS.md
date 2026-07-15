@@ -1,5 +1,10 @@
 # Implementation Progress
 
+## 2026-07-15 — Document-service responsibility split
+
+- **P2-CODE-018:** retained `documents.service.ts` as the controller compatibility facade and moved document file retrieval/watermarking plus archive/cancel lifecycle commands into focused services. Existing query/access filtering remains in `documentQueries.service.ts`; tenant/ACL checks stay before file reads and lifecycle commands.
+- Backend verification passed: `npm test` (90 tests), `npm run lint`, and `npm run build`. Docker PostgreSQL E2E remains unavailable because Compose requires an unset `POSTGRES_PASSWORD`; no runtime Compose env file is present.
+
 ## 2026-07-15 — Sign-request service responsibility split
 
 - **P2-CODE-017:** split sign-request queries, draft creation, signer management, lifecycle commands, signing-progress rules and the atomic internal-signing command out of `signRequests.service.ts`. The facade retains controller-facing authorization, audit boundaries and response contracts.
