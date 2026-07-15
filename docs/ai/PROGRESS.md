@@ -11,6 +11,9 @@
   frontend lint/typecheck/build, local Docker E2E, and MinIO/S3 E2E.
 - Technical publication blockers are clear. Fair-Code/legal review remains a
   separate non-technical publication approval before any public tag or release.
+- Final history remediation removed historical private documentation paths,
+  tenant references, stored document/test-output blobs, and backup archives;
+  the final full-history Gitleaks scan passes with zero findings.
 
 ## 2026-07-15 — Public source alpha packaging
 
@@ -19,9 +22,8 @@
   requires legal review before publication.
 - Public onboarding now requires explicit demo passwords and documents that
   signing is not automatically qualified PKI/PAdES signing.
-- Public scan found historical Public Workspace/Example Organization absolute documentation links and
-  debug artifacts; exclude or remediate them before publishing the full docs
-  archive.
+- Historical private documentation links and debug artifacts have been removed
+  through the final controlled history rewrite before publication.
 
 ## 2026-07-15 — Security cleanup (in progress)
 

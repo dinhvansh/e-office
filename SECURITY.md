@@ -1,6 +1,6 @@
 # Security Policy
 
-E-Office is an alpha source-available project. This policy describes how to
+FlowDocker E-Office is an alpha source-available project. This policy describes how to
 report vulnerabilities and the baseline responsibilities for self-hosted
 deployments. It is not a warranty, managed security commitment, or regulatory
 compliance statement.
@@ -9,7 +9,7 @@ compliance statement.
 
 Please do not report suspected vulnerabilities in public issues.
 
-Send a private report to: [TO BE CONFIRMED BY MAINTAINER].
+Send a private report to: vanqn95@gmail.com.
 
 Include, when safe:
 
@@ -53,7 +53,7 @@ Security support and commercial support may be offered under a separate
 Commercial License or support agreement. The Community Source License does not
 create a managed service, uptime SLA, patch SLA, or security support SLA.
 
-Commercial / support contact: [TO BE CONFIRMED BY MAINTAINER].
+Commercial / support contact: vanqn95@gmail.com.
 
 ## Status
 
@@ -61,7 +61,6 @@ Classification: READY AS DRAFT, subject to maintainer approval.
 
 Required maintainer decisions:
 
-- private security contact;
 - supported versions policy;
 - disclosure timeline;
 - commercial support contact.

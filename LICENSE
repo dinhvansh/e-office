@@ -1,7 +1,9 @@
-E-Office Community Source License
+FlowDocker E-Office Community Source License
 Version 0.1.0-alpha draft
 
-Copyright (c) 2026 E-Office contributors.
+Copyright © 2026 Nguyễn Đình Vân. All rights reserved.
+
+FlowDocker™ and FlowDocker E-Office™ are trademarks of Nguyễn Đình Vân.
 
 This license is a source-available, fair-code style license. It is not an
 OSI-approved open-source license. It is intended to allow internal self-hosting,
@@ -14,7 +16,7 @@ not a statement of external legal approval.
 
 1. Definitions
 
-"Software" means the E-Office source code, documentation, packages, examples,
+"Software" means the FlowDocker E-Office source code, documentation, packages, examples,
 and related materials distributed with this license.
 
 "Internal Business Use" means installing, running, evaluating, testing,
@@ -35,7 +37,7 @@ product.
 
 "White-Label" means presenting the Software, or a service substantially based
 on it, under another name, brand, logo, domain, or identity in a way that hides
-or replaces E-Office as the source technology.
+or replaces FlowDocker E-Office as the source technology.
 
 "OEM / Embedded Distribution" means bundling, embedding, integrating, or
 including the Software or a derivative work in another product, appliance,
@@ -84,7 +86,8 @@ You may not:
 
 - remove, obscure, or alter copyright, license, attribution, or proprietary
   notices;
-- use E-Office trademarks, logos, product names, or branding except as allowed
+- use FlowDocker or FlowDocker E-Office trademarks, logos, product names, or
+  branding except as allowed
   by TRADEMARK.md or separate written permission;
 - imply endorsement, sponsorship, affiliation, or approval by the project
   maintainers without written permission;
@@ -94,12 +97,11 @@ You may not:
 
 A Commercial License may grant additional rights, including hosted resale,
 white-label resale, OEM distribution, or other commercial use cases. See
-COMMERCIAL-LICENSING.md. Contact: [TO BE CONFIRMED BY MAINTAINER].
+COMMERCIAL-LICENSING.md. Contact: vanqn95@gmail.com.
 
 6. Ownership
 
-The Software is owned by its copyright holders. Contributions are licensed to
-the project under the contribution terms accepted by the maintainer. This
+The Software is copyright © 2026 Nguyễn Đình Vân. All rights reserved. This
 license does not transfer ownership of the Software or any trademarks.
 
 7. Warranty disclaimer

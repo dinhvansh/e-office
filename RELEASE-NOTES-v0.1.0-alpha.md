@@ -1,4 +1,4 @@
-# E-Office v0.1.0-alpha
+# FlowDocker E-Office v0.1.0-alpha
 
 > Pre-release. Not for regulated production signing without separate legal and
 > technical assessment.
@@ -23,6 +23,9 @@ legal/compliance controls for any regulated deployment.
 
 ## Licensing
 
-Source is available under draft Fair-Code/community terms. It is not OSI open
-source. Redistribution, white-labeling and hosted resale require a commercial
-license, subject to legal review.
+FlowDocker E-Office source is available under draft Fair-Code/community terms.
+It is not OSI open source. Redistribution, white-labeling and hosted resale
+require a commercial license. Commercial licensing: vanqn95@gmail.com.
+
+Copyright © 2026 Nguyễn Đình Vân. All rights reserved. FlowDocker™ and
+FlowDocker E-Office™ are trademarks of Nguyễn Đình Vân.

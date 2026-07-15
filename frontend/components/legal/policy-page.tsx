@@ -17,7 +17,7 @@ export function PolicyPage({ title, version, sections }: PolicyPageProps) {
         <header className="mt-6 border-b border-slate-200 pb-6">
           <p className="text-sm font-medium text-amber-800">{policyMetadata.status}. Not external legal approval.</p>
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">{title}</h1>
-          <p className="mt-3 text-sm text-slate-600">Version {version} | Effective draft date {policyMetadata.effectiveDate}</p>
+          <p className="mt-3 text-sm text-slate-600">{policyMetadata.productName} · Version {version} | Effective draft date {policyMetadata.effectiveDate}</p>
         </header>
         <div className="mt-8 space-y-8 text-slate-700">
           {sections.map((section) => (
@@ -28,11 +28,11 @@ export function PolicyPage({ title, version, sections }: PolicyPageProps) {
           ))}
         </div>
         <footer className="mt-10 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
-          <h2 className="font-semibold text-slate-900">Support and licensing</h2>
+          <h2 className="font-semibold text-slate-900">Privacy and licensing</h2>
           <p className="mt-1">
             For account or workspace questions, contact your workspace
-            administrator or <a className="text-blue-700 underline underline-offset-2" href={`mailto:${policyMetadata.supportEmail}`}>{policyMetadata.supportEmail}</a>.
-            Commercial licensing contact: {policyMetadata.commercialEmail}.
+            administrator. Privacy contact: <a className="text-blue-700 underline underline-offset-2" href={`mailto:${policyMetadata.privacyEmail}`}>{policyMetadata.privacyEmail}</a>.
+            Commercial licensing contact: <a className="text-blue-700 underline underline-offset-2" href={`mailto:${policyMetadata.commercialEmail}`}>{policyMetadata.commercialEmail}</a>.
           </p>
           <div className="mt-4 flex gap-4"><Link className="text-blue-700 underline underline-offset-2" href="/register">Register</Link><Link className="text-blue-700 underline underline-offset-2" href="/login">Log in</Link></div>
         </footer>

@@ -1,8 +1,9 @@
-# E-Office
+# FlowDocker E-Office
 
 ## Project governance
 
-E-Office is source-available fair-code software, not OSI open source. The
+FlowDocker E-Office is source-available fair-code software, not OSI open
+source. The
 [Community Source License](LICENSE) allows internal self-hosting, internal
 modification, evaluation, learning, non-commercial personal use, development,
 testing, and contribution. Commercial hosted resale, managed-service resale,
@@ -12,7 +13,9 @@ as a competing product require a separate commercial license.
 Trademark and logo rights are not granted automatically. See
 [COMMERCIAL-LICENSING.md](COMMERCIAL-LICENSING.md),
 [TRADEMARK.md](TRADEMARK.md), [CONTRIBUTING.md](CONTRIBUTING.md), and
-[SECURITY.md](SECURITY.md). The licensing and policy package is a publication
+[SECURITY.md](SECURITY.md). FlowDocker™ and FlowDocker E-Office™ are trademarks
+of Nguyễn Đình Vân. Copyright © 2026 Nguyễn Đình Vân. All rights reserved. The
+licensing and policy package is a publication
 draft subject to maintainer approval; it must not be described as external
 legal approval.
 

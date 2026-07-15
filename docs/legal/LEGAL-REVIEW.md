@@ -10,11 +10,12 @@ and policy package internally consistent with the current business intent.
 
 Classification: READY AS DRAFT
 
-E-Office source code is publicly visible under a source-available, fair-code
-style Community Source License. Internal self-hosting, internal modification,
-evaluation, learning, development/testing, non-commercial personal use, and
-contribution are allowed. Commercial resale models that substantially monetize
-the software itself require a separate Commercial License.
+FlowDocker E-Office source code is publicly visible under a source-available,
+fair-code style Community Source License. Copyright © 2026 Nguyễn Đình Vân. All
+rights reserved. Internal self-hosting, internal modification, evaluation,
+learning, development/testing, non-commercial personal use, and contribution
+are allowed. Commercial resale models that substantially monetize the software
+itself require a separate Commercial License.
 
 The draft intentionally does not use an OSI-approved open-source license.
 README language has been aligned to avoid calling the project "open source" in
@@ -52,7 +53,7 @@ Allowed without a Commercial License:
 - non-commercial personal use;
 - contribution;
 - consulting, implementation, training, migration, integration, and support
-  services around E-Office, provided they do not effectively resell the
+  services around FlowDocker E-Office, provided they do not effectively resell the
   software itself as hosted access, a managed service, a white-label product,
   OEM distribution, or commercial redistribution.
 
@@ -62,9 +63,9 @@ Classification: READY AS DRAFT
 
 Requires a Commercial License:
 
-- paid hosted access to E-Office;
-- SaaS or service-bureau offerings where substantial value comes from E-Office;
-- managed hosting where E-Office is the product or a substantial part of the
+- paid hosted access to FlowDocker E-Office;
+- SaaS or service-bureau offerings where substantial value comes from FlowDocker E-Office;
+- managed hosting where FlowDocker E-Office is the product or a substantial part of the
   product delivered to third parties;
 - white-label or rebranded resale;
 - OEM or embedded distribution;
@@ -76,7 +77,8 @@ Requires a Commercial License:
 
 Classification: READY AS DRAFT
 
-TRADEMARK.md now states that trademark, logo, trade dress, domain, product
+FlowDocker™ and FlowDocker E-Office™ are trademarks of Nguyễn Đình Vân.
+TRADEMARK.md states that trademark, logo, trade dress, domain, product
 naming, and brand rights are not granted automatically by the source license or
 by commercial licensing unless expressly granted in writing.
 
@@ -97,8 +99,9 @@ License:
 - no GDPR, HIPAA, eIDAS, SOC 2, ISO 27001, PAdES, qualified-signature, PKI, or
   trust-service compliance claim is made;
 - warranty disclaimer and limitation of liability language are present;
-- governing law, legal entity, and commercial/privacy contacts are explicit
-  maintainer placeholders.
+- commercial, privacy, and security contacts are vanqn95@gmail.com;
+- governing law and contracting legal entity remain explicit maintainer
+  placeholders.
 
 The registration acceptance language links the current Terms and Privacy Notice
 versions and clarifies that accepting them does not grant commercial resale,
@@ -132,11 +135,7 @@ Classification: READY AS DRAFT
 
 Classification: NEEDS MAINTAINER DECISION
 
-- copyright holder / legal entity;
-- commercial licensing contact;
-- privacy contact;
-- security reporting contact;
-- trademark owner;
+- contracting legal entity;
 - approved logo and brand asset rules;
 - supported versions and vulnerability disclosure timeline;
 - governing law and venue;
@@ -165,8 +164,8 @@ enforcement or broad publication:
 
 Classification: NEEDS MAINTAINER DECISION
 
-- The package is coherent as a draft, but placeholders must be resolved before
-  final public publication.
+- The package is coherent as a draft. Governing law, venue, and contracting
+  legal entity remain unresolved before final public publication.
 - If the project markets commercial hosting or managed services, the Terms and
   Privacy Notice must be updated for the actual operator, subprocessors,
   support commitments, billing terms, and incident process.
@@ -177,24 +176,23 @@ Classification: NEEDS MAINTAINER DECISION
 
 ## Final Classification
 
-- LICENSE: READY AS DRAFT; NEEDS MAINTAINER DECISION for entity, contact, and
+- LICENSE: READY AS DRAFT; NEEDS MAINTAINER DECISION for entity and
   governing law; NEEDS EXTERNAL LEGAL COUNSEL before enforcement reliance.
 - COMMERCIAL-LICENSING.md: READY AS DRAFT; NEEDS MAINTAINER DECISION for
-  contact, entity, and commercial process; NEEDS EXTERNAL LEGAL COUNSEL for
+  entity and commercial process; NEEDS EXTERNAL LEGAL COUNSEL for
   commercial agreement templates.
-- TRADEMARK.md: READY AS DRAFT; NEEDS MAINTAINER DECISION for owner and brand
-  asset rules; NEEDS EXTERNAL LEGAL COUNSEL for formal trademark strategy.
+- TRADEMARK.md: READY AS DRAFT; NEEDS MAINTAINER DECISION for brand asset
+  rules; NEEDS EXTERNAL LEGAL COUNSEL for formal trademark strategy.
 - README licensing/legal sections: READY AS DRAFT.
-- SECURITY.md: READY AS DRAFT; NEEDS MAINTAINER DECISION for reporting contact
-  and supported versions.
-- Terms of Service: READY AS DRAFT; NEEDS MAINTAINER DECISION for entity,
-  contact, and governing law; NEEDS EXTERNAL LEGAL COUNSEL for public hosted
+- SECURITY.md: READY AS DRAFT; NEEDS MAINTAINER DECISION for supported versions.
+- Terms of Service: READY AS DRAFT; NEEDS MAINTAINER DECISION for entity and
+  governing law; NEEDS EXTERNAL LEGAL COUNSEL for public hosted
   service use.
-- Privacy Notice: READY AS DRAFT; NEEDS MAINTAINER DECISION for privacy
-  contact, operator identity, retention, and subprocessors; NEEDS EXTERNAL
+- Privacy Notice: READY AS DRAFT; NEEDS MAINTAINER DECISION for operator
+  identity, retention, and subprocessors; NEEDS EXTERNAL
   LEGAL COUNSEL for production privacy compliance.
-- policy-metadata.ts: READY AS DRAFT; NEEDS MAINTAINER DECISION for placeholder
-  values.
+- policy-metadata.ts: READY AS DRAFT; NEEDS MAINTAINER DECISION for governing
+  law and legal-entity placeholders.
 - registration acceptance language: READY AS DRAFT.
 
 Overall draft publication readiness: READY AS DRAFT, subject to maintainer

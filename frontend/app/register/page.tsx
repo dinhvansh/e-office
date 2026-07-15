@@ -146,7 +146,7 @@ export default function RegisterPage() {
             </Link>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Tạo tài khoản mới</h1>
             <p className="text-gray-600">
-              Đăng ký để sử dụng E-Office
+              Đăng ký để sử dụng FlowDocker E-Office
             </p>
           </div>
 
@@ -324,7 +324,7 @@ export default function RegisterPage() {
                 <Link href="/privacy" className="text-indigo-600 hover:text-indigo-700 font-medium underline underline-offset-2">
                   Privacy Notice
                 </Link>{' '}
-                for this alpha deployment. This acceptance does not grant commercial resale, hosted resale, white-label, OEM, or trademark rights.
+                for this FlowDocker E-Office alpha deployment. This acceptance does not grant commercial resale, hosted resale, white-label, OEM, or trademark rights.
                 <span className="block mt-1 text-xs text-gray-500">Versions {policyMetadata.termsVersion}/{policyMetadata.privacyVersion}, draft effective date {policyMetadata.effectiveDate}.</span>
               </label>
             </div>
@@ -348,7 +348,7 @@ export default function RegisterPage() {
       {/* Right side - Hero */}
       <div className="hidden lg:flex flex-1 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 items-center justify-center p-12">
         <div className="max-w-md text-white">
-          <h2 className="text-4xl font-bold mb-6">Chào mừng đến với E-Office!</h2>
+          <h2 className="text-4xl font-bold mb-6">Chào mừng đến với FlowDocker E-Office!</h2>
           <p className="text-lg text-blue-100 mb-8">
             Hệ thống quản lý tài liệu và luồng ký điện tử hiện đại, giúp doanh nghiệp của bạn vận hành hiệu quả hơn.
           </p>
