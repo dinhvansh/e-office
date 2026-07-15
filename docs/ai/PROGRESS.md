@@ -25,3 +25,7 @@ Verification evidence is stored in `docs/ux/evidence/`.
 ## Public legal pages — 2026-07-15
 
 - **UX-001 fixed and browser verified:** registration now links to public `/terms` and `/privacy` pages using centralized versions/effective date. Pages deliberately state that legal review is pending, work at 375 px and preserve registration values on return. Registration persistence currently records acceptance as a boolean only; recording policy versions remains a backend/schema follow-up.
+
+## Workflow preview localization — 2026-07-15
+
+- **UX-016 fixed and browser verified:** the default approval-workflow preview now renders centralized Vietnamese Unicode labels for the title, step count, approver type, duration and missing approver. Chromium Playwright used a realistic two-step workflow at desktop and 375 px; evidence is stored in `docs/ux/evidence/`.

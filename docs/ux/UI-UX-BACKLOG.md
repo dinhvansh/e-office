@@ -212,6 +212,11 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - Capture before/after screenshots and link them from the implementation PR.
 - Preserve existing authorization and signing security behavior.
 
+## UX-016 — Fixed (browser verified 2026-07-15)
+
+- Workflow preview copy is centralized and rendered in Vietnamese Unicode for the title, step count, approver type, duration and missing-approver state.
+- Chromium Playwright verified a strict default workflow with two realistic approval steps at desktop and 375 px. Evidence: `evidence/ux016-workflow-preview-desktop-after-fix.png` and `evidence/ux016-workflow-preview-mobile-after-fix.png`.
+
 ## Verified fixes — 2026-07-14
 
 - **UX-002 / UX-018:** numeric/autofill/paste OTP input, expiry and resend cooldown feedback, plus stable localized recovery codes.

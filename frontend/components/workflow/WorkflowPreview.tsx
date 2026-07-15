@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle, Clock, User } from 'lucide-react';
 import { useAuth } from '@/components/providers/auth-provider';
+import { workflowPreviewLabels } from '@/lib/workflow-preview-labels';
 
 interface WorkflowPreviewProps {
   workflowId: number;
@@ -41,7 +42,7 @@ export function WorkflowPreview({ workflowId }: WorkflowPreviewProps) {
   if (isLoading) {
     return (
       <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <p className="text-sm text-gray-500">Dang tai workflow...</p>
+        <p className="text-sm text-gray-500">{workflowPreviewLabels.loading}</p>
       </div>
     );
   }
@@ -55,8 +56,8 @@ export function WorkflowPreview({ workflowId }: WorkflowPreviewProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-gray-700">Quy trinh phe duyet</h4>
-        <span className="text-xs text-gray-500">{steps.length} buoc</span>
+        <h4 className="text-sm font-semibold text-gray-700">{workflowPreviewLabels.title}</h4>
+        <span className="text-xs text-gray-500">{workflowPreviewLabels.steps(steps.length)}</span>
       </div>
 
       <div className="space-y-2">
@@ -85,20 +86,17 @@ export function WorkflowPreview({ workflowId }: WorkflowPreviewProps) {
                 </div>
               ) : (
                 <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
-                  <p className="text-xs text-gray-500">Chua co thong tin nguoi phe duyet</p>
+                  <p className="text-xs text-gray-500">{workflowPreviewLabels.missingApprover}</p>
                 </div>
               )}
 
               <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
                 <User className="w-3 h-3" />
                 <span>
-                  {step.approver_type === 'user' && 'Nguoi dung'}
-                  {step.approver_type === 'role' && 'Vai tro'}
-                  {step.approver_type === 'department' && 'Phong ban'}
-                  {step.approver_type === 'manager' && 'Quan ly'}
+                  {workflowPreviewLabels.approverTypes[step.approver_type]}
                 </span>
                 <Clock className="w-3 h-3 ml-2" />
-                <span>{step.due_in_days} ngay</span>
+                <span>{workflowPreviewLabels.dueInDays(step.due_in_days)}</span>
               </div>
             </div>
             {step.is_required && <CheckCircle className="w-4 h-4 text-green-500" />}

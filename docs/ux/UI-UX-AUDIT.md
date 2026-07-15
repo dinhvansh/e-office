@@ -130,6 +130,10 @@ The following High issues should be completed or browser-verified before public 
 | UX-016 approval-preview language consistency | No | Correct localized frontend copy and add locale rendering coverage. |
 | UX-018 OTP resend recovery | Yes | Return a safe, specific delivery/configuration status and make SMTP readiness observable. |
 
+## UX-016 verification — 2026-07-15
+
+- **Fixed and browser verified:** workflow preview labels use centralized Vietnamese Unicode copy for the title, step count, approver types, duration and missing-approver state. Chromium verified the strict default-workflow preview with realistic approver data at desktop and 375 px. Evidence: `evidence/ux016-workflow-preview-desktop-after-fix.png` and `evidence/ux016-workflow-preview-mobile-after-fix.png`.
+
 ## Audit follow-up
 
 Before closing the remaining authenticated findings, replay the listed flows in Chromium at desktop and 375 px / 768 px widths with approved requester, approver, signer and administrator accounts. Capture screenshots for each high-severity item and test real OTP delivery, keyboard-only signing, screen-reader labels, and destructive confirmation focus restoration.
