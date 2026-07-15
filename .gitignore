@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.*.local
+.env.test
+.env.e2e
 backend/.env
 frontend/.env.local
 license-server/.env

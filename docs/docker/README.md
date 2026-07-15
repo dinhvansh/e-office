@@ -32,6 +32,22 @@ empty `CORS_ORIGIN`, a missing `APP_BASE_URL`, and any
 The backend image includes Noto Sans; the default `PDF_UNICODE_FONT_PATH` and
 `PDF_UNICODE_BOLD_FONT_PATH` values in the Compose example match that image.
 
+## Reproducible PostgreSQL E2E
+
+Run the isolated Docker E2E stack from the repository root:
+
+```powershell
+npm run e2e:docker
+```
+
+The helper creates a temporary env file from `.env.test.example`, starts only
+PostgreSQL, Redis, backend and the outbox worker with `docker-compose.test.yml`,
+waits for health/readiness, applies migrations and executes the workflow E2E
+inside the backend container. It removes containers and volumes afterward. The
+committed values are deterministic **test-only** credentials and are never used
+by the production Compose command. The helper never overwrites `.env`; use
+`E2E_KEEP_CONTAINERS=1` to retain a failing stack for diagnosis.
+
 ## Network and optional services
 
 PostgreSQL and Redis use the internal Compose network by default; only frontend

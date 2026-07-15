@@ -1,5 +1,9 @@
 # Implementation Progress
 
+## 2026-07-15 — Reproducible Docker PostgreSQL E2E
+
+- The missing `POSTGRES_PASSWORD` blocker is resolved for local/CI E2E through a test-only Compose overlay, ignored local env names and a helper that materializes `.env.test.example` only in a temporary directory. Production Compose still requires explicit secrets.
+
 ## 2026-07-15 — Document-service responsibility split
 
 - **P2-CODE-018:** retained `documents.service.ts` as the controller compatibility facade and moved document file retrieval/watermarking plus archive/cancel lifecycle commands into focused services. Existing query/access filtering remains in `documentQueries.service.ts`; tenant/ACL checks stay before file reads and lifecycle commands.

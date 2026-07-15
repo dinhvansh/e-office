@@ -10,6 +10,7 @@
     "ci:build": "cd backend && npm run build && cd ../frontend && npm run build",
     "e2e:auth": "cd backend && npm run test:auth-matrix",
     "e2e:workflow": "cd backend && npm run test:e2e:workflow",
+    "e2e:docker": "node scripts/run-docker-e2e.js",
     "e2e:ui:smoke": "cd frontend && npm run test:e2e -- tests/ui-simple.spec.ts",
     "e2e:api:smoke": "cd frontend && npm run test:e2e -- tests/e2e.spec.ts --grep \"API can upload a document and create sign request\"",
     "e2e:smoke": "npm run e2e:auth && npm run e2e:workflow",

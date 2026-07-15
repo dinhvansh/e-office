@@ -70,6 +70,19 @@ URL mặc định:
 - backend: `http://localhost:4000`
 - license server: `http://localhost:5000`
 
+## Docker PostgreSQL E2E
+
+Chạy workflow E2E cô lập (PostgreSQL, Redis, backend và outbox worker) bằng một lệnh:
+
+```bash
+npm run e2e:docker
+```
+
+Lệnh dùng `.env.test.example` để tạo env tạm, project Docker `eoffice-e2e` và
+xóa containers/volumes khi kết thúc. Các credential trong template chỉ dành cho
+test cô lập, không phải production secret; helper không đọc, tạo hoặc ghi đè `.env`.
+Đặt `E2E_KEEP_CONTAINERS=1` khi cần giữ stack để chẩn đoán lỗi.
+
 ## Chạy local không qua Docker
 
 1. Tạo env:
