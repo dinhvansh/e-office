@@ -103,8 +103,26 @@ export default function CreateSignRequestPage() {
   const submittingRef = useRef(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const customizedStepsRef = useRef<any[] | null>(null);
   const adhocStepsRef = useRef<any[] | null>(null);
+  const steps = ['Tài liệu', 'Workflow', 'Người tham gia', 'Rà soát'];
+
+  const validateStep = (step: number) => {
+    const errors: Record<string, string> = {};
+    if (step === 1) {
+      if (!isEditMode && !file) errors.file = 'Vui lòng chọn tệp trước khi tiếp tục.';
+      if (!documentTypeId) errors.documentType = 'Vui lòng chọn loại văn bản.';
+    }
+    if (step === 2 && selectedDocType?.require_approval && workflowMode === 'adhoc' && !adhocStepsRef.current?.length) errors.workflow = 'Vui lòng thêm ít nhất một bước xử lý.';
+    if (step === 3) signers.forEach((signer, index) => { if (!signer.name || !signer.email) errors[`signer-${index}`] = 'Mỗi người ký cần có họ tên và email.'; });
+    setStepErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const nextStep = () => { if (validateStep(currentStep)) setCurrentStep((step) => Math.min(4, step + 1)); };
 
   const { data: documentTypes } = useQuery({
     queryKey: ['document-types', 'create-purpose'],
@@ -264,9 +282,6 @@ export default function CreateSignRequestPage() {
       }
 
       if (selectedDocType?.require_approval) {
-        if (false && !selectedWorkflowId && (!adhocSteps || adhocSteps.length === 0)) {
-          throw new Error('Vui lòng chọn workflow có sẵn hoặc tự tạo workflow thủ công');
-        }
         if (workflowMode === 'adhoc' && (!adhocStepsRef.current || adhocStepsRef.current.length === 0)) {
           throw new Error('Vui lòng thêm ít nhất một bước phê duyệt hoặc ký');
         }
@@ -400,6 +415,16 @@ export default function CreateSignRequestPage() {
     },
   });
 
+  useEffect(() => {
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges || createMutation.isPending) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
+  }, [hasUnsavedChanges, createMutation.isPending]);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -419,7 +444,10 @@ export default function CreateSignRequestPage() {
         }}
       >
         <InlineActionFeedback error={submitError} success={submitSuccess} />
-        <Card>
+        <nav aria-label="Các bước tạo trình ký" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {steps.map((label, index) => { const step = index + 1; return <button key={label} type="button" onClick={() => { if (step <= currentStep) setCurrentStep(step); }} disabled={step > currentStep} className={`rounded-lg border p-3 text-left text-sm focus-visible:ring-2 focus-visible:ring-ring ${step === currentStep ? 'border-blue-600 bg-blue-50 font-semibold' : step < currentStep ? 'border-emerald-300 bg-emerald-50' : 'text-muted-foreground'}`}><span className="mr-2">{step < currentStep ? '✓' : step}.</span>{label}</button>; })}
+        </nav>
+        {currentStep === 1 && <Card>
           <CardContent className="space-y-5 p-6">
             {isEditMode && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -468,7 +496,7 @@ export default function CreateSignRequestPage() {
                   type="file"
                   className="hidden"
                   accept=".pdf,.doc,.docx"
-                  onChange={(event) => setFile(event.target.files?.[0] || null)}
+                  onChange={(event) => { setFile(event.target.files?.[0] || null); setHasUnsavedChanges(true); }}
                 />
                 <label htmlFor="file-upload" className="cursor-pointer">
                   <FileText className="mx-auto mb-3 h-10 w-10 text-slate-400" />
@@ -491,7 +519,7 @@ export default function CreateSignRequestPage() {
               <Label>Loại văn bản *</Label>
               <Select
                 value={documentTypeId?.toString() || ''}
-                onValueChange={(value) => setDocumentTypeId(Number(value))}
+                onValueChange={(value) => { setDocumentTypeId(Number(value)); setHasUnsavedChanges(true); }}
                 disabled={isEditMode}
               >
                 <SelectTrigger>
@@ -505,11 +533,13 @@ export default function CreateSignRequestPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {stepErrors.file && <p className="text-sm text-destructive" role="alert">{stepErrors.file}</p>}
+              {stepErrors.documentType && <p className="text-sm text-destructive" role="alert">{stepErrors.documentType}</p>}
             </div>
           </CardContent>
-        </Card>
+        </Card>}
 
-        {selectedDocType && (
+        {currentStep === 2 && selectedDocType && (
           <Card>
             <CardContent className="space-y-5 p-6">
               <div>
@@ -578,7 +608,7 @@ export default function CreateSignRequestPage() {
           </Card>
         )}
 
-        <Card>
+        {currentStep === 3 && <Card>
           <CardContent className="space-y-6 p-6">
             <div>
               <h3 className="text-lg font-semibold">3. Người ký ngoài và thông tin bổ sung</h3>
@@ -595,7 +625,8 @@ export default function CreateSignRequestPage() {
                     <p>{!selectedDocType ? 'Chọn loại văn bản trước, sau đó anh có thể thêm người ký bên ngoài ngay tại đây.' : 'Khai báo tại đây nếu có người ký bên ngoài hệ thống. Danh sách này sẽ đi cùng luồng khi mở editor.'}</p>
                   </div>
                 </div>
-                <SignersSection signers={signers} onChange={setSigners} externalOrgs={externalOrgs || []} />
+                <SignersSection signers={signers} onChange={(value) => { setSigners(value); setHasUnsavedChanges(true); }} externalOrgs={externalOrgs || []} />
+                {Object.values(stepErrors).some((error) => error.includes('người ký')) && <p className="text-sm text-destructive" role="alert">Vui lòng hoàn thiện thông tin người ký.</p>}
               </div>
             )}
 
@@ -621,21 +652,28 @@ export default function CreateSignRequestPage() {
               <AttachmentsSection files={attachments} onChange={setAttachments} />
             </div>
           </CardContent>
-        </Card>
+        </Card>}
+
+        {currentStep === 4 && <Card><CardContent className="space-y-4 p-6"><h3 className="text-lg font-semibold">Rà soát trước khi tạo</h3><div className="grid gap-3 text-sm sm:grid-cols-2"><p><strong>Tài liệu:</strong> {file?.name || existingSignRequestData?.sign_request?.document?.original_file_name}</p><p><strong>Loại văn bản:</strong> {selectedDocType?.name || 'Chưa chọn'}</p><p><strong>Workflow:</strong> {workflowMode === 'no_approval' ? 'Không cần phê duyệt' : workflowMode === 'adhoc' ? `${adhocSteps?.length || 0} bước tùy chỉnh` : workflowMode || 'Chưa cấu hình'}</p><p><strong>Người ký:</strong> {signers.length ? signers.map((signer) => signer.name || signer.email).join(', ') : 'Chưa có'}</p></div><p className="text-sm text-muted-foreground">Kiểm tra lại thông tin. Khi xác nhận, hệ thống sẽ tạo trình ký và chuyển tới editor để đặt trường ký.</p></CardContent></Card>}
 
         <div className="sticky bottom-20 z-10 -mx-1 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:static sm:mx-0 sm:flex-row sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
           <Button
             type="button"
             variant="outline"
-            onClick={() => (isEditMode ? router.push(`/sign-requests/${existingSignRequestId}/editor`) : router.push('/sign-requests'))}
+            onClick={() => currentStep > 1 ? setCurrentStep((step) => step - 1) : (isEditMode ? router.push(`/sign-requests/${existingSignRequestId}/editor`) : router.push('/sign-requests'))}
             className="w-full sm:w-auto"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             {isEditMode ? 'Quay lại editor' : 'Hủy'}
           </Button>
+          {currentStep < 4 ? (
+            <Button type="button" onClick={nextStep} className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto">
+              Tiếp tục <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          ) : (
           <Button
             type="submit"
-            disabled={(!isEditMode && !file) || !documentTypeId || createMutation.isPending || isLoadingExisting}
+            disabled={createMutation.isPending || isLoadingExisting}
             className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto"
           >
             {createMutation.isPending
@@ -647,6 +685,7 @@ export default function CreateSignRequestPage() {
                 : 'Tiếp tục sang editor'}
             {!createMutation.isPending && <ArrowRight className="ml-2 h-4 w-4" />}
           </Button>
+          )}
         </div>
       </form>
     </div>

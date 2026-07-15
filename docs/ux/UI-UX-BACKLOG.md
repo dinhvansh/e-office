@@ -48,6 +48,8 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 
 ### UX-005 — Break sign-request setup into guided, recoverable steps
 
+- **Status:** Fixed — browser verified 2026-07-15.
+
 - **Screen/flow:** `/sign-requests/create`.
 - **Problem:** Upload, document type, workflow rules/customization and signer configuration occupy a single dense form. Validation happens late, making it difficult to understand readiness or recover from a missing prerequisite.
 - **Severity:** High.
