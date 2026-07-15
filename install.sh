@@ -372,7 +372,7 @@ print_final_info() {
     echo ""
     echo -e "${BLUE}🔐 Đăng nhập:${NC}"
     echo "   Email:    admin@acme.local"
-    echo "   Password: secret123"
+    echo "   Password: set DEMO_ADMIN_PASSWORD before running the seed"
     echo ""
     echo -e "${YELLOW}⚠️  Nhớ đổi password ngay sau khi đăng nhập!${NC}"
     echo ""

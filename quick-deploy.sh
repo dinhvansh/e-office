@@ -67,7 +67,7 @@ echo "Backend:  http://$VPS_IP:4000"
 echo
 echo "Dang nhap mac dinh:"
 echo "  Email: admin@acme.local"
-echo "  Password: secret123"
+echo "  Password: set DEMO_ADMIN_PASSWORD before running the seed"
 echo
 echo "Lenh huu ich:"
 echo "  docker compose logs -f"

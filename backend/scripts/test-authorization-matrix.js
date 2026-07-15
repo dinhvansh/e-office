@@ -14,14 +14,22 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.includes("@db:")) {
 
 const prisma = new PrismaClient();
 const API_BASE = process.env.E2E_API_BASE || "http://localhost:4000/api/v1";
-const PASSWORD = process.env.E2E_ROLE_PASSWORD || "secret123";
+const PASSWORD = process.env.E2E_ROLE_PASSWORD;
+if (!PASSWORD) {
+  throw new Error("E2E_ROLE_PASSWORD is required; this test must not use a shared default password");
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET is required to issue isolated E2E test tokens");
+}
 
 async function issueAccessToken(email) {
   const user = await prisma.users.findUnique({ where: { email } });
   if (!user) throw new Error(`User not found for token issuance: ${email}`);
   return jwt.sign(
     { sub: user.id.toString(), tenantId: user.tenant_id, role: user.role ?? null },
-    process.env.JWT_SECRET || "replace-me-jwt-secret-with-32-chars-minimum",
+    JWT_SECRET,
     { expiresIn: "15m" }
   );
 }

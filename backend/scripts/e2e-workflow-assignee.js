@@ -20,12 +20,11 @@ const COMPLETION_MODE = process.env.E2E_COMPLETION_MODE || "any_one";
 const MIN_REQUIRED = Number(process.env.E2E_MIN_REQUIRED || "1");
 const CASE_LABEL = process.env.E2E_CASE_LABEL || `${ASSIGNEE_TYPE}-${COMPLETION_MODE}`;
 const DIRECT_MANAGER_EMAIL = process.env.E2E_DIRECT_MANAGER_EMAIL || "manager@acme.local";
-const PASSWORD_CANDIDATES = [
-  process.env.E2E_ADMIN_PASSWORD,
-  "password123",
-  "secret123",
-  "admin123",
-].filter(Boolean);
+const E2E_ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD;
+if (!E2E_ADMIN_PASSWORD) {
+  throw new Error("E2E_ADMIN_PASSWORD is required; this script must not try shared default passwords");
+}
+const E2E_PEER_PASSWORD = process.env.E2E_PEER_PASSWORD || E2E_ADMIN_PASSWORD;
 
 const PNG_SIGNATURE =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
@@ -33,38 +32,11 @@ const MINIMAL_PDF_BASE64 =
   "JVBERi0xLjQKJeLjz9MKMyAwIG9iago8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL1Jlc291cmNlczw8L0ZvbnQ8PC9GMSA1IDAgUj4+Pj4vTWVkaWFCb3hbMCAwIDYxMiA3OTJdL0NvbnRlbnRzIDQgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvTGVuZ3RoIDQ0Pj4Kc3RyZWFtCkJUCi9GMSA0OCBUZgoxMCA3MDAgVGQKKFRlc3QpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PgplbmRvYmoKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKNSAwIG9iago8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2ZXRpY2E+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmDQowMDAwMDAwMjczIDAwMDAwIG4NCjAwMDAwMDAyMjQgMDAwMDAgbg0KMDAwMDAwMDAxNSAwMDAwMCBuDQowMDAwMDAwMTI1IDAwMDAwIG4NCjAwMDAwMDAzMjIgMDAwMDAgbg0KdHJhaWxlcgo8PC9TaXplIDYvUm9vdCAxIDAgUj4+CnN0YXJ0eHJlZgo0MDIKJSVFT0YK";
 
 async function loginWithEmail(email) {
-  for (const password of PASSWORD_CANDIDATES) {
-    try {
-      const response = await axios.post(`${API_BASE}/auth/login`, {
-        email,
-        password,
-      });
-      return { token: response.data.data.tokens.accessToken, password, email };
-    } catch (error) {
-      // try next password
-    }
-  }
-
-  const user = await prisma.users.findFirst({
-    where: { email },
-    select: { id: true },
+  const response = await axios.post(`${API_BASE}/auth/login`, {
+    email,
+    password: E2E_ADMIN_PASSWORD,
   });
-  if (user) {
-    const fallbackPassword = "password123";
-    const passwordHash = await bcrypt.hash(fallbackPassword, 10);
-    await prisma.users.update({
-      where: { id: user.id },
-      data: { password_hash: passwordHash },
-    });
-
-    const response = await axios.post(`${API_BASE}/auth/login`, {
-      email,
-      password: fallbackPassword,
-    });
-    return { token: response.data.data.tokens.accessToken, password: fallbackPassword, email };
-  }
-
-  throw new Error(`Unable to login as ${email}`);
+  return { token: response.data.data.tokens.accessToken, password: E2E_ADMIN_PASSWORD, email };
 }
 
 async function login() {
@@ -83,7 +55,7 @@ async function ensurePeerUser(adminUser) {
 
   if (peer) return peer;
 
-  const passwordHash = await bcrypt.hash("password123", 10);
+  const passwordHash = await bcrypt.hash(E2E_PEER_PASSWORD, 10);
   peer = await prisma.users.create({
     data: {
       tenant_id: adminUser.tenant_id,

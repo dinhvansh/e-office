@@ -198,6 +198,12 @@ fi
 print_info "Frontend URL: $FRONTEND_URL"
 print_info "Backend URL: $BACKEND_URL"
 
+if [ -z "${DEMO_ADMIN_PASSWORD:-}" ] || [ ${#DEMO_ADMIN_PASSWORD} -lt 16 ]; then
+    print_error "Set DEMO_ADMIN_PASSWORD to a unique value of at least 16 characters before running this installer."
+    exit 1
+fi
+export DEMO_ADMIN_PASSWORD
+
 # Generate JWT secrets
 print_info "Generating secure JWT secrets..."
 JWT_SECRET=$(openssl rand -base64 32)
@@ -217,6 +223,7 @@ DATABASE_URL="postgresql://eoffice:eoffice123@db:5432/eoffice_db"
 # JWT (Auto-generated)
 JWT_SECRET=$JWT_SECRET
 REFRESH_TOKEN_SECRET=$REFRESH_TOKEN_SECRET
+DEMO_ADMIN_PASSWORD=$DEMO_ADMIN_PASSWORD
 TOKEN_EXPIRES_IN=15m
 REFRESH_TOKEN_EXPIRES_IN=7d
 
@@ -238,7 +245,7 @@ SMTP_HOST=mail.example.com
 SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=noreply@example.com
-SMTP_PASSWORD=changeme
+SMTP_PASSWORD=${SMTP_PASSWORD:-}
 EMAIL_FROM=noreply@example.com
 EMAIL_FROM_NAME=E-Office System
 EOF
@@ -367,7 +374,7 @@ echo "   Backend:  $BACKEND_URL"
 echo ""
 echo "👤 Default Login:"
 echo "   Email:    admin@acme.local"
-echo "   Password: admin123"
+echo "   Password: the value supplied through DEMO_ADMIN_PASSWORD"
 echo ""
 echo "📚 Useful Commands:"
 echo "   View logs:     docker compose logs -f"

@@ -17,7 +17,8 @@ docker-compose exec backend node scripts/seed-org-final.js
 ## Access
 - Frontend: http://localhost:3000
 - Backend: http://localhost:4000
-- Login: `admin@acme.local` / `admin123`
+- Login: `admin@acme.local` with the unique value supplied through
+  `DEMO_ADMIN_PASSWORD` before running a demo seed.
 
 ## Useful Commands
 ```bash

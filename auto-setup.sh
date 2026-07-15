@@ -103,6 +103,16 @@ JWT_SECRET=$(openssl rand -base64 32)
 REFRESH_TOKEN_SECRET=$(openssl rand -base64 32)
 DB_PASSWORD=$(openssl rand -base64 16 | tr -d "=+/" | cut -c1-20)
 
+if [ -z "${DEMO_ADMIN_PASSWORD:-}" ]; then
+    read -rsp "Set a unique demo admin password (minimum 16 characters): " DEMO_ADMIN_PASSWORD
+    echo
+fi
+if [ ${#DEMO_ADMIN_PASSWORD} -lt 16 ]; then
+    echo -e "${RED}Demo admin password must contain at least 16 characters.${NC}"
+    exit 1
+fi
+export DEMO_ADMIN_PASSWORD
+
 echo -e "${GREEN}✓${NC} Secrets đã được tạo"
 
 # ============================================
@@ -194,6 +204,7 @@ REDIS_URL=redis://redis:6379
 # JWT Secrets
 JWT_SECRET=$JWT_SECRET
 REFRESH_TOKEN_SECRET=$REFRESH_TOKEN_SECRET
+DEMO_ADMIN_PASSWORD=$DEMO_ADMIN_PASSWORD
 
 # Application URLs
 VPS_IP=$VPS_IP
@@ -224,6 +235,7 @@ REDIS_URL=redis://redis:6379
 
 JWT_SECRET=$JWT_SECRET
 REFRESH_TOKEN_SECRET=$REFRESH_TOKEN_SECRET
+DEMO_ADMIN_PASSWORD=$DEMO_ADMIN_PASSWORD
 TOKEN_EXPIRES_IN=1h
 REFRESH_TOKEN_EXPIRES_IN=30d
 
@@ -357,7 +369,7 @@ Email Configuration:
 
 Default Admin Account:
   Email: admin@acme.local
-  Password: admin123
+  Password: supplied through DEMO_ADMIN_PASSWORD (not written here)
   
 ⚠️  QUAN TRỌNG:
   1. Đổi password admin ngay sau khi đăng nhập
@@ -392,7 +404,7 @@ echo ""
 echo -e "${BLUE}🔐 Đăng nhập:${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  Email:    admin@acme.local"
-echo "  Password: admin123"
+echo "  Password: the value supplied through DEMO_ADMIN_PASSWORD"
 echo ""
 echo -e "${YELLOW}⚠️  LƯU Ý QUAN TRỌNG:${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
