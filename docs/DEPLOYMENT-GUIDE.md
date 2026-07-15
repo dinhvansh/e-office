@@ -92,7 +92,7 @@ sudo bash quick-deploy.sh
 ## 8. Tài khoản mặc định sau seed
 
 - email: `admin@acme.local`
-- password: `secret123`
+- password: the unique value supplied through `DEMO_ADMIN_PASSWORD`
 
 ## 9. Lệnh vận hành thường dùng
 

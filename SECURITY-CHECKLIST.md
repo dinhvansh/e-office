@@ -49,9 +49,9 @@
   - File: `backend/src/modules/auth/auth.routes.ts`
   - Uncomment: `authRouter.post("/login", authLimiter, ...)`
   
-- [ ] **Change default admin password**
-  - Current: `admin123`
-  - Run: `node backend/scripts/change-admin-password.js`
+- [ ] **Set a unique admin password before seeding**
+  - Set `DEMO_ADMIN_PASSWORD` to a unique value of at least 16 characters.
+  - Do not publish or reuse a shared demo password.
 
 - [ ] **Generate new JWT secrets**
   - Run: `node backend/scripts/generate-jwt-secrets.js`

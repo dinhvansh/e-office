@@ -834,7 +834,7 @@ docker-compose -f docker-compose.dev.yml exec backend node scripts/seed.js
 ### 4. Access application
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:4000
-- Login: admin@acme.local / secret123
+- Login: admin@acme.local with the value supplied through `DEMO_ADMIN_PASSWORD`
 
 ## 🏭 Production Installation
 

@@ -37,9 +37,9 @@ Kỳ vọng:
 
 - admin:
   - `admin@acme.local`
-  - `secret123`
+  - the value supplied through `DEMO_ADMIN_PASSWORD`
 - sample users:
-  - password thường là `password123`
+  - use an isolated test password supplied by the test environment
 
 ## 4. Flow nên test sau mỗi thay đổi lớn
 

@@ -40,7 +40,7 @@ docker exec eoffice-backend node scripts/seed-workflows-simple.js
 
 ### Login mẫu
 
-- `admin@acme.local / secret123`
+- `admin@acme.local` with the unique value supplied through `DEMO_ADMIN_PASSWORD`
 
 ## 3. Flow cần hiểu trước khi sửa code
 

@@ -26,7 +26,7 @@ bash auto-setup.sh
 1. **Truy cập ứng dụng**: `http://YOUR_VPS_IP:3000`
 2. **Đăng nhập**:
    - Email: `admin@acme.local`
-   - Password: `admin123`
+   - Password: the unique value supplied through `DEMO_ADMIN_PASSWORD`
 3. **Đổi password ngay lập tức**
 4. **Backup file `.credentials.txt`** và xóa nó
 

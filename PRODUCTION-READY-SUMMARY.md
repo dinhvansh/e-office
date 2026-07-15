@@ -58,7 +58,7 @@
 
 2. **Change Default Admin Password**
    ```bash
-   # Current: admin@acme.local / admin123
+   # Set DEMO_ADMIN_PASSWORD to a unique value before seeding admin@acme.local
    # Login and change via UI or run:
    node backend/scripts/change-admin-password.js
    ```

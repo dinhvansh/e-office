@@ -126,7 +126,7 @@ curl http://36.50.27.139:3000
 
 **Default Login:**
 - Email: `admin@acme.local`
-- Password: `admin123`
+- Password: the unique value supplied through `DEMO_ADMIN_PASSWORD`
 
 ## Quản Lý Services
 

@@ -101,7 +101,7 @@ npm run dev
 ```
 Frontend: http://localhost:3000
 Backend:  http://localhost:4000
-Login:    admin@acme.local / admin123
+Login:    admin@acme.local / value supplied through DEMO_ADMIN_PASSWORD
 ```
 
 ## 🐳 Setup với Docker
@@ -150,7 +150,7 @@ docker-compose exec backend node scripts/seed-org-final.js
 ```
 Frontend: http://localhost:3000
 Backend:  http://localhost:4000
-Login:    admin@acme.local / admin123
+Login:    admin@acme.local / value supplied through DEMO_ADMIN_PASSWORD
 ```
 
 ## 🔧 Troubleshooting
@@ -224,7 +224,7 @@ docker-compose up -d
 
 ```
 Email:    admin@acme.local
-Password: admin123
+Password: value supplied through DEMO_ADMIN_PASSWORD
 ```
 
 **⚠️ Đổi password ngay sau khi login lần đầu!**

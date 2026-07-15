@@ -60,7 +60,7 @@ sudo bash install.sh
 ### Đăng nhập lần đầu:
 ```
 Email:    admin@acme.local
-Password: secret123
+Password: the unique value supplied through DEMO_ADMIN_PASSWORD
 ```
 
 ⚠️ **QUAN TRỌNG - BẢO MẬT**: 
@@ -210,7 +210,7 @@ docker compose up -d
 ## 🔒 Bảo Mật
 
 ### Đổi password admin:
-1. Đăng nhập với `admin@acme.local / secret123`
+1. Đăng nhập với `admin@acme.local` và giá trị đã cấp qua `DEMO_ADMIN_PASSWORD`
 2. Vào Settings → Change Password
 
 ### Cấu hình firewall:

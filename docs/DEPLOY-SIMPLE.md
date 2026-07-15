@@ -86,7 +86,7 @@ Truy cập:
 
 Login:
 - Email: `admin@acme.local`
-- Password: `secret123`
+- Password: the unique value supplied through `DEMO_ADMIN_PASSWORD`
 
 ---
 
