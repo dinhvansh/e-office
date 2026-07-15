@@ -5,9 +5,9 @@ product names, and related
 marks may be referenced. It does not grant trademark ownership or broad brand
 rights.
 
-Trademark owner: Nguyễn Đình Vân.
+Trademark owner: Nguyễn Đình Văn.
 
-FlowDocker™ and FlowDocker E-Office™ are trademarks of Nguyễn Đình Vân.
+FlowDocker™ and FlowDocker E-Office™ are trademarks of Nguyễn Đình Văn.
 
 ## General rule
 

@@ -9,7 +9,7 @@
   commercial terms, trademark notice, and policy copy are internally coherent
   drafts subject to maintainer approval; they are not external legal approval.
 - Public ownership and contact details: copyright holder and trademark owner
-  Nguyễn Đình Vân; commercial, privacy, and security contact
+  Nguyễn Đình Văn; commercial, privacy, and security contact
   vanqn95@gmail.com. Governing law, venue, and contracting legal entity remain
   [TO BE CONFIRMED BY MAINTAINER].
 - The signing flow must not be represented as qualified electronic signing,

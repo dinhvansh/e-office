@@ -11,7 +11,7 @@ and policy package internally consistent with the current business intent.
 Classification: READY AS DRAFT
 
 FlowDocker E-Office source code is publicly visible under a source-available,
-fair-code style Community Source License. Copyright © 2026 Nguyễn Đình Vân. All
+fair-code style Community Source License. Copyright © 2026 Nguyễn Đình Văn. All
 rights reserved. Internal self-hosting, internal modification, evaluation,
 learning, development/testing, non-commercial personal use, and contribution
 are allowed. Commercial resale models that substantially monetize the software
@@ -77,7 +77,7 @@ Requires a Commercial License:
 
 Classification: READY AS DRAFT
 
-FlowDocker™ and FlowDocker E-Office™ are trademarks of Nguyễn Đình Vân.
+FlowDocker™ and FlowDocker E-Office™ are trademarks of Nguyễn Đình Văn.
 TRADEMARK.md states that trademark, logo, trade dress, domain, product
 naming, and brand rights are not granted automatically by the source license or
 by commercial licensing unless expressly granted in writing.

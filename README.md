@@ -14,7 +14,7 @@ Trademark and logo rights are not granted automatically. See
 [COMMERCIAL-LICENSING.md](COMMERCIAL-LICENSING.md),
 [TRADEMARK.md](TRADEMARK.md), [CONTRIBUTING.md](CONTRIBUTING.md), and
 [SECURITY.md](SECURITY.md). FlowDocker™ and FlowDocker E-Office™ are trademarks
-of Nguyễn Đình Vân. Copyright © 2026 Nguyễn Đình Vân. All rights reserved. The
+of Nguyễn Đình Văn. Copyright © 2026 Nguyễn Đình Văn. All rights reserved. The
 licensing and policy package is a publication
 draft subject to maintainer approval; it must not be described as external
 legal approval.

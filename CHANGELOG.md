@@ -5,8 +5,8 @@ All notable changes to FlowDocker E-Office are documented here.
 ## Unreleased
 
 - Finalized public alpha draft ownership, contact, and trademark information:
-  copyright © 2026 Nguyễn Đình Vân. All rights reserved; FlowDocker™ and
-  FlowDocker E-Office™ are trademarks of Nguyễn Đình Vân.
+  copyright © 2026 Nguyễn Đình Văn. All rights reserved; FlowDocker™ and
+  FlowDocker E-Office™ are trademarks of Nguyễn Đình Văn.
 
 ### Security
 

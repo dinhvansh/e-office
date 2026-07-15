@@ -71,7 +71,7 @@ specific nominative reference.
 
 Commercial licensing contact: vanqn95@gmail.com.
 
-Copyright holder: Nguyễn Đình Vân.
+Copyright holder: Nguyễn Đình Văn.
 
 Legal entity / contracting party: [TO BE CONFIRMED BY MAINTAINER].
 
