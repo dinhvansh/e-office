@@ -1,5 +1,10 @@
 # Implementation Progress
 
+## 2026-07-15 — Sign-request service responsibility split
+
+- **P2-CODE-017:** split sign-request queries, draft creation, signer management, lifecycle commands, signing-progress rules and the atomic internal-signing command out of `signRequests.service.ts`. The facade retains controller-facing authorization, audit boundaries and response contracts.
+- Backend verification passed: `npm test` (89 tests), `npm run lint`, and `npm run build`. Docker PostgreSQL E2E could not start because Docker Compose requires an unset `POSTGRES_PASSWORD`; no compose environment file is present in the workspace.
+
 ## 2026-07-15 — Final accessibility and responsive pass
 
 - **UX-010 fixed:** resolved all project-owned frontend lint warnings with dependency-safe callbacks/memoization and accessible image handling. Chromium verification covered keyboard signing, dialog Escape/focus return, responsive desktop/768px/375px states, async retry and duplicate-submit protection. No known UI/UX debt remains from the current audit backlog.

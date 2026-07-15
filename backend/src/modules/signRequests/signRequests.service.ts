@@ -14,18 +14,17 @@ import { notificationsService } from "../notifications/notifications.service";
 import { NotificationType } from "../notifications/notifications.types";
 import { authorizationService } from "../authorization/authorization.service";
 import { documentWorkflowOrchestratorService } from "../documents/documentWorkflowOrchestrator.service";
-import {
-  getDefaultCompletionMode,
-  isWorkflowAssigneeType,
-  isWorkflowCompletionMode,
-  resolveAssigneeType,
-  type WorkflowCompletionMode,
-} from "../workflows/workflowStepAssignment";
-import { canSignerActInOrder, findNextWaitingSigningOrder } from "./signingOrder.policy";
+import { canSignerActInOrder } from "./signingOrder.policy";
 import { workflowStateService } from "../workflows/workflowState.service";
 import { buildSignRequestFlowHints, canSendSignRequestStatus, isEditableSignRequestStatus } from "./signRequestFlow.policy";
 import { signRequestQueriesService } from "./signRequestQueries.service";
 import type { SignRequestFlowSigner } from "./signRequestFlow.policy";
+import { signingProgressService } from "./signingProgress.service";
+import { signRequestQueryService } from "./signRequestQuery.service";
+import { signRequestDraftService, type CreateDraftSignRequestInput } from "./signRequestDraft.service";
+import { signerManagementService } from "./signerManagement.service";
+import { signRequestLifecycleService } from "./signRequestLifecycle.service";
+import { internalSigningCommandService } from "./internalSigningCommand.service";
 import bcrypt from "bcrypt";
 
 export interface SignerInput {
@@ -108,20 +107,7 @@ class SignRequestsService {
   }
 
   async listSignRequests(tenantId: number, userId: number) {
-    const signRequests = await signRequestsRepository.listByTenant(tenantId);
-    const decisions = await Promise.all(
-      signRequests.map(async (signRequest) => {
-        const access = await authorizationService.canAccessDocument(
-          userId,
-          tenantId,
-          signRequest.document_id,
-          "read"
-        );
-        return access.allowed ? signRequest : null;
-      })
-    );
-
-    return decisions.filter((signRequest): signRequest is NonNullable<typeof signRequest> => !!signRequest);
+    return signRequestQueryService.listSignRequests(tenantId, userId);
   }
 
   /**
@@ -216,107 +202,20 @@ class SignRequestsService {
    * Get sign requests created by the current user with pagination
    */
   async getMySignRequests(
-    userId: number, 
-    tenantId: number, 
+    userId: number,
+    tenantId: number,
     status?: string,
     page: number = 1,
     limit: number = 10
   ) {
-    const where: Prisma.sign_requestsWhereInput = {
-      tenant_id: tenantId,
-      document: {
-        owner_id: userId
-      }
-    };
-
-    if (status === "pending") {
-      where.status = { in: ["pending_approval", "pending", "in_progress"] };
-    } else if (status) {
-      where.status = status;
-    }
-
-    // Get total count
-    const total = await prisma.sign_requests.count({ where });
-
-    // Calculate pagination
-    const skip = (page - 1) * limit;
-    const totalPages = Math.ceil(total / limit);
-
-    // Get paginated data
-    const signRequests = await signRequestsRepository.findMany({
-      where,
-      include: {
-        document: {
-          select: {
-            id: true,
-            title: true,
-            original_file_name: true,
-            document_number: true,
-            owner: {
-              select: { 
-                id: true,
-                full_name: true, 
-                email: true 
-              }
-            }
-          }
-        },
-        signers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            status: true,
-            signed_at: true,
-            signing_order: true,
-            is_internal: true,
-            user_id: true
-          },
-          orderBy: {
-            signing_order: 'asc'
-          }
-        }
-      },
-      orderBy: { created_at: 'desc' },
-      skip,
-      take: limit
-    });
-
-    return {
-      data: signRequests.map((request) => ({
-        ...request,
-        ...this.buildFlowHints(request),
-      })),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNext: page < totalPages,
-        hasPrev: page > 1
-      }
-    };
+    return signRequestQueryService.getMySignRequests(userId, tenantId, status, page, limit);
   }
 
   /**
    * Create draft sign request (auto-created by system)
    */
-  async createDraftSignRequest(data: {
-    document_id: number;
-    tenant_id: number;
-    title?: string;
-    auto_created?: boolean;
-  }) {
-    const signRequestData: Prisma.sign_requestsCreateInput = {
-      tenant: { connect: { id: data.tenant_id } },
-      document: { connect: { id: data.document_id } },
-      title: data.title,
-      workflow_type: "sequential",
-      status: "draft",
-      auto_created: data.auto_created || false,
-    };
-    
-    return await signRequestsRepository.create(signRequestData);
+  async createDraftSignRequest(data: CreateDraftSignRequestInput) {
+    return signRequestDraftService.createDraftSignRequest(data);
   }
 
   async createSignRequest(tenantId: number, userId: number, input: CreateSignRequestInput) {
@@ -479,53 +378,9 @@ class SignRequestsService {
     }
   }
 
-  private async getSignerStepCompletionConfig(documentId: number, signingOrder: number) {
-    const document = await prisma.documents.findUnique({
-      where: { id: documentId },
-      select: { workflow_instance: { select: { workflow_id: true } } },
-    });
 
-    const workflowId = document?.workflow_instance?.workflow_id;
-    if (!workflowId) {
-      return {
-        completionMode: "all" as WorkflowCompletionMode,
-        minRequired: 1,
-      };
-    }
 
-    const step = await prisma.workflow_steps.findFirst({
-      where: {
-        workflow_id: workflowId,
-        participant_role: "signer",
-        step_order: signingOrder,
-      },
-      select: {
-        approver_type: true,
-        assignee_type: true,
-        completion_mode: true,
-        min_required: true,
-      },
-    });
 
-    const assigneeType = step
-      ? resolveAssigneeType({
-          approver_type: step.approver_type ?? undefined,
-          assignee_type: isWorkflowAssigneeType(step.assignee_type) ? step.assignee_type : undefined,
-        })
-      : null;
-    const completionMode = step && isWorkflowCompletionMode(step.completion_mode)
-      ? step.completion_mode
-      : getDefaultCompletionMode(assigneeType ?? 'specific_user');
-
-    return {
-      completionMode,
-      minRequired: Math.max(1, step?.min_required || 1),
-    };
-  }
-
-  private isSignerStatusComplete(status?: string | null) {
-    return status === "signed" || status === "completed";
-  }
 
   async addSigner(
     signRequestId: number,
@@ -533,41 +388,9 @@ class SignRequestsService {
     userId: number,
     signerData: SignerInput & { signing_order?: number }
   ) {
-    // Verify sign request exists and belongs to tenant
     const signRequest = await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
-
     this.ensureEditableStatus(signRequest.status);
-
-    // Check if signer is internal user
-    const internalUser = await prisma.users.findFirst({
-      where: {
-        tenant_id: tenantId,
-        email: signerData.email,
-        status: 'active'
-      },
-      select: { id: true } // ✅ Get user ID
-    });
-
-    // Create signer with Prisma relation
-    const signerCreateData: Prisma.signersCreateInput = {
-      sign_request: { connect: { id: signRequestId } },
-      email: signerData.email,
-      name: signerData.name,
-      role: signerData.role,
-      signing_order: signerData.signing_order,
-      status: 'draft',
-      is_internal: !!internalUser, // ✅ Set based on user existence
-      position_data: signerData.position_data as Prisma.InputJsonValue,
-    };
-
-    // ✅ Add user relation if internal
-    if (internalUser) {
-      signerCreateData.user = { connect: { id: internalUser.id } };
-    }
-
-    const signer = await signersRepository.create(signerCreateData);
-
-    return signer;
+    return signerManagementService.createDraftSigner(signRequestId, tenantId, signerData);
   }
 
   async sendSignRequest(id: number, tenantId: number, userId: number) {
@@ -950,38 +773,8 @@ class SignRequestsService {
    */
   async cancelSignRequest(id: number, tenantId: number, userId: number, reason?: string) {
     const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
+    await signRequestLifecycleService.cancel(signRequest, id, tenantId, userId, reason);
 
-    // Only allow canceling pending or in-progress sign requests
-    if (signRequest.status === "completed" || signRequest.status === "cancelled") {
-      throw ApiError.badRequest(
-        `Cannot cancel sign request with status: ${signRequest.status}`,
-        "SIGN_REQUEST_CANCEL_DENIED"
-      );
-    }
-
-    // Get user info for email
-    // Update sign request status with cancellation info
-    await prisma.sign_requests.update({
-      where: { id, tenant_id: tenantId },
-      data: {
-        status: "cancelled",
-        cancellation_reason: reason || "Không có lý do",
-        cancelled_at: new Date(),
-        cancelled_by: userId,
-      },
-    });
-
-    // Update document status back to draft
-    if (signRequest.document_id) {
-      await documentsRepository.update(signRequest.document_id, {
-        status: "draft",
-      });
-    }
-
-    // TODO: Send cancellation emails to all signers
-    // Email notification will be implemented when sendSignRequestCancelled is added to email service
-
-    // Audit log
     await auditService.record({
       tenantId,
       documentId: signRequest.document_id,
@@ -1068,107 +861,28 @@ class SignRequestsService {
     }
 
     const completionConfig = signer.signing_order && signRequest.document_id
-      ? await this.getSignerStepCompletionConfig(signRequest.document_id, signer.signing_order)
+      ? await signingProgressService.getSignerStepCompletionConfig(signRequest.document_id, signer.signing_order)
       : null;
 
     // State changes that make a signature visible must commit together.  PDF
     // generation and notifications intentionally happen after this transaction.
-    await prisma.$transaction(async (tx) => {
-      const signed = await tx.signers.updateMany({
-        where: { id: signer.id, sign_request_id: signRequestId, status: "pending" },
-        data: {
-          status: "signed",
-          signed_at: new Date(),
-          signature_data: finalSignatureData,
-          signature_type: signatureType,
-          ip_address: ipAddress,
-          user_agent: userAgent,
-          ...(typeof signatureData === "object" ? { position_data: signatureData as Prisma.InputJsonValue } : {}),
-        },
-      });
-      if (signed.count !== 1) {
-        throw ApiError.conflict("Signer is no longer active", "CONCURRENT_MODIFICATION");
-      }
-
-      let transactionSigners = await tx.signers.findMany({ where: { sign_request_id: signRequestId } });
-      if (signer.signing_order) {
-        const currentOrder = transactionSigners.filter((item) => item.signing_order === signer.signing_order);
-        const completedCount = currentOrder.filter((item) => this.isSignerStatusComplete(item.status)).length;
-        const stepComplete = completionConfig?.completionMode === "any_one"
-          ? completedCount >= 1
-          : completionConfig?.completionMode === "min_n"
-            ? completedCount >= completionConfig.minRequired
-            : currentOrder.every((item) => this.isSignerStatusComplete(item.status));
-
-        if (stepComplete && (completionConfig?.completionMode === "any_one" || completionConfig?.completionMode === "min_n")) {
-          await tx.signers.updateMany({
-            where: { sign_request_id: signRequestId, signing_order: signer.signing_order, status: { notIn: ["signed", "completed", "rejected"] } },
-            data: { status: "completed" },
-          });
-          transactionSigners = await tx.signers.findMany({ where: { sign_request_id: signRequestId } });
-        }
-
-        if (stepComplete && signRequest.workflow_type === "sequential") {
-          const nextOrder = findNextWaitingSigningOrder(transactionSigners);
-          if (nextOrder !== null) {
-            const activated = await tx.signers.updateMany({
-              where: { sign_request_id: signRequestId, signing_order: nextOrder, status: "waiting_signing" },
-              data: { status: "pending" },
-            });
-            if (activated.count > 0) {
-              await tx.outbox_events.create({
-                data: {
-                  tenant_id: tenantId,
-                  aggregate_type: "sign_request",
-                  aggregate_id: String(signRequestId),
-                  event_type: "SIGNER_ACTIVATED",
-                  payload: { sign_request_id: signRequestId, signing_order: nextOrder },
-                  deduplication_key: `signer-activated:${signRequestId}:${nextOrder}`,
-                },
-              });
-            }
-          }
-        }
-      }
-
-      const allSignedInTransaction = (await tx.signers.findMany({ where: { sign_request_id: signRequestId } }))
-        .every((item) => this.isSignerStatusComplete(item.status));
-      await workflowStateService.transitionSigningPair(tx, {
-        documentId: signRequest.document_id,
-        signRequestId,
-        documentStatus: allSignedInTransaction ? "generating_artifact" : "in_progress",
-        signRequestStatus: allSignedInTransaction ? "generating_artifact" : "in_progress",
-      });
-      await tx.audit_logs.create({
-        data: { document_id: signRequest.document_id, event: "sign.internal_signed", user_id: userId, ip: ipAddress, ua: userAgent },
-      });
-      await tx.outbox_events.create({
-        data: {
-          tenant_id: tenantId,
-          aggregate_type: "sign_request",
-          aggregate_id: String(signRequestId),
-          event_type: "SIGNATURE_SUBMITTED",
-          payload: { sign_request_id: signRequestId, signer_id: signer.id, is_internal: true },
-          deduplication_key: `signature-submitted:${signRequestId}:${signer.id}`,
-        },
-      });
-      if (allSignedInTransaction) {
-        await tx.outbox_events.create({
-          data: {
-            tenant_id: tenantId,
-            aggregate_type: "sign_request",
-            aggregate_id: String(signRequestId),
-            event_type: "SIGNED_ARTIFACT_REQUESTED",
-            payload: { sign_request_id: signRequestId, document_id: signRequest.document_id },
-            deduplication_key: `signed-artifact:${signRequestId}`,
-          },
-        });
-      }
+    await internalSigningCommandService.persistSignature({
+      signRequestId,
+      tenantId,
+      userId,
+      signer,
+      signRequest,
+      completionConfig,
+      signatureData,
+      finalSignatureData,
+      signatureType,
+      ipAddress,
+      userAgent,
     });
 
     // Check if all signers have signed
     const allSigners = await signersRepository.findBySignRequest(signRequestId);
-    const allSigned = allSigners.every((s) => this.isSignerStatusComplete(s.status));
+    const allSigned = allSigners.every((s) => signingProgressService.isSignerStatusComplete(s.status));
 
     // ✅ PROGRESSIVE PDF: Generate PDF after each signature
     if (!allSigned) try {
@@ -1242,30 +956,7 @@ class SignRequestsService {
 
   async retrySignedArtifactGeneration(signRequestId: number, tenantId: number, userId: number) {
     const signRequest = await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
-    if (signRequest.status !== "artifact_failed") {
-      throw ApiError.badRequest("Signed artifact is not retryable", "ARTIFACT_RETRY_NOT_ALLOWED");
-    }
-
-    await prisma.$transaction(async (tx) => {
-      await workflowStateService.transitionSigningPair(tx, {
-        documentId: signRequest.document_id,
-        signRequestId,
-        documentStatus: "generating_artifact",
-        signRequestStatus: "generating_artifact",
-      });
-      await tx.outbox_events.create({
-        data: {
-          tenant_id: tenantId,
-          aggregate_type: "sign_request",
-          aggregate_id: String(signRequestId),
-          event_type: "SIGNED_ARTIFACT_REQUESTED",
-          payload: { sign_request_id: signRequestId, retry: true },
-          deduplication_key: `signed-artifact-retry:${signRequestId}:${Date.now()}`,
-        },
-      });
-    });
-
-    return { status: "generating_artifact" };
+    return signRequestLifecycleService.retrySignedArtifactGeneration(signRequest, signRequestId, tenantId);
   }
 
   // ✅ Phase 2: Get Signers
@@ -1390,32 +1081,13 @@ class SignRequestsService {
 
   async getSigners(signRequestId: number, tenantId: number) {
     await this.getSignRequest(signRequestId, tenantId);
-    return await signersRepository.findBySignRequest(signRequestId);
+    return signerManagementService.getSigners(signRequestId);
   }
 
   // ✅ Phase 2: Remove Signer
   async removeSignerFromRequest(signRequestId: number, signerId: number, tenantId: number, userId: number) {
     const signRequest = await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
-
-    // Remove fields assigned to this signer
-    await prisma.sign_request_fields.deleteMany({
-      where: { assigned_signer_id: signerId }
-    });
-
-    // Delete signer
-    await signersRepository.delete(signerId);
-
-    // Reorder remaining signers
-    const remainingSigners = await signersRepository.findBySignRequest(signRequestId);
-    const sortedSigners = remainingSigners.sort((a, b) => 
-      (a.signing_order || 0) - (b.signing_order || 0)
-    );
-
-    for (let i = 0; i < sortedSigners.length; i++) {
-      await signersRepository.update(sortedSigners[i].id, {
-        signing_order: i + 1
-      });
-    }
+    await signerManagementService.removeSignerAndReorder(signRequestId, signerId);
 
     // Audit log (optional - may fail if audit service has issues)
     try {
@@ -1445,43 +1117,7 @@ class SignRequestsService {
 
     const signRequest = await this.ensureCanManageSignRequest(signer.sign_request_id, tenantId, userId);
     this.ensureEditableStatus(signRequest.status);
-
-    // If email changed, check if new email is internal user
-    if (updates.email && updates.email !== signer.email) {
-      const internalUser = await prisma.users.findFirst({
-        where: {
-          tenant_id: tenantId,
-          email: updates.email,
-          status: 'active'
-        },
-        select: { id: true }
-      });
-
-      // Update is_internal and user relation based on new email
-      const { position_data, ...otherUpdates } = updates;
-      const updateData: Prisma.signersUpdateInput = {
-        ...otherUpdates,
-        ...(position_data ? { position_data: position_data as Prisma.InputJsonValue } : {}),
-        is_internal: !!internalUser,
-      };
-
-      // ✅ Use Prisma relation for user_id
-      if (internalUser) {
-        updateData.user = { connect: { id: internalUser.id } };
-      } else if (signer.user_id) {
-        // Disconnect if was internal but now external
-        updateData.user = { disconnect: true };
-      }
-
-      await signersRepository.update(signerId, updateData);
-    } else {
-      // Just update other fields
-      const { position_data, ...otherUpdates } = updates;
-      await signersRepository.update(signerId, {
-        ...otherUpdates,
-        ...(position_data ? { position_data: position_data as Prisma.InputJsonValue } : {}),
-      });
-    }
+    await signerManagementService.updateSignerRecord(signerId, signer, tenantId, updates);
 
     // Audit log (optional - may fail if audit service has issues)
     try {
@@ -1809,13 +1445,7 @@ class SignRequestsService {
   ) {
     const signRequest = await this.ensureCanManageSignRequest(signRequestId, tenantId, userId);
     this.ensureEditableStatus(signRequest.status);
-
-    // Update signing_order for each signer
-    for (const signer of signers) {
-      await signersRepository.update(signer.id, {
-        signing_order: signer.signing_order,
-      });
-    }
+    await signerManagementService.reorderSigners(signers);
 
     // Audit log (optional)
     try {
@@ -1837,30 +1467,7 @@ class SignRequestsService {
    */
   async deleteSignRequest(id: number, tenantId: number, userId: number) {
     const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
-
-    // Only allow deleting editable sign requests
-    if (!this.isEditableStatus(signRequest.status)) {
-      throw ApiError.badRequest(
-        'Chỉ có thể xóa văn bản ở trạng thái nháp',
-        'SIGN_REQUEST_DELETE_DENIED'
-      );
-    }
-
-    // Delete all related data
-    // 1. Delete fields
-    await prisma.sign_request_fields.deleteMany({
-      where: { sign_request_id: id }
-    });
-
-    // 2. Delete signers
-    await prisma.signers.deleteMany({
-      where: { sign_request_id: id }
-    });
-
-    // 3. Delete sign request
-    await prisma.sign_requests.delete({
-      where: { id }
-    });
+    await signRequestLifecycleService.deleteDraft(signRequest, id);
 
     // Audit log
     await auditService.record({
@@ -1879,50 +1486,7 @@ class SignRequestsService {
    */
   async revokeSignRequest(id: number, tenantId: number, userId: number) {
     const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
-
-    // Only allow revoking completed sign requests
-    if (signRequest.status !== 'completed') {
-      throw ApiError.badRequest(
-        'Chỉ có thể thu hồi văn bản đã hoàn thành',
-        'SIGN_REQUEST_REVOKE_DENIED'
-      );
-    }
-
-    // Check if all signers are internal
-    const signers = await signersRepository.findBySignRequest(id);
-    const hasExternalSigners = signers.some(s => !s.is_internal);
-    
-    if (hasExternalSigners) {
-      throw ApiError.badRequest(
-        'Không thể thu hồi văn bản có người ký bên ngoài',
-        'SIGN_REQUEST_REVOKE_EXTERNAL_DENIED'
-      );
-    }
-
-    // Reset all signers to pending status
-    for (const signer of signers) {
-      await signersRepository.update(signer.id, {
-        status: 'pending',
-        signed_at: null,
-        signature_data: null,
-        signature_type: null,
-        ip_address: null,
-        user_agent: null,
-        otp: null,
-        otp_expire: null,
-        signing_token: null
-      });
-    }
-
-    // Update sign request status back to draft
-    await signRequestsRepository.updateStatus(id, tenantId, 'draft');
-
-    // Update document status back to draft
-    if (signRequest.document_id) {
-      await documentsRepository.update(signRequest.document_id, {
-        status: 'draft',
-      });
-    }
+    await signRequestLifecycleService.revokeCompleted(signRequest, id, tenantId);
 
     // Audit log
     await auditService.record({
