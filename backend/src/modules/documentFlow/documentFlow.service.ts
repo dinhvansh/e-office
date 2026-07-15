@@ -276,6 +276,7 @@ export class DocumentFlowService {
       phases,
       steps,
       activities,
+      status_summary: this.buildStatusSummary(document, userId),
       // User permissions for actions
       can_approve: this.canUserApprove(document, userId),
       can_sign: this.canUserSign(document, userId, currentUser?.email || null),
@@ -294,6 +295,14 @@ export class DocumentFlowService {
       default:
         return 'pending';
     }
+  }
+
+  private buildStatusSummary(document: { status: string | null; owner: { id: number }; sign_request?: { status: string | null; deadline: Date | null; signers: Array<{ status: string | null }> } | null }, userId: number) {
+    const status = document.sign_request?.status || document.status || 'draft';
+    const signers = document.sign_request?.signers || [];
+    const completed = signers.filter((signer) => ['signed', 'completed'].includes(signer.status || '')).length;
+    const actor = status === 'pending_approval' ? 'approver' : ['pending', 'pending_signature', 'in_progress'].includes(status) ? 'signer' : ['generating_artifact', 'artifact_failed'].includes(status) ? 'system' : status === 'draft' ? 'requester' : null;
+    return { status, current_actor: actor, next_action: status === 'artifact_failed' ? 'RETRY_ARTIFACT' : 'REVIEW_STATUS', progress: { completed, total: signers.length }, deadline: document.sign_request?.deadline?.toISOString() || null, can_retry_artifact: status === 'artifact_failed' && document.owner.id === userId };
   }
 
   private mapSignerStatus(status: string): FlowStep['status'] {

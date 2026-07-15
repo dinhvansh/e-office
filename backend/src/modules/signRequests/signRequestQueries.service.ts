@@ -1,7 +1,7 @@
 import { ApiError } from "../../core/errors/api-error";
 import { authorizationService } from "../authorization/authorization.service";
 import { prisma } from "../../config/prisma";
-import { buildSignRequestFlowHints } from "./signRequestFlow.policy";
+import { buildSignRequestFlowHints, buildWorkflowStatusSummary } from "./signRequestFlow.policy";
 import { normalizeStoredFieldBox } from "./coordinate.helper";
 import { signRequestsRepository } from "./signRequests.repository";
 
@@ -19,6 +19,9 @@ class SignRequestQueriesService {
     }
 
     const workflowSnapshot = await this.getWorkflowSnapshotForDocument(signRequest.document_id, tenantId);
+    const canManage = userId
+      ? (await authorizationService.canAccessDocument(userId, tenantId, signRequest.document_id, "edit")).allowed
+      : false;
     return {
       ...signRequest,
       fields: signRequest.fields.map((field) => {
@@ -37,6 +40,12 @@ class SignRequestQueriesService {
       }),
       workflow_snapshot: workflowSnapshot,
       ...buildSignRequestFlowHints(signRequest.status, signRequest.signers),
+      status_summary: buildWorkflowStatusSummary({
+        status: signRequest.status,
+        signers: signRequest.signers,
+        deadline: signRequest.deadline,
+        canRetryArtifact: canManage,
+      }),
     };
   }
 

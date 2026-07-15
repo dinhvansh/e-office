@@ -1,0 +1,2 @@
+import { defineConfig, devices } from '@playwright/test';
+export default defineConfig({ testDir: './tests', testMatch: 'workflow-status.spec.ts', timeout: 60_000, use: { baseURL: 'http://127.0.0.1:3017', viewport: { width: 1280, height: 720 } }, projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }], globalTeardown: './scripts/cleanup-ux007-output.mjs', webServer: { command: 'node scripts/start-ux007-test-server.mjs', url: 'http://127.0.0.1:3017/login', reuseExistingServer: false, timeout: 60_000 } });

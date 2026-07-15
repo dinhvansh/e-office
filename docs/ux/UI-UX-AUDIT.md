@@ -141,3 +141,6 @@ The following High issues should be completed or browser-verified before public 
 ## Audit follow-up
 
 Before closing the remaining authenticated findings, replay the listed flows in Chromium at desktop and 375 px / 768 px widths with approved requester, approver, signer and administrator accounts. Capture screenshots for each high-severity item and test real OTP delivery, keyboard-only signing, screen-reader labels, and destructive confirmation focus restoration.
+## Verified fixes
+
+- **UX-007 — Fixed (2026-07-15):** Detail APIs now provide a stable workflow status summary (status, current actor role, next action, progress, deadline and retry eligibility). A shared Vietnamese status panel is used on sign-request, document-flow and approval detail; My Tasks identifies the action for the current user. Chromium replay verified artifact failure/retry, expiry and responsive 1280/768/375 layouts. Evidence: `evidence/ux007-artifact-failure-desktop.png`, `evidence/ux007-retry-success-desktop.png`, `evidence/ux007-expired-tablet.png`, `evidence/ux007-expired-mobile.png`.

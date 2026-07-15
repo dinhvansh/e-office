@@ -25,6 +25,7 @@ interface Task {
   signing_order?: number;
   created_at: string;
   due_date?: string;
+  next_action?: string;
 }
 
 export default function MyTasksPage() {
@@ -168,6 +169,12 @@ export default function MyTasksPage() {
       );
     }
   };
+
+  const getNextAction = (task: Task) => task.next_action === 'SIGN_NOW'
+    ? 'Bạn cần ký tài liệu này.'
+    : task.next_action === 'REVIEW_APPROVAL'
+      ? 'Bạn cần xem và phê duyệt tài liệu này.'
+      : 'Xem trạng thái xử lý.';
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
@@ -333,6 +340,7 @@ export default function MyTasksPage() {
                     </td>
                     <td className="px-2 py-3">
                       {getStatusBadge(task)}
+                      <p className="mt-1 text-xs text-muted-foreground">{getNextAction(task)}</p>
                     </td>
                     <td className="px-2 py-3">
                       <div onClick={stopRowNavigation}>
@@ -374,6 +382,7 @@ export default function MyTasksPage() {
                     </div>
                     <div className="font-medium text-sm truncate">{task.document_title || 'Untitled'}</div>
                     <div className="text-xs text-muted-foreground font-mono">{task.document_number}</div>
+                    <p className="mt-2 text-xs text-muted-foreground">{getNextAction(task)}</p>
                   </div>
                 </div>
 

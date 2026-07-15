@@ -2,13 +2,14 @@
 
 import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, FileText, Users, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import dayjs from 'dayjs';
+import { WorkflowStatusPanel, type WorkflowStatusSummary } from '@/components/workflow/WorkflowStatusPanel';
 
 interface Signer {
   id: number;
@@ -36,12 +37,14 @@ interface SignRequest {
     document_number: string | null;
   };
   signers: Signer[];
+  status_summary?: WorkflowStatusSummary;
 }
 
 export default function SignRequestDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { fetchJson } = useAuth();
+  const queryClient = useQueryClient();
   const signRequestId = parseInt(params.id as string);
   const [pdfUrl, setPdfUrl] = React.useState<string>('');
 
@@ -51,6 +54,11 @@ export default function SignRequestDetailPage() {
       const res = await fetchJson<{ sign_request: SignRequest }>(`/sign-requests/${signRequestId}`);
       return res.sign_request;
     },
+  });
+
+  const retryArtifact = useMutation({
+    mutationFn: () => fetchJson(`/sign-requests/${signRequestId}/retry-artifact`, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sign-request', signRequestId] }),
   });
 
   // Load PDF with authentication
@@ -193,8 +201,11 @@ export default function SignRequestDetailPage() {
               )}
             </div>
           </div>
-          {getStatusBadge(signRequest.status)}
         </div>
+      </div>
+
+      <div className="mb-6">
+        <WorkflowStatusPanel summary={signRequest.status_summary} onRetryArtifact={() => retryArtifact.mutate()} retrying={retryArtifact.isPending} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

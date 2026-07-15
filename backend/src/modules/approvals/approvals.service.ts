@@ -29,6 +29,7 @@ type CombinedTask = {
 };
 import { isApprovalStepComplete } from './approvalCompletion.policy';
 import { workflowStateService } from '../workflows/workflowState.service';
+import { buildWorkflowStatusSummary } from '../signRequests/signRequestFlow.policy';
 
 class ApprovalsService {
   /**
@@ -118,7 +119,14 @@ class ApprovalsService {
       throw ApiError.forbidden('You are not authorized to view this approval', 'NOT_AUTHORIZED');
     }
 
-    return approval;
+    return {
+      ...approval,
+      status_summary: buildWorkflowStatusSummary({
+        status: approval.action === 'pending' ? 'pending_approval' : approval.action,
+        signers: [],
+        deadline: approval.due_date,
+      }),
+    };
   }
 
   async listComments(approvalId: number, userId: number, tenantId: number) {
@@ -1115,6 +1123,7 @@ class ApprovalsService {
           workflow_step: approval.workflow_step?.step_name,
           created_at: approval.created_at,
           due_date: approval.due_date,
+          next_action: approval.action === 'pending' ? 'REVIEW_APPROVAL' : 'VIEW_STATUS',
         });
       });
     }
@@ -1165,6 +1174,7 @@ class ApprovalsService {
               signing_order: signer.signing_order,
               created_at: signRequest.created_at,
               due_date: null, // Signers don't have due dates
+              next_action: ['pending', 'otp_sent'].includes(signer.status || '') ? 'SIGN_NOW' : 'VIEW_STATUS',
             });
           });
         }

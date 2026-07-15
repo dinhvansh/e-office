@@ -14,6 +14,43 @@ export type SignRequestFlowHints = {
   };
 };
 
+/** A stable, presentation-neutral status contract for detail screens. */
+export type WorkflowStatusSummary = {
+  status: string;
+  current_actor: "requester" | "approver" | "signer" | "system" | null;
+  next_action: SignRequestFlowHints["next_action"] | "RETRY_ARTIFACT";
+  progress: { completed: number; total: number };
+  deadline: string | null;
+  can_retry_artifact: boolean;
+};
+
+export function buildWorkflowStatusSummary(input: {
+  status: string | null | undefined;
+  signers: readonly SignRequestFlowSigner[];
+  deadline?: Date | string | null;
+  canRetryArtifact?: boolean;
+}): WorkflowStatusSummary {
+  const hints = buildSignRequestFlowHints(input.status, input.signers);
+  const status = input.status || "draft";
+  const completed = input.signers.filter((signer) => ["signed", "completed"].includes(signer.status ?? "")).length;
+  const waitingApproval = hints.flow_counters.waiting_approval > 0 || status === "pending_approval";
+  const waitingSigning = hints.flow_counters.waiting_signing > 0 || hints.flow_counters.pending > 0 || ["pending", "in_progress", "pending_signature"].includes(status);
+  const actor = status === "draft" ? "requester"
+    : waitingApproval ? "approver"
+    : waitingSigning ? "signer"
+    : ["generating_artifact", "artifact_failed"].includes(status) ? "system"
+    : null;
+
+  return {
+    status,
+    current_actor: actor,
+    next_action: status === "artifact_failed" ? "RETRY_ARTIFACT" : hints.next_action,
+    progress: { completed, total: input.signers.length },
+    deadline: input.deadline ? new Date(input.deadline).toISOString() : null,
+    can_retry_artifact: status === "artifact_failed" && Boolean(input.canRetryArtifact),
+  };
+}
+
 export function isEditableSignRequestStatus(status: string | null | undefined): boolean {
   return status === "draft" || status === "rejected";
 }

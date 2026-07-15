@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
 import SignatureModal from '@/components/signature/SignatureModal';
 import { getApiBaseUrl } from '@/lib/env';
+import { WorkflowStatusPanel, type WorkflowStatusSummary } from '@/components/workflow/WorkflowStatusPanel';
 
 interface ApprovalDetail {
   id: number;
@@ -49,6 +50,7 @@ interface ApprovalDetail {
     step_name: string;
     approver_type: string;
   };
+  status_summary?: WorkflowStatusSummary;
 }
 
 interface DiscussionComment {
@@ -363,6 +365,7 @@ export default function ApprovalDetailPage() {
 
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-6 py-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <main className="min-w-0 space-y-5">
+          <WorkflowStatusPanel summary={approval.status_summary} />
           <section className="rounded-2xl border bg-white p-5 shadow-sm">
             <div className="grid gap-4 md:grid-cols-3">
               <div className="md:col-span-2">

@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { WorkflowStatusPanel } from '@/components/workflow/WorkflowStatusPanel';
 import { toast } from 'sonner';
 
 type SharePermissionRecord = {
@@ -495,6 +496,10 @@ export default function DocumentFlowPage() {
           </div>
             </div>
         </div>
+      </div>
+
+      <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
+        <WorkflowStatusPanel summary={flowData.status_summary} />
       </div>
 
       {/* Main Content */}

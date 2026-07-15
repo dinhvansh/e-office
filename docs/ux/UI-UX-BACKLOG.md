@@ -68,6 +68,8 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 
 ### UX-007 — Make status tracking answer “what happens next?”
 
+- **Status:** Fixed — browser verified 2026-07-15.
+
 - **Screen/flow:** Sign-request/document detail, approval and task pages.
 - **Problem:** State badges exist, including `artifact_failed`, but the user does not consistently receive the current owner, required next action, deadline or expected artifact completion context.
 - **Severity:** Medium.
@@ -75,6 +77,8 @@ Source: [UI-UX-AUDIT.md](UI-UX-AUDIT.md), 2026-07-14. Evidence labels: **E1** so
 - **Evidence:** E1: `frontend/app/(dashboard)/sign-requests/[id]/page.tsx` maps status and exposes artifact retry; E3 workflow replay unavailable.
 - **Recommended fix:** Add a status timeline and contextual action panel driven by stable status/next-action API fields.
 - **Acceptance criteria:** Every state has plain-language label, actor/owner, next action and deadline/ETA when applicable; artifact failure explains retry eligibility; no raw internal enum is shown.
+
+- **Verification:** Chromium replay covered authorized artifact retry, an expired request without retry exposure, and 1280px/768px/375px layouts. Evidence is stored in `docs/ux/evidence/ux007-*.png`.
 
 ### UX-008 — Complete and verify the notification destination
 
