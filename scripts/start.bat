@@ -38,7 +38,7 @@ echo.
 echo Frontend:  http://localhost:3000
 echo Backend:   http://localhost:4000
 echo.
-echo Login: admin@acme.local / password123
+echo Login password: set DEMO_ADMIN_PASSWORD before running the seed
 echo.
 echo Opening browser in 5 seconds...
 timeout /t 5 /nobreak >nul

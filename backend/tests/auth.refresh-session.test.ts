@@ -36,19 +36,23 @@ afterEach(() => {
 
 test("refresh persists a replacement session and rejects reuse of the rotated token", async () => {
   const oldToken = makeToken("old-session");
-  const sessions = new Map<string, { id: string; user_id: number; tenant_id: number; token_hash: string; expires_at: Date; revoked_at: Date | null; replaced_by_id: string | null }>([
-    ["old-session", { id: "old-session", user_id: 41, tenant_id: 9, token_hash: tokenHash(oldToken), expires_at: new Date(Date.now() + 60_000), revoked_at: null, replaced_by_id: null }],
+  const sessions = new Map<string, { id: string; family_id: string; user_id: number; tenant_id: number; token_hash: string; expires_at: Date; revoked_at: Date | null; replaced_by_id: string | null }>([
+    ["old-session", { id: "old-session", family_id: "family-1", user_id: 41, tenant_id: 9, token_hash: tokenHash(oldToken), expires_at: new Date(Date.now() + 60_000), revoked_at: null, replaced_by_id: null }],
   ]);
   (prisma.refresh_sessions as unknown as { findUnique: unknown }).findUnique = async ({ where }: { where: { id: string } }) => sessions.get(where.id) ?? null;
-  (prisma.refresh_sessions as unknown as { create: unknown }).create = async ({ data }: { data: { id: string; user_id: number; tenant_id: number; token_hash: string; expires_at: Date } }) => {
+  (prisma.refresh_sessions as unknown as { create: unknown }).create = async ({ data }: { data: { id: string; family_id: string; user_id: number; tenant_id: number; token_hash: string; expires_at: Date } }) => {
     sessions.set(data.id, { ...data, revoked_at: null, replaced_by_id: null });
   };
-  (prisma.refresh_sessions as unknown as { updateMany: unknown }).updateMany = async ({ where, data }: { where: { id: string; revoked_at?: null }; data: { revoked_at: Date; replaced_by_id?: string } }) => {
-    const session = sessions.get(where.id);
-    if (!session || (where.revoked_at === null && session.revoked_at)) return { count: 0 };
-    session.revoked_at = data.revoked_at;
-    session.replaced_by_id = data.replaced_by_id ?? null;
-    return { count: 1 };
+  (prisma.refresh_sessions as unknown as { updateMany: unknown }).updateMany = async ({ where, data }: { where: { id?: string; family_id?: string; revoked_at?: null }; data: { revoked_at: Date; replaced_by_id?: string } }) => {
+    const matching = [...sessions.values()].filter((session) =>
+      (!where.id || session.id === where.id) && (!where.family_id || session.family_id === where.family_id) &&
+      (where.revoked_at !== null || !session.revoked_at),
+    );
+    for (const session of matching) {
+      session.revoked_at = data.revoked_at;
+      session.replaced_by_id = data.replaced_by_id ?? null;
+    }
+    return { count: matching.length };
   };
   const service = new AuthService({ findByEmail: async () => activeUser, findById: async () => activeUser });
 
@@ -59,10 +63,12 @@ test("refresh persists a replacement session and rejects reuse of the rotated to
   assert.equal(sessions.get("old-session")?.revoked_at instanceof Date, true);
   assert.equal(sessions.get("old-session")?.replaced_by_id, replacementId.jti);
   assert.equal(sessions.get(replacementId.jti)?.token_hash, tokenHash(replacement));
+  assert.equal(sessions.get(replacementId.jti)?.family_id, "family-1");
 
   await assert.rejects(service.refresh(oldToken), (error: unknown) =>
     error instanceof ApiError && error.code === "INVALID_REFRESH_TOKEN",
   );
+  assert.equal(sessions.get(replacementId.jti)?.revoked_at instanceof Date, true);
 });
 
 test("logout revokes the current persisted refresh session", async () => {

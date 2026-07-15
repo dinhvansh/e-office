@@ -457,10 +457,6 @@ export default function WorkflowsPage() {
     paused: Array.isArray(workflows) ? workflows.filter((w) => !w.is_active).length : 0,
   };
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [statusFilter, searchQuery, itemsPerPage]);
-
   const totalItems = filteredWorkflows.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -492,7 +488,7 @@ export default function WorkflowsPage() {
           <Input
             placeholder="Tìm theo tên quy trình..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             className="pl-10"
           />
         </div>
@@ -502,7 +498,7 @@ export default function WorkflowsPage() {
           <Button
             size="sm"
             variant={statusFilter === 'all' ? 'default' : 'outline'}
-            onClick={() => setStatusFilter('all')}
+            onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
             className={statusFilter === 'all' ? 'bg-blue-500 text-white hover:bg-blue-600' : 'hover:bg-gray-100'}
           >
             Tất cả
@@ -511,7 +507,7 @@ export default function WorkflowsPage() {
           <Button
             size="sm"
             variant={statusFilter === 'active' ? 'default' : 'outline'}
-            onClick={() => setStatusFilter('active')}
+            onClick={() => { setStatusFilter('active'); setCurrentPage(1); }}
             className={statusFilter === 'active' ? 'bg-blue-500 text-white hover:bg-blue-600' : 'hover:bg-gray-100'}
           >
             Đang hoạt động
@@ -520,7 +516,7 @@ export default function WorkflowsPage() {
           <Button
             size="sm"
             variant={statusFilter === 'paused' ? 'default' : 'outline'}
-            onClick={() => setStatusFilter('paused')}
+            onClick={() => { setStatusFilter('paused'); setCurrentPage(1); }}
             className={statusFilter === 'paused' ? 'bg-blue-500 text-white hover:bg-blue-600' : 'hover:bg-gray-100'}
           >
             Tạm dừng
@@ -733,7 +729,7 @@ export default function WorkflowsPage() {
                   <span>Mỗi trang</span>
                   <select
                     value={itemsPerPage}
-                    onChange={(event) => setItemsPerPage(Number(event.target.value))}
+                    onChange={(event) => { setItemsPerPage(Number(event.target.value)); setCurrentPage(1); }}
                     className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700"
                   >
                     {[10, 20, 30, 50].map((size) => (

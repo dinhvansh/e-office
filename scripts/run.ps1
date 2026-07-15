@@ -100,7 +100,7 @@ Write-Host "Backend:   http://localhost:4000"
 Write-Host ""
 Write-Host "Login:"
 Write-Host "  Email:    admin@acme.local"
-Write-Host "  Password: password123"
+Write-Host "  Password: set DEMO_ADMIN_PASSWORD before running the seed"
 Write-Host ""
 
 Write-Host "Opening browser..."

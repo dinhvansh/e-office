@@ -1,5 +1,18 @@
 # Implementation Progress
 
+## 2026-07-15 — Security cleanup (in progress)
+
+- Added refresh-token family replay revocation, webhook SSRF blocking and
+  Unicode-safe watermark rendering. Next 16/React 19 migration now passes
+  frontend lint, typecheck and webpack production build. Backend tests (101),
+  lint, build, Docker E2E and MinIO/S3 E2E all pass. Playwright remains
+  unverified because this sandbox denies local port binding (`EACCES`). See
+  `FINAL-SECURITY-REVIEW.md`.
+- Credential cleanup parameterized all active/manual account and seed scripts
+  through `DEMO_ADMIN_PASSWORD`. The final scan has no weak credential usable
+  by runtime, CI, dev seeds or manual admin commands; residual literals are
+  test/debug fixtures, docs, or weak-secret deny-lists.
+
 ## 2026-07-15 — Outbox Phase 2 delivery foundation
 
 - Email templates and webhook delivery now run through the existing outbox

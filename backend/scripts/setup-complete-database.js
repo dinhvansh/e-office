@@ -47,7 +47,7 @@ console.log('='.repeat(60));
 if (failCount === 0) {
   console.log('\n🎉 Database setup complete!');
   console.log('\n📋 What was created:');
-  console.log('   - 1 Admin user (admin@acme.local / password123)');
+  console.log('   - 1 Admin user (password supplied through DEMO_ADMIN_PASSWORD)');
   console.log('   - 4 Roles (Admin, Manager, User, Viewer)');
   console.log('   - 39 Permissions');
   console.log('   - 3 Departments');
@@ -57,7 +57,7 @@ if (failCount === 0) {
   console.log('   - 8 Document Types');
   console.log('\n🔐 Login with:');
   console.log('   Email: admin@acme.local');
-  console.log('   Password: password123');
+  console.log('   Password: supplied through DEMO_ADMIN_PASSWORD');
 } else {
   console.log('\n⚠️  Some scripts failed. Check errors above.');
   console.log('   You may need to run failed scripts manually.');

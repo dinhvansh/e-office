@@ -2,6 +2,7 @@ import { request } from "undici";
 import crypto from "crypto";
 import { webhooksRepository } from "./webhooks.repository";
 import { DeliveryError } from "../outbox/deliveryError";
+import { assertSafeWebhookUrl } from "./webhookUrlSafety";
 
 class WebhookService {
   async emit(tenantId: number, event: string, payload: unknown): Promise<void> {
@@ -19,6 +20,7 @@ class WebhookService {
         let error: string | undefined;
 
         try {
+          await assertSafeWebhookUrl(webhook.url);
           const body = JSON.stringify({
             event,
             payload,
@@ -30,6 +32,7 @@ class WebhookService {
 
           const res = await request(webhook.url, {
             method: "POST",
+            maxRedirections: 0,
             body,
             headers: {
               "Content-Type": "application/json",

@@ -110,21 +110,20 @@ export default function SignRequestEditorPage() {
 
   useEffect(() => {
     if (!editorData) return;
-    setFields(editorData.fields || []);
+    void Promise.resolve().then(() => {
+      setFields(editorData.fields || []);
 
-    const validSignerIds = new Set(
-      participants
-        .filter((participant) => participant.kind === 'signer' && participant.signer_id)
-        .map((participant) => participant.signer_id as number)
-    );
+      const validSignerIds = new Set(
+        participants
+          .filter((participant) => participant.kind === 'signer' && participant.signer_id)
+          .map((participant) => participant.signer_id as number)
+      );
 
-    setSelectedSigner((current) => {
-      if (current && validSignerIds.has(current)) {
-        return current;
-      }
-
-      const firstSignerParticipant = participants.find((participant) => participant.kind === 'signer' && participant.signer_id);
-      return firstSignerParticipant?.signer_id || null;
+      setSelectedSigner((current) => {
+        if (current && validSignerIds.has(current)) return current;
+        const firstSignerParticipant = participants.find((participant) => participant.kind === 'signer' && participant.signer_id);
+        return firstSignerParticipant?.signer_id || null;
+      });
     });
   }, [editorData, participants, signRequestId]);
 

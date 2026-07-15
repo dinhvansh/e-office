@@ -43,9 +43,6 @@ Write-Host ""
 Write-Host "All seeds completed successfully!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Test credentials:" -ForegroundColor Yellow
-Write-Host "   CEO: ceo@acme.local / password123"
-Write-Host "   HR Director: dir.hr@acme.local / password123"
-Write-Host "   IT Director: dir.it@acme.local / password123"
-Write-Host "   Admin: admin@acme.local / password123"
+Write-Host "   Passwords are supplied through DEMO_ADMIN_PASSWORD"
 Write-Host ""
 Write-Host "Login at: http://localhost:3000/login" -ForegroundColor Cyan

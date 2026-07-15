@@ -27,22 +27,12 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  // Password strength indicators
-  const [passwordStrength, setPasswordStrength] = useState({
-    length: false,
-    uppercase: false,
-    lowercase: false,
-    number: false
-  });
-
-  useEffect(() => {
-    setPasswordStrength({
-      length: formData.password.length >= 8,
-      uppercase: /[A-Z]/.test(formData.password),
-      lowercase: /[a-z]/.test(formData.password),
-      number: /\d/.test(formData.password)
-    });
-  }, [formData.password]);
+  const passwordStrength = {
+    length: formData.password.length >= 8,
+    uppercase: /[A-Z]/.test(formData.password),
+    lowercase: /[a-z]/.test(formData.password),
+    number: /\d/.test(formData.password),
+  };
 
   useEffect(() => {
     window.sessionStorage.setItem(REGISTER_DRAFT_KEY, JSON.stringify(formData));

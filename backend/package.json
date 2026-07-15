@@ -17,11 +17,11 @@
     "test:auth-matrix": "node scripts/test-authorization-matrix.js"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1086.0",
+    "@aws-sdk/client-s3": "^3.1087.0",
     "@prisma/client": "^5.22.0",
     "@types/bcrypt": "^6.0.0",
     "@types/nodemailer": "^7.0.4",
-    "axios": "^1.13.2",
+    "axios": "^1.18.1",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -37,11 +37,11 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "node-fetch": "^2.7.0",
-    "nodemailer": "^7.0.10",
+    "nodemailer": "^9.0.3",
     "pdf-lib": "^1.17.1",
     "pg": "^8.11.0",
     "undici": "^6.19.8",
-    "uuid": "^9.0.1",
+    "uuid": "^11.1.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {

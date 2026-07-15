@@ -49,11 +49,8 @@ export default function PDFSigningViewer({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const signaturePadRef = useRef<any>(null);
   const [activeFieldId, setActiveFieldId] = useState<number | null>(null);
-  const [fieldValues, setFieldValues] = useState<Record<number, string>>(existingFieldValues);
-
-  useEffect(() => {
-    setFieldValues(existingFieldValues);
-  }, [existingFieldValues]);
+  const [newFieldValues, setNewFieldValues] = useState<Record<number, string>>({});
+  const fieldValues = { ...existingFieldValues, ...newFieldValues };
 
   useEffect(() => {
     if (!canvasRef.current || !activeFieldId) return;
@@ -176,7 +173,7 @@ export default function PDFSigningViewer({
                                 event.stopPropagation();
                                 if (!signaturePadRef.current || signaturePadRef.current.isEmpty()) return;
                                 const signature = signaturePadRef.current.toDataURL();
-                                setFieldValues((prev) => ({ ...prev, [field.id]: signature }));
+                                setNewFieldValues((prev) => ({ ...prev, [field.id]: signature }));
                                 setActiveFieldId(null);
                                 onFieldComplete?.(field.id, signature);
                               }}
@@ -198,7 +195,7 @@ export default function PDFSigningViewer({
                               className="mb-3 w-full rounded-lg border-2 border-blue-400 bg-white px-4 py-3 text-lg"
                               onChange={(event) => {
                                 const dateValue = new Date(event.target.value).toLocaleDateString('vi-VN');
-                                setFieldValues((prev) => ({ ...prev, [field.id]: dateValue }));
+                                setNewFieldValues((prev) => ({ ...prev, [field.id]: dateValue }));
                               }}
                             />
                           ) : (
@@ -209,7 +206,7 @@ export default function PDFSigningViewer({
                               defaultValue={fieldValues[field.id] || existingFieldValues?.[field.id] || ''}
                               className="mb-3 w-full rounded-lg border-2 border-blue-400 bg-white px-4 py-3 text-lg"
                               onChange={(event) => {
-                                setFieldValues((prev) => ({ ...prev, [field.id]: event.target.value }));
+                                setNewFieldValues((prev) => ({ ...prev, [field.id]: event.target.value }));
                               }}
                             />
                           )}
@@ -229,7 +226,7 @@ export default function PDFSigningViewer({
                                   return;
                                 }
 
-                                setFieldValues((prev) => ({ ...prev, [field.id]: value }));
+                                setNewFieldValues((prev) => ({ ...prev, [field.id]: value }));
                                 setActiveFieldId(null);
                                 onFieldComplete?.(field.id, value);
                               }}
@@ -267,7 +264,7 @@ export default function PDFSigningViewer({
       onClose={() => setActiveFieldId(null)}
       onConfirm={(signature) => {
         if (!activeSignatureField) return;
-        setFieldValues((prev) => ({ ...prev, [activeSignatureField.id]: signature }));
+        setNewFieldValues((prev) => ({ ...prev, [activeSignatureField.id]: signature }));
         setActiveFieldId(null);
         onFieldComplete?.(activeSignatureField.id, signature);
       }}

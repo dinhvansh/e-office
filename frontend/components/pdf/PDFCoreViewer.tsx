@@ -92,9 +92,11 @@ export default function PDFCoreViewer({
 
   useEffect(() => {
     if (!pdfUrl) {
-      setPdfDoc(null);
-      setTotalPages(0);
-      setCurrentPage(1);
+      void Promise.resolve().then(() => {
+        setPdfDoc(null);
+        setTotalPages(0);
+        setCurrentPage(1);
+      });
       return;
     }
 

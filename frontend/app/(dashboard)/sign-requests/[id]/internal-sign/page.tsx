@@ -158,10 +158,10 @@ export default function InternalSigningPage() {
     } finally {
       setLoading(false);
     }
-  }, [data, fetchJson, pdfUrl, router, signRequestId, tokens?.accessToken, user?.id]);
+  }, [data, fetchJson, pdfUrl, router, signRequestId, tokens, user]);
 
   useEffect(() => {
-    fetchSigningData();
+    void Promise.resolve().then(() => fetchSigningData());
 
     const interval = setInterval(() => {
       if (data?.sign_request?.status === 'in_progress') {

@@ -616,6 +616,7 @@ model tenant_settings {
 
 model refresh_sessions {
   id              String   @id
+  family_id       String?
   user_id         Int
   tenant_id       Int
   token_hash      String   @unique
@@ -626,6 +627,7 @@ model refresh_sessions {
   user            users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id, revoked_at])
+  @@index([family_id, revoked_at])
   @@index([tenant_id, expires_at])
 }
 

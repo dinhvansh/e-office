@@ -22,14 +22,16 @@ async function setupITUserAndReassign() {
 
     // 2. Set password for IT user
     console.log('🔑 Setting password for IT user...');
-    const hashedPassword = await bcrypt.hash('password123', 10);
+    const password = process.env.DEMO_ADMIN_PASSWORD;
+    if (!password) throw new Error('DEMO_ADMIN_PASSWORD is required');
+    const hashedPassword = await bcrypt.hash(password, 10);
     
     await prisma.users.update({
       where: { id: itUser.id },
       data: { password_hash: hashedPassword }
     });
     
-    console.log('✅ Password set: password123');
+    console.log('✅ Password set from DEMO_ADMIN_PASSWORD');
     console.log('');
 
     // 3. Get admin user
@@ -76,7 +78,7 @@ async function setupITUserAndReassign() {
     console.log('');
     console.log('✅ IT User Login:');
     console.log('   Email: dir.it@acme.local');
-    console.log('   Password: password123');
+    console.log('   Password: supplied through DEMO_ADMIN_PASSWORD');
     console.log('');
     console.log('✅ Admin can now see approval 22 in "Phê duyệt của tôi"');
     console.log('   Document ID: 92');

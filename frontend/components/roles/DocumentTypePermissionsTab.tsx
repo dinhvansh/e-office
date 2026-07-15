@@ -79,7 +79,7 @@ type FetchJson = <T = any>(url: string, options?: RequestInit) => Promise<T>;
 export function DocumentTypePermissionsTab({ fetchJson }: { fetchJson: FetchJson }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
-  const [selectedDocumentTypeId, setSelectedDocumentTypeId] = useState<number | null>(null);
+  const [requestedDocumentTypeId, setSelectedDocumentTypeId] = useState<number | null>(null);
   const [policy, setPolicy] = useState<DocumentTypePolicy | null>(null);
   const [entries, setEntries] = useState<PermissionEntry[]>([]);
   const [form, setForm] = useState<PermissionForm>(blankForm());
@@ -123,30 +123,17 @@ export function DocumentTypePermissionsTab({ fetchJson }: { fetchJson: FetchJson
     );
   }, [documentTypes, search]);
 
-  useEffect(() => {
-    if (!filteredDocumentTypes.length) {
-      setSelectedDocumentTypeId(null);
-      return;
-    }
-
-    setSelectedDocumentTypeId((current) =>
-      current && filteredDocumentTypes.some((item) => item.id === current) ? current : filteredDocumentTypes[0].id
-    );
-  }, [filteredDocumentTypes]);
+  const selectedDocumentTypeId = filteredDocumentTypes.some((item) => item.id === requestedDocumentTypeId)
+    ? requestedDocumentTypeId
+    : filteredDocumentTypes[0]?.id ?? null;
 
   useEffect(() => {
-    if (!selectedDocumentTypeId) {
-      setPolicy(null);
-      setEntries([]);
-      setForm(blankForm());
-      setEditingId(null);
-      return;
-    }
+    if (!selectedDocumentTypeId) return;
 
     let cancelled = false;
-    setIsLoadingPolicy(true);
-
-    fetchJson<DocumentTypePolicy>(`/settings/document-type-policy/${selectedDocumentTypeId}`)
+    void Promise.resolve().then(() => {
+      setIsLoadingPolicy(true);
+      return fetchJson<DocumentTypePolicy>(`/settings/document-type-policy/${selectedDocumentTypeId}`)
       .then((nextPolicy) => {
         if (cancelled) return;
         setPolicy(nextPolicy);
@@ -182,9 +169,10 @@ export function DocumentTypePermissionsTab({ fetchJson }: { fetchJson: FetchJson
         setForm(blankForm());
         setEditingId(null);
       })
-      .finally(() => {
-        if (!cancelled) setIsLoadingPolicy(false);
-      });
+        .finally(() => {
+          if (!cancelled) setIsLoadingPolicy(false);
+        });
+    });
 
     return () => {
       cancelled = true;

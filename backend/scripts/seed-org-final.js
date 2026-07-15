@@ -19,7 +19,9 @@ async function main() {
 
   console.log(`Using tenant: ${tenant.name}\n`);
 
-  const hashedPassword = await bcrypt.hash('password123', 10);
+  const password = process.env.DEMO_ADMIN_PASSWORD;
+  if (!password) throw new Error('DEMO_ADMIN_PASSWORD is required');
+  const hashedPassword = await bcrypt.hash(password, 10);
 
   // Positions
   console.log('Creating positions...');
@@ -327,7 +329,7 @@ async function main() {
   console.log('  - Level 3: HR, IT, Sales, Tech (6)');
   console.log('Users: 9 (with hierarchy)');
   console.log('===================\n');
-  console.log('Test accounts (password: password123):');
+  console.log('Test accounts (password supplied through DEMO_ADMIN_PASSWORD):');
   console.log('  ceo@acme.local (CEO, Admin)');
   console.log('  dir.hr@acme.local (Director HR, Manager)');
   console.log('  dir.it@acme.local (Director IT, Manager)');

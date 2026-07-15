@@ -188,7 +188,7 @@ Write-Host "  License:   http://localhost:3001"
 Write-Host ""
 Write-Host "Login Credentials:"
 Write-Host "  Email:    admin@acme.local"
-Write-Host "  Password: password123"
+Write-Host "  Password: set DEMO_ADMIN_PASSWORD before running the seed"
 Write-Host ""
 Write-Host "Opening browser in 3 seconds..."
 Start-Sleep -Seconds 3

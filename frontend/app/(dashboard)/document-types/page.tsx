@@ -111,6 +111,7 @@ const aclPermissionOptions: Array<{ value: AclPermission; label: string }> = [
   { value: 'SHARE', label: 'Chia sẻ' },
   { value: 'DELETE', label: 'Xóa' },
 ];
+const aclPermissionValues = new Set<AclPermission>(aclPermissionOptions.map((option) => option.value));
 
 const aclScopeOptions: Array<{ value: AclScope; label: string }> = [
   { value: 'OWN', label: 'Của mình' },
@@ -193,6 +194,11 @@ export default function DocumentTypesPage() {
     setDefaultWorkflowId(type?.default_workflow_id || null);
     setAllowWorkflowOverride(type?.allow_workflow_override || false);
     setShowNumberingPattern(type?.require_numbering ?? true);
+    setDefaultVisibilityScope('department');
+    setDefaultSecurityLevel('normal');
+    setAutoAssignCreatorDepartment(true);
+    setForcePrivateOnCreate(false);
+    setIsPolicyLoading(Boolean(type?.id));
     resetAclTemplateForm();
     setAclTemplates([]);
     resetAdvancedPolicyForm();
@@ -242,21 +248,9 @@ export default function DocumentTypesPage() {
   useEffect(() => {
     if (!showCreateModal) return;
 
-    if (!editingType?.id) {
-      setDefaultVisibilityScope('department');
-      setDefaultSecurityLevel('normal');
-      setAutoAssignCreatorDepartment(true);
-      setForcePrivateOnCreate(false);
-      resetAclTemplateForm();
-      setAclTemplates([]);
-      resetAdvancedPolicyForm();
-      setAdvancedPolicies([]);
-      setIsPolicyLoading(false);
-      return;
-    }
+    if (!editingType?.id) return;
 
     let cancelled = false;
-    setIsPolicyLoading(true);
 
     fetchJson<DocumentTypePolicy>(`/settings/document-type-policy/${editingType.id}`)
       .then((policy) => {
@@ -272,7 +266,9 @@ export default function DocumentTypesPage() {
             subject_id: template.subject_id ? String(template.subject_id) : '',
             scope_department_id: template.scope_department_id ? String(template.scope_department_id) : '',
             scope: template.scope || 'ASSIGNED_ONLY',
-            permissions: template.permissions || [],
+            permissions: (template.permissions || []).filter(
+              (permission): permission is AclPermission => aclPermissionValues.has(permission as AclPermission),
+            ),
             status_limit: template.status_limit || [],
             is_active: template.is_active !== false,
           }))

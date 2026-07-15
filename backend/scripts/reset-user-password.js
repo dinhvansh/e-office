@@ -5,10 +5,10 @@ const prisma = new PrismaClient();
 
 async function resetPassword() {
   const email = process.argv[2];
-  const newPassword = process.argv[3] || 'admin123';
+  const newPassword = process.argv[3];
 
-  if (!email) {
-    console.log('Usage: node reset-user-password.js <email> [password]');
+  if (!email || !newPassword || newPassword.length < 16) {
+    console.log('Usage: node reset-user-password.js <email> <password-at-least-16-characters>');
     process.exit(1);
   }
 

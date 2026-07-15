@@ -48,8 +48,6 @@ export default function DocumentsPage() {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<number | null>(null);
   const [confidentialLevel, setConfidentialLevel] = useState("normal");
   const [visibilityScope, setVisibilityScope] = useState("public");
-  const [workflowMode, setWorkflowMode] = useState<'no_approval' | 'strict' | 'flexible' | 'adhoc' | null>(null);
-  const [selectedDocType, setSelectedDocType] = useState<DocumentType | null>(null);
   const [customizedSteps, setCustomizedSteps] = useState<any[] | null>(null);
   const [adhocSteps, setAdhocSteps] = useState<any[] | null>(null);
   
@@ -153,31 +151,16 @@ export default function DocumentsPage() {
   );
   const activeWorkflows = Array.isArray(workflowsData) ? workflowsData.filter((wf) => wf.is_active) : [];
 
-  // Detect workflow mode when document type changes
-  useEffect(() => {
-    if (selectedDocumentTypeId) {
-      const docType = activeDocumentTypes.find((t) => t.id === selectedDocumentTypeId);
-      setSelectedDocType(docType || null);
-      
-      if (!docType) {
-        setWorkflowMode(null);
-        return;
-      }
-
-      if (!docType.require_approval) {
-        setWorkflowMode('no_approval');
-      } else if (!docType.default_workflow_id) {
-        setWorkflowMode('adhoc');
-      } else if (!docType.allow_workflow_override) {
-        setWorkflowMode('strict');
-      } else {
-        setWorkflowMode('flexible');
-      }
-    } else {
-      setWorkflowMode(null);
-      setSelectedDocType(null);
-    }
-  }, [selectedDocumentTypeId, activeDocumentTypes]);
+  const selectedDocType = activeDocumentTypes.find((type) => type.id === selectedDocumentTypeId) || null;
+  const workflowMode = !selectedDocType
+    ? null
+    : !selectedDocType.require_approval
+      ? 'no_approval'
+      : !selectedDocType.default_workflow_id
+        ? 'adhoc'
+        : !selectedDocType.allow_workflow_override
+          ? 'strict'
+          : 'flexible';
 
   // Map document types to options with icons
   const getDocumentTypeIcon = (code: string) => {

@@ -20,7 +20,9 @@ async function main() {
 
   console.log(`Using tenant: ${tenant.name}\n`);
 
-  const hashedPassword = await bcrypt.hash('password123', 10);
+  const password = process.env.DEMO_ADMIN_PASSWORD;
+  if (!password) throw new Error('DEMO_ADMIN_PASSWORD is required');
+  const hashedPassword = await bcrypt.hash(password, 10);
 
   // Get or create positions
   console.log('Creating positions...');
@@ -223,11 +225,7 @@ async function main() {
   console.log('Users: 5');
   console.log('===================\n');
   console.log('Test accounts:');
-  console.log('  ceo@acme.local / password123');
-  console.log('  dir.hr@acme.local / password123');
-  console.log('  dir.it@acme.local / password123');
-  console.log('  staff.hr@acme.local / password123');
-  console.log('  staff.it@acme.local / password123');
+  console.log('  Passwords are supplied through DEMO_ADMIN_PASSWORD');
   console.log('\nLogin: http://localhost:3000/login');
 }
 

@@ -71,7 +71,7 @@ export function ManageSignersDialog({
   const [localSigners, setLocalSigners] = useState<Signer[]>(signers);
 
   React.useEffect(() => {
-    setLocalSigners(signers);
+    void Promise.resolve().then(() => setLocalSigners(signers));
   }, [signers]);
 
   const { data: directoryUsers = [], isLoading: isLoadingUsers } = useQuery<DirectoryUser[]>({

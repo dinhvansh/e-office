@@ -8,7 +8,8 @@ async function resetPassword() {
     console.log('🔄 Resetting admin password...\n');
 
     const email = 'admin@acme.local';
-    const newPassword = 'password123';
+    const newPassword = process.env.DEMO_ADMIN_PASSWORD;
+    if (!newPassword) throw new Error('DEMO_ADMIN_PASSWORD is required');
 
     // Hash password
     const hashedPassword = await bcrypt.hash(newPassword, 10);

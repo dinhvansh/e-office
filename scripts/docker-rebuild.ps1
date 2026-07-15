@@ -72,5 +72,5 @@ Write-Host "   Backend:  http://36.50.27.139:4000" -ForegroundColor White
 Write-Host ""
 Write-Host "👤 Default login:" -ForegroundColor Cyan
 Write-Host "   Email:    admin@acme.local" -ForegroundColor White
-Write-Host "   Password: admin123" -ForegroundColor White
+Write-Host "   Password: set DEMO_ADMIN_PASSWORD before running the seed" -ForegroundColor White
 Write-Host ""

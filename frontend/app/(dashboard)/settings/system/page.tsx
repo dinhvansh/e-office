@@ -158,10 +158,6 @@ export default function SystemSettingsPage() {
   const [testEmail, setTestEmail] = useState("");
   const [watermarkPreviewMode, setWatermarkPreviewMode] = useState<WatermarkStatusKey>("draft");
 
-  useEffect(() => {
-    void loadSettings();
-  }, []);
-
   const previewFontFamily = useMemo(() => {
     return watermarkFontOptions.find((option) => option.value === watermarkConfig.font_family)?.preview
       || "Helvetica, Arial, sans-serif";
@@ -191,6 +187,10 @@ export default function SystemSettingsPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    void Promise.resolve().then(loadSettings);
+  }, []);
 
   async function handleSaveEmail() {
     try {

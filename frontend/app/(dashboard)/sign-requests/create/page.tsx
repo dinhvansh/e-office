@@ -178,6 +178,7 @@ export default function CreateSignRequestPage() {
   );
 
   useEffect(() => {
+    void Promise.resolve().then(() => {
     if (!documentTypeId) {
       setSelectedDocType(null);
       setSelectedWorkflowId(null);
@@ -215,13 +216,15 @@ export default function CreateSignRequestPage() {
     }
 
     setSelectedWorkflowId(null);
-    setWorkflowMode('adhoc');
+      setWorkflowMode('adhoc');
+    });
   }, [documentTypeId, activeDocumentTypes]);
 
   useEffect(() => {
     if (!isEditMode || !existingSignRequestData?.sign_request) return;
 
     const signRequest = existingSignRequestData.sign_request;
+    void Promise.resolve().then(() => {
     setDocumentTypeId(signRequest.document?.document_type_id || null);
 
     const externalSigners: Signer[] = (signRequest.signers || [])
@@ -240,11 +243,13 @@ export default function CreateSignRequestPage() {
       }));
 
     setSigners(externalSigners);
+    });
   }, [existingSignRequestData, isEditMode]);
 
   useEffect(() => {
     if (!isEditMode || !existingDocumentData?.document) return;
-    setCcEmails(existingDocumentData.document.cc_emails || []);
+    const ccEmails = existingDocumentData.document.cc_emails || [];
+    void Promise.resolve().then(() => setCcEmails(ccEmails));
   }, [existingDocumentData, isEditMode]);
 
   useEffect(() => {
@@ -262,8 +267,10 @@ export default function CreateSignRequestPage() {
 
     if (!workflowSnapshotSteps?.length) return;
 
-    customizedStepsRef.current = workflowSnapshotSteps;
-    setCustomizedSteps(workflowSnapshotSteps);
+    void Promise.resolve().then(() => {
+      customizedStepsRef.current = workflowSnapshotSteps;
+      setCustomizedSteps(workflowSnapshotSteps);
+    });
   }, [existingSignRequestData, isEditMode, selectedDocType]);
 
   const fileToBase64 = (selectedFile: File): Promise<string> =>

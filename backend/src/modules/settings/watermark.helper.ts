@@ -1,4 +1,5 @@
-import { PDFDocument, StandardFonts, degrees, rgb } from 'pdf-lib';
+import { PDFDocument, degrees, rgb } from 'pdf-lib';
+import { embedUnicodeFont } from '../../core/pdf/unicodeFont';
 import { settingsRepository } from './settings.repository';
 
 export type WatermarkFontFamily =
@@ -169,7 +170,7 @@ export async function applyWatermarkToPdfBytes(
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(pdfBytes);
   const pages = pdfDoc.getPages();
-  const font = await pdfDoc.embedFont(resolveStandardFont(config.font_family));
+  const font = await embedUnicodeFont(pdfDoc, config.font_family.endsWith('_bold'));
   const color = hexToRgb(config.color);
   const image = await embedWatermarkImage(pdfDoc, variant);
 
@@ -328,22 +329,6 @@ function resolveFontFamily(value: unknown): WatermarkFontFamily {
     : defaultWatermarkConfig.font_family;
 }
 
-function resolveStandardFont(fontFamily: WatermarkFontFamily) {
-  switch (fontFamily) {
-    case 'helvetica':
-      return StandardFonts.Helvetica;
-    case 'times_roman':
-      return StandardFonts.TimesRoman;
-    case 'times_bold':
-      return StandardFonts.TimesRomanBold;
-    case 'courier':
-      return StandardFonts.Courier;
-    case 'courier_bold':
-      return StandardFonts.CourierBold;
-    default:
-      return StandardFonts.HelveticaBold;
-  }
-}
 
 async function embedWatermarkImage(pdfDoc: PDFDocument, variant: WatermarkVariant) {
   if (!(variant.mode === 'image' || variant.mode === 'both') || !variant.image_data) {

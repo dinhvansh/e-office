@@ -98,7 +98,7 @@ Write-Host "🖥️  Backend:   http://localhost:4000" -ForegroundColor White
 Write-Host ""
 Write-Host "🔐 Login:" -ForegroundColor Yellow
 Write-Host "   Email:    admin@acme.local" -ForegroundColor White
-Write-Host "   Password: password123" -ForegroundColor White
+Write-Host "   Password: set DEMO_ADMIN_PASSWORD before running the seed" -ForegroundColor White
 Write-Host ""
 
 Write-Host "Opening browser..." -ForegroundColor Cyan

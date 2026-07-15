@@ -108,14 +108,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const stored = readStoredSession();
-    if (stored?.tokens) {
-      setTokens(stored.tokens);
-      setUser(stored.user);
-      setTenant(stored.tenant);
-      setPermissions(stored.permissions ?? []);
-    }
-    setIsLoading(false);
+    void Promise.resolve().then(() => {
+      const stored = readStoredSession();
+      if (stored?.tokens) {
+        setTokens(stored.tokens);
+        setUser(stored.user);
+        setTenant(stored.tenant);
+        setPermissions(stored.permissions ?? []);
+      }
+      setIsLoading(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -160,7 +162,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
-    fetchPermissions(tokens.accessToken);
+    void Promise.resolve().then(() => fetchPermissions(tokens.accessToken));
   }, [fetchPermissions, permissions.length, tokens?.accessToken]);
 
   const performLogin = useCallback(async (email: string, password: string) => {

@@ -82,7 +82,9 @@ async function assignRole(userId, roleId) {
 
 async function main() {
   const tenant = await getTenant();
-  const passwordHash = await bcrypt.hash('password123', 10);
+  const password = process.env.DEMO_ADMIN_PASSWORD;
+  if (!password) throw new Error('DEMO_ADMIN_PASSWORD is required');
+  const passwordHash = await bcrypt.hash(password, 10);
 
   const departments = {
     IT: await upsertDepartment(tenant.id, 'IT', 'Phong IT'),

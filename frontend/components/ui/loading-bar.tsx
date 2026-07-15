@@ -26,31 +26,18 @@ export function LoadingBar() {
   }, []);
 
   useEffect(() => {
-    // Start loading when pathname changes (fallback).
-    setLoading(true);
-    setProgress(20);
+    if (!loading) return;
 
-    // Simulate progress
-    const timer1 = setTimeout(() => setProgress(40), 100);
-    const timer2 = setTimeout(() => setProgress(60), 200);
-    const timer3 = setTimeout(() => setProgress(80), 300);
-    
-    // Complete loading
-    const timer4 = setTimeout(() => {
+    const timer = setTimeout(() => {
       setProgress(100);
       setTimeout(() => {
         setLoading(false);
         setProgress(0);
       }, 200);
-    }, 500);
+    }, 120);
 
-    return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-      clearTimeout(timer4);
-    };
-  }, [pathname]);
+    return () => clearTimeout(timer);
+  }, [pathname, loading]);
 
   if (!loading && progress === 0) return null;
 

@@ -291,7 +291,9 @@ async function main() {
   // ==================== USERS ====================
   console.log('👤 Creating users...');
 
-  const hashedPassword = await bcrypt.hash('password123', 10);
+  const password = process.env.DEMO_ADMIN_PASSWORD;
+  if (!password) throw new Error('DEMO_ADMIN_PASSWORD is required');
+  const hashedPassword = await bcrypt.hash(password, 10);
 
   // CEO
   const ceo = await prisma.users.upsert({
@@ -631,11 +633,7 @@ async function main() {
 
   console.log('🎉 Org Chart seed completed!\n');
   console.log('📝 Test credentials:');
-  console.log('   CEO: ceo@acme.local / password123');
-  console.log('   HR Director: dir.hr@acme.local / password123');
-  console.log('   IT Director: dir.it@acme.local / password123');
-  console.log('   Sales Manager HN: mgr.sales.hn@acme.local / password123');
-  console.log('   HR Staff: staff.hr1@acme.local / password123');
+  console.log('   Passwords are supplied through DEMO_ADMIN_PASSWORD');
   console.log('\n🌐 Login at: http://localhost:3000/login');
 }
 

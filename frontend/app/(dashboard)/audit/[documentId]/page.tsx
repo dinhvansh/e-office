@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { ArrowLeft, Download, Eye, FileDown, FileSearch, Paperclip, ShieldCheck } from "lucide-react";
 
@@ -58,9 +58,10 @@ const statCards = (summary?: DocumentAuditSummary) => [
   },
 ];
 
-export default function AuditPage({ params }: { params: { documentId: string } }) {
+export default function AuditPage() {
   const { fetchJson } = useAuth();
   const router = useRouter();
+  const params = useParams<{ documentId: string }>();
   const documentId = Number(params.documentId);
 
   const { data, isLoading } = useQuery({

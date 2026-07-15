@@ -8,7 +8,8 @@ async function createApproverUser() {
   try {
     const tenantId = 1;
     const email = 'approver@acme.local';
-    const password = 'password123';
+    const password = process.env.DEMO_ADMIN_PASSWORD;
+    if (!password) throw new Error('DEMO_ADMIN_PASSWORD is required');
 
     // 1. Check if user exists
     const existing = await prisma.users.findFirst({

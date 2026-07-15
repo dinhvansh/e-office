@@ -78,7 +78,7 @@ export default function PublicSigningPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [otpExpiresAt, setOtpExpiresAt] = useState<string | null>(null);
   const [resendAvailableAt, setResendAvailableAt] = useState(0);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
   const [otpFeedback, setOtpFeedback] = useState('');
   
   // Guided flow state
@@ -91,8 +91,12 @@ export default function PublicSigningPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   useEffect(() => {
+    const initialUpdate = window.setTimeout(() => setNow(Date.now()), 0);
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearTimeout(initialUpdate);
+      window.clearInterval(interval);
+    };
   }, []);
 
   const fetchSigningData = useCallback(async (): Promise<SigningData | null> => {
@@ -128,7 +132,7 @@ export default function PublicSigningPage() {
   }, [token]);
 
   useEffect(() => {
-    fetchSigningData();
+    void Promise.resolve().then(fetchSigningData);
   }, [fetchSigningData]);
 
   const handleSendOtp = async () => {

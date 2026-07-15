@@ -28,7 +28,9 @@ async function checkAdminUser() {
         return;
       }
 
-      const hashedPassword = await bcrypt.hash('admin123', 10);
+      const password = process.env.DEMO_ADMIN_PASSWORD;
+      if (!password) throw new Error('DEMO_ADMIN_PASSWORD is required');
+      const hashedPassword = await bcrypt.hash(password, 10);
       const newUser = await prisma.users.create({
         data: {
           tenant_id: tenant.id,
@@ -41,7 +43,7 @@ async function checkAdminUser() {
       });
 
       console.log('✅ Created user:', newUser.email);
-      console.log('   Password: admin123');
+      console.log('   Password: supplied through DEMO_ADMIN_PASSWORD');
       
       // Assign Admin role
       const adminRole = await prisma.roles.findFirst({
@@ -70,12 +72,14 @@ async function checkAdminUser() {
 
     // Test password
     console.log('\n🔐 Testing password...');
-    const isValid = await bcrypt.compare('admin123', user.password_hash);
-    console.log('   Password "admin123":', isValid ? '✅ Valid' : '❌ Invalid');
+    const password = process.env.DEMO_ADMIN_PASSWORD;
+    if (!password) throw new Error('DEMO_ADMIN_PASSWORD is required');
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    console.log('   DEMO_ADMIN_PASSWORD:', isValid ? '✅ Valid' : '❌ Invalid');
 
     if (!isValid) {
-      console.log('\n💡 Resetting password to "admin123"...');
-      const hashedPassword = await bcrypt.hash('admin123', 10);
+      console.log('\n💡 Resetting password from DEMO_ADMIN_PASSWORD...');
+      const hashedPassword = await bcrypt.hash(password, 10);
       await prisma.users.update({
         where: { id: user.id },
         data: { password_hash: hashedPassword },

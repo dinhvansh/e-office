@@ -136,14 +136,13 @@ export default function ApprovalDetailPage() {
   }, [fetchJson]);
 
   useEffect(() => {
-    fetchApprovalDetail();
+    void Promise.resolve().then(fetchApprovalDetail);
   }, [fetchApprovalDetail]);
 
   useEffect(() => {
     const documentId = approval?.document.id;
     if (documentId) {
-      fetchComments();
-      fetchAttachments(documentId);
+      void Promise.resolve().then(() => Promise.all([fetchComments(), fetchAttachments(documentId)]));
     }
   }, [approval?.id, approval?.document.id, approval?.document.sign_request_id, fetchAttachments, fetchComments]);
 

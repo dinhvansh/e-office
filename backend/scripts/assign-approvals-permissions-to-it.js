@@ -94,7 +94,7 @@ async function assignApprovalsPermissionsToIT() {
     console.log('   - All approval permissions');
     console.log('\nYou can now login as:');
     console.log('   Email: dir.it@acme.local');
-    console.log('   Password: password123');
+    console.log('   Password: supplied through DEMO_ADMIN_PASSWORD');
 
     await prisma.$disconnect();
 

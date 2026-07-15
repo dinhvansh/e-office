@@ -18,25 +18,20 @@ function ResetPasswordForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [verifying, setVerifying] = useState(true);
+  const [verifying, setVerifying] = useState(Boolean(token));
   const [tokenValid, setTokenValid] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  // Password strength indicators
-  const [passwordStrength, setPasswordStrength] = useState({
-    length: false,
-    uppercase: false,
-    lowercase: false,
-    number: false
-  });
+  const passwordStrength = {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /\d/.test(password),
+  };
 
   useEffect(() => {
-    if (!token) {
-      setError('Token không hợp lệ');
-      setVerifying(false);
-      return;
-    }
+    if (!token) return;
 
     // Verify token
     fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/verify-reset-token/${token}`)
@@ -54,15 +49,6 @@ function ResetPasswordForm() {
         setVerifying(false);
       });
   }, [token]);
-
-  useEffect(() => {
-    setPasswordStrength({
-      length: password.length >= 8,
-      uppercase: /[A-Z]/.test(password),
-      lowercase: /[a-z]/.test(password),
-      number: /\d/.test(password)
-    });
-  }, [password]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,7 +101,7 @@ function ResetPasswordForm() {
     );
   }
 
-  if (!tokenValid) {
+  if (!token || !tokenValid) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4">
         <div className="w-full max-w-md">
@@ -124,7 +110,7 @@ function ResetPasswordForm() {
               <XCircle className="w-8 h-8 text-red-600" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Link không hợp lệ</h1>
-            <p className="text-gray-600 mb-6">{error}</p>
+            <p className="text-gray-600 mb-6">{error || 'Token không hợp lệ'}</p>
             <Link href="/forgot-password">
               <Button className="w-full">Yêu cầu link mới</Button>
             </Link>

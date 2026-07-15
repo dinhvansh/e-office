@@ -245,7 +245,7 @@ Write-Host ""
 
 Write-Host "🔐 LOGIN CREDENTIALS:" -ForegroundColor Yellow
 Write-Host "   📧 Email:    admin@acme.local" -ForegroundColor White
-Write-Host "   🔑 Password: password123" -ForegroundColor White
+Write-Host "   🔑 Password: set DEMO_ADMIN_PASSWORD before running the seed" -ForegroundColor White
 Write-Host ""
 
 Write-Host "📚 USEFUL COMMANDS:" -ForegroundColor Yellow

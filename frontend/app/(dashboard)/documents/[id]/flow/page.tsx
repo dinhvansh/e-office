@@ -9,7 +9,7 @@ import { FlowParticipants } from '@/components/flow/FlowParticipants';
 import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, FileText, Download, RefreshCw, Share2, Trash2, History } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -54,7 +54,6 @@ export default function DocumentFlowPage() {
   const queryClient = useQueryClient();
   const documentId = params.id as string;
   const [activeTab, setActiveTab] = useState<'activities' | 'participants'>('activities');
-  const [pdfUrl, setPdfUrl] = useState<string>('');
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -67,7 +66,7 @@ export default function DocumentFlowPage() {
   });
 
   // Fetch flow data with auto-refresh to show new signatures
-  const { data: flowData, isLoading, refetch, isFetching } = useQuery<any>({
+  const { data: flowData, isLoading, refetch, isFetching, dataUpdatedAt } = useQuery<any>({
     queryKey: ['document-flow', documentId],
     queryFn: async () => {
       const response = await fetchJson(`/documents/${documentId}/flow`);
@@ -90,8 +89,7 @@ export default function DocumentFlowPage() {
     refetchOnWindowFocus: true, // Refresh when user returns to tab
   });
 
-  // Set PDF URL - use progressive/signed version if available
-  useEffect(() => {
+  const pdfUrl = useMemo(() => {
     const document = flowData?.document;
     if (typeof window !== 'undefined' && documentId && document) {
       if (!process.env.NEXT_PUBLIC_API_URL) {
@@ -106,12 +104,12 @@ export default function DocumentFlowPage() {
       
       // Add timestamp to force reload when signed_file_path changes
       // This prevents browser from showing cached old PDF
-      const timestamp = Date.now();
-      const cacheBuster = hasSignedFile ? `?t=${timestamp}` : '';
+      const cacheBuster = hasSignedFile ? `?t=${dataUpdatedAt}` : '';
       
-      setPdfUrl(`${apiUrl}/documents/${documentId}/${endpoint}${cacheBuster}`);
+      return `${apiUrl}/documents/${documentId}/${endpoint}${cacheBuster}`;
     }
-  }, [documentId, flowData]);
+    return '';
+  }, [dataUpdatedAt, documentId, flowData]);
 
   const isCompleted = (flowData?.document?.status || '').toLowerCase() === 'completed';
 

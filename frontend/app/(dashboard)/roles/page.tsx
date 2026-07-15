@@ -87,7 +87,7 @@ export default function RolesPage() {
   const [formData, setFormData] = useState({ name: '', description: '' });
   const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]);
   const [documentSearch, setDocumentSearch] = useState('');
-  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
+  const [requestedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
   const [documentPermissionForm, setDocumentPermissionForm] = useState({
     subject_type: 'user' as 'user' | 'department' | 'position_in_department',
     subject_id: '',
@@ -155,6 +155,11 @@ export default function RolesPage() {
     },
   });
 
+  const documents = useMemo(() => (documentsData ?? []) as DocumentItem[], [documentsData]);
+  const selectedDocumentId = documents.some((document) => document.id === requestedDocumentId)
+    ? requestedDocumentId
+    : documents[0]?.id ?? null;
+
   const { data: usersData } = useQuery({
     queryKey: ['document-permissions-users'],
     enabled: false,
@@ -199,7 +204,6 @@ export default function RolesPage() {
     enabled: !!viewingRoleUsers && showUsersDialog,
   });
 
-  const documents = useMemo(() => (documentsData ?? []) as DocumentItem[], [documentsData]);
   const permissionUsers = (usersData || []) as UserOption[];
   const permissionDepartments = (departmentsData || []) as DepartmentOption[];
   const permissionPositions = ((positionsData || []) as PositionOption[]).filter((position) => position.is_active !== false);
@@ -324,19 +328,6 @@ export default function RolesPage() {
     settings: 'Cài đặt',
   };
 
-  useEffect(() => {
-    if (!documents.length) {
-      setSelectedDocumentId(null);
-      return;
-    }
-
-    setSelectedDocumentId((current) => {
-      if (current && documents.some((document) => document.id === current)) {
-        return current;
-      }
-      return documents[0].id;
-    });
-  }, [documents]);
 
   const getDocumentDisplayName = (document: DocumentItem) =>
     document.title || document.original_file_name || document.document_number || `Tài liệu #${document.id}`;

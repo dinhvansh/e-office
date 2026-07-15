@@ -122,7 +122,7 @@ Write-Host "Frontend:  http://localhost:3000"
 Write-Host "Backend:   http://localhost:4000"
 Write-Host ""
 Write-Host "Login:"
-Write-Host "  admin@acme.local / password123"
+Write-Host "  admin@acme.local / password supplied through DEMO_ADMIN_PASSWORD"
 Write-Host ""
 
 Start-Sleep -Seconds 3

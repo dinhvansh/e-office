@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,12 +39,15 @@ export function DestructiveConfirmationDialog({
   const [error, setError] = useState<string | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
-    if (open) {
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
       returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setError(null);
+      onOpenChange(true);
+      return;
     }
-  }, [open]);
+    close();
+  };
 
   const close = () => {
     if (isPending) return;
@@ -68,7 +71,7 @@ export function DestructiveConfirmationDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => (nextOpen ? onOpenChange(true) : close())}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent aria-describedby="destructive-confirmation-description" className="max-w-md">
         <DialogHeader>
           <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-700">

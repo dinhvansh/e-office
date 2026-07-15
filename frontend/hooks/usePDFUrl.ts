@@ -1,16 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export function usePDFUrl(apiUrl: string, token: string | null) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(() => Boolean(token));
+  const [error, setError] = useState<string | null>(() => token ? null : 'No authentication token');
+  const blobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!token) {
-      setError('No authentication token');
-      setLoading(false);
-      return;
-    }
+    if (!token) return;
 
     let cancelled = false;
 
@@ -30,6 +27,7 @@ export function usePDFUrl(apiUrl: string, token: string | null) {
         
         if (!cancelled) {
           const url = URL.createObjectURL(blob);
+          blobUrlRef.current = url;
           setBlobUrl(url);
           setLoading(false);
         }
@@ -45,9 +43,7 @@ export function usePDFUrl(apiUrl: string, token: string | null) {
 
     return () => {
       cancelled = true;
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
     };
   }, [apiUrl, token]);
 

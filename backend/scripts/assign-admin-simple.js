@@ -17,7 +17,9 @@ async function assignAdminRole() {
       
       // Create user if not exists
       const bcrypt = require('bcrypt');
-      const hashedPassword = await bcrypt.hash('admin123', 10);
+      const password = process.env.DEMO_ADMIN_PASSWORD;
+      if (!password) throw new Error('DEMO_ADMIN_PASSWORD is required');
+      const hashedPassword = await bcrypt.hash(password, 10);
       
       const newUser = await prisma.users.create({
         data: {

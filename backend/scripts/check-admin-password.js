@@ -21,7 +21,8 @@ async function checkAdmin() {
     console.log('   Password Hash:', user.password_hash.substring(0, 20) + '...');
     
     // Test password
-    const testPassword = 'password123';
+    const testPassword = process.env.DEMO_ADMIN_PASSWORD;
+    if (!testPassword) throw new Error('DEMO_ADMIN_PASSWORD is required');
     const isMatch = await bcrypt.compare(testPassword, user.password_hash);
     
     console.log('\n🔐 Password Test:');

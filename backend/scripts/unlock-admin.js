@@ -19,7 +19,7 @@ async function unlockAdmin() {
     console.log('✅ Admin account unlocked!');
     console.log('\n📧 You can now login with:');
     console.log(`   Email: ${email}`);
-    console.log(`   Password: password123`);
+    console.log('   Password: supplied through DEMO_ADMIN_PASSWORD');
     console.log('\n🔗 Login at: http://localhost:3000');
     console.log('\n💡 Tip: Clear browser cache or use incognito mode');
 

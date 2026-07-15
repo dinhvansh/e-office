@@ -41,7 +41,9 @@ async function createSuperAdmin() {
       }
 
       // Create super admin
-      const passwordHash = await bcrypt.hash('admin123', 10);
+      const password = process.env.DEMO_ADMIN_PASSWORD;
+      if (!password) throw new Error('DEMO_ADMIN_PASSWORD is required');
+      const passwordHash = await bcrypt.hash(password, 10);
       
       const superAdmin = await prisma.users.create({
         data: {
@@ -56,7 +58,7 @@ async function createSuperAdmin() {
 
       console.log('✅ Super Admin created successfully!');
       console.log('   Email: admin@acme.local');
-      console.log('   Password: admin123');
+      console.log('   Password: supplied through DEMO_ADMIN_PASSWORD');
       console.log('   Role: super_admin');
     }
 
@@ -68,7 +70,7 @@ async function createSuperAdmin() {
     console.log('\n🔐 Login:');
     console.log('   URL: http://localhost:3000/login');
     console.log('   Email: admin@acme.local');
-    console.log('   Password: admin123');
+    console.log('   Password: supplied through DEMO_ADMIN_PASSWORD');
 
   } catch (error) {
     console.error('❌ Error:', error.message);

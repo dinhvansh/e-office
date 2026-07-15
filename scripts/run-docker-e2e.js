@@ -11,6 +11,7 @@ const composeFiles = ["docker-compose.yml", "docker-compose.test.yml"];
 if (storageMode === "s3") composeFiles.push("docker-compose.s3.test.yml");
 let temporaryDirectory;
 let envFile;
+let cleanupStarted = false;
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -28,6 +29,24 @@ function compose(...args) {
   const fileArgs = composeFiles.flatMap((file) => ["-f", file]);
   return run("docker", ["compose", "--project-name", projectName, "--env-file", envFile, ...fileArgs, ...args], options);
 }
+
+function cleanup() {
+  if (cleanupStarted) return;
+  cleanupStarted = true;
+  if (process.env.E2E_KEEP_CONTAINERS !== "1" && envFile) {
+    try { compose("down", "--volumes", "--remove-orphans"); } catch (error) { console.error(error.message); }
+  }
+  if (temporaryDirectory) fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+}
+
+function handleTermination(signal, exitCode) {
+  console.error(`[docker-e2e] Received ${signal}; cleaning up.`);
+  cleanup();
+  process.exit(exitCode);
+}
+
+process.once("SIGINT", () => handleTermination("SIGINT", 130));
+process.once("SIGTERM", () => handleTermination("SIGTERM", 143));
 
 function parseEnv(contents) {
   return Object.fromEntries(contents.split(/\r?\n/)
@@ -131,10 +150,7 @@ async function main() {
         compose("logs", "--no-color", "--tail", "250");
       } catch (error) { console.error(error.message); }
     }
-    if (process.env.E2E_KEEP_CONTAINERS !== "1" && envFile) {
-      try { compose("down", "--volumes", "--remove-orphans"); } catch (error) { console.error(error.message); }
-    }
-    if (temporaryDirectory) fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+    cleanup();
   }
 }
 

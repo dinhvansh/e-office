@@ -127,7 +127,7 @@ export function NotificationBell() {
 
   // Auto-refresh unread count every 30 seconds
   useEffect(() => {
-    fetchUnreadCount();
+    void Promise.resolve().then(fetchUnreadCount);
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, [fetchUnreadCount]);

@@ -3,12 +3,12 @@
  * 
  * Account 1: Người tạo tài liệu (Creator)
  * - Email: creator@acme.local
- * - Password: password123
+ * - Password: DEMO_ADMIN_PASSWORD (required)
  * - Role: User (có quyền tạo tài liệu)
  * 
  * Account 2: Người phê duyệt (Approver)
  * - Email: approver@acme.local
- * - Password: password123
+ * - Password: DEMO_ADMIN_PASSWORD (required)
  * - Role: Manager (có quyền phê duyệt)
  */
 
@@ -22,7 +22,9 @@ async function createApprovalTestUsers() {
     console.log('🔧 Creating 2 test accounts for approval workflow...\n');
 
     // Hash password
-    const hashedPassword = await bcrypt.hash('password123', 10);
+    const password = process.env.DEMO_ADMIN_PASSWORD;
+    if (!password) throw new Error('DEMO_ADMIN_PASSWORD is required');
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Get tenant ID (ACME Corporation)
     const tenant = await prisma.tenants.findFirst({
@@ -94,7 +96,7 @@ async function createApprovalTestUsers() {
 
     console.log('✅ Creator account created:');
     console.log(`   Email: creator@acme.local`);
-    console.log(`   Password: password123`);
+    console.log('   Password: supplied through DEMO_ADMIN_PASSWORD');
     console.log(`   Role: User`);
     console.log(`   ID: ${creator.id}\n`);
 
@@ -133,7 +135,7 @@ async function createApprovalTestUsers() {
 
     console.log('✅ Approver account created:');
     console.log(`   Email: approver@acme.local`);
-    console.log(`   Password: password123`);
+    console.log('   Password: supplied through DEMO_ADMIN_PASSWORD');
     console.log(`   Role: Manager`);
     console.log(`   ID: ${approver.id}\n`);
 

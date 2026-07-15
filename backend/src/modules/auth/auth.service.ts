@@ -83,13 +83,22 @@ export class AuthService {
     }
     const session = await prisma.refresh_sessions.findUnique({ where: { id: payload.jti } });
     if (!session || session.user_id !== user.id || session.tenant_id !== user.tenant_id ||
-      session.revoked_at || session.expires_at <= new Date() || session.token_hash !== this.tokenHash(refreshToken)) {
+      session.expires_at <= new Date() || session.token_hash !== this.tokenHash(refreshToken)) {
+      throw ApiError.unauthorized("Invalid refresh token", "INVALID_REFRESH_TOKEN");
+    }
+    if (session.revoked_at) {
+      // A valid, previously rotated token is evidence of replay. Revoke every
+      // descendant in the same family before rejecting the request.
+      await prisma.refresh_sessions.updateMany({
+        where: { family_id: session.family_id ?? session.id, user_id: user.id, tenant_id: user.tenant_id, revoked_at: null },
+        data: { revoked_at: new Date() },
+      });
       throw ApiError.unauthorized("Invalid refresh token", "INVALID_REFRESH_TOKEN");
     }
     // Get primary role from user_roles (prioritize Admin role, then first role, fallback to user.role)
     const roles = user.user_roles?.map(ur => ur.role?.name).filter(Boolean) ?? [];
     const primaryRole = roles.includes('Admin') ? 'Admin' : (roles[0] ?? user.role);
-    const response = await this.buildAuthResponse(user.id, user.tenant_id, user.email, primaryRole, user.tenant?.name ?? null, user.tenant?.plan ?? null, user.tenant?.status ?? null);
+    const response = await this.buildAuthResponse(user.id, user.tenant_id, user.email, primaryRole, user.tenant?.name ?? null, user.tenant?.plan ?? null, user.tenant?.status ?? null, session.family_id ?? session.id);
     const nextSessionId = this.verifyRefreshToken(response.tokens.refreshToken).jti!;
     try {
       const revoked = await prisma.refresh_sessions.updateMany({
@@ -167,7 +176,7 @@ export class AuthService {
     }
   }
 
-  private async issueTokens(userId: number, tenantId: number, role?: string | null): Promise<AuthTokens> {
+  private async issueTokens(userId: number, tenantId: number, role?: string | null, familyId: string = randomUUID()): Promise<AuthTokens> {
     const claims: JwtClaims = {
       sub: userId.toString(),
       tenantId,
@@ -185,6 +194,7 @@ export class AuthService {
     await prisma.refresh_sessions.create({
       data: {
         id: sessionId,
+        family_id: familyId,
         user_id: userId,
         tenant_id: tenantId,
         token_hash: this.tokenHash(refreshToken),
@@ -216,8 +226,9 @@ export class AuthService {
     tenantName: string | null,
     tenantPlan: string | null,
     tenantStatus: string | null,
+    familyId?: string,
   ): Promise<AuthResponse> {
-    const tokens = await this.issueTokens(userId, tenantId, role);
+    const tokens = await this.issueTokens(userId, tenantId, role, familyId);
     return {
       tokens,
       user: {
