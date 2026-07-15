@@ -1,5 +1,49 @@
 # FlowDocker E-Office
 
+Document Workflow, Approval & E-Signing Platform
+
+FlowDocker E-Office is a self-hosted platform for routing internal documents
+through approval and signing workflows. It combines a Next.js workspace, a
+TypeScript API, and PostgreSQL-backed auditability for organizations that need
+structured document handling without giving up control of their deployment.
+
+> **Alpha status:** this release is intended for evaluation in an isolated
+> environment. Review the limitations below before any production deployment.
+
+## Key features
+
+- Internal approval workflows and sequential or parallel internal signing.
+- External signing links protected by OTP verification.
+- Multi-tenant workspaces with RBAC, document ACLs, audit events, and scoped
+  access controls.
+- Local filesystem storage by default, with optional S3-compatible storage
+  (including MinIO).
+- Docker deployment with PostgreSQL, Redis, backend, frontend, and an optional
+  license service.
+
+## Architecture at a glance
+
+```text
+Browser → Next.js frontend → Express API → PostgreSQL / Redis
+                                 └──────→ Local storage or S3-compatible storage
+```
+
+## Docker quick start
+
+1. Copy `.env.compose.example` to `.env` and set unique secrets and URLs.
+2. Start the stack:
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+3. Open `http://localhost:3000`. The API is available at
+   `http://localhost:4000`.
+
+For a demo-only database, set `AUTO_INIT_DB=true` explicitly before starting
+the backend. It runs a destructive schema push and seed, so never use it with
+data that must be retained.
+
 ## Project governance
 
 FlowDocker E-Office is source-available fair-code software, not OSI open
@@ -73,7 +117,7 @@ Sau khi seed dữ liệu:
 Seed demo yêu cầu `DEMO_ADMIN_PASSWORD` rõ ràng (ít nhất 16 ký tự). Không có
 mật khẩu mặc định cho production; chỉ seed vào database demo/local riêng biệt.
 
-## Chạy bằng Docker
+## Docker configuration details
 
 1. Tạo file `.env` từ mẫu:
 
