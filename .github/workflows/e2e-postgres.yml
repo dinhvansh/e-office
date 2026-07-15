@@ -12,53 +12,8 @@ permissions:
 
 jobs:
   workflow-e2e:
-    name: Workflow E2E (PostgreSQL)
+    name: Workflow E2E (Docker Compose)
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: eoffice_ci
-          POSTGRES_PASSWORD: eoffice_ci_password
-          POSTGRES_DB: eoffice_e2e
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U eoffice_ci -d eoffice_e2e"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-    defaults:
-      run:
-        working-directory: backend
-    env:
-      NODE_ENV: development
-      PORT: "4000"
-      DATABASE_URL: postgresql://eoffice_ci:eoffice_ci_password@localhost:5432/eoffice_e2e?schema=public
-      REDIS_URL: redis://localhost:6379
-      JWT_SECRET: ci-only-jwt-secret-with-at-least-thirty-two-characters
-      REFRESH_TOKEN_SECRET: ci-only-refresh-secret-with-at-least-thirty-two-characters
-      DISABLE_LICENSE_CHECK: "true"
-      CORS_ORIGIN: http://localhost:3000
-      STORAGE_DRIVER: local
-      STORAGE_BASE_PATH: ./storage
-      PDF_UNICODE_FONT_PATH: /usr/share/fonts/truetype/noto/NotoSans-Regular.ttf
-      PDF_UNICODE_BOLD_FONT_PATH: /usr/share/fonts/truetype/noto/NotoSans-Bold.ttf
-      E2E_API_BASE: http://localhost:4000/api/v1
-      E2E_PUBLIC_BASE: http://localhost:4000/public
-      E2E_ADMIN_EMAIL: admin@acme.local
-      DEMO_ADMIN_PASSWORD: ci-only-demo-password-not-for-production
-      E2E_ADMIN_PASSWORD: ci-only-demo-password-not-for-production
-      E2E_INTERNAL_SIGNER_EMAIL: admin@acme.local
 
     steps:
       - name: Checkout
@@ -68,63 +23,22 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
 
-      - name: Install Unicode PDF fonts
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes fonts-noto-core
+      - name: Verify Docker Compose
+        run: docker compose version
 
-      - name: Install backend dependencies
-        run: npm ci
+      - name: Run the shared Docker PostgreSQL E2E helper
+        env:
+          # Keep containers only long enough for the failure diagnostics below.
+          E2E_KEEP_CONTAINERS: "1"
+        run: npm run e2e:docker
 
-      - name: Generate Prisma client
-        run: npx prisma generate
-
-      - name: Apply Prisma migrations
-        run: npx prisma migrate deploy
-
-      - name: Seed required E2E baseline
-        run: |
-          node scripts/seed.js
-          node scripts/seed-rbac.js
-          node scripts/seed-document-types.js
-          node scripts/seed-workflows-simple.js
-
-      - name: Build backend
-        run: npm run build
-
-      - name: Start backend
-        run: nohup npm run start > "$RUNNER_TEMP/eoffice-backend.log" 2>&1 &
-
-      - name: Start signed-artifact outbox worker
-        run: nohup npm run worker:outbox > "$RUNNER_TEMP/eoffice-outbox-worker.log" 2>&1 &
-
-      - name: Wait for backend health
-        run: |
-          for attempt in {1..30}; do
-            if curl --fail --silent --show-error http://localhost:4000/health; then
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Backend did not become healthy in time"
-          cat "$RUNNER_TEMP/eoffice-backend.log" || true
-          cat "$RUNNER_TEMP/eoffice-outbox-worker.log" || true
-          exit 1
-
-      - name: Run PostgreSQL workflow E2E
-        run: npm run test:e2e:workflow
-
-      - name: Show backend and service logs on failure
+      - name: Show Compose diagnostics on failure
         if: failure()
         run: |
-          cat "$RUNNER_TEMP/eoffice-backend.log" || true
-          docker logs "${{ job.services.postgres.id }}" || true
-          docker logs "${{ job.services.redis.id }}" || true
+          docker compose --project-name eoffice-e2e --env-file .env.test.example -f docker-compose.yml -f docker-compose.test.yml ps || true
+          docker compose --project-name eoffice-e2e --env-file .env.test.example -f docker-compose.yml -f docker-compose.test.yml logs --no-color || true
 
-      - name: Clean up service containers
+      - name: Clean up Docker E2E stack
         if: always()
-        run: |
-          docker rm -f "${{ job.services.postgres.id }}" "${{ job.services.redis.id }}" || true
+        run: docker compose --project-name eoffice-e2e --env-file .env.test.example -f docker-compose.yml -f docker-compose.test.yml down --volumes --remove-orphans

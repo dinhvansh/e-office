@@ -48,6 +48,9 @@ committed values are deterministic **test-only** credentials and are never used
 by the production Compose command. The helper never overwrites `.env`; use
 `E2E_KEEP_CONTAINERS=1` to retain a failing stack for diagnosis.
 
+GitHub Actions invokes this exact helper with `E2E_KEEP_CONTAINERS=1`, prints
+Compose logs when it fails, then always removes its test containers and volumes.
+
 ## Network and optional services
 
 PostgreSQL and Redis use the internal Compose network by default; only frontend

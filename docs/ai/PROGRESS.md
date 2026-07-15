@@ -3,6 +3,7 @@
 ## 2026-07-15 — Reproducible Docker PostgreSQL E2E
 
 - The missing `POSTGRES_PASSWORD` blocker is resolved for local/CI E2E through a test-only Compose overlay, ignored local env names and a helper that materializes `.env.test.example` only in a temporary directory. Production Compose still requires explicit secrets.
+- GitHub Actions now calls the same `npm run e2e:docker` entry point, retains the isolated Compose stack only for failure diagnostics, and always removes test containers/volumes afterward.
 
 ## 2026-07-15 — Document-service responsibility split
 
