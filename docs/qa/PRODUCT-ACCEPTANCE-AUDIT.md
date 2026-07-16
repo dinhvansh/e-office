@@ -22,6 +22,7 @@ The deterministic E2E dataset used `admin@acme.local`, an approval+signing workf
 | Request creation | PASS (runtime subset) | Package rollback, atomic document/sign-request creation, duplicate protection verified. |
 | Approval | PASS (runtime subset) | UAT PostgreSQL runtime verifies submit → `AWAITING_APPROVAL`, assigned pending approval, exactly one accepted concurrent approval, one workflow-completion outbox event, and transition to signing. |
 | Internal signing | PASS (runtime subset) | UAT runtime configures internal signer/field, forces an audit-write rollback to verify transactional safety, rejects duplicate concurrent signing without duplicate audit/outbox events, then completes the artifact path. |
+| Sequential signing | PARTIAL | Backend regression suite (104/104) verifies order-two internal and public signers receive `SIGNING_ORDER_VIOLATION` before order one, same-order parallel behavior, and next-order activation. A real two-internal-signer browser/UAT flow remains unrun. |
 | External signing | PARTIAL | 99-test suite verified OTP/session/order policy; no real browser/external-persona run. |
 | Workflow state machine | PARTIAL | Unit/policy coverage and E2E transitions passed; complete matrix not independently executed. |
 | Artifact / completion | PASS (runtime subset) | Local artifact download; MinIO source/artifact, hash metadata, delete behavior, and failure/retry policies verified. |
