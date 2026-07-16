@@ -45,6 +45,13 @@ export class ExternalOrgsService {
       }
     }
 
+    if (data.email) {
+      const existing = await externalOrgsRepository.findByEmail(data.email, tenantId);
+      if (existing) {
+        throw ApiError.badRequest("Organization email already exists", "EMAIL_EXISTS");
+      }
+    }
+
     return externalOrgsRepository.create({
       tenant_id: tenantId,
       ...data,
@@ -73,6 +80,13 @@ export class ExternalOrgsService {
       const existing = await externalOrgsRepository.findByCode(data.code, tenantId);
       if (existing && existing.id !== id) {
         throw ApiError.badRequest("Organization code already exists", "CODE_EXISTS");
+      }
+    }
+
+    if (data.email) {
+      const existing = await externalOrgsRepository.findByEmail(data.email, tenantId);
+      if (existing && existing.id !== id) {
+        throw ApiError.badRequest("Organization email already exists", "EMAIL_EXISTS");
       }
     }
 

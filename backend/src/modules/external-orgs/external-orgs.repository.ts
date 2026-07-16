@@ -62,6 +62,12 @@ export class ExternalOrgsRepository {
     });
   }
 
+  async findByEmail(email: string, tenantId: number) {
+    return prisma.external_organizations.findFirst({
+      where: { email, tenant_id: tenantId },
+    });
+  }
+
   async create(data: {
     tenant_id: number;
     name: string;
