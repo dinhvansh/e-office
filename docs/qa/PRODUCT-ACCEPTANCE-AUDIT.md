@@ -15,7 +15,7 @@ The deterministic E2E dataset used `admin@acme.local`, an approval+signing workf
 | Phase | Result | Verified evidence / limitation |
 |---|---|---|
 | Clean UAT environment | PASS | Fresh Compose databases/volumes for local and S3 runs. |
-| Master Data | PARTIAL | E2E created workflow, mapped document type, numbering rule and package; full CRUD/persona coverage not run. |
+| Master Data | PARTIAL | Real UAT browser flow created a document from an accessible document-type list and persisted numbered document `009/2026` with type `Báo cáo` in PostgreSQL. The PostgreSQL authorization matrix also passed Admin create/update for departments, positions and document types, plus Viewer/User/Manager negative master-data checks. Full master-data CRUD, downstream dropdowns beyond document types, and two-tenant UI coverage remain unrun. |
 | Users / Roles / Permissions | PARTIAL | Fresh PostgreSQL API matrix passed for Admin/Manager/User/Viewer; full persona/role matrix not run. |
 | RBAC / ACL / Tenant Isolation | PARTIAL | Fresh PostgreSQL API matrix verified role denies and cross-tenant document denial; authenticated direct navigation, refresh, and same-session new-tab persistence are verified for the seeded Admin. UI/direct URL/full API tampering matrix remains otherwise unverified. |
 | Workflow Setup & document-type mapping | PASS (runtime subset) | E2E created mapped workflow and resolved it during request creation. |
