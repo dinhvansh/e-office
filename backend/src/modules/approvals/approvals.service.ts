@@ -298,14 +298,35 @@ class ApprovalsService {
       status: 'in_progress',
     });
 
-    // Create approval records for all approvers in first step
-    const approvals = approverIds.map(approverId => ({
-      document_id: documentId,
-      workflow_id: workflowId,
-      workflow_step_id: firstStep.id,
-      approver_user_id: approverId,
-      due_date: dueDate,
-    }));
+    // Materialize every approval step up front. Later steps stay waiting until the
+    // preceding step completes; the transition below atomically activates them.
+    // Creating only the first step leaves nothing for that transition to activate.
+    const approvals = [] as Array<{
+      document_id: number;
+      workflow_id: number;
+      workflow_step_id: number;
+      approver_user_id: number;
+      due_date: Date;
+      action?: string;
+    }>;
+    for (const [index, step] of approverSteps.entries()) {
+      const stepApproverIds = index === 0
+        ? approverIds
+        : await approvalsRepository.getApproversForStep(step.id, tenantId, documentId);
+      if (stepApproverIds.length === 0) {
+        throw ApiError.badRequest('No approvers found for workflow step', 'NO_APPROVERS_FOUND');
+      }
+      const stepDueDate = new Date();
+      stepDueDate.setDate(stepDueDate.getDate() + step.due_in_days);
+      approvals.push(...stepApproverIds.map((approverId) => ({
+        document_id: documentId,
+        workflow_id: workflowId,
+        workflow_step_id: step.id,
+        approver_user_id: approverId,
+        due_date: stepDueDate,
+        ...(index > 0 ? { action: 'waiting' } : {}),
+      })));
+    }
 
     await approvalsRepository.createApprovals(approvals);
 
@@ -359,8 +380,8 @@ class ApprovalsService {
 
     return {
       instance,
-      approvals: approvals.length,
-      message: `Document submitted for approval. ${approvals.length} approver(s) notified.`,
+      approvals: approverIds.length,
+      message: `Document submitted for approval. ${approverIds.length} approver(s) notified.`,
     };
   }
 
