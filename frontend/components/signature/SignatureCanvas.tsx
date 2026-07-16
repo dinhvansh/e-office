@@ -26,7 +26,10 @@ const SignatureCanvas = forwardRef<SignatureCanvasRef, SignatureCanvasProps>(
 
       const canvas = canvasRef.current;
       const signaturePad = new SignaturePad(canvas, {
-        backgroundColor: 'rgb(255, 255, 255)',
+        // Keep the PNG alpha channel. The surrounding dialog can be white for
+        // usability, but a handwritten signature must not paint a white box
+        // over the document when it is embedded into the PDF.
+        backgroundColor: 'rgba(0, 0, 0, 0)',
         penColor: 'rgb(0, 0, 0)',
       });
 
@@ -68,7 +71,7 @@ const SignatureCanvas = forwardRef<SignatureCanvasRef, SignatureCanvasProps>(
     return (
       <canvas
         ref={canvasRef}
-        className={`border border-gray-300 rounded-lg ${className}`}
+        className={`border border-gray-300 rounded-lg bg-transparent ${className}`}
         style={{ width: `${width}px`, height: `${height}px` }}
       />
     );

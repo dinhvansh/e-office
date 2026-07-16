@@ -73,11 +73,8 @@ export default function SignatureModal({
 
     if (!ctx) return '';
 
-    // White background
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw text
+    // Canvas is transparent by default. Preserve that alpha channel so typed
+    // signatures behave exactly like drawn signatures in the final PDF.
     ctx.fillStyle = 'black';
     ctx.font = '48px "Brush Script MT", cursive';
     ctx.textAlign = 'center';

@@ -275,7 +275,7 @@ export default function InternalSigningPage() {
                       ref={sigCanvasRef}
                       canvasProps={{
                         className: 'w-full h-48 cursor-crosshair',
-                        style: { backgroundColor: 'white' },
+                        style: { backgroundColor: 'transparent' },
                       }}
                     />
                   </div>
