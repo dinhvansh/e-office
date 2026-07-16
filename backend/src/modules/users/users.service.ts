@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import type { Prisma } from '@prisma/client';
 import { usersRepository } from './users.repository';
+import { prisma } from '../../config/prisma';
 
 type UserFilters = {
   page?: number;
@@ -149,6 +150,13 @@ export const usersService = {
     // Check if user is managing any departments
     if (existing.managed_departments.length > 0) {
       throw new Error('Cannot delete user who is managing departments');
+    }
+
+    const internalSignerCount = await prisma.signers.count({
+      where: { user_id: id, is_internal: true },
+    });
+    if (internalSignerCount > 0) {
+      throw new Error('Cannot delete user with signing assignments');
     }
 
     return usersRepository.delete(id);

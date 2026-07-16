@@ -86,6 +86,17 @@ test("UAT users: admin creates a user through the UI with organizational assignm
   ]));
   await unionContext.close();
 
+  const workflowDocument = await callApi(page, "/documents", {
+    method: "POST",
+    body: JSON.stringify({ file_name: `user-reference-${suffix}.txt`, file_base64: Buffer.from(`user reference ${suffix}`).toString("base64") }),
+  });
+  expect(workflowDocument.status).toBe(201);
+  const signRequest = await callApi(page, "/sign-requests", {
+    method: "POST",
+    body: JSON.stringify({ document_id: workflowDocument.body.data.document.id, title: `User reference ${suffix}`, workflow_type: "sequential", signers: [{ email, name: `UAT User ${suffix}` }] }),
+  });
+  expect(signRequest.status).toBe(201);
+
   const updated = await callApi(page, `/users/${created.id}`, {
     method: "PUT",
     body: JSON.stringify({ full_name: `UAT User Updated ${suffix}`, status: "inactive" }),
@@ -113,7 +124,9 @@ test("UAT users: admin creates a user through the UI with organizational assignm
   expect(referencedDepartmentDeletion.status).toBe(400);
   expect(referencedDepartmentDeletion.body.error).toMatchObject({ code: "DEPARTMENT_HAS_USERS" });
   const deleted = await callApi(page, `/users/${created.id}`, { method: "DELETE" });
-  expect(deleted.status).toBe(200);
+  expect(deleted.status).toBe(400);
+  expect((await callApi(page, `/sign-requests/${signRequest.body.data.sign_request.id}`, { method: "DELETE" })).status).toBe(200);
+  expect((await callApi(page, `/users/${created.id}`, { method: "DELETE" })).status).toBe(200);
   expect((await callApi(page, `/roles/${roleA.body.data.id}`, { method: "DELETE" })).status).toBe(200);
   expect((await callApi(page, `/roles/${roleB.body.data.id}`, { method: "DELETE" })).status).toBe(200);
   expect((await callApi(page, `/departments/${department.body.data.id}`, { method: "DELETE" })).status).toBe(200);
