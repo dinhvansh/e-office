@@ -372,6 +372,14 @@ async function run() {
         expectOk: false,
       },
       {
+        name: "Cross-tenant viewer cannot read foreign external organization",
+        fn: () =>
+          axios.get(`${API_BASE}/external-orgs/${externalOrgId}`, {
+            headers: { Authorization: `Bearer ${crossTenantToken}` },
+          }),
+        expectOk: false,
+      },
+      {
         name: "Cross-tenant viewer cannot read foreign document",
         fn: () =>
           axios.get(`${API_BASE}/documents/${crossTenantDocumentId}`, {
