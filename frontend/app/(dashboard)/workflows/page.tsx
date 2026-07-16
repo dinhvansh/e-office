@@ -112,7 +112,7 @@ export default function WorkflowsPage() {
     queryKey: ['positions'],
     queryFn: async () => {
       const data = await fetchJson<any>('/positions');
-      return data?.positions || [];
+      return (data?.positions || []).filter((position: any) => position.is_active);
     },
   });
 
@@ -121,7 +121,7 @@ export default function WorkflowsPage() {
     queryKey: ['departments'],
     queryFn: async () => {
       const data = await fetchJson<any>('/departments');
-      return data || [];
+      return (data || []).filter((department: any) => department.is_active);
     },
   });
 

@@ -33,6 +33,7 @@ interface User {
 interface Department {
   id: number;
   name: string;
+  is_active: boolean;
 }
 
 interface Role {
@@ -179,7 +180,7 @@ export default function UsersPage() {
   };
 
   const users: User[] = ((usersData as any) || []).sort((a: User, b: User) => b.id - a.id);
-  const departments: Department[] = (departmentsData as any) || [];
+  const departments: Department[] = ((departmentsData as any) || []).filter((department: Department) => department.is_active);
   const roles: Role[] = (rolesData as any) || [];
   const positions = ((positionsData as any)?.positions || []).filter((p: any) => p.is_active);
 
