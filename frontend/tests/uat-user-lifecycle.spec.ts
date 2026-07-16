@@ -52,6 +52,20 @@ test("UAT users: admin creates a user through the UI with organizational assignm
   expect(created).toMatchObject({ email, department_id: department.body.data.id, position_id: position.body.data.position.id });
   expect(created.user_roles.map((item: { role: { id: number } }) => item.role.id)).toContain(userRole.id);
 
+  const userContext = await page.context().browser()!.newContext({ baseURL: process.env.PLAYWRIGHT_BASE_URL });
+  const userPage = await userContext.newPage();
+  await userPage.goto("/login");
+  await userPage.getByLabel("Email").fill(email);
+  await userPage.locator('input[type="password"]').fill("UatUser1A");
+  await userPage.locator('button[type="submit"]').click();
+  await expect(userPage).toHaveURL(/\/$/);
+  const changedPassword = await callApi(userPage, "/users/change-password", {
+    method: "POST",
+    body: JSON.stringify({ old_password: "UatUser1A", new_password: "UatUser2B" }),
+  });
+  expect(changedPassword.status).toBe(200);
+  await userContext.close();
+
   const updated = await callApi(page, `/users/${created.id}`, {
     method: "PUT",
     body: JSON.stringify({ full_name: `UAT User Updated ${suffix}`, status: "inactive" }),
