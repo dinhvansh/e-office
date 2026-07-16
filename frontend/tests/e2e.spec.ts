@@ -40,7 +40,7 @@ test.describe("WP Sign smoke suite", () => {
     await page.getByLabel("Mật khẩu").fill(creds.password);
     await page.getByRole("button", { name: /đăng nhập/i }).click();
     await expect(page.getByText("Tài liệu gần đây")).toBeVisible();
-    await expect(page.getByText("Upload PDF mới")).toBeVisible();
+    await expect(page.locator('a[href="/documents"]').first()).toBeVisible();
   });
 
   test("API can upload a document and create sign request", async ({ request }) => {

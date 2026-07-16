@@ -35,3 +35,14 @@ test("multi-approval E2E waits for asynchronous artifact completion", () => {
   assert.match(source, /async function waitForCompletedSignRequest/);
   assert.match(source, /await waitForCompletedSignRequest\(signRequestId, headers\)/);
 });
+
+test("clean Docker UAT frontend is built against the exposed E2E backend", () => {
+  const repoRoot = path.resolve(__dirname, "../../..");
+  const env = fs.readFileSync(path.join(repoRoot, ".env.test.example"), "utf8");
+
+  assert.match(env, /^BACKEND_PORT=4010$/m);
+  assert.match(env, /^FRONTEND_PORT=3010$/m);
+  assert.match(env, /^CORS_ORIGIN=http:\/\/localhost:3010$/m);
+  assert.match(env, /^NEXT_PUBLIC_API_URL=http:\/\/localhost:4010\/api\/v1$/m);
+  assert.match(env, /^NEXT_PUBLIC_API_BASE_URL=http:\/\/localhost:4010\/api\/v1$/m);
+});
