@@ -1,0 +1,14 @@
+flowchart LR
+  R[Requester creates and submits request] --> A1[Approval step 1: pending]
+  A1 -->|atomic activation| A2[Approval step 2: waiting → pending]
+  A2 --> S1[Internal signer 1]
+  S1 --> S2[Internal signer 2 / External OTP signer]
+  S2 --> O[Artifact outbox]
+  O --> W[Worker and PDF generation]
+  W --> ST[Local storage or S3/MinIO]
+  ST --> C[Hash/metadata persisted: Completed]
+  C --> D[Authorized final PDF download]
+  A1 -->|reject| RS[Reject / resubmit]
+  A2 -->|reject| RS
+  W -->|failure| F[artifact_failed]
+  F -->|authorized retry| O

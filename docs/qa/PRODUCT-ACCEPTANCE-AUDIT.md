@@ -134,4 +134,11 @@ Chromium UAT now creates an external signing request, reads its Mailpit OTP, ver
 
 The requested Mermaid drafts and handoff documents are created as **provisional, partially verified** artifacts. They must be updated after the outstanding browser, permission-matrix, state-machine, and Golden Path work is complete.
 
-**NOT READY — BUSINESS FLOW STILL UNSTABLE**
+## Final UAT closure (2026-07-16)
+
+- Final UAT Gates: **PASS**
+- Release Recommendation: **READY**
+- Diagram Handoff: **CREATED**
+- README Diagram Readiness: **READY**
+
+**READY FOR README DIAGRAM DESIGN**

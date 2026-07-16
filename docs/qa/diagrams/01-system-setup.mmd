@@ -1,0 +1,6 @@
+flowchart LR
+  T[Tenant Admin] --> M[Master Data: departments, positions, external contacts]
+  M --> U[Users, Roles and Permissions]
+  U --> W[Workflow Configuration]
+  W --> D[Document Type]
+  D --> X[Document Type ↔ Workflow Mapping]

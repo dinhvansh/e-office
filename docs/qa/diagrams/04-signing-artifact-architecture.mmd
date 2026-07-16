@@ -1,0 +1,10 @@
+flowchart LR
+  A[Requester / Approver / Internal Signer / External Signer] --> F[Frontend]
+  F --> API[Backend API]
+  API <--> DB[(PostgreSQL)]
+  API --> O[Outbox]
+  O --> W[Worker]
+  W --> P[PDF engine]
+  P --> S[Local storage / S3-MinIO]
+  S --> M[Artifact hash and metadata]
+  M --> X[Completed final artifact]

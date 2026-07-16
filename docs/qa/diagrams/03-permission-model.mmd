@@ -1,0 +1,8 @@
+flowchart LR
+  T[Tenant isolation] --> R[RBAC]
+  R --> A[ACL / ownership]
+  A --> W[Workflow assignment]
+  W --> P[Assigned approver / signer]
+  P --> F[Signing field ownership]
+  F --> B[Backend authorization enforcement]
+  E[External OTP session binding] --> B
