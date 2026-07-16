@@ -84,7 +84,7 @@ test.describe("WP Sign smoke suite", () => {
     const email = `${marker}@example.test`;
     const upload = await request.post(`${API_BASE}/documents`, {
       headers: authHeaders,
-      data: { file_name: `${marker}.txt`, file_base64: Buffer.from(marker).toString("base64") },
+      data: { file_name: `${marker}.pdf`, file_base64: "JVBERi0xLjQKJeLjz9MKMyAwIG9iago8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL1Jlc291cmNlczw8L0ZvbnQ8PC9GMSA1IDAgUj4+Pj4vTWVkaWFCb3hbMCAwIDYxMiA3OTJdL0NvbnRlbnRzIDQgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvTGVuZ3RoIDQ0Pj4Kc3RyZWFtCkJUCi9GMSA0OCBUZgoxMCA3MDAgVGQKKFRlc3QpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PgplbmRvYmoKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKNSAwIG9iago8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2ZXRpY2E+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmDQowMDAwMDAwMjczIDAwMDAwIG4NCjAwMDAwMDAyMjQgMDAwMDAwIG4NCjAwMDAwMDAxNSAwMDAwMCBuDQowMDAwMDAwMTI1IDAwMDAwIG4NCjAwMDAwMDAzMjIgMDAwMDAwIG4NCnRyYWlsZXI8PC9TaXplIDYvUm9vdCAxIDAgUj4+CnN0YXJ0eHJlZgo0MDIKJSVFT0YK" },
     });
     expect(upload.ok()).toBeTruthy();
     const documentId = (await upload.json()).data.document.id as number;
@@ -112,5 +112,26 @@ test.describe("WP Sign smoke suite", () => {
     await page.getByLabel(/Mã OTP/).fill(otp);
     await page.getByRole("button", { name: /Xác thực OTP/ }).click();
     await expect(page.locator("p.text-green-900", { hasText: "Xác thực thành công" })).toBeVisible();
+    const signing = await page.evaluate(async ({ signingToken, oneTimePassword }) => {
+      const response = await fetch(`http://127.0.0.1:4010/public/sign/${signingToken}/sign`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          otp: oneTimePassword,
+          signature_data: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          signature_type: "drawn",
+          field_values: [],
+        }),
+      });
+      return { status: response.status, body: await response.json() };
+    }, { signingToken: signer.signing_token, oneTimePassword: otp });
+    expect(signing.status).toBe(200);
+    await expect.poll(async () => {
+      const status = await request.get(`${API_BASE}/sign-requests/${signRequestId}`, { headers: authHeaders });
+      return (await status.json()).data.sign_request.status;
+    }, { timeout: 30_000 }).toBe("completed");
+    const artifact = await request.get(`http://127.0.0.1:4010/public/sign/${signer.signing_token}/download-signed`);
+    expect(artifact.ok()).toBeTruthy();
   });
 });

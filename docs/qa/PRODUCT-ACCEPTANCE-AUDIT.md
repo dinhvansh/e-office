@@ -121,6 +121,10 @@ The full legacy frontend suite ran with Chromium (47 tests): 16 passed and 31 fa
 
 Clean UAT browser checks passed for workflow creation/persistence, document-type default-workflow mapping and inactive-type exclusion, plus Viewer direct-URL/API denial for workflow creation (3/3). The PostgreSQL workflow refactor rerun then verified package rollback, submit to approval, concurrent-approval protection, transition to signatures, signing rollback, concurrent-signing protection, audit/outbox effects, completed state, and signed-artifact download. The assignee rerun verified a `position_in_department` step with `min_n=2`: both real assignees approved before the Admin completed internal signing. The 104/104 backend regression rerun covers both internal and public order-two rejection (`SIGNING_ORDER_VIOLATION`), same-order parallel behavior, and next-order activation. UI creation/edit/reorder of individual workflow steps and a real two-internal-signer browser flow remain explicitly unrun coverage; they are not reproduced product defects.
 
+## External signature to artifact browser regression — PASS (2026-07-16)
+
+Chromium UAT now creates an external signing request, reads its Mailpit OTP, verifies the public session, submits an external signature, polls the real PostgreSQL request to `completed`, and downloads the generated signed PDF. This reproduced `BUG-UAT-014`: cross-origin public-sign submission omitted `credentials: 'include'`, so the OTP HttpOnly session cookie was not sent. The fix adds credentials to that submit request and loads `PDFSigningViewer` client-only, avoiding SSR evaluation of browser-only `DOMMatrix` on `/sign/[token]`.
+
 ## Release recommendation
 
 **NOT READY.** Required acceptance phases and two Golden Paths are incomplete. The strict READY criteria have not been met, even though no Critical or High product bug was reproduced in the executed coverage.

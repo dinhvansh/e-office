@@ -17,7 +17,7 @@ This is an audit result, not an assertion that untested cells are allowed or den
 | Assigned approver only | Not run | Not run | PASS (policy) | Tenant-scoped assigned task tests passed; E2E duplicate approval rejected. |
 | Assigned signer only / ordering | Not run | Not run | PASS (policy) | Order-two signer denied before order-one; duplicate signing denied. |
 | Signing field ownership | Not run | Not run | PASS (policy) | Guessed other-signer/other-request fields denied before mutation. |
-| Public external OTP/session | Not run | Not run | PASS (policy) | Pre-OTP original PDF denied; valid session allowed; expired/consumed session denied. |
+| Public external OTP/session | PASS (OTP, signature, artifact download) | PASS (public invitation URL) | PASS (policy + browser) | Pre-OTP original PDF denied; valid session allowed; expired/consumed session denied. Chromium verifies invitation, Mailpit OTP, session-authenticated external signature, terminal completed state, and signed-PDF download. |
 | Tenant A → Tenant B document | Not run | Not run | PASS (matrix + S3 E2E) | Cross-tenant viewer denied foreign document; S3 E2E also accepts only 403/404. |
 | Tenant isolation: list/search/artifact/notifications/approvals/signing/admin | Not run | Not run | Not run | Full matrix outstanding. |
 | ID tampering: tenant/owner/document/workflow/request/signer/field/artifact | Not run | Not run | PARTIAL | Field and cross-request field guessing denied; remaining identifiers outstanding. |

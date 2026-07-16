@@ -1,13 +1,13 @@
 'use client';
 
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import SignatureModal from '@/components/signature/SignatureModal';
-import PDFSigningViewer from '@/components/pdf/PDFSigningViewer';
 import ProgressHeader from '@/components/signing/ProgressHeader';
 import SigningSidebar from '@/components/signing/SigningSidebar';
 import ConfirmationDialog from '@/components/ui/confirmation-dialog';
@@ -16,6 +16,8 @@ import { toast } from 'sonner';
 import { CheckCircle, FileText, Mail, User, Clock, Play } from 'lucide-react';
 import { getPublicApiBaseUrl } from '@/lib/env';
 import { AsyncListSkeleton } from '@/components/ui/async-state';
+
+const PDFSigningViewer = dynamic(() => import('@/components/pdf/PDFSigningViewer'), { ssr: false });
 
 interface SigningData {
   signer: {
@@ -439,6 +441,7 @@ export default function PublicSigningPage() {
         `${apiBase}/public/sign/${token}/sign`,
         {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(requestBody),
         }
