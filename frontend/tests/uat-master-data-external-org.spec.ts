@@ -15,8 +15,8 @@ async function api(page: Page, path: string, init: RequestInit = {}) {
 }
 
 test("UAT master data: external organization lifecycle rejects duplicate code and email", async ({ page }) => {
-  const email = process.env.PLAYWRIGHT_EMAIL;
-  const password = process.env.PLAYWRIGHT_PASSWORD;
+  const email = process.env.PLAYWRIGHT_EMAIL ?? "";
+  const password = process.env.PLAYWRIGHT_PASSWORD ?? "";
   test.skip(!email || !password, "PLAYWRIGHT_EMAIL and PLAYWRIGHT_PASSWORD are required for real UAT data");
 
   const suffix = Date.now().toString();

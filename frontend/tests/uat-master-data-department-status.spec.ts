@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const credentials = {
-  email: process.env.PLAYWRIGHT_EMAIL,
-  password: process.env.PLAYWRIGHT_PASSWORD,
+  email: process.env.PLAYWRIGHT_EMAIL ?? "",
+  password: process.env.PLAYWRIGHT_PASSWORD ?? "",
 };
 const apiBase = process.env.PLAYWRIGHT_API_BASE_URL ?? "http://127.0.0.1:4010/api/v1";
 

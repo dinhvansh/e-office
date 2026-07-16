@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 const creds = {
-  email: process.env.PLAYWRIGHT_EMAIL,
-  password: process.env.PLAYWRIGHT_PASSWORD,
+  email: process.env.PLAYWRIGHT_EMAIL ?? "",
+  password: process.env.PLAYWRIGHT_PASSWORD ?? "",
 };
 
 test.describe("Document Types UI Test", () => {
