@@ -73,7 +73,7 @@ Signing completion writes an outbox event. The worker generates the PDF artifact
 
 ## Demo
 
-[![Watch FlowDocker E-Office Demo](docs/assets/readme/demo/demo-thumbnail.png)](docs/assets/readme/demo/flowdocker-eoffice-demo.webm)
+[![Watch FlowDocker E-Office Demo](docs/assets/readme/demo/demo-thumbnail.png)](docs/assets/readme/demo/flowdocker-eoffice-demo.mp4)
 
 ## Architecture / Technology
 
