@@ -71,6 +71,22 @@ test("UAT tenant lifecycle: onboarding admin can update only its own company pro
   expect(department.status).toBe(201);
   const departmentId = department.body.data.id as number;
 
+  const externalOrgName = `Private External Org ${suffix}`;
+  const externalOrg = await callApi(page, "/external-orgs", {
+    method: "POST",
+    body: JSON.stringify({ name: externalOrgName, code: `ORG${suffix.slice(-6)}`, category: "partner" }),
+  });
+  expect(externalOrg.status).toBe(201);
+  const externalOrgId = externalOrg.body.data.id as number;
+
+  const documentTypeName = `Private Document Type ${suffix}`;
+  const documentType = await callApi(page, "/document-types", {
+    method: "POST",
+    body: JSON.stringify({ name: documentTypeName, code: `DT${suffix.slice(-6)}` }),
+  });
+  expect(documentType.status).toBe(201);
+  const documentTypeId = documentType.body.data.id as number;
+
   const secondTenant = await page.request.post(`${apiBase}/tenants/create-with-admin`, {
     data: {
       tenant_name: secondTenantName,
@@ -95,6 +111,12 @@ test("UAT tenant lifecycle: onboarding admin can update only its own company pro
   await expect(secondPage.getByRole("table")).not.toContainText(`Private Department ${suffix}`);
   const foreignDepartment = await callApi(secondPage, `/departments/${departmentId}`);
   expect(foreignDepartment.status).toBe(404);
+  await secondPage.goto("/external-orgs");
+  await expect(secondPage.locator("body")).not.toContainText(externalOrgName);
+  expect((await callApi(secondPage, `/external-orgs/${externalOrgId}`)).status).toBe(404);
+  await secondPage.goto("/document-types");
+  await expect(secondPage.locator("body")).not.toContainText(documentTypeName);
+  expect((await callApi(secondPage, `/document-types/${documentTypeId}`)).status).toBe(404);
   await secondContext.close();
 
   const isolated = await browser.newContext({ baseURL: process.env.PLAYWRIGHT_BASE_URL });
