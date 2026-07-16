@@ -1,6 +1,12 @@
 import { Request, Response } from "express";
 import { ok } from "../../core/utils/response";
 import { tenantsService } from "./tenants.service";
+import { z } from "zod";
+
+const updateTenantSchema = z.object({
+  name: z.string().trim().min(1).max(255).optional(),
+  domain: z.string().trim().min(1).max(255).nullable().optional(),
+});
 
 export class TenantsController {
   me = async (req: Request, res: Response): Promise<void> => {
@@ -22,6 +28,12 @@ export class TenantsController {
   stats = async (req: Request, res: Response): Promise<void> => {
     const stats = await tenantsService.getTenantStats(req.auth!.tenantId);
     res.json(ok({ stats }));
+  };
+
+  updateMe = async (req: Request, res: Response): Promise<void> => {
+    const payload = updateTenantSchema.parse(req.body);
+    const tenant = await tenantsService.updateTenantProfile(req.auth!.tenantId, payload);
+    res.json(ok({ tenant }));
   };
 
   /**

@@ -342,6 +342,16 @@ async function run() {
         expectOk: false,
       },
       {
+        name: "Viewer cannot update tenant profile",
+        fn: () =>
+          axios.put(
+            `${API_BASE}/tenants/me`,
+            { name: "Viewer must not update tenant" },
+            { headers: { Authorization: `Bearer ${viewerToken}` } }
+          ),
+        expectOk: false,
+      },
+      {
         name: "Admin can update position",
         fn: () =>
           axios.put(

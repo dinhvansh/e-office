@@ -36,6 +36,28 @@ class TenantsService {
     return tenantsRepository.getStats(tenantId);
   }
 
+  async updateTenantProfile(tenantId: number, data: { name?: string; domain?: string | null }) {
+    if (data.name) {
+      const duplicateName = await prisma.tenants.findFirst({
+        where: { name: data.name, NOT: { id: tenantId } },
+      });
+      if (duplicateName) {
+        throw ApiError.badRequest('Tenant name already exists', 'TENANT_NAME_EXISTS');
+      }
+    }
+
+    if (data.domain) {
+      const duplicateDomain = await prisma.tenants.findFirst({
+        where: { domain: data.domain, NOT: { id: tenantId } },
+      });
+      if (duplicateDomain) {
+        throw ApiError.badRequest('Tenant domain already exists', 'TENANT_DOMAIN_EXISTS');
+      }
+    }
+
+    return prisma.tenants.update({ where: { id: tenantId }, data });
+  }
+
   /**
    * Create new tenant with admin user
    * This is for SaaS onboarding - creates a complete tenant setup
@@ -63,6 +85,18 @@ class TenantsService {
 
     if (existingUser) {
       throw ApiError.badRequest('Email already registered', 'EMAIL_EXISTS');
+    }
+
+    const duplicateTenant = await prisma.tenants.findFirst({
+      where: {
+        OR: [
+          { name: data.tenant_name },
+          ...(data.tenant_domain ? [{ domain: data.tenant_domain }] : []),
+        ],
+      },
+    });
+    if (duplicateTenant) {
+      throw ApiError.badRequest('Tenant name or domain already exists', 'TENANT_EXISTS');
     }
 
     // Validate password strength
