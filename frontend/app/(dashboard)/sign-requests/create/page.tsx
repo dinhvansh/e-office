@@ -106,7 +106,9 @@ export default function CreateSignRequestPage() {
   const [submissionLocked, setSubmissionLocked] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
-  const [currentStep, setCurrentStep] = useState(1);
+  // Returning from the PDF editor is normally about correcting participants,
+  // so do not make users walk through the locked document screen first.
+  const [currentStep, setCurrentStep] = useState(isEditMode ? 3 : 1);
   const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const customizedStepsRef = useRef<any[] | null>(null);
@@ -466,7 +468,7 @@ export default function CreateSignRequestPage() {
         <InlineActionFeedback error={submitError} success={submitSuccess} />
         {submitError && <AsyncErrorState message="Không thể lưu cấu hình. Dữ liệu đã nhập vẫn được giữ nguyên." onRetry={retryCreate} />}
         <nav aria-label="Các bước tạo trình ký" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {steps.map((label, index) => { const step = index + 1; return <button key={label} type="button" onClick={() => { if (step <= currentStep) setCurrentStep(step); }} disabled={step > currentStep} className={`rounded-lg border p-3 text-left text-sm focus-visible:ring-2 focus-visible:ring-ring ${step === currentStep ? 'border-blue-600 bg-blue-50 font-semibold' : step < currentStep ? 'border-emerald-300 bg-emerald-50' : 'text-muted-foreground'}`}><span className="mr-2">{step < currentStep ? '✓' : step}.</span>{label}</button>; })}
+          {steps.map((label, index) => { const step = index + 1; const canNavigate = isEditMode || step <= currentStep; return <button key={label} type="button" onClick={() => { if (canNavigate) setCurrentStep(step); }} disabled={!canNavigate} className={`rounded-lg border p-3 text-left text-sm focus-visible:ring-2 focus-visible:ring-ring ${step === currentStep ? 'border-blue-600 bg-blue-50 font-semibold' : canNavigate ? 'border-emerald-300 bg-emerald-50' : 'text-muted-foreground'}`}><span className="mr-2">{step < currentStep ? '✓' : step}.</span>{label}</button>; })}
         </nav>
         {currentStep === 1 && <Card>
           <CardContent className="space-y-5 p-6">

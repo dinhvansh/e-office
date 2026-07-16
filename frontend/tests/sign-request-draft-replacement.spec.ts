@@ -89,6 +89,11 @@ test.describe('Sign-request replacement draft', () => {
     await page.locator('input[type="password"]').fill(password!);
     await page.getByRole('button', { name: 'Đăng nhập' }).click();
     await expect(page).toHaveURL(/\/$/);
+    await page.goto(`/sign-requests/create?signRequestId=${signRequestId}`);
+    await expect(page.getByRole('heading', { name: /Người ký ngoài và thông tin bổ sung/ })).toBeVisible();
+    await page.getByRole('button', { name: /Tài liệu/ }).click();
+    await page.getByRole('button', { name: /Người tham gia/ }).click();
+    await expect(page.getByRole('heading', { name: /Người ký ngoài và thông tin bổ sung/ })).toBeVisible();
     await page.goto(`/sign-requests/${signRequestId}/editor`);
     await expect(page.getByText('Page 1 / 1')).toBeVisible();
     await page.locator('canvas').click({ position: { x: 180, y: 180 }, force: true });
