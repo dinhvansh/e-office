@@ -69,8 +69,13 @@ export const documentTypesRepository = {
   },
 
   async delete(id: number, tenantId: number) {
-    const deleted = await prisma.document_types.deleteMany({ where: { id, tenant_id: tenantId } });
-    if (deleted.count !== 1) throw ApiError.notFound('Document type not found', 'DOCUMENT_TYPE_NOT_FOUND');
+    await prisma.$transaction(async (tx) => {
+      const documentType = await tx.document_types.findFirst({ where: { id, tenant_id: tenantId } });
+      if (!documentType) throw ApiError.notFound('Document type not found', 'DOCUMENT_TYPE_NOT_FOUND');
+
+      await tx.numbering_rules.deleteMany({ where: { tenant_id: tenantId, document_type_id: id } });
+      await tx.document_types.delete({ where: { id } });
+    });
   },
 
   async getStats(tenantId: number) {
