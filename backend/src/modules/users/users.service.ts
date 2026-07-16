@@ -16,12 +16,12 @@ export const usersService = {
     department_id?: number;
     position_id?: number;
     manager_id?: number;
-  }) {
-    if (!data.department_id) {
+  }, requireAll = false) {
+    if (requireAll && !data.department_id) {
       throw new Error('Department is required');
     }
 
-    if (!data.position_id) {
+    if (requireAll && !data.position_id) {
       throw new Error('Position is required');
     }
   },
@@ -68,7 +68,7 @@ export const usersService = {
     position_id?: number;
     role_ids?: number[];
   }) {
-    this.validateOrganizationalFields(data);
+    this.validateOrganizationalFields(data, true);
 
     // Check if email already exists
     const existing = await usersRepository.findByEmail(data.email);

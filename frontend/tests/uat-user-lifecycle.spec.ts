@@ -52,6 +52,29 @@ test("UAT users: admin creates a user through the UI with organizational assignm
   expect(created).toMatchObject({ email, department_id: department.body.data.id, position_id: position.body.data.position.id });
   expect(created.user_roles.map((item: { role: { id: number } }) => item.role.id)).toContain(userRole.id);
 
+  const updated = await callApi(page, `/users/${created.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ full_name: `UAT User Updated ${suffix}`, status: "inactive" }),
+  });
+  expect(updated.status).toBe(200);
+  expect(updated.body.data).toMatchObject({ full_name: `UAT User Updated ${suffix}`, status: "inactive" });
+  const reactivated = await callApi(page, `/users/${created.id}`, { method: "PUT", body: JSON.stringify({ status: "active" }) });
+  expect(reactivated.status).toBe(200);
+  expect(reactivated.body.data.status).toBe("active");
+
+  expect((await callApi(page, "/users", {
+    method: "POST",
+    body: JSON.stringify({ email, password: "UatUser1A", full_name: "Duplicate", department_id: department.body.data.id, role_ids: [userRole.id] }),
+  })).status).toBe(400);
+  expect((await callApi(page, "/users", {
+    method: "POST",
+    body: JSON.stringify({ email: `invalid-dept-${suffix}@example.test`, password: "UatUser1A", full_name: "Invalid department", department_id: 99999999, role_ids: [userRole.id] }),
+  })).status).toBe(400);
+  expect((await callApi(page, "/users", {
+    method: "POST",
+    body: JSON.stringify({ email: `invalid-role-${suffix}@example.test`, password: "UatUser1A", full_name: "Invalid role", department_id: department.body.data.id, role_ids: [99999999] }),
+  })).status).toBe(400);
+
   const referencedDepartmentDeletion = await callApi(page, `/departments/${department.body.data.id}`, { method: "DELETE" });
   expect(referencedDepartmentDeletion.status).toBe(400);
   expect(referencedDepartmentDeletion.body.error).toMatchObject({ code: "DEPARTMENT_HAS_USERS" });
