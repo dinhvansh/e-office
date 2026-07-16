@@ -1,5 +1,10 @@
 # Test-only overlay. Always invoke with --env-file .env.test (or the helper).
 services:
+  mailpit:
+    image: axllent/mailpit:v1.22.3
+    ports:
+      - "8025:8025"
+    restart: "no"
   db:
     restart: "no"
   redis:

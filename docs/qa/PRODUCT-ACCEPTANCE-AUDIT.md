@@ -30,7 +30,7 @@ The deterministic E2E dataset used `admin@acme.local`, an approval+signing workf
 | Permission escalation / negative tests | PARTIAL | Disabled account/session, field ownership, signing order, cross-tenant S3 document access, and admin-policy tests passed; full ID tampering matrix remains unverified. |
 | Golden Path 1 | PARTIAL | Approval + internal signer + local artifact passed by real backend/PostgreSQL; browser requirement blocked. |
 | Golden Path 2 | PARTIAL | Clean PostgreSQL flow verified `min_n=2` approval, internal signing, async worker artifact completion; two sequential internal signers remain unverified. |
-| Golden Path 3 | BLOCKED (UAT infrastructure) | External OTP signing artifact flow cannot run end to end on the current UAT stack: `SMTP_ENABLED=false` and no test-mail capture/inbox is provisioned, while OTP is deliberately not exposed by the public API. Policy coverage passes, but no external-persona browser evidence exists. |
+| Golden Path 3 | PARTIAL | The UAT overlay now provisions Mailpit and the real backend SMTP transport delivered a probe message to its inbox. OTP/session policy coverage passes, but the external-persona browser signing and final artifact flow remains unexecuted. |
 | Final gates | PARTIAL | All listed command gates passed except Playwright browser business-flow E2E was not run because no browser surface was available. |
 
 ## Commands and outcomes
