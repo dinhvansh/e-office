@@ -69,6 +69,15 @@ test("UAT master data: document type lifecycle persists workflow mapping and ina
   expect(activeTypes.status).toBe(200);
   expect((activeTypes.body.data as Array<{ id: number }>).some((type) => type.id === id)).toBe(false);
 
+  await page.goto("/documents");
+  await page.locator("#file-upload-input").setInputFiles({
+    name: "inactive-document-type.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4\n%%EOF"),
+  });
+  await page.getByRole("button", { name: /chọn loại văn bản/i }).click();
+  await expect(page.locator('[role="listbox"] [role="option"]', { hasText: name })).toHaveCount(0);
+
   expect((await api(page, `/document-types/${id}`, { method: "DELETE" })).status).toBe(200);
   expect((await api(page, `/document-types/${id}`)).status).toBe(404);
 });
