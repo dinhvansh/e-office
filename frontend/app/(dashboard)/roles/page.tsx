@@ -99,7 +99,10 @@ export default function RolesPage() {
     can_delete: false,
   });
   const queryClient = useQueryClient();
-  const { fetchJson } = useAuth();
+  const { fetchJson, user, permissions } = useAuth();
+  const canCreateRoles = user?.role === 'super_admin' || permissions.includes('roles:create');
+  const canUpdateRoles = user?.role === 'super_admin' || permissions.includes('roles:update');
+  const canDeleteRoles = user?.role === 'super_admin' || permissions.includes('roles:delete');
   const confirmDestructive = useDestructiveConfirmation();
 
   const createRoleMutation = useMutation({
@@ -373,7 +376,7 @@ export default function RolesPage() {
         description="Tra cứu quyền tài liệu và quản trị vai trò hệ thống"
         iconColor="text-rose-600"
         actions={
-          activeTab === 'system-roles' ? (
+          activeTab === 'system-roles' && canCreateRoles ? (
             <Button onClick={() => {
               setEditingRole(null);
               setFormData({ name: '', description: '' });
@@ -427,7 +430,7 @@ export default function RolesPage() {
               icon={Shield}
               title="Chưa có vai trò"
               description="Tạo vai trò đầu tiên để phân quyền cho người dùng trong hệ thống"
-              action={{
+              action={canCreateRoles ? {
                 label: "Tạo vai trò mới",
                 onClick: () => {
                   setEditingRole(null);
@@ -435,7 +438,7 @@ export default function RolesPage() {
                   setSelectedPermissions([]);
                   setShowCreateModal(true);
                 },
-              }}
+              } : undefined}
             />
           </div>
         ) : (
@@ -515,9 +518,9 @@ export default function RolesPage() {
                   >
                     Xem chi tiết
                   </Button>
-                  {!role.is_system && (
+                  {!role.is_system && (canUpdateRoles || canDeleteRoles) && (
                     <>
-                      <Button 
+                      {canUpdateRoles && <Button 
                         variant="ghost" 
                         size="icon"
                         className="hover:bg-primary/10 hover:text-primary transition-colors"
@@ -529,8 +532,8 @@ export default function RolesPage() {
                         }}
                       >
                         <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
+                      </Button>}
+                      {canDeleteRoles && <Button
                         variant="ghost"
                         size="icon"
                         className="hover:bg-destructive/10 hover:text-destructive transition-colors"
@@ -549,7 +552,7 @@ export default function RolesPage() {
                         }}
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
+                      </Button>}
                     </>
                   )}
                 </CardFooter>
@@ -595,7 +598,7 @@ export default function RolesPage() {
                         )}
                       </div>
                     </div>
-                    {!selectedRole.is_system && (
+                    {!selectedRole.is_system && canUpdateRoles && (
                       <Button
                         variant="ghost"
                         size="icon"
