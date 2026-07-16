@@ -117,6 +117,10 @@ Playwright CLI 1.61.1 and its pinned Chromium v1228 are available and launch suc
 
 The full legacy frontend suite ran with Chromium (47 tests): 16 passed and 31 failed. The failures are evidence that this gate is not yet acceptable for release. Reproduced harness problems include concurrent login rate limiting against one seeded account (HTTP 429), stale password/port assumptions, and UI suites that assert obsolete native `<select>` controls or mock response contracts rather than current UI behavior. The dedicated E2E environment now uses 127.0.0.1 endpoints and bypasses login throttling only for deterministic E2E seed accounts. `SelectWithIcon` now exposes listbox/option accessibility semantics. The remaining legacy UAT suites must be converted to current real-data flows before they can prove the required Golden Paths.
 
+## Workflow UAT rerun (2026-07-16)
+
+Clean UAT browser checks passed for workflow creation/persistence, document-type default-workflow mapping and inactive-type exclusion, plus Viewer direct-URL/API denial for workflow creation (3/3). The PostgreSQL workflow refactor rerun then verified package rollback, submit to approval, concurrent-approval protection, transition to signatures, signing rollback, concurrent-signing protection, audit/outbox effects, completed state, and signed-artifact download. The assignee rerun verified a `position_in_department` step with `min_n=2`: both real assignees approved before the Admin completed internal signing. UI creation/edit/reorder of individual workflow steps remains the explicitly unrun browser coverage; it is not a reproduced product defect.
+
 ## Release recommendation
 
 **NOT READY.** Required acceptance phases and two Golden Paths are incomplete. The strict READY criteria have not been met, even though no Critical or High product bug was reproduced in the executed coverage.
