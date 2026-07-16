@@ -90,6 +90,54 @@ async function signInUi(page: Page, signRequestId: number, evidence: string) {
 test.describe.serial('Golden Path browser evidence', () => {
   test.skip(!apiBase || !adminEmail || !password, 'UAT credentials are required');
 
+  test('PDF editor renders an authenticated document without a CDN worker', async ({ page, request }) => {
+    const adminToken = await token(request, adminEmail!);
+    const documentTypes = await api(request, '/document-types?purpose=create', { token: adminToken });
+    expect(documentTypes.response.ok()).toBeTruthy();
+    const documentTypeId = documentTypes.body.data.find((item: { is_active: boolean }) => item.is_active)?.id;
+    expect(documentTypeId).toBeTruthy();
+
+    const document = await api(request, '/documents', {
+      method: 'POST',
+      token: adminToken,
+      data: {
+        title: `PDF viewer ${Date.now()}`,
+        document_type_id: documentTypeId,
+        file_name: 'pdf-viewer-regression.pdf',
+        file_base64: validPdf,
+        mime_type: 'application/pdf',
+      },
+    });
+    expect(document.response.ok()).toBeTruthy();
+    const documentId = document.body.data.document.id as number;
+    let signRequestId = document.body.data.document.sign_request_id as number | undefined;
+    if (!signRequestId) {
+      const me = await api(request, '/auth/me', { token: adminToken });
+      const user = me.body.data.user as { id: number; email: string; full_name?: string };
+      const signRequest = await api(request, '/sign-requests', {
+        method: 'POST',
+        token: adminToken,
+        data: {
+          document_id: documentId,
+          title: `PDF viewer ${Date.now()} signing`,
+          workflow_type: 'sequential',
+          signers: [{ email: user.email, name: user.full_name || user.email, role: 'signer', signing_order: 1 }],
+        },
+      });
+      expect(signRequest.response.ok()).toBeTruthy();
+      signRequestId = signRequest.body.data.sign_request.id as number;
+    }
+    expect(signRequestId).toBeTruthy();
+
+    await login(page, adminEmail!);
+    await page.goto(`/sign-requests/${signRequestId}/editor`);
+    await expect(page.getByText('Page 1 / 1')).toBeVisible({ timeout: 15_000 });
+    await expect.poll(
+      () => page.locator('canvas').first().evaluate((element) => (element as HTMLCanvasElement).width),
+      { timeout: 15_000 },
+    ).toBeGreaterThan(0);
+  });
+
   test('Golden Path 1: UI approval, internal signing, artifact and authorized download', async ({ browser, page, request }) => {
     const admin = await token(request, adminEmail!);
     const me = (await api(request, '/auth/me', { token: admin })).body.data.user;

@@ -6,7 +6,14 @@ import { Button } from '@/components/ui/button';
 import * as pdfjsLib from 'pdfjs-dist';
 
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+  // Keep the PDF.js worker in the production bundle. PDF.js 5 publishes an
+  // ESM worker (`.mjs`); using the obsolete CDN `.js` path left the viewer
+  // permanently blank whenever that request returned 404 or the CDN was
+  // unavailable.
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url,
+  ).toString();
 }
 
 interface OverlayContext {
@@ -75,6 +82,7 @@ export default function PDFCoreViewer({
   const [autoFitTick, setAutoFitTick] = useState(0);
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
   const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
+  const [viewerError, setViewerError] = useState<string | null>(null);
 
   const getAvailableWidth = useCallback(() => {
     const container = containerRef.current;
@@ -96,15 +104,17 @@ export default function PDFCoreViewer({
         setPdfDoc(null);
         setTotalPages(0);
         setCurrentPage(1);
+        setViewerError(null);
       });
       return;
     }
 
     let cancelled = false;
+    const loadingTask = pdfjsLib.getDocument(pdfUrl);
 
     const loadPdf = async () => {
       try {
-        const loadingTask = pdfjsLib.getDocument(pdfUrl);
+        setViewerError(null);
         const doc = await loadingTask.promise;
         if (cancelled) return;
         setPdfDoc(doc);
@@ -112,6 +122,11 @@ export default function PDFCoreViewer({
         setCurrentPage(1);
       } catch (loadError) {
         console.error('Error loading PDF document:', loadError);
+        if (!cancelled) {
+          setPdfDoc(null);
+          setTotalPages(0);
+          setViewerError('Không thể tải hoặc hiển thị PDF. Vui lòng thử lại.');
+        }
       }
     };
 
@@ -119,6 +134,7 @@ export default function PDFCoreViewer({
 
     return () => {
       cancelled = true;
+      void loadingTask.destroy();
     };
   }, [pdfUrl]);
 
@@ -331,12 +347,14 @@ export default function PDFCoreViewer({
     );
   }
 
-  if (error) {
+  const resolvedError = error ?? viewerError;
+
+  if (resolvedError) {
     return (
       <div className={`flex h-full items-center justify-center ${backgroundClassName}`}>
         <div className="text-center text-red-500">
           <p className="font-semibold">{errorTitle}</p>
-          <p className="text-sm">{error}</p>
+          <p className="text-sm">{resolvedError}</p>
         </div>
       </div>
     );
