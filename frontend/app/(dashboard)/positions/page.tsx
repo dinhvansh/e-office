@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Users, Briefcase, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Briefcase, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Power } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDestructiveConfirmation } from '@/components/providers/destructive-confirmation-provider';
 
@@ -190,6 +190,19 @@ export default function PositionsPage() {
     },
     onError: (error: any) => {
       toast.error(error.message || 'Có lỗi xảy ra');
+    },
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: async (position: Position) => fetchJson(`/positions/${position.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ is_active: !position.is_active }),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['positions'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Cáº­p nháº­t tráº¡ng thÃ¡i tháº¥t báº¡i');
     },
   });
 
@@ -378,13 +391,24 @@ export default function PositionsPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleOpenDialog(position)}
+                        aria-label={`Chá»‰nh sá»­a ${position.name}`}
                       >
                         <Pencil className="w-4 h-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
+                        aria-label={`${position.is_active ? 'Táº¡m dá»«ng' : 'KÃ­ch hoáº¡t'} ${position.name}`}
+                        onClick={() => toggleStatusMutation.mutate(position)}
+                        disabled={toggleStatusMutation.isPending}
+                      >
+                        <Power className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => handleDelete(position)}
+                        aria-label={`XÃ³a ${position.name}`}
                         disabled={!!(position._count?.users && position._count.users > 0)}
                       >
                         <Trash2 className="w-4 h-4 text-red-600" />
