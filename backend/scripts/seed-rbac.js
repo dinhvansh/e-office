@@ -159,8 +159,14 @@ async function seedRBAC() {
 
   const userPermissions = allPermissions.filter(
     (permission) =>
-      ['documents', 'sign_requests', 'approvals'].includes(permission.resource) &&
-      ['create', 'read'].includes(permission.action)
+      (
+        ['documents', 'sign_requests'].includes(permission.resource) &&
+        ['create', 'read'].includes(permission.action)
+      ) ||
+      (
+        permission.resource === 'approvals' &&
+        ['create', 'read', 'update'].includes(permission.action)
+      )
   );
   await prisma.role_permissions.deleteMany({ where: { role_id: userRole.id } });
   await prisma.role_permissions.createMany({
