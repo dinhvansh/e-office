@@ -108,21 +108,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    void Promise.resolve().then(() => {
-      const stored = readStoredSession();
-      if (stored?.tokens) {
-        setTokens(stored.tokens);
-        setUser(stored.user);
-        setTenant(stored.tenant);
-        setPermissions(stored.permissions ?? []);
-      }
-      setIsLoading(false);
-    });
+    const stored = readStoredSession();
+    if (stored?.tokens) {
+      setTokens(stored.tokens);
+      setUser(stored.user);
+      setTenant(stored.tenant);
+      setPermissions(stored.permissions ?? []);
+    }
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
+    if (isLoading) {
+      return;
+    }
     writeStoredSession({ tokens, user, tenant, permissions });
-  }, [tokens, user, tenant, permissions]);
+  }, [isLoading, tokens, user, tenant, permissions]);
 
   const fetchPermissions = useCallback(async (accessToken?: string) => {
     if (!accessToken) {
@@ -199,6 +200,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw new Error(payload.error?.message ?? 'Đăng nhập thất bại');
     }
     
+    writeStoredSession({
+      tokens: payload.data.tokens,
+      user: payload.data.user,
+      tenant: payload.data.tenant,
+      permissions: [],
+    });
     setTokens(payload.data.tokens);
     setUser(payload.data.user);
     setTenant(payload.data.tenant);
