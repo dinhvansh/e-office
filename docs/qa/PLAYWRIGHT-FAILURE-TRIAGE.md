@@ -36,7 +36,7 @@
 | Role nav: approver | A | Synthetic role/permissions not current role model. | Use seeded Manager/persona fixture. | Medium | obsolete/open |
 | Role nav: signer | A | Synthetic role/permissions not current role model. | Use seeded internal signer persona. | Medium | obsolete/open |
 | Role nav mobile overflow | A | Same synthetic super_admin assumption. | Rebuild from real Admin fixture. | Medium | obsolete/open |
-| UI simple documents | B | Hard-coded `secret123` while clean UAT seed password differs; test then remains on login. | Use E2E password environment variable. | Medium | open |
+| UI simple documents | A (resolved) | Legacy spec hard-coded `secret123`; clean UAT uses credentials supplied through `PLAYWRIGHT_EMAIL` and `PLAYWRIGHT_PASSWORD`. The spec now uses those variables and passes against the seeded Admin. | Keep credentials environment-provided; replace diagnostic-only assertions only when the document UI smoke is formally redesigned. | Medium | resolved |
 | UX-011 config guard /login | A | Old configuration guard expectation does not represent current clean UAT configuration. | Re-derive expected behavior from current settings route. | Low | obsolete/open |
 | UX-011 config guard protected route | A | Same obsolete configuration fixture. | Re-derive expected behavior from current settings route. | Low | obsolete/open |
 | UX-016 workflow preview localization | A | Fixed mock route/fixture uses stale workflow shape. | Rebuild with clean workflow seed data. | Medium | obsolete/open |

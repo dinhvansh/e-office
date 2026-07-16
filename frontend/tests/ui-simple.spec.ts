@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
 
 const creds = {
-  email: "admin@acme.local",
-  password: "secret123",
+  email: process.env.PLAYWRIGHT_EMAIL,
+  password: process.env.PLAYWRIGHT_PASSWORD,
 };
 
 test.describe("Document Types UI Test", () => {
   test("Login and verify documents page loads", async ({ page }) => {
+    test.skip(!creds.email || !creds.password, "PLAYWRIGHT_EMAIL and PLAYWRIGHT_PASSWORD are required for real UAT data");
     // Enable console logging
     page.on('console', msg => console.log('PAGE LOG:', msg.text()));
     page.on('pageerror', err => console.log('PAGE ERROR:', err.message));

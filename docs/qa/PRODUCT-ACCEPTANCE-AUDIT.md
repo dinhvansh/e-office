@@ -76,6 +76,10 @@ Unverified: all matrix cells through UI, direct URL, and direct API; all require
 
 Clean Docker UAT verified that the seeded Admin session is synchronously durable before the login redirect. `frontend/tests/auth-session-persistence.spec.ts` passed three sequential runs covering login and immediate redirect, direct `/documents` navigation, browser refresh, a same-browser new tab, and an isolated browser context (which correctly redirects to login). The prior direct-URL session-loss regression is closed.
 
+### Document UI smoke authentication â€” PASS (2026-07-16)
+
+`frontend/tests/ui-simple.spec.ts` now reads the seeded UAT account from `PLAYWRIGHT_EMAIL` and `PLAYWRIGHT_PASSWORD` rather than an obsolete hard-coded password. It passes with the real clean-stack Admin, alongside the direct-route persistence and master-data UI regressions.
+
 ## Remaining product debt / blockers
 
 1. Restore an available browser surface and execute screenshot-backed Playwright/business-path checks against the live UAT stack.
