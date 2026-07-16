@@ -24,6 +24,7 @@ export const departmentsService = {
     parent_id?: number;
     manager_id?: number;
     description?: string;
+    is_active?: boolean;
   }) {
     // Check if code already exists
     if (data.code) {
@@ -53,6 +54,7 @@ export const departmentsService = {
     parent_id?: number;
     manager_id?: number;
     description?: string;
+    is_active?: boolean;
   }) {
     // Check if department exists
     const existing = await departmentsRepository.findById(id, tenantId);

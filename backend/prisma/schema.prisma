@@ -201,6 +201,7 @@ model departments {
   parent_id   Int?
   manager_id  Int?
   description String?
+  is_active   Boolean   @default(true)
   created_at  DateTime  @default(now())
   tenant      tenants   @relation(fields: [tenant_id], references: [id])
   parent      departments? @relation("department_hierarchy", fields: [parent_id], references: [id])

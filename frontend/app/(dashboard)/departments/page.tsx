@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Building2, Edit, Trash2, Search, User } from 'lucide-react';
+import { Plus, Building2, Edit, Trash2, Search, User, Power } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -132,6 +132,20 @@ export default function DepartmentsPage() {
     },
     onError: (error: any) => {
       const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
+      toast.error(message);
+    },
+  });
+
+  const toggleDepartmentStatusMutation = useMutation({
+    mutationFn: (department: Department) => fetchJson(`/departments/${department.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ is_active: !department.is_active }),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments-tree'] });
+    },
+    onError: (error: any) => {
+      const message = typeof error === 'string' ? error : error?.message || 'Cá»­p nháº­t tráº¡ng thÃ¡i tháº¥t báº¡i';
       toast.error(message);
     },
   });
@@ -322,13 +336,24 @@ export default function DepartmentsPage() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleEdit(dept)}
+                                  aria-label={`Chá»‰nh sá»­a ${dept.name}`}
                                 >
                                   <Edit className="w-4 h-4" />
                                 </Button>
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  aria-label={`${dept.is_active ? 'Táº¡m dá»«ng' : 'KÃ­ch hoáº¡t'} ${dept.name}`}
+                                  onClick={() => toggleDepartmentStatusMutation.mutate(dept)}
+                                  disabled={toggleDepartmentStatusMutation.isPending}
+                                >
+                                  <Power className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
                                   onClick={() => handleDelete(dept)}
+                                  aria-label={`XÃ³a ${dept.name}`}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>

@@ -9,6 +9,7 @@ const departmentPayloadSchema = z.object({
   parent_id: z.number().int().positive().nullable().optional(),
   manager_id: z.number().int().positive().nullable().optional(),
   description: z.string().trim().max(500).nullable().optional(),
+  is_active: z.boolean().optional(),
 });
 
 const updateDepartmentPayloadSchema = departmentPayloadSchema.partial();
@@ -18,6 +19,7 @@ type CreateDepartmentInput = {
   parent_id?: number | null;
   manager_id?: number | null;
   description?: string | null;
+  is_active?: boolean;
 };
 const errorMessage = (error: unknown): string => error instanceof Error ? error.message : 'Unexpected error';
 

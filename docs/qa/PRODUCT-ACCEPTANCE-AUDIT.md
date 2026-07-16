@@ -15,7 +15,7 @@ The deterministic E2E dataset used `admin@acme.local`, an approval+signing workf
 | Phase | Result | Verified evidence / limitation |
 |---|---|---|
 | Clean UAT environment | PASS | Fresh Compose databases/volumes for local and S3 runs. |
-| Master Data | PARTIAL | Real UAT browser flow created a document from an accessible document-type list and persisted numbered document `009/2026` with type `Báo cáo` in PostgreSQL. The PostgreSQL authorization matrix also passed Admin create/update for departments, positions and document types, plus Viewer/User/Manager negative master-data checks. Full master-data CRUD, downstream dropdowns beyond document types, and two-tenant UI coverage remain unrun. |
+| Master Data | PARTIAL | Real UAT browser flows created numbered document `010/2026` from the accessible document-type list and completed Department create/duplicate rejection/disable/re-enable/delete. PostgreSQL confirms `departments.is_active` migration and document-type persistence. The authorization matrix passed Admin create/update for departments, positions and document types, plus Viewer/User/Manager negative master-data checks. Full positions/external-org CRUD, disabled-record downstream filtering, and two-tenant UI coverage remain unrun. |
 | Users / Roles / Permissions | PARTIAL | Fresh PostgreSQL API matrix passed for Admin/Manager/User/Viewer; full persona/role matrix not run. |
 | RBAC / ACL / Tenant Isolation | PARTIAL | Fresh PostgreSQL API matrix verified role denies and cross-tenant document denial; authenticated direct navigation, refresh, and same-session new-tab persistence are verified for the seeded Admin. UI/direct URL/full API tampering matrix remains otherwise unverified. |
 | Workflow Setup & document-type mapping | PASS (runtime subset) | E2E created mapped workflow and resolved it during request creation. |
@@ -63,6 +63,7 @@ Fixed UAT defects:
 3. `BUG-UAT-003` — Fresh RBAC seed omitted all `document_types:*` permissions, causing Admin document-type management to return 403. Fixed by seeding the four catalog permissions.
 4. `BUG-UAT-004` — Email outbox deduplication raised repeated unique-constraint errors instead of making repeated delivery requests safe. Fixed by treating the dedupe unique-key conflict as a no-op.
 5. `BUG-UAT-005` — Multi-approval E2E asserted synchronous completion while artifact generation is asynchronous. Fixed by polling for the terminal completed state.
+6. `BUG-UAT-007` — Departments showed a status in the UI but did not have persisted status data or an enable/disable operation. Fixed with a PostgreSQL migration, authenticated status update endpoint support, and an accessible UI toggle; browser regression verifies the full lifecycle.
 
 Regression coverage: four checks in `backend/tests/dockerE2eScripts.policy.test.ts` and the duplicate-email outbox test; backend suite passed 103/103. The clean PostgreSQL authorization matrix, full local/S3 Docker business flows, and multi-approval artifact flow were rerun successfully. Fix commits: `e7ebf22` (`fix(uat): run authorization matrix in clean Docker stack`) and `9c68b12` (`fix(outbox): make duplicate email enqueues idempotent`).
 
