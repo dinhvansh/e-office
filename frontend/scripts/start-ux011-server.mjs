@@ -8,7 +8,7 @@ for (const key of Object.keys(env)) {
 }
 
 await rm(distDir, { recursive: true, force: true });
-const child = spawn(process.execPath, ['./node_modules/next/dist/bin/next', 'dev', '-p', '3011'], {
+const child = spawn(process.execPath, ['./node_modules/next/dist/bin/next', 'dev', '--webpack', '-p', '3011'], {
   env,
   stdio: 'inherit',
 });

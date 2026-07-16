@@ -80,6 +80,10 @@ Clean Docker UAT verified that the seeded Admin session is synchronously durable
 
 `frontend/tests/ui-simple.spec.ts` now reads the seeded UAT account from `PLAYWRIGHT_EMAIL` and `PLAYWRIGHT_PASSWORD` rather than an obsolete hard-coded password. It passes with the real clean-stack Admin, alongside the direct-route persistence and master-data UI regressions.
 
+### Startup configuration fallback â€” PASS (2026-07-16)
+
+The configured UAT stack renders its normal login and protected-route flows. In a separate server process with API URL variables removed, UX-011 verifies that both `/login` and `/settings/system` render the accessible safe-unavailable guard without exposing configuration details. The isolated server now explicitly uses webpack, matching the application's Next configuration.
+
 ## Remaining product debt / blockers
 
 1. Restore an available browser surface and execute screenshot-backed Playwright/business-path checks against the live UAT stack.

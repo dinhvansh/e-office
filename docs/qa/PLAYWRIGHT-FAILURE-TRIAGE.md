@@ -37,8 +37,8 @@
 | Role nav: signer | A | Synthetic role/permissions not current role model. | Use seeded internal signer persona. | Medium | obsolete/open |
 | Role nav mobile overflow | A | Same synthetic super_admin assumption. | Rebuild from real Admin fixture. | Medium | obsolete/open |
 | UI simple documents | A (resolved) | Legacy spec hard-coded `secret123`; clean UAT uses credentials supplied through `PLAYWRIGHT_EMAIL` and `PLAYWRIGHT_PASSWORD`. The spec now uses those variables and passes against the seeded Admin. | Keep credentials environment-provided; replace diagnostic-only assertions only when the document UI smoke is formally redesigned. | Medium | resolved |
-| UX-011 config guard /login | A | Old configuration guard expectation does not represent current clean UAT configuration. | Re-derive expected behavior from current settings route. | Low | obsolete/open |
-| UX-011 config guard protected route | A | Same obsolete configuration fixture. | Re-derive expected behavior from current settings route. | Low | obsolete/open |
+| UX-011 config guard /login | B (resolved) | The configuration guard remains the intended missing-API-URL fallback. The isolated harness failed to start because Next 16 selected Turbopack while the app has a webpack configuration. | Start the isolated server with `next dev --webpack`; UAT configured startup remains covered by real auth/UI tests. | Low | resolved |
+| UX-011 config guard protected route | B (resolved) | Same isolated-harness startup incompatibility. The missing-config guard passes for this protected route once the harness explicitly uses webpack. | Retain both safe-failure assertions. | Low | resolved |
 | UX-016 workflow preview localization | A | Fixed mock route/fixture uses stale workflow shape. | Rebuild with clean workflow seed data. | Medium | obsolete/open |
 | UX-007 workflow status/retry | A | Fixed request ID and mock state contract; not a real assigned actor flow. | Move to real workflow UAT suite. | Medium | obsolete/open |
 | UX-007 workflow unauthorized retry | A | Same fixed-ID/mock assumption. | Cover with real Viewer/tenant-negative test. | Medium | obsolete/open |
