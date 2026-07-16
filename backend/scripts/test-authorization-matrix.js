@@ -312,6 +312,24 @@ async function run() {
         expectOk: true,
       },
       {
+        name: "Viewer can read roles",
+        fn: () =>
+          axios.get(`${API_BASE}/roles`, {
+            headers: { Authorization: `Bearer ${viewerToken}` },
+          }),
+        expectOk: true,
+      },
+      {
+        name: "Viewer cannot create role",
+        fn: () =>
+          axios.post(
+            `${API_BASE}/roles`,
+            { name: `Viewer Role ${Date.now()}` },
+            { headers: { Authorization: `Bearer ${viewerToken}` } }
+          ),
+        expectOk: false,
+      },
+      {
         name: "User cannot create document type",
         fn: () =>
           axios.post(
