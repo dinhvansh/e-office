@@ -55,3 +55,7 @@ The previously reproduced direct-URL session-loss regression is **resolved**. Th
 Apart from that reproduced direct-URL issue, no D or E issue has yet been proven by this 31-failure baseline. The failures currently establish that the legacy frontend suite is not a release-quality UAT suite. All real business/permission flows still require dedicated browser tests with real PostgreSQL data.
 
 The current external-signer browser regression is **PASS**: it uses real seeded UAT authentication, creates and dispatches a request to a unique external address, reads the delivered OTP from UAT Mailpit, and verifies it at the issued public signing URL. This replaces the stale direct-signing harness for OTP/link coverage; final signature and artifact completion are still not covered by this regression.
+
+## ACL browser regression (2026-07-16)
+
+`uat-document-acl.spec.ts` passes against the clean UAT stack. A same-tenant Viewer receives HTTP 403 when attempting to grant document permissions on an Admin-owned document. A separately provisioned tenant Admin also receives HTTP 403 when attempting the same ACL mutation against a foreign document. The endpoint authorizes document sharing before applying the completed-document rule, so no foreign document metadata is exposed. This is a verified permission control, not a legacy-suite failure.
