@@ -66,6 +66,26 @@ test("UAT users: admin creates a user through the UI with organizational assignm
   expect(changedPassword.status).toBe(200);
   await userContext.close();
 
+  const permissions = await callApi(page, "/roles/permissions");
+  const [firstPermission, secondPermission] = permissions.body.data as Array<{ id: number; resource: string; action: string }>;
+  const roleA = await callApi(page, "/roles", { method: "POST", body: JSON.stringify({ name: `UAT Union A ${suffix}`, permission_ids: [firstPermission.id] }) });
+  const roleB = await callApi(page, "/roles", { method: "POST", body: JSON.stringify({ name: `UAT Union B ${suffix}`, permission_ids: [secondPermission.id] }) });
+  expect(roleA.status).toBe(201);
+  expect(roleB.status).toBe(201);
+  expect((await callApi(page, `/users/${created.id}`, { method: "PUT", body: JSON.stringify({ role_ids: [roleA.body.data.id, roleB.body.data.id] }) })).status).toBe(200);
+  const unionContext = await page.context().browser()!.newContext({ baseURL: process.env.PLAYWRIGHT_BASE_URL });
+  const unionPage = await unionContext.newPage();
+  await unionPage.goto("/login");
+  await unionPage.getByLabel("Email").fill(email);
+  await unionPage.locator('input[type="password"]').fill("UatUser2B");
+  await unionPage.locator('button[type="submit"]').click();
+  await expect(unionPage).toHaveURL(/\/$/);
+  const effectivePermissions = await callApi(unionPage, "/roles/my-permissions");
+  expect(effectivePermissions.body.data).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: firstPermission.id }), expect.objectContaining({ id: secondPermission.id }),
+  ]));
+  await unionContext.close();
+
   const updated = await callApi(page, `/users/${created.id}`, {
     method: "PUT",
     body: JSON.stringify({ full_name: `UAT User Updated ${suffix}`, status: "inactive" }),
@@ -94,6 +114,8 @@ test("UAT users: admin creates a user through the UI with organizational assignm
   expect(referencedDepartmentDeletion.body.error).toMatchObject({ code: "DEPARTMENT_HAS_USERS" });
   const deleted = await callApi(page, `/users/${created.id}`, { method: "DELETE" });
   expect(deleted.status).toBe(200);
+  expect((await callApi(page, `/roles/${roleA.body.data.id}`, { method: "DELETE" })).status).toBe(200);
+  expect((await callApi(page, `/roles/${roleB.body.data.id}`, { method: "DELETE" })).status).toBe(200);
   expect((await callApi(page, `/departments/${department.body.data.id}`, { method: "DELETE" })).status).toBe(200);
   expect((await callApi(page, `/positions/${position.body.data.position.id}`, { method: "DELETE" })).status).toBe(200);
 });
