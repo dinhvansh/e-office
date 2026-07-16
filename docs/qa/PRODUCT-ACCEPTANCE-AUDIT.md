@@ -23,14 +23,14 @@ The deterministic E2E dataset used `admin@acme.local`, an approval+signing workf
 | Approval | PASS (runtime subset) | UAT PostgreSQL runtime verifies submit → `AWAITING_APPROVAL`, assigned pending approval, exactly one accepted concurrent approval, one workflow-completion outbox event, and transition to signing. |
 | Internal signing | PASS (runtime subset) | UAT runtime configures internal signer/field, forces an audit-write rollback to verify transactional safety, rejects duplicate concurrent signing without duplicate audit/outbox events, then completes the artifact path. |
 | Sequential signing | PARTIAL | Backend regression suite (104/104) verifies order-two internal and public signers receive `SIGNING_ORDER_VIOLATION` before order one, same-order parallel behavior, and next-order activation. A real two-internal-signer browser/UAT flow remains unrun. |
-| External signing | PARTIAL | Backend regression suite (104/104) verifies OTP/session lifecycle, minimal pre-OTP metadata, expiry/consumption denial, and public signing-order enforcement; no real browser/external-persona flow was run. |
+| External signing | PARTIAL | Backend regression suite (104/104) verifies OTP/session lifecycle, minimal pre-OTP metadata, expiry/consumption denial, and public signing-order enforcement. Clean UAT Playwright now creates a real external signer, sends the request through Mailpit, opens the issued public link, extracts the delivered OTP, and verifies it in the browser. Final external signature and artifact completion remain unexecuted. |
 | Workflow state machine | PARTIAL | Backend 104/104 verifies valid approval-only/artifact transitions and invalid terminal-state denial; UAT runtime traversed `AWAITING_APPROVAL` → `AWAITING_SIGNATURES` → `COMPLETED`. Full transition matrix remains unexecuted. |
 | Artifact / completion | PASS (runtime subset) | Latest UAT PostgreSQL request is `completed` with a persisted signed artifact and hash; runtime downloaded the local artifact. MinIO source/artifact, delete behavior, and failure/retry policies are also verified. |
 | Notification / Email / Webhook | PARTIAL | UAT PostgreSQL flow persisted approval-request, sign-request, and workflow-completed notifications plus processed approval/signature/artifact outbox events. Worker/outbox policy tests pass; no live email/webhook recipient or browser My Tasks check. |
 | Permission escalation / negative tests | PARTIAL | Disabled account/session, field ownership, signing order, cross-tenant S3 document access, and admin-policy tests passed; full ID tampering matrix remains unverified. |
 | Golden Path 1 | PARTIAL | Approval + internal signer + local artifact passed by real backend/PostgreSQL; browser requirement blocked. |
 | Golden Path 2 | PARTIAL | Clean PostgreSQL flow verified `min_n=2` approval, internal signing, async worker artifact completion; two sequential internal signers remain unverified. |
-| Golden Path 3 | PARTIAL | The UAT overlay now provisions Mailpit and the real backend SMTP transport delivered a probe message to its inbox. OTP/session policy coverage passes, but the external-persona browser signing and final artifact flow remains unexecuted. |
+| Golden Path 3 | PARTIAL | The UAT overlay provisions Mailpit; real backend SMTP delivery and the public browser OTP verification flow pass. The final external signature and artifact flow remain unexecuted. |
 | Final gates | PARTIAL | All listed command gates passed except Playwright browser business-flow E2E was not run because no browser surface was available. |
 
 ## Commands and outcomes
@@ -88,6 +88,10 @@ Clean Docker UAT verified that the seeded Admin session is synchronously durable
 
 `frontend/tests/ui-simple.spec.ts` now reads the seeded UAT account from `PLAYWRIGHT_EMAIL` and `PLAYWRIGHT_PASSWORD` rather than an obsolete hard-coded password. It passes with the real clean-stack Admin, alongside the direct-route persistence and master-data UI regressions.
 
+### External signer OTP browser regression — PASS (2026-07-16)
+
+`frontend/tests/e2e.spec.ts` now covers the current real UAT path: API creates and sends an external signing request, Mailpit receives the one-time code, and Chromium opens the issued public link and verifies that code. This confirms token generation at request dispatch and public OTP/session hydration; signing submission and completed-artifact verification remain separate outstanding coverage.
+
 ### Startup configuration fallback â€” PASS (2026-07-16)
 
 The configured UAT stack renders its normal login and protected-route flows. In a separate server process with API URL variables removed, UX-011 verifies that both `/login` and `/settings/system` render the accessible safe-unavailable guard without exposing configuration details. The isolated server now explicitly uses webpack, matching the application's Next configuration.
@@ -95,7 +99,7 @@ The configured UAT stack renders its normal login and protected-route flows. In 
 ## Remaining product debt / blockers
 
 1. Restore an available browser surface and execute screenshot-backed Playwright/business-path checks against the live UAT stack.
-2. Execute Golden Paths 2 and 3 on clean deterministic tenant data.
+2. Complete Golden Paths 2 and 3 on clean deterministic tenant data, including two sequential internal signers and the external signature/artifact terminal path.
 3. Complete `03-PERMISSION-MATRIX.md` at UI, URL, and API layers, including all tampering tests.
 4. Execute complete master-data CRUD, notification/email/webhook delivery, and state-machine transition matrices.
 5. Resolve the frontend build-cache disk-space warning before CI/release hardening.

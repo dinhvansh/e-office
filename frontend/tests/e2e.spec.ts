@@ -76,4 +76,41 @@ test.describe("WP Sign smoke suite", () => {
     expect(srJson.data.sign_request.document_id).toBe(documentId);
     expect(srJson.data.sign_request.signers.length).toBeGreaterThan(0);
   });
+
+  test("external signer can open the issued link and verify the emailed OTP", async ({ page, request }) => {
+    const { token } = await authenticate(request);
+    const authHeaders = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const marker = `external-otp-${Date.now()}`;
+    const email = `${marker}@example.test`;
+    const upload = await request.post(`${API_BASE}/documents`, {
+      headers: authHeaders,
+      data: { file_name: `${marker}.txt`, file_base64: Buffer.from(marker).toString("base64") },
+    });
+    expect(upload.ok()).toBeTruthy();
+    const documentId = (await upload.json()).data.document.id as number;
+    const created = await request.post(`${API_BASE}/sign-requests`, {
+      headers: authHeaders,
+      data: { document_id: documentId, title: marker, workflow_type: "sequential", signers: [{ email, name: "External OTP UAT" }] },
+    });
+    expect(created.ok()).toBeTruthy();
+    const signRequestId = (await created.json()).data.sign_request.id as number;
+    const sent = await request.post(`${API_BASE}/sign-requests/${signRequestId}/send`, { headers: authHeaders });
+    expect(sent.ok()).toBeTruthy();
+    const sentData = await sent.json();
+    const signer = sentData.data.sign_request.signers.find((candidate: { email: string }) => candidate.email === email);
+    expect(signer?.signing_token).toMatch(/^[a-f0-9]{64}$/);
+
+    await page.goto(`/sign/${signer.signing_token}`);
+    await expect(page.getByRole("heading", { name: marker })).toBeVisible();
+    const messages = await request.get("http://127.0.0.1:8025/api/v1/messages");
+    expect(messages.ok()).toBeTruthy();
+    const message = (await messages.json()).messages.find((candidate: { To: Array<{ Address: string }> }) => candidate.To.some((to) => to.Address === email));
+    expect(message).toBeTruthy();
+    const content = await request.get(`http://127.0.0.1:8025/api/v1/message/${message.ID}`);
+    const otp = (JSON.stringify(await content.json()).match(/\b\d{6}\b/) || [])[0];
+    expect(otp).toMatch(/^\d{6}$/);
+    await page.getByLabel(/Mã OTP/).fill(otp);
+    await page.getByRole("button", { name: /Xác thực OTP/ }).click();
+    await expect(page.locator("p.text-green-900", { hasText: "Xác thực thành công" })).toBeVisible();
+  });
 });
