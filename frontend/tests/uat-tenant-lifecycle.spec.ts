@@ -34,6 +34,9 @@ test("UAT tenant lifecycle: onboarding admin can update only its own company pro
   const initialDomain = `uat-${suffix}.example.test`;
   const updatedName = `${initialName} Updated`;
   const updatedDomain = `updated-${suffix}.example.test`;
+  const secondAdminEmail = `uat-tenant-b-${suffix}@example.test`;
+  const secondTenantName = `UAT Tenant B ${suffix}`;
+  const secondTenantDomain = `uat-b-${suffix}.example.test`;
 
   const created = await page.request.post(`${apiBase}/tenants/create-with-admin`, {
     data: {
@@ -46,17 +49,6 @@ test("UAT tenant lifecycle: onboarding admin can update only its own company pro
   });
   expect(created.status()).toBe(201);
   expect((await created.json()).data.tenant.name).toBe(initialName);
-
-  const duplicate = await page.request.post(`${apiBase}/tenants/create-with-admin`, {
-    data: {
-      tenant_name: initialName,
-      tenant_domain: `duplicate-${initialDomain}`,
-      admin_email: `duplicate-${adminEmail}`,
-      admin_password: password,
-      admin_full_name: "Duplicate Tenant Admin",
-    },
-  });
-  expect(duplicate.status()).toBe(400);
 
   await signIn(page, adminEmail, password);
   await page.goto("/settings/tenant");
@@ -71,6 +63,39 @@ test("UAT tenant lifecycle: onboarding admin can update only its own company pro
   const profile = await callApi(page, "/tenants/me");
   expect(profile.status).toBe(200);
   expect(profile.body.data.tenant).toMatchObject({ name: updatedName, domain: updatedDomain });
+
+  const department = await callApi(page, "/departments", {
+    method: "POST",
+    body: JSON.stringify({ name: `Private Department ${suffix}`, code: `TEN${suffix.slice(-6)}` }),
+  });
+  expect(department.status).toBe(201);
+  const departmentId = department.body.data.id as number;
+
+  const secondTenant = await page.request.post(`${apiBase}/tenants/create-with-admin`, {
+    data: {
+      tenant_name: secondTenantName,
+      tenant_domain: secondTenantDomain,
+      admin_email: secondAdminEmail,
+      admin_password: password,
+      admin_full_name: "UAT Tenant B Admin",
+    },
+  });
+  expect(secondTenant.status()).toBe(201);
+
+  const duplicateName = await callApi(page, "/tenants/me", {
+    method: "PUT",
+    body: JSON.stringify({ name: secondTenantName }),
+  });
+  expect(duplicateName.status).toBe(400);
+
+  const secondContext = await browser.newContext({ baseURL: process.env.PLAYWRIGHT_BASE_URL });
+  const secondPage = await secondContext.newPage();
+  await signIn(secondPage, secondAdminEmail, password);
+  await secondPage.goto("/departments");
+  await expect(secondPage.getByRole("table")).not.toContainText(`Private Department ${suffix}`);
+  const foreignDepartment = await callApi(secondPage, `/departments/${departmentId}`);
+  expect(foreignDepartment.status).toBe(404);
+  await secondContext.close();
 
   const isolated = await browser.newContext({ baseURL: process.env.PLAYWRIGHT_BASE_URL });
   const isolatedPage = await isolated.newPage();
