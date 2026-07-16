@@ -42,7 +42,8 @@ test("clean Docker UAT frontend is built against the exposed E2E backend", () =>
 
   assert.match(env, /^BACKEND_PORT=4010$/m);
   assert.match(env, /^FRONTEND_PORT=3010$/m);
-  assert.match(env, /^CORS_ORIGIN=http:\/\/localhost:3010$/m);
-  assert.match(env, /^NEXT_PUBLIC_API_URL=http:\/\/localhost:4010\/api\/v1$/m);
-  assert.match(env, /^NEXT_PUBLIC_API_BASE_URL=http:\/\/localhost:4010\/api\/v1$/m);
+  assert.match(env, /^CORS_ORIGIN=http:\/\/127\.0\.0\.1:3010$/m);
+  assert.match(env, /^NEXT_PUBLIC_API_URL=http:\/\/127\.0\.0\.1:4010\/api\/v1$/m);
+  assert.match(env, /^NEXT_PUBLIC_API_BASE_URL=http:\/\/127\.0\.0\.1:4010\/api\/v1$/m);
+  assert.match(env, /^RATE_LIMIT_BYPASS_EMAILS=admin@acme\.local,manager@acme\.local,staff\.it@acme\.local,legal@acme\.local,finance@acme\.local$/m);
 });

@@ -31,6 +31,9 @@ export function SelectWithIcon({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-label={selectedOption?.label ?? placeholder}
         className={cn(
           'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
           className
@@ -52,12 +55,14 @@ export function SelectWithIcon({
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
+          <div role="listbox" className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
             <div className="max-h-60 overflow-auto p-1">
               {options.map((option) => (
                 <button
                   key={option.value}
                   type="button"
+                  role="option"
+                  aria-selected={value === option.value}
                   onClick={() => {
                     onChange(option.value);
                     setIsOpen(false);
