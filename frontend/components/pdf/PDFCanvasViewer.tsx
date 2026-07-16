@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { X } from 'lucide-react';
 import PDFCoreViewer from '@/components/pdf/PDFCoreViewer';
 import { usePDFUrl } from '@/hooks/usePDFUrl';
 import { clampNormalizedBox, pctToPx, pxToPct } from '@/lib/coordinate.helper';
@@ -35,6 +36,7 @@ interface PDFCanvasViewerProps {
   onFieldAdd?: (field: Omit<Field, 'id'>) => void;
   onFieldMove?: (id: string, xPct: number, yPct: number) => void;
   onFieldResize?: (id: string, widthPct: number, heightPct: number) => void;
+  onFieldDelete?: (id: string) => void;
 }
 
 const DEFAULT_FIELD_SIZE_PX: Record<Field['type'], { width: number; height: number }> = {
@@ -54,9 +56,11 @@ export function PDFCanvasViewer({
   onFieldAdd,
   onFieldMove,
   onFieldResize,
+  onFieldDelete,
 }: PDFCanvasViewerProps) {
   const { blobUrl, loading, error } = usePDFUrl(fileUrl, token);
   const [dragState, setDragState] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
+  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [resizeState, setResizeState] = useState<{
     id: string;
     startPointerX: number;
@@ -74,6 +78,20 @@ export function PDFCanvasViewer({
     ],
     []
   );
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!selectedFieldId || !onFieldDelete || (event.key !== 'Delete' && event.key !== 'Backspace')) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
+      event.preventDefault();
+      onFieldDelete(selectedFieldId);
+      setSelectedFieldId(null);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onFieldDelete, selectedFieldId]);
 
   return (
     <PDFCoreViewer
@@ -132,7 +150,8 @@ export function PDFCanvasViewer({
               return (
                 <div
                   key={field.id}
-                  className={`pointer-events-auto group absolute rounded-md border-2 ${color.border} ${color.bg} ${color.hover} cursor-move bg-opacity-30 transition-all duration-75`}
+                  data-sign-field-id={field.id}
+                  className={`pointer-events-auto group absolute rounded-md border-2 ${color.border} ${color.bg} ${color.hover} ${onFieldMove ? 'cursor-move' : 'cursor-default'} bg-opacity-30 transition-all duration-75 ${selectedFieldId === field.id ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}
                   style={{
                     left: `${boxPx.left}px`,
                     top: `${boxPx.top}px`,
@@ -140,12 +159,14 @@ export function PDFCanvasViewer({
                     height: `${boxPx.height}px`,
                   }}
                   onMouseDown={(event) => {
+                    if (!onFieldMove) return;
                     if ((event.target as HTMLElement).dataset.resizeHandle === 'true') {
                       return;
                     }
 
                     event.preventDefault();
                     event.stopPropagation();
+                    setSelectedFieldId(field.id);
                     const fieldElement = event.currentTarget;
                     const pageElement = fieldElement.parentElement;
                     if (!pageElement) return;
@@ -191,7 +212,26 @@ export function PDFCanvasViewer({
                     {field.signer_name ? <div className="truncate text-xs opacity-75">{field.signer_name}</div> : null}
                   </div>
 
-                  <div
+                  {onFieldDelete ? <button
+                    type="button"
+                    aria-label={`Xóa ${getResolvedFieldLabel(field)}`}
+                    title="Xóa vị trí ký"
+                    className={`absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-red-600 text-white shadow transition-opacity ${selectedFieldId === field.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onFieldDelete?.(field.id);
+                      setSelectedFieldId(null);
+                    }}
+                  >
+                    <X className="h-3 w-3" aria-hidden="true" />
+                  </button> : null}
+
+                  {onFieldResize ? <div
                     data-resize-handle="true"
                     className="absolute -bottom-1 -right-1 h-4 w-4 cursor-se-resize rounded-full border-2 border-white bg-blue-600 opacity-0 shadow-lg transition-all duration-200 group-hover:opacity-100 hover:scale-110 hover:bg-blue-700"
                     onMouseDown={(event) => {
@@ -224,7 +264,7 @@ export function PDFCanvasViewer({
                       document.addEventListener('mousemove', moveHandler);
                       document.addEventListener('mouseup', upHandler);
                     }}
-                  />
+                  /> : null}
                 </div>
               );
             })}

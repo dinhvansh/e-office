@@ -89,6 +89,8 @@ export default function CreateSignRequestPage() {
 
   const existingSignRequestId = Number(searchParams.get('signRequestId') || '');
   const isEditMode = Number.isFinite(existingSignRequestId) && existingSignRequestId > 0;
+  const replacedSignRequestId = Number(searchParams.get('replaces') || '');
+  const isReplacementDraft = Number.isFinite(replacedSignRequestId) && replacedSignRequestId > 0;
 
   const [file, setFile] = useState<File | null>(null);
   const [documentTypeId, setDocumentTypeId] = useState<number | null>(null);
@@ -439,6 +441,11 @@ export default function CreateSignRequestPage() {
 
   return (
     <div className="space-y-6">
+      {isReplacementDraft ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+          Luồng #{replacedSignRequestId} đã được hủy và vẫn còn trong lịch sử. Hãy upload PDF mới và chọn lại loại văn bản để tạo bản nháp thay thế.
+        </div>
+      ) : null}
       <PageHeader
         icon={Upload}
         title={isEditMode ? 'Chỉnh cấu hình trình ký' : 'Tạo trình ký'}

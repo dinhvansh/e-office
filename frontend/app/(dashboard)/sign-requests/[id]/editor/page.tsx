@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CalendarDays, CheckSquare, PenLine, Save, Send, TextCursorInput } from 'lucide-react';
+import { ArrowLeft, CalendarDays, CheckSquare, PenLine, RotateCcw, Save, Send, TextCursorInput } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/components/providers/auth-provider';
 import { PDFCanvasViewer } from '@/components/pdf/PDFCanvasViewer';
 import { Button } from '@/components/ui/button';
 import { getDefaultFieldLabel, getDefaultFieldPlaceholder, getResolvedFieldLabel } from '@/lib/sign-field.helper';
+import { useDestructiveConfirmation } from '@/components/providers/destructive-confirmation-provider';
 
 interface Field {
   id?: number;
@@ -72,6 +73,7 @@ export default function SignRequestEditorPage() {
   const router = useRouter();
   const { fetchJson } = useAuth();
   const queryClient = useQueryClient();
+  const confirmDestructive = useDestructiveConfirmation();
   const signRequestId = Number(params.id);
 
   const [fields, setFields] = useState<Field[]>([]);
@@ -87,6 +89,7 @@ export default function SignRequestEditorPage() {
   const isEditable =
     signRequest?.flow_state === 'DRAFT' || signRequest?.status === 'draft' || signRequest?.status === 'rejected';
   const isReadOnly = !isEditable;
+  const canCancelAndRecreate = Boolean(signRequest && !['completed', 'cancelled'].includes(signRequest.status ?? ''));
 
   const allSigners: Signer[] = signRequest?.signers || [];
   const signers = allSigners.filter((signer) => signer.role === 'signer' || !signer.role);
@@ -152,6 +155,34 @@ export default function SignRequestEditorPage() {
     },
   });
 
+  const cancelAndRecreateMutation = useMutation({
+    mutationFn: async () =>
+      fetchJson(`/sign-requests/${signRequestId}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: 'Hủy để thay PDF hoặc loại văn bản và tạo lại bản nháp' }),
+      }),
+    onSuccess: () => {
+      toast.success('Đã hủy luồng cũ. Hãy tạo bản nháp mới.');
+      router.replace(`/sign-requests/create?replaces=${signRequestId}`);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Không thể hủy luồng ký');
+    },
+  });
+
+  const handleCancelAndRecreate = () => {
+    confirmDestructive(
+      {
+        title: 'Hủy luồng và tạo lại',
+        targetName: signRequest?.document?.title || `Yêu cầu ký #${signRequestId}`,
+        description: 'Luồng hiện tại sẽ được hủy và lưu lại trong lịch sử. Sau đó bạn sẽ tạo bản nháp mới để thay PDF hoặc chọn lại loại văn bản.',
+        confirmLabel: 'Hủy luồng và tạo lại',
+        errorMessage: 'Không thể hủy luồng ký. Vui lòng thử lại.',
+      },
+      () => cancelAndRecreateMutation.mutateAsync(),
+    );
+  };
+
   const handlePickField = (type: Field['type']) => {
     if (isReadOnly) {
       toast.error('Tài liệu đã gửi, không thể chỉnh sửa vị trí ký');
@@ -213,7 +244,7 @@ export default function SignRequestEditorPage() {
       toast.error('Tài liệu đã gửi, không thể chỉnh sửa');
       return;
     }
-    setFields(fields.filter((_, itemIndex) => itemIndex !== index));
+    setFields((currentFields) => currentFields.filter((_, itemIndex) => itemIndex !== index));
   };
 
   if (isLoading) {
@@ -230,7 +261,7 @@ export default function SignRequestEditorPage() {
         <div className="mx-auto max-w-[1800px] px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
-              <Button variant="ghost" size="sm" onClick={() => router.push(`/sign-requests/create?signRequestId=${signRequestId}`)} className="w-full sm:w-auto">
+              <Button variant="ghost" size="sm" onClick={() => router.push(isEditable ? `/sign-requests/create?signRequestId=${signRequestId}` : '/sign-requests')} className="w-full sm:w-auto">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Quay lại
               </Button>
@@ -261,8 +292,14 @@ export default function SignRequestEditorPage() {
                 </Button>
               </div>
             ) : (
-              <div className="rounded border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700">
-                Chỉ xem - không thể chỉnh sửa
+              <div className="flex flex-col gap-2 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+                <span>Luồng đã gửi nên file và loại văn bản được khóa để bảo toàn lịch sử phê duyệt.</span>
+                {canCancelAndRecreate ? (
+                  <Button variant="outline" size="sm" onClick={handleCancelAndRecreate} disabled={cancelAndRecreateMutation.isPending}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Hủy luồng & tạo lại
+                  </Button>
+                ) : null}
               </div>
             )}
           </div>
@@ -376,9 +413,9 @@ export default function SignRequestEditorPage() {
                         email: signer.email,
                         signing_order: index + 1,
                       }))}
-                      selectedSignerId={selectedSigner || undefined}
+                      selectedSignerId={isEditable ? selectedSigner || undefined : undefined}
                       selectedFieldType={selectedFieldType}
-                      onFieldAdd={(field) => {
+                      onFieldAdd={isEditable ? (field) => {
                         const newField: Field = {
                           ...field,
                           type: selectedFieldType,
@@ -387,21 +424,21 @@ export default function SignRequestEditorPage() {
                           label: getDefaultFieldLabel(selectedFieldType),
                           assigned_signer_id: selectedSigner,
                         };
-                        setFields([...fields, newField]);
+                        setFields((currentFields) => [...currentFields, newField]);
                         toast.success('Đã thêm vị trí');
-                      }}
-                      onFieldMove={(id, xPct, yPct) => {
+                      } : undefined}
+                      onFieldMove={isEditable ? (id, xPct, yPct) => {
                         const index = Number(id.replace('field-', ''));
-                        const nextFields = [...fields];
-                        nextFields[index] = { ...nextFields[index], xPct, yPct };
-                        setFields(nextFields);
-                      }}
-                      onFieldResize={(id, widthPct, heightPct) => {
+                        setFields((currentFields) => currentFields.map((field, fieldIndex) => fieldIndex === index ? { ...field, xPct, yPct } : field));
+                      } : undefined}
+                      onFieldResize={isEditable ? (id, widthPct, heightPct) => {
                         const index = Number(id.replace('field-', ''));
-                        const nextFields = [...fields];
-                        nextFields[index] = { ...nextFields[index], widthPct, heightPct };
-                        setFields(nextFields);
-                      }}
+                        setFields((currentFields) => currentFields.map((field, fieldIndex) => fieldIndex === index ? { ...field, widthPct, heightPct } : field));
+                      } : undefined}
+                      onFieldDelete={isEditable ? (id) => {
+                        const index = Number(id.replace('field-', ''));
+                        if (!Number.isNaN(index)) handleDeleteField(index);
+                      } : undefined}
                     />
                   </div>
                 </div>

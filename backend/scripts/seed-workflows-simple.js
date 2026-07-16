@@ -13,17 +13,29 @@ async function seedWorkflows() {
     }
     console.log('✅ Using tenant:', tenant.name);
 
-    // Get roles
-    const managerRole = await prisma.roles.findFirst({
-      where: { name: 'Manager', tenant_id: tenant.id }
-    });
-    const adminRole = await prisma.roles.findFirst({
-      where: { name: 'Admin', tenant_id: tenant.id }
-    });
+    // The demo workflow must use the same normalized assignment model as the
+    // workflow editor. Legacy approver_type-only rows cannot show a resolved
+    // actor in the current UI and can create unusable approval tasks.
+    const [manager, legal, admin] = await Promise.all([
+      prisma.users.findFirst({ where: { tenant_id: tenant.id, email: 'manager@acme.local' } }),
+      prisma.users.findFirst({ where: { tenant_id: tenant.id, email: 'legal@acme.local' } }),
+      prisma.users.findFirst({ where: { tenant_id: tenant.id, email: 'admin@acme.local' } }),
+    ]);
 
-    // Get departments
-    const itDept = await prisma.departments.findFirst({
-      where: { name: 'IT Department', tenant_id: tenant.id }
+    if (!manager || !legal || !admin) {
+      throw new Error('Demo approvers are missing. Run seed-demo-internal-users.js before seeding workflows.');
+    }
+
+    const approverStep = (workflowId, stepOrder, stepName, userId) => ({
+      workflow_id: workflowId,
+      step_order: stepOrder,
+      step_name: stepName,
+      approver_type: 'user',
+      approver_id: userId,
+      assignee_type: 'specific_user',
+      assignee_user_id: userId,
+      completion_mode: 'all',
+      participant_role: 'approver',
     });
 
     console.log('\n📋 Creating workflows...');
@@ -51,12 +63,7 @@ async function seedWorkflows() {
       where: { workflow_id: workflow1.id }
     });
     await prisma.workflow_steps.create({
-      data: {
-        workflow_id: workflow1.id,
-        step_order: 1,
-        step_name: 'Phê duyệt quản lý',
-        approver_type: 'manager',
-      },
+      data: approverStep(workflow1.id, 1, 'Phê duyệt quản lý', manager.id),
     });
     console.log('  → Added 1 step');
 
@@ -84,20 +91,8 @@ async function seedWorkflows() {
     });
     await prisma.workflow_steps.createMany({
       data: [
-        {
-          workflow_id: workflow2.id,
-          step_order: 1,
-          step_name: 'Phê duyệt trưởng phòng',
-          approver_type: 'manager',
-          approver_id: null,
-        },
-        {
-          workflow_id: workflow2.id,
-          step_order: 2,
-          step_name: 'Phê duyệt giám đốc',
-          approver_type: 'role',
-          approver_id: adminRole?.id,
-        },
+        approverStep(workflow2.id, 1, 'Phê duyệt trưởng phòng', manager.id),
+        approverStep(workflow2.id, 2, 'Phê duyệt giám đốc', admin.id),
       ],
     });
     console.log('  → Added 2 steps');
@@ -126,30 +121,21 @@ async function seedWorkflows() {
     });
     await prisma.workflow_steps.createMany({
       data: [
-        {
-          workflow_id: workflow3.id,
-          step_order: 1,
-          step_name: 'Phê duyệt phòng ban',
-          approver_type: 'department',
-          approver_id: itDept?.id,
-        },
-        {
-          workflow_id: workflow3.id,
-          step_order: 2,
-          step_name: 'Phê duyệt quản lý',
-          approver_type: 'role',
-          approver_id: managerRole?.id,
-        },
-        {
-          workflow_id: workflow3.id,
-          step_order: 3,
-          step_name: 'Phê duyệt giám đốc',
-          approver_type: 'role',
-          approver_id: adminRole?.id,
-        },
+        approverStep(workflow3.id, 1, 'Phê duyệt phòng ban', manager.id),
+        approverStep(workflow3.id, 2, 'Phê duyệt pháp chế', legal.id),
+        approverStep(workflow3.id, 3, 'Phê duyệt giám đốc', admin.id),
       ],
     });
     console.log('  → Added 3 steps');
+
+    // Keep the documented Hợp đồng type aligned with the verified three-step
+    // contract approval workflow, rather than a stale workflow id from a
+    // previous demo run.
+    await prisma.document_types.updateMany({
+      where: { tenant_id: tenant.id, code: 'HOP_DONG' },
+      data: { default_workflow_id: workflow3.id, require_approval: true },
+    });
+    console.log('  → Mapped Hợp đồng to the 3-step contract workflow');
 
     console.log('\n✅ Workflows seeded successfully!');
     console.log('\n📊 Summary:');

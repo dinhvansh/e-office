@@ -34,8 +34,8 @@ function main() {
 
   // Optional baseline master data for first-time demo usage.
   run('node', ['scripts/seed-document-types.js']);
-  run('node', ['scripts/seed-workflows-simple.js']);
   run('node', ['scripts/seed-demo-internal-users.js']);
+  run('node', ['scripts/seed-workflows-simple.js']);
 
   console.log('[init-db] Database initialization completed.');
 }
