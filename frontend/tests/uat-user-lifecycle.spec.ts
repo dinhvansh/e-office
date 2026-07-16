@@ -52,6 +52,11 @@ test("UAT users: admin creates a user through the UI with organizational assignm
   expect(created).toMatchObject({ email, department_id: department.body.data.id, position_id: position.body.data.position.id });
   expect(created.user_roles.map((item: { role: { id: number } }) => item.role.id)).toContain(userRole.id);
 
+  const referencedDepartmentDeletion = await callApi(page, `/departments/${department.body.data.id}`, { method: "DELETE" });
+  expect(referencedDepartmentDeletion.status).toBe(400);
+  expect(referencedDepartmentDeletion.body.error).toMatchObject({ code: "DEPARTMENT_HAS_USERS" });
   const deleted = await callApi(page, `/users/${created.id}`, { method: "DELETE" });
   expect(deleted.status).toBe(200);
+  expect((await callApi(page, `/departments/${department.body.data.id}`, { method: "DELETE" })).status).toBe(200);
+  expect((await callApi(page, `/positions/${position.body.data.position.id}`, { method: "DELETE" })).status).toBe(200);
 });

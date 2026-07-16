@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { departmentsService } from './departments.service';
+import { AppError } from '../../utils/errors';
 
 const idSchema = z.coerce.number().int().positive();
 const departmentPayloadSchema = z.object({
@@ -85,7 +86,14 @@ export const departmentsController = {
       await departmentsService.deleteDepartment(id, tenantId);
       res.json({ success: true, message: 'Department deleted' });
     } catch (error: unknown) {
-      res.status(400).json({ success: false, error: errorMessage(error) });
+      const appError = error instanceof AppError ? error : null;
+      res.status(appError?.statusCode ?? 400).json({
+        success: false,
+        error: {
+          code: appError?.code ?? 'DEPARTMENT_DELETE_FAILED',
+          message: errorMessage(error),
+        },
+      });
     }
   },
 };
