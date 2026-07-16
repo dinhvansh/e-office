@@ -184,6 +184,13 @@ async function run() {
     );
     const documentTypeId = createdDocType.data?.data?.id;
 
+    const createdExternalOrg = await axios.post(
+      `${API_BASE}/external-orgs`,
+      { name: `Security Partner ${Date.now()}`, code: `ORG${Date.now()}`.slice(-10), email: `matrix-${Date.now()}@example.test` },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    const externalOrgId = createdExternalOrg.data?.data?.id;
+
     const crossTenantDoc = await axios.post(
       `${API_BASE}/documents`,
       {
@@ -343,6 +350,26 @@ async function run() {
             { headers: { Authorization: `Bearer ${adminToken}` } }
           ),
         expectOk: true,
+      },
+      {
+        name: "User cannot create external organization",
+        fn: () =>
+          axios.post(
+            `${API_BASE}/external-orgs`,
+            { name: "User external organization", code: `UORG${Date.now()}`.slice(-10) },
+            { headers: { Authorization: `Bearer ${userToken}` } }
+          ),
+        expectOk: false,
+      },
+      {
+        name: "Viewer cannot update external organization",
+        fn: () =>
+          axios.put(
+            `${API_BASE}/external-orgs/${externalOrgId}`,
+            { name: "Viewer should not update" },
+            { headers: { Authorization: `Bearer ${viewerToken}` } }
+          ),
+        expectOk: false,
       },
       {
         name: "Cross-tenant viewer cannot read foreign document",
