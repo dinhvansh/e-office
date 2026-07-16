@@ -64,7 +64,8 @@ const DEFAULT_STEP_FORM_DATA: StepFormData = {
 };
 
 export default function WorkflowsPage() {
-  const { fetchJson } = useAuth();
+  const { fetchJson, user, permissions } = useAuth();
+  const canCreateWorkflows = user?.role === 'super_admin' || permissions.includes('workflows:create');
   const queryClient = useQueryClient();
   
   // Workflow dialog
@@ -472,12 +473,12 @@ export default function WorkflowsPage() {
         title="Quản lý Quy trình Phê duyệt"
         description="Quản lý các quy trình phê duyệt văn bản"
         iconColor="text-blue-600"
-        actions={
+        actions={canCreateWorkflows ? (
           <Button onClick={handleCreateWorkflow} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="w-4 h-4 mr-2" />
             Tạo quy trình mới
           </Button>
-        }
+        ) : undefined}
       />
 
       {/* Search & Filter */}
@@ -546,7 +547,7 @@ export default function WorkflowsPage() {
               icon={Workflow}
               title={searchQuery ? 'Không tìm thấy quy trình' : 'Chưa có quy trình nào'}
               description={searchQuery ? 'Thử tìm kiếm với từ khóa khác' : 'Tạo quy trình phê duyệt đầu tiên'}
-              action={!searchQuery ? {
+              action={!searchQuery && canCreateWorkflows ? {
                 label: 'Tạo quy trình',
                 onClick: handleCreateWorkflow,
               } : undefined}
