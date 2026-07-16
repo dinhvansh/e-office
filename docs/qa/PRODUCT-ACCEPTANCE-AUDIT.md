@@ -30,7 +30,7 @@ The deterministic E2E dataset used `admin@acme.local`, an approval+signing workf
 | Permission escalation / negative tests | PARTIAL | Disabled account/session, field ownership, signing order, cross-tenant S3 document access, and admin-policy tests passed; full ID tampering matrix remains unverified. |
 | Golden Path 1 | PARTIAL | Approval + internal signer + local artifact passed by real backend/PostgreSQL; browser requirement blocked. |
 | Golden Path 2 | PARTIAL | Clean PostgreSQL flow verified `min_n=2` approval, internal signing, async worker artifact completion; two sequential internal signers remain unverified. |
-| Golden Path 3 | PARTIAL | The UAT overlay provisions Mailpit; real backend SMTP delivery and the public browser OTP verification flow pass. The final external signature and artifact flow remain unexecuted. |
+| Golden Path 3 | PASS | Real UAT browser creates and sends the external invitation, reads the Mailpit OTP, verifies the public session, submits the external signature, waits for PostgreSQL `completed`, and downloads the generated signed PDF. The public submit request preserves the OTP HttpOnly session across the frontend/API origin boundary. |
 | Final gates | PARTIAL | All listed command gates passed except Playwright browser business-flow E2E was not run because no browser surface was available. |
 
 ## Commands and outcomes
