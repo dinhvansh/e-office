@@ -480,8 +480,8 @@ export default function DocumentFlowPage() {
           {/* Right: discussion and audit activity. Participant state is already shown in the workflow timeline. */}
           <div className={hasWorkflowSteps ? "lg:col-span-3" : "lg:col-span-4"}>
             <div className="space-y-6">
-              {!isCompleted && document.sign_request_id ? <SignRequestDiscussion signRequestId={document.sign_request_id} documentId={Number(documentId)} /> : null}
-              {!isCompleted && <DossierAttachments documentId={Number(documentId)} />}
+              {document.sign_request_id ? <SignRequestDiscussion signRequestId={document.sign_request_id} documentId={Number(documentId)} readOnly={isCompleted} /> : null}
+              <DossierAttachments documentId={Number(documentId)} readOnly={isCompleted} />
               <section className="rounded-lg border bg-white shadow-sm">
                 <div className="border-b px-4 py-3 text-sm font-semibold text-slate-900">Hoạt động</div>
                 <div className="p-4">
