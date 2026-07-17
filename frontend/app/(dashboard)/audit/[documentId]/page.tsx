@@ -64,7 +64,7 @@ export default function AuditPage() {
   const params = useParams<{ documentId: string }>();
   const documentId = Number(params.documentId);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["audit", documentId],
     queryFn: async () => {
       return fetchJson<AuditResponse>(`/audit/${documentId}`);
@@ -84,6 +84,14 @@ export default function AuditPage() {
           Quay lại flow
         </Button>
       </div>
+
+      {isError && (
+        <Card>
+          <CardContent className="p-6 text-sm text-red-600">
+            {error instanceof Error ? error.message : 'Không có quyền xem nhật ký tài liệu.'}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {statCards(data?.summary).map((item) => {
