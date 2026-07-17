@@ -156,6 +156,9 @@ class SignRequestsService {
     }
 
     const signRequest = await this.getSignRequest(signRequestId, tenantId);
+    if (["completed", "cancelled", "rejected"].includes((signRequest.status || "").toLowerCase())) {
+      throw ApiError.forbidden("Completed sign requests are read-only", "SIGN_REQUEST_READ_ONLY");
+    }
 
     const comment = await prisma.sign_request_comments.create({
       data: {

@@ -110,6 +110,8 @@ class DocumentsService {
     return Buffer.concat([...locals, ...central, end]);
   }
   private async canAddAttachment(documentId: number, tenantId: number, userId: number, ownerId: number | null) {
+    const document = await documentsRepository.findById(documentId, tenantId);
+    if (!document || document.status === "completed") return false;
     if (ownerId === userId) return true;
     const [activeApprover, activeSigner] = await Promise.all([
       prisma.document_approvals.findFirst({
