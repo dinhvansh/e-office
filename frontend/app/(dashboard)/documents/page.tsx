@@ -82,11 +82,8 @@ export default function DocumentsPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'all' | 'archive'>('all');
-  
   // Filter and search state
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const statusFilter = 'completed';
   const [searchQuery, setSearchQuery] = useState('');
   const [documentTypeFilter, setDocumentTypeFilter] = useState<string>('all');
   const [confidentialLevelFilter, setConfidentialLevelFilter] = useState<string>('all');
@@ -95,10 +92,7 @@ export default function DocumentsPage() {
     queryKey: ["documents", page, limit, statusFilter, searchQuery, documentTypeFilter, confidentialLevelFilter],
     enabled: canReadDocuments,
     queryFn: async () => {
-      let url = `/documents?page=${page}&limit=${limit}`;
-      if (statusFilter && statusFilter !== 'all') {
-        url += `&status=${statusFilter}`;
-      }
+      let url = `/documents?page=${page}&limit=${limit}&status=completed`;
       if (searchQuery) {
         url += `&search=${encodeURIComponent(searchQuery)}`;
       }
@@ -116,7 +110,7 @@ export default function DocumentsPage() {
           total: number;
           totalPages: number;
         };
-      }>(url); // All documents including signed ones
+      }>(url);
       return data;
     },
   });
@@ -823,7 +817,7 @@ export default function DocumentsPage() {
             <div>
               <CardTitle>Danh sách tài liệu</CardTitle>
               <CardDescription>
-                Theo dõi trạng thái và quản lý tài liệu đã tải lên
+                Chỉ hiển thị tài liệu đã hoàn tất ký
               </CardDescription>
             </div>
             <Badge variant="outline">
@@ -840,24 +834,6 @@ export default function DocumentsPage() {
             />
           ) : (
             <>
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={(value) => {
-            setActiveTab(value as 'all' | 'archive');
-            setPage(1);
-            setSearchQuery('');
-            // Auto-set filter based on tab
-            if (value === 'archive') {
-              setStatusFilter('completed');
-            } else {
-              setStatusFilter('all');
-            }
-          }} className="mb-4">
-            <TabsList className="grid w-full max-w-full sm:max-w-md grid-cols-2">
-              <TabsTrigger value="all" className="gap-2"><FileText className="h-4 w-4" />Tất cả tài liệu</TabsTrigger>
-              <TabsTrigger value="archive" className="gap-2"><FolderArchive className="h-4 w-4" />Lưu trữ</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
           {/* Filter and Search Section */}
           <div className="mb-4 flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -871,37 +847,6 @@ export default function DocumentsPage() {
                 }}
                 className="w-full pl-9"
               />
-            </div>
-            <div className="sm:w-48">
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                {activeTab === 'all' ? (
-                  <>
-                    <option value="all">Tất cả trạng thái</option>
-                    <option value="draft">Nháp</option>
-                    <option value="pending_approval">Chờ phê duyệt</option>
-                    <option value="approved">Đã phê duyệt</option>
-                    <option value="pending_signature">Chờ ký</option>
-                    <option value="completed">Hoàn thành</option>
-                    <option value="active">Hoạt động</option>
-                    <option value="rejected">Từ chối</option>
-                    <option value="cancelled">Đã hủy</option>
-                    <option value="archived">Lưu trữ</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="completed">Hoàn thành</option>
-                    <option value="archived">Lưu trữ</option>
-                    <option value="cancelled">Đã hủy</option>
-                  </>
-                )}
-              </select>
             </div>
             <div className="sm:w-48">
               <select
@@ -1113,7 +1058,7 @@ export default function DocumentsPage() {
                                   </Button>
                                 )}
                                 {/* Archive tab actions - only for completed */}
-                                {canUpdateDocuments && activeTab === 'archive' && doc.status === 'completed' && (
+                                {canUpdateDocuments && doc.status === 'completed' && (
                                   <>
                                     <Button
                                       variant="ghost"
