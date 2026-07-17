@@ -579,6 +579,7 @@ export default function DocumentFlowPage() {
                   <span className="hidden sm:inline">Quyền xem</span>
                 </Button>
               )}
+              {flowData?.can_view_audit && (
               <Button
                 variant="outline"
                 size="sm"
@@ -588,6 +589,7 @@ export default function DocumentFlowPage() {
                 <History className="h-4 w-4 shrink-0 sm:mr-2" />
                 Log tài liệu
               </Button>
+              )}
             </div>
           </div>
 

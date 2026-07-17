@@ -1,5 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { authorizationService } from '../authorization/authorization.service';
+import { canAccessDocumentAudit } from '../audit/document-audit-access.service';
 
 
 interface FlowStep {
@@ -256,7 +257,10 @@ export class DocumentFlowService {
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
-    const documentPermissions = await authorizationService.resolveDocumentPermission(userId, tenantId, documentId);
+    const [documentPermissions, canViewAudit] = await Promise.all([
+      authorizationService.resolveDocumentPermission(userId, tenantId, documentId),
+      canAccessDocumentAudit(userId, tenantId, documentId),
+    ]);
 
     // 5. Determine overall status
     return {
@@ -284,6 +288,7 @@ export class DocumentFlowService {
       can_sign: this.canUserSign(document, userId, currentUser?.email || null),
       can_manage_sign_request: document.owner.id === userId && !!document.sign_request?.id,
       can_share: documentPermissions.canShare,
+      can_view_audit: canViewAudit,
     };
   }
 
