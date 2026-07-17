@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { WorkflowStatusPanel } from '@/components/workflow/WorkflowStatusPanel';
 import { SignRequestDiscussion } from '@/components/sign-requests/sign-request-discussion';
 import { DossierAttachments } from '@/components/documents/dossier-attachments';
+import { DocumentDownloadMenu } from '@/components/documents/document-download-menu';
 import { toast } from 'sonner';
 
 type SharePermissionRecord = {
@@ -329,10 +330,11 @@ export default function DocumentFlowPage() {
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Quay lại
               </Button>
-              <Button
-                variant="outline"
+              <DocumentDownloadMenu documentId={Number(documentId)} documentNumber={document.document_number} originalFileName={document.original_file_name} status={document.status} signedFilePath={document.signed_file_path} />
+              <Button 
+                variant="outline" 
                 size="sm"
-                className="min-w-0 max-w-full"
+                className="hidden"
                 onClick={async () => {
                   try {
                     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -425,7 +427,7 @@ export default function DocumentFlowPage() {
               <Button 
                 variant="outline" 
                 size="sm"
-                className="min-w-0 max-w-full px-2 text-[0px] sm:px-3 sm:text-sm"
+                className="hidden"
                 onClick={async () => {
                   try {
                     if (!process.env.NEXT_PUBLIC_API_URL) {

@@ -16,6 +16,7 @@ import { getApiBaseUrl } from '@/lib/env';
 import { WorkflowStatusPanel, type WorkflowStatusSummary } from '@/components/workflow/WorkflowStatusPanel';
 import { DossierAttachments } from '@/components/documents/dossier-attachments';
 import { SignRequestDiscussion } from '@/components/sign-requests/sign-request-discussion';
+import { DocumentDownloadMenu } from '@/components/documents/document-download-menu';
 
 interface ApprovalDetail {
   id: number;
@@ -359,10 +360,7 @@ export default function ApprovalDetailPage() {
             </div>
             <p className="mt-1 text-sm text-slate-500">{approval.workflow.name}</p>
           </div>
-          <Button variant="outline" onClick={handleDownload}>
-            <Download className="mr-2 h-4 w-4" />
-            Tải xuống
-          </Button>
+          <DocumentDownloadMenu documentId={approval.document.id} documentNumber={approval.document.document_number} originalFileName={approval.document.original_file_name} status={approval.document.status} />
         </div>
       </div>
 
