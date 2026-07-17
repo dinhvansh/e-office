@@ -131,8 +131,8 @@ export default function SignRequestsPage() {
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async ({ signRequestId, documentId }: { signRequestId: number; documentId: number }) => {
-      await fetchJson(`/sign-requests/${signRequestId}`, { method: 'DELETE' });
       await fetchJson(`/documents/${documentId}`, { method: 'DELETE' });
+      await fetchJson(`/sign-requests/${signRequestId}`, { method: 'DELETE' });
     },
     onSuccess: () => {
       toast.success('Đã xóa văn bản thành công!');

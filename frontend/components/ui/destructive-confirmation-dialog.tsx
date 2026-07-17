@@ -63,8 +63,8 @@ export function DestructiveConfirmationDialog({
       await onConfirm();
       onOpenChange(false);
       window.setTimeout(() => returnFocusRef.current?.focus(), 0);
-    } catch {
-      setError(errorMessage);
+    } catch (error) {
+      setError(error instanceof Error && error.message ? error.message : errorMessage);
     } finally {
       setIsPending(false);
     }
