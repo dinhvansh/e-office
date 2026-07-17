@@ -507,7 +507,7 @@ export default function SignRequestsPage() {
                             variant="outline"
                             onClick={() => router.push(`/documents/${request.document.id}/flow`)}
                             title="Xem tài liệu"
-                            className="h-7 w-7 p-0"
+                            className="hidden h-7 w-7 p-0"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </Button>
@@ -526,7 +526,7 @@ export default function SignRequestsPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
                               {/* Delete - Draft only */}
-                              {(request.flow_state === 'DRAFT' || request.status === 'draft') && ['draft', 'cancelled'].includes(request.document.status || '') && (
+                              {(request.flow_state === 'DRAFT' || request.status === 'draft' || request.status === 'cancelled') && ['draft', 'cancelled'].includes(request.document.status || '') && (
                                 <>
                                   <DropdownMenuItem
                                     onClick={() => handleDelete(request.id, request.document.id)}
@@ -572,7 +572,7 @@ export default function SignRequestsPage() {
                               )}
 
                               {/* External Signer Actions */}
-                              {request.signers.some(s => !s.is_internal) && (
+                              {request.signers.some(s => !s.is_internal) && !['cancelled', 'completed'].includes(request.status) && (
                                 <>
                                   <DropdownMenuItem
                                     onClick={() => handleCopySigningLink(request)}
