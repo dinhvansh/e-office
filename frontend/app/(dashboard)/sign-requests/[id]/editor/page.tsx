@@ -215,15 +215,15 @@ export default function SignRequestEditorPage() {
       toast.error('Tài liệu đã gửi, không thể gửi lại');
       return;
     }
-    if (signers.length === 0) {
+    if (signers.length === 0 && fields.length > 0) {
       toast.error('Cần có ít nhất một người ký');
       return;
     }
-    if (fields.length === 0) {
+    if (signers.length > 0 && fields.length === 0) {
       toast.error('Cần đặt ít nhất một vị trí ký');
       return;
     }
-    if (fields.some((field) => field.required && !field.assigned_signer_id)) {
+    if (signers.length > 0 && fields.some((field) => field.required && !field.assigned_signer_id)) {
       toast.error('Tất cả vị trí bắt buộc phải được gán cho người ký');
       return;
     }

@@ -1193,9 +1193,12 @@ class DocumentsService {
     // If document has sign request, validate fields
     if (document.sign_request_id) {
       const { signRequestFieldsService } = await import('../signRequests/signRequestFields.service');
-      const validation = await signRequestFieldsService.validateFieldsBeforeSend(document.sign_request_id);
-      if (!validation.valid) {
-        throw ApiError.badRequest(validation.message || 'Sign fields validation failed', 'SIGN_FIELDS_INVALID');
+      const fieldCount = await prisma.sign_request_fields.count({ where: { sign_request_id: document.sign_request_id } });
+      if (fieldCount > 0) {
+        const validation = await signRequestFieldsService.validateFieldsBeforeSend(document.sign_request_id);
+        if (!validation.valid) {
+          throw ApiError.badRequest(validation.message || 'Sign fields validation failed', 'SIGN_FIELDS_INVALID');
+        }
       }
     }
     
