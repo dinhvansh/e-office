@@ -253,29 +253,21 @@ class DocumentsService {
       throw ApiError.forbidden("You do not have access to this document", "DOCUMENT_ACCESS_DENIED");
     }
 
-    const editDecision = await authorizationService.canAccessDocument(userId, tenantId, documentId, "edit");
-    const participant = await prisma.users.findFirst({
-      where: { id: userId, tenant_id: tenantId },
-      select: { email: true },
-    }).then(async (user) => {
-      if (!user) return false;
-      const [approval, signer] = await Promise.all([
-        prisma.document_approvals.findFirst({
-          where: { document_id: documentId, approver_user_id: userId },
-          select: { id: true },
-        }),
-        prisma.signers.findFirst({
-          where: {
-            sign_request: { document_id: documentId },
-            OR: [{ user_id: userId }, { email: user.email }],
-          },
-          select: { id: true },
-        }),
-      ]);
-      return !!approval || !!signer;
+    // Supporting evidence must not be mutable by every historical/future
+    // participant. Only the owner or an approver with an active pending task
+    // may add it. Later sequential steps are materialized as `waiting`, and
+    // completed approvers no longer have `pending` records.
+    const activeApprover = await prisma.document_approvals.findFirst({
+      where: {
+        document_id: documentId,
+        approver_user_id: userId,
+        action: "pending",
+        document: { tenant_id: tenantId },
+      },
+      select: { id: true },
     });
 
-    if (!editDecision.allowed && document.owner_id !== userId && !participant) {
+    if (document.owner_id !== userId && !activeApprover) {
       throw ApiError.forbidden("You do not have permission to add attachments", "DOCUMENT_ATTACHMENT_DENIED");
     }
 

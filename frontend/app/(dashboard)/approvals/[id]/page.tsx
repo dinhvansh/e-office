@@ -102,6 +102,7 @@ export default function ApprovalDetailPage() {
 
   const fileUrl = useMemo(() => `${getApiBaseUrl()}/approvals/${approvalId}/document/view`, [approvalId]);
   const isProcessed = approval ? approval.action !== 'pending' : false;
+  const canUploadAttachment = !isProcessed;
   const hasDiscussion = Boolean(approval?.document.sign_request_id);
 
   const fetchApprovalDetail = useCallback(async () => {
@@ -401,17 +402,17 @@ export default function ApprovalDetailPage() {
           </section>
         </main>
 
-        <aside className="min-w-0 space-y-5">
-          <section className="rounded-2xl border bg-white p-5 shadow-sm">
+        <aside className="flex min-w-0 flex-col gap-5">
+          <section className="order-1 rounded-2xl border bg-white p-5 shadow-sm">
             <h2 className="mb-4 font-semibold text-slate-950">Hành động phê duyệt</h2>
 
             {!isProcessed && !selectedAction && (
-              <div className="space-y-3">
-                <Button onClick={() => handleActionClick('approve')} className="h-11 w-full bg-green-600 hover:bg-green-700">
+              <div className="space-y-2">
+                <Button onClick={() => handleActionClick('approve')} className="h-10 w-full">
                   <CheckCircle className="mr-2 h-4 w-4" />
                   Phê duyệt
                 </Button>
-                <Button onClick={() => handleActionClick('reject')} variant="destructive" className="h-11 w-full">
+                <Button onClick={() => handleActionClick('reject')} variant="outline" className="h-10 w-full border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive">
                   <XCircle className="mr-2 h-4 w-4" />
                   Từ chối
                 </Button>
@@ -469,15 +470,15 @@ export default function ApprovalDetailPage() {
             )}
           </section>
 
-          <section className="rounded-2xl border bg-white p-5 shadow-sm">
+          <section className="order-3 rounded-2xl border bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 font-semibold text-slate-950">
                 <Paperclip className="h-4 w-4" />
                 Tài liệu đính kèm
               </h2>
-              <Label className="inline-flex cursor-pointer items-center rounded-lg border px-3 py-2 text-xs font-medium hover:bg-slate-50">
+              {canUploadAttachment ? <Label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground">
                 <Upload className="mr-2 h-4 w-4" />
-                {uploadingAttachment ? 'Đang tải...' : 'Thêm file'}
+                {uploadingAttachment ? 'Đang tải...' : 'Thêm tệp đính kèm'}
                 <input
                   type="file"
                   className="hidden"
@@ -485,7 +486,7 @@ export default function ApprovalDetailPage() {
                   disabled={uploadingAttachment}
                   accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
                 />
-              </Label>
+              </Label> : null}
             </div>
 
             <p className="mb-3 text-xs text-slate-500">
@@ -514,7 +515,7 @@ export default function ApprovalDetailPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border bg-white p-5 shadow-sm">
+          <section className="order-2 rounded-2xl border bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 font-semibold text-slate-950">
                 <MessageSquare className="h-4 w-4" />

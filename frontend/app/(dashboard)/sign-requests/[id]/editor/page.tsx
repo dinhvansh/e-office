@@ -11,6 +11,7 @@ import { PDFCanvasViewer } from '@/components/pdf/PDFCanvasViewer';
 import { Button } from '@/components/ui/button';
 import { getDefaultFieldLabel, getDefaultFieldPlaceholder, getResolvedFieldLabel } from '@/lib/sign-field.helper';
 import { useDestructiveConfirmation } from '@/components/providers/destructive-confirmation-provider';
+import { SignRequestDiscussion } from '@/components/sign-requests/sign-request-discussion';
 
 interface Field {
   id?: number;
@@ -474,7 +475,7 @@ export default function SignRequestEditorPage() {
             </div>
           </main>
 
-          <aside className="order-3 xl:order-3 xl:col-span-3">
+          <aside className="order-3 space-y-4 xl:order-3 xl:col-span-3">
             <div className="rounded-lg border bg-white p-4 shadow-sm">
               <h3 className="mb-3 font-semibold">Công cụ đặt vị trí</h3>
               {isReadOnly ? (
@@ -500,6 +501,7 @@ export default function SignRequestEditorPage() {
                 </div>
               )}
             </div>
+            {signRequest ? <SignRequestDiscussion signRequestId={signRequestId} /> : null}
           </aside>
         </div>
       </div>
