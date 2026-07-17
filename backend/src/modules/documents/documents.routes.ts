@@ -26,7 +26,7 @@ documentsRouter.get("/:id/tags", requirePermission('documents', 'read'), require
 documentsRouter.get("/:id", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.getById));
 documentsRouter.get("/:id/permissions", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.getPermissions));
 documentsRouter.get("/:id/permissions/effective", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.getEffectivePermissions));
-documentsRouter.get("/:id/access-viewers", requirePermission('documents', 'update'), requireDocumentAccess("share"), asyncHandler(controller.getEffectiveViewers));
+documentsRouter.get("/:id/access-viewers", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.getEffectiveViewers));
 documentsRouter.get("/:id/versions", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.getVersions));
 documentsRouter.get("/:id/versions/latest", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.getLatestVersion));
 

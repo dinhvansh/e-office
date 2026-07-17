@@ -7,7 +7,7 @@ import { FlowTimeline } from '@/components/flow/FlowTimeline';
 import { FlowActivities } from '@/components/flow/FlowActivities';
 import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Check, ChevronsUpDown, FileText, Download, RefreshCw, Share2, Trash2, History, UserRound } from 'lucide-react';
+import { ArrowLeft, Check, ChevronsUpDown, FileText, Download, RefreshCw, Share2, Trash2, History, UserRound, Info } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -189,6 +189,7 @@ export default function DocumentFlowPage() {
   const [cancelReason, setCancelReason] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [viewersDialogOpen, setViewersDialogOpen] = useState(false);
   const [shareForm, setShareForm] = useState({
     subject_type: 'user' as 'user' | 'department' | 'position_in_department',
     subject_id: '',
@@ -272,7 +273,7 @@ export default function DocumentFlowPage() {
 
   const { data: effectiveViewersData, isLoading: isLoadingEffectiveViewers } = useQuery<{ viewers: EffectiveViewer[] }>({
     queryKey: ['document-effective-viewers', documentId],
-    enabled: shareDialogOpen && isCompleted,
+    enabled: (shareDialogOpen || viewersDialogOpen) && isCompleted,
     queryFn: () => fetchJson(`/documents/${documentId}/access-viewers`),
   });
 
@@ -473,7 +474,8 @@ export default function DocumentFlowPage() {
   const canCancel = canManageSignRequest && ['pending_approval', 'pending_signature', 'in_progress'].includes(document.status);
   const canDelete = canManageSignRequest && ['draft', 'cancelled'].includes(document.status);
   const canRevoke = canManageSignRequest && document.status === 'completed';
-  const canShareCompletedDocument = isCompleted;
+  const canShareCompletedDocument = isCompleted && Boolean(flowData?.can_share);
+  const canViewCompletedDocument = isCompleted;
   const hasWorkflowSteps = steps.length > 0;
 
   // Calculate progress percentage
@@ -563,6 +565,18 @@ export default function DocumentFlowPage() {
                 >
                   <Share2 className="h-4 w-4 shrink-0 sm:mr-2" />
                   Chia sẻ
+                </Button>
+              )}
+              {!canShareCompletedDocument && canViewCompletedDocument && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="min-w-0 max-w-full"
+                  onClick={() => setViewersDialogOpen(true)}
+                  title="Xem những người hiện có quyền xem tài liệu"
+                >
+                  <Info className="h-4 w-4 shrink-0 sm:mr-2" />
+                  <span className="hidden sm:inline">Quyền xem</span>
                 </Button>
               )}
               <Button
@@ -694,6 +708,35 @@ export default function DocumentFlowPage() {
             >
               {cancelMutation.isPending ? 'Đang hủy...' : 'Xác nhận hủy'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={viewersDialogOpen} onOpenChange={setViewersDialogOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Người đang có quyền xem</DialogTitle>
+          </DialogHeader>
+          {isLoadingEffectiveViewers ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Đang kiểm tra quyền xem hiệu lực...</p>
+          ) : effectiveViewers.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Chưa có người dùng nào được cấp quyền xem.</p>
+          ) : (
+            <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+              {effectiveViewers.map((viewer) => (
+                <div key={viewer.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                  <UserAvatar user={viewer} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{viewer.full_name || viewer.email}</p>
+                    <p className="truncate text-xs text-muted-foreground">{viewer.email}{viewer.department?.name ? ` · ${viewer.department.name}` : ''}</p>
+                  </div>
+                  <Badge variant="outline" className="shrink-0">Có quyền xem</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewersDialogOpen(false)}>Đóng</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
