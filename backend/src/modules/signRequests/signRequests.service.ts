@@ -134,16 +134,16 @@ class SignRequestsService {
             email: true,
           },
         },
-        attachments: { include: { uploader: { select: { id: true, full_name: true, email: true } } } },
+        attachments: { include: { uploader: { select: { id: true, full_name: true, email: true } }, document: { select: { owner_id: true } } } },
       },
       orderBy: { created_at: "asc" },
     });
     const final = ["completed", "cancelled", "rejected"].includes((request.status || "").toLowerCase());
-    return comments.map((comment) => ({
+    return Promise.all(comments.map(async (comment) => ({
       ...comment,
       can_withdraw: !final && !comment.deleted_at && comment.user_id === userId && Date.now() - comment.created_at.getTime() <= 15 * 60 * 1000,
-      attachments: comment.attachments.map((attachment) => ({ ...attachment, can_withdraw: attachment.status === "ACTIVE" && (attachment.uploaded_by === userId || request.document?.owner_id === userId) })),
-    }));
+      attachments: await Promise.all(comment.attachments.map(async (attachment) => ({ ...attachment, can_withdraw: await documentsService.canWithdrawAttachment(attachment, request.document_id, tenantId, userId) }))),
+    })));
   }
 
   async addComment(signRequestId: number, tenantId: number, userId: number, body: string, attachments: Array<{ file_name: string; file_base64: string; file_type?: string }> = []) {

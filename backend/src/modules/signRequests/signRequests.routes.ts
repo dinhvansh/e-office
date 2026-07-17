@@ -16,7 +16,7 @@ signRequestsRouter.get("/my-requests", requirePermission("sign_requests", "read"
 
 signRequestsRouter.put(
   "/:id/signers/reorder",
-  requirePermission("sign_requests", "update"),
+  requirePermission("sign_requests", "read"),
   asyncHandler(controller.reorderSigners)
 );
 signRequestsRouter.post(
@@ -50,8 +50,8 @@ signRequestsRouter.post(
   requirePermission("sign_requests", "update"),
   asyncHandler(controller.addComment)
 );
-signRequestsRouter.put("/:id/comments/:commentId", requirePermission("sign_requests", "update"), asyncHandler(controller.editComment));
-signRequestsRouter.delete("/:id/comments/:commentId", requirePermission("sign_requests", "update"), asyncHandler(controller.deleteComment));
+signRequestsRouter.put("/:id/comments/:commentId", requirePermission("sign_requests", "read"), asyncHandler(controller.editComment));
+signRequestsRouter.delete("/:id/comments/:commentId", requirePermission("sign_requests", "read"), asyncHandler(controller.deleteComment));
 signRequestsRouter.post(
   "/:id/fields",
   requirePermission("sign_requests", "update"),

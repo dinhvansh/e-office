@@ -301,6 +301,12 @@ class DocumentsService {
     return { can_upload: await this.canAddAttachment(documentId, tenantId, userId, document.owner_id) };
   }
 
+  async canWithdrawAttachment(attachment: { status: string; uploaded_by: number | null; document: { owner_id: number | null } }, documentId: number, tenantId: number, userId: number) {
+    if (attachment.status !== "ACTIVE") return false;
+    if (attachment.document.owner_id === userId) return true;
+    return attachment.uploaded_by === userId && await this.canAddAttachment(documentId, tenantId, userId, attachment.document.owner_id);
+  }
+
   async addAttachment(
     documentId: number,
     tenantId: number,
@@ -514,8 +520,7 @@ class DocumentsService {
     const attachment = await prisma.document_attachments.findFirst({ where: { id: attachmentId, document_id: documentId, document: { tenant_id: tenantId } }, include: { document: { select: { owner_id: true } } } });
     if (!attachment) throw ApiError.notFound("Attachment not found", "ATTACHMENT_NOT_FOUND");
     if (attachment.status === "WITHDRAWN") throw ApiError.conflict("Attachment is already withdrawn", "ATTACHMENT_ALREADY_WITHDRAWN");
-    const canWithdrawOwnUpload = attachment.uploaded_by === userId && await this.canAddAttachment(documentId, tenantId, userId, attachment.document.owner_id);
-    if (attachment.document.owner_id !== userId && !canWithdrawOwnUpload) throw ApiError.forbidden("You cannot withdraw this attachment", "ATTACHMENT_WITHDRAW_DENIED");
+    if (!(await this.canWithdrawAttachment(attachment, documentId, tenantId, userId))) throw ApiError.forbidden("You cannot withdraw this attachment", "ATTACHMENT_WITHDRAW_DENIED");
     const updated = await prisma.document_attachments.update({ where: { id: attachmentId }, data: { status: "WITHDRAWN", withdrawn_by: userId, withdrawn_at: new Date(), withdraw_reason: reason }, include: { uploader: { select: { id: true, full_name: true, email: true } } } });
     await auditService.record({ tenantId, documentId, event: "document.attachment_withdrawn", userId });
     return updated;
