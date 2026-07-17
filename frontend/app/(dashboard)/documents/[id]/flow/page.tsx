@@ -331,24 +331,6 @@ export default function DocumentFlowPage() {
                 Quay lại
               </Button>
               <DocumentDownloadMenu documentId={Number(documentId)} documentNumber={document.document_number} originalFileName={document.original_file_name} status={document.status} signedFilePath={document.signed_file_path} />
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="hidden"
-                onClick={async () => {
-                  try {
-                    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-                    const authData = localStorage.getItem('esign.auth');
-                    const token = authData ? JSON.parse(authData).tokens?.accessToken : null;
-                    const response = await fetch(`${apiUrl}/documents/${documentId}/dossier/download`, { headers: { Authorization: `Bearer ${token}` } });
-                    if (!response.ok) throw new Error('Download failed');
-                    const url = URL.createObjectURL(await response.blob()); const link = window.document.createElement('a'); link.href = url; link.download = `${document?.document_number || 'ho-so'}-dossier.zip`; link.click(); URL.revokeObjectURL(url);
-                  } catch (error) { toast.error('Không thể tải bộ hồ sơ'); }
-                }}
-              >
-                <Download className="h-4 w-4 shrink-0 sm:mr-2" />
-                {document?.status === 'completed' ? 'Tải toàn bộ hồ sơ' : 'Tải bộ hồ sơ hiện tại'}
-              </Button>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-start gap-2">
                   <FileText className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
@@ -423,54 +405,6 @@ export default function DocumentFlowPage() {
               >
                 <History className="h-4 w-4 shrink-0 sm:mr-2" />
                 Log tài liệu
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="hidden"
-                onClick={async () => {
-                  try {
-                    if (!process.env.NEXT_PUBLIC_API_URL) {
-                      throw new Error('NEXT_PUBLIC_API_URL environment variable is required');
-                    }
-                    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-                    // Use signed file if available (progressive or completed)
-                    const hasSignedFile = document?.signed_file_path;
-                    const endpoint = hasSignedFile ? 'download-signed' : 'download';
-                    
-                    const authData = localStorage.getItem('esign.auth');
-                    const token = authData ? JSON.parse(authData).tokens?.accessToken : null;
-                    
-                    const response = await fetch(`${apiUrl}/documents/${documentId}/${endpoint}`, {
-                      headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    
-                    if (!response.ok) throw new Error('Download failed');
-                    
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = window.document.createElement('a');
-                    a.href = url;
-                    
-                    // Add status to filename
-                    const statusLabel = document?.status === 'completed' ? 'hoan-thanh' : 'dang-ky';
-                    const filename = hasSignedFile 
-                      ? `${document.document_number || 'document'}-${statusLabel}.pdf`
-                      : `${document.document_number || 'document'}.pdf`;
-                    
-                    a.download = filename;
-                    window.document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    window.document.body.removeChild(a);
-                  } catch (error) {
-                    console.error('Download error:', error);
-                    alert('Không thể tải xuống file');
-                  }
-                }}
-              >
-                <Download className="h-4 w-4 shrink-0 sm:mr-2" />
-                Tải xuống {document?.signed_file_path ? (document?.status === 'completed' ? '(Hoàn thành)' : '(Đang ký)') : ''}
               </Button>
             </div>
           </div>
