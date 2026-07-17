@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, MessageSquare, Paperclip, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -14,6 +14,7 @@ const toBase64 = (file: File) => new Promise<string>((resolve, reject) => { cons
 
 export function SignRequestDiscussion({ signRequestId, documentId, className = '' }: { signRequestId: number; documentId?: number; className?: string }) {
   const { fetchJson } = useAuth();
+  const queryClient = useQueryClient();
   const [body, setBody] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [posting, setPosting] = useState(false);
@@ -25,7 +26,9 @@ export function SignRequestDiscussion({ signRequestId, documentId, className = '
     setPosting(true);
     try {
       await fetchJson(`/sign-requests/${signRequestId}/comments`, { method: 'POST', body: JSON.stringify({ body: body.trim(), attachments: await Promise.all(files.map(async (file) => ({ file_name: file.name, file_type: file.type || undefined, file_base64: await toBase64(file) }))) }) });
-      setBody(''); setFiles([]); await refetch(); toast.success('Đã gửi bình luận');
+      setBody(''); setFiles([]); await refetch();
+      if (documentId) await queryClient.invalidateQueries({ queryKey: ['dossier-attachments', documentId] });
+      toast.success('Đã gửi bình luận');
     } catch (error: any) { toast.error(error.message || 'Không thể gửi bình luận'); } finally { setPosting(false); }
   };
   return <section id="discussion" className={`scroll-mt-24 rounded-xl border bg-white p-4 shadow-sm ${className}`}>
