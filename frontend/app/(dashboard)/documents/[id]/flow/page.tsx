@@ -7,7 +7,7 @@ import { FlowTimeline } from '@/components/flow/FlowTimeline';
 import { FlowActivities } from '@/components/flow/FlowActivities';
 import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, FileText, Download, RefreshCw, Share2, Trash2, History } from 'lucide-react';
+import { ArrowLeft, Check, ChevronsUpDown, FileText, Download, RefreshCw, Share2, Trash2, History, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,6 +17,10 @@ import { SignRequestDiscussion } from '@/components/sign-requests/sign-request-d
 import { DossierAttachments } from '@/components/documents/dossier-attachments';
 import { DocumentDownloadMenu } from '@/components/documents/document-download-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ComboboxSelect } from '@/components/ui/combobox-select';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 type SharePermissionRecord = {
@@ -36,6 +40,7 @@ type ShareUserOption = {
   id: number;
   email: string;
   full_name?: string;
+  avatar_url?: string | null;
 };
 
 type ShareDepartmentOption = {
@@ -49,6 +54,83 @@ type SharePositionOption = {
   code?: string;
   is_active?: boolean;
 };
+
+function getInitials(name?: string, email?: string) {
+  const source = (name || email || '?').trim();
+  return source
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
+
+function UserShareCombobox({
+  users,
+  value,
+  onChange,
+}: {
+  users: ShareUserOption[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedUser = users.find((user) => String(user.id) === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="h-11 w-full justify-between px-3 font-normal">
+          {selectedUser ? (
+            <span className="flex min-w-0 items-center gap-2">
+              <UserAvatar user={selectedUser} />
+              <span className="min-w-0 truncate">{selectedUser.full_name || selectedUser.email}</span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">Chọn người dùng...</span>
+          )}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Tìm theo tên hoặc email..." />
+          <CommandEmpty>Không tìm thấy người dùng phù hợp.</CommandEmpty>
+          <CommandGroup className="max-h-64 overflow-y-auto p-1">
+            {users.map((user) => (
+              <CommandItem
+                key={user.id}
+                value={`${user.full_name || ''} ${user.email}`}
+                onSelect={() => {
+                  onChange(String(user.id));
+                  setOpen(false);
+                }}
+                className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2.5"
+              >
+                <UserAvatar user={user} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{user.full_name || user.email}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{user.email}</span>
+                </span>
+                <Check className={cn('h-4 w-4 text-primary', String(user.id) === value ? 'opacity-100' : 'opacity-0')} />
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function UserAvatar({ user }: { user: ShareUserOption }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-xs font-semibold text-primary">
+      {user.avatar_url && !imageFailed ? (
+        <img src={user.avatar_url} alt="" className="h-full w-full object-cover" onError={() => setImageFailed(true)} />
+      ) : getInitials(user.full_name, user.email) || <UserRound className="h-4 w-4" />}
+    </span>
+  );
+}
 
 export default function DocumentFlowPage() {
   const params = useParams();
@@ -567,57 +649,46 @@ export default function DocumentFlowPage() {
 
             <div className="space-y-2">
               <div className="text-sm font-medium">Loại đối tượng</div>
-              <select
+              <ComboboxSelect
                 value={shareForm.subject_type}
-                onChange={(event) =>
+                onChange={(value) =>
                   setShareForm((current) => ({
                     ...current,
-                    subject_type: event.target.value as 'user' | 'department' | 'position_in_department',
+                    subject_type: value as 'user' | 'department' | 'position_in_department',
                     subject_id: '',
                     scope_department_id: '',
                   }))
                 }
-                className="w-full rounded-md border border-input bg-background px-3 py-2"
-              >
-                <option value="user">Người dùng</option>
-                <option value="department">Phòng ban</option>
-                <option value="position_in_department">Chức danh trong phòng ban</option>
-              </select>
+                options={[
+                  { value: 'user', label: 'Người dùng' },
+                  { value: 'department', label: 'Phòng ban' },
+                  { value: 'position_in_department', label: 'Chức danh trong phòng ban' },
+                ]}
+                searchPlaceholder="Tìm loại đối tượng..."
+              />
             </div>
 
             {shareForm.subject_type === 'user' && (
               <div className="space-y-2">
                 <div className="text-sm font-medium">Người dùng</div>
-                <select
+                <UserShareCombobox
+                  users={shareUsers}
                   value={shareForm.subject_id}
-                  onChange={(event) => setShareForm((current) => ({ ...current, subject_id: event.target.value }))}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2"
-                >
-                  <option value="">-- Chọn người dùng --</option>
-                  {shareUsers.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.full_name || user.email}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setShareForm((current) => ({ ...current, subject_id: value }))}
+                />
               </div>
             )}
 
             {shareForm.subject_type === 'department' && (
               <div className="space-y-2">
                 <div className="text-sm font-medium">Phòng ban</div>
-                <select
+                <ComboboxSelect
                   value={shareForm.subject_id}
-                  onChange={(event) => setShareForm((current) => ({ ...current, subject_id: event.target.value }))}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2"
-                >
-                  <option value="">-- Chọn phòng ban --</option>
-                  {shareDepartments.map((department: ShareDepartmentOption) => (
-                    <option key={department.id} value={department.id}>
-                      {department.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setShareForm((current) => ({ ...current, subject_id: String(value) }))}
+                  options={shareDepartments.map((department: ShareDepartmentOption) => ({ value: String(department.id), label: department.name }))}
+                  placeholder="Chọn phòng ban..."
+                  searchPlaceholder="Tìm phòng ban..."
+                />
               </div>
             )}
 
@@ -625,33 +696,23 @@ export default function DocumentFlowPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <div className="text-sm font-medium">Phòng ban</div>
-                  <select
+                  <ComboboxSelect
                     value={shareForm.scope_department_id}
-                    onChange={(event) => setShareForm((current) => ({ ...current, scope_department_id: event.target.value }))}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2"
-                  >
-                    <option value="">-- Chọn phòng ban --</option>
-                    {shareDepartments.map((department: ShareDepartmentOption) => (
-                      <option key={department.id} value={department.id}>
-                        {department.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setShareForm((current) => ({ ...current, scope_department_id: String(value) }))}
+                    options={shareDepartments.map((department: ShareDepartmentOption) => ({ value: String(department.id), label: department.name }))}
+                    placeholder="Chọn phòng ban..."
+                    searchPlaceholder="Tìm phòng ban..."
+                  />
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm font-medium">Chức danh</div>
-                  <select
+                  <ComboboxSelect
                     value={shareForm.subject_id}
-                    onChange={(event) => setShareForm((current) => ({ ...current, subject_id: event.target.value }))}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2"
-                  >
-                    <option value="">-- Chọn chức danh --</option>
-                    {sharePositions.map((position) => (
-                      <option key={position.id} value={position.id}>
-                        {position.name}{position.code ? ` (${position.code})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setShareForm((current) => ({ ...current, subject_id: String(value) }))}
+                    options={sharePositions.map((position) => ({ value: String(position.id), label: `${position.name}${position.code ? ` (${position.code})` : ''}` }))}
+                    placeholder="Chọn chức danh..."
+                    searchPlaceholder="Tìm chức danh..."
+                  />
                 </div>
               </div>
             )}
