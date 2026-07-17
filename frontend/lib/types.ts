@@ -8,7 +8,9 @@ export type DocumentRecord = {
   version: number;
   created_at: string;
     document_type_id?: number | null;
-    document_type?: { name: string; code?: string } | null;
+    // List DTOs return the resolved type name, while a few legacy/detail
+    // endpoints still return the relation object.
+    document_type?: string | { name: string; code?: string } | null;
   document_number?: string | null;
   confidential_level?: string | null;
     visibility_scope?: string | null;

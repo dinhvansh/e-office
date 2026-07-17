@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { ChangeEvent, KeyboardEvent, MouseEvent, useState, useEffect, useMemo } from "react";
-import { FileText, Upload, Trash2, Download, Eye, Send, Archive, XCircle } from "lucide-react";
+import { Archive, Download, Eye, FileText, FileType2, FolderArchive, Search, Send, Trash2, Upload, XCircle } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { DocumentRecord, DocumentType } from "@/lib/types";
 import { PageHeader } from "@/components/ui/page-header";
@@ -31,6 +31,24 @@ import { MoreVertical } from "lucide-react";
 import { useDestructiveConfirmation } from "@/components/providers/destructive-confirmation-provider";
 import { AsyncErrorState } from "@/components/ui/async-state";
 
+const documentStatusMeta: Record<string, { label: string; variant: "success" | "pending" | "warning" | "danger" | "info" | "default" }> = {
+  draft: { label: "Nháp", variant: "default" },
+  pending_approval: { label: "Chờ phê duyệt", variant: "pending" },
+  approved: { label: "Đã phê duyệt", variant: "success" },
+  pending_signature: { label: "Chờ ký", variant: "info" },
+  completed: { label: "Hoàn thành", variant: "success" },
+  active: { label: "Hoạt động", variant: "success" },
+  rejected: { label: "Từ chối", variant: "danger" },
+  cancelled: { label: "Đã hủy", variant: "danger" },
+  archived: { label: "Lưu trữ", variant: "warning" },
+};
+
+const getDocumentTypeName = (document: DocumentRecord): string | null => {
+  if (typeof document.document_type === "string") return document.document_type;
+  return document.document_type?.name || null;
+};
+
+const getStatusMeta = (status: string | null) => documentStatusMeta[status || "draft"] || { label: status || "Nháp", variant: "default" as const };
 
 export default function DocumentsPage() {
   const { fetchJson, hasPermission } = useAuth();
@@ -835,22 +853,23 @@ export default function DocumentsPage() {
             }
           }} className="mb-4">
             <TabsList className="grid w-full max-w-full sm:max-w-md grid-cols-2">
-              <TabsTrigger value="all">📋 Tất cả tài liệu</TabsTrigger>
-              <TabsTrigger value="archive">📦 Quản lý lưu trữ</TabsTrigger>
+              <TabsTrigger value="all" className="gap-2"><FileText className="h-4 w-4" />Tất cả tài liệu</TabsTrigger>
+              <TabsTrigger value="archive" className="gap-2"><FolderArchive className="h-4 w-4" />Lưu trữ</TabsTrigger>
             </TabsList>
           </Tabs>
 
           {/* Filter and Search Section */}
           <div className="mb-4 flex flex-col sm:flex-row gap-3">
-            <div className="flex-1">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="🔍 Tìm kiếm theo tên, số văn bản..."
+                placeholder="Tìm theo tên hoặc số văn bản"
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
                   setPage(1); // Reset to first page
                 }}
-                className="w-full"
+                className="w-full pl-9"
               />
             </div>
             <div className="sm:w-48">
@@ -864,22 +883,22 @@ export default function DocumentsPage() {
               >
                 {activeTab === 'all' ? (
                   <>
-                    <option value="all">📋 Tất cả trạng thái</option>
-                    <option value="draft">📝 Nháp</option>
-                    <option value="pending_approval">⏳ Chờ duyệt</option>
-                    <option value="approved">✅ Đã duyệt</option>
-                    <option value="pending_signature">✍️ Chờ ký</option>
-                    <option value="completed">✅ Hoàn thành</option>
-                    <option value="active">✅ Hoạt động</option>
-                    <option value="rejected">❌ Từ chối</option>
-                    <option value="cancelled">🚫 Đã hủy</option>
-                    <option value="archived">📦 Đã thanh lý</option>
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="draft">Nháp</option>
+                    <option value="pending_approval">Chờ phê duyệt</option>
+                    <option value="approved">Đã phê duyệt</option>
+                    <option value="pending_signature">Chờ ký</option>
+                    <option value="completed">Hoàn thành</option>
+                    <option value="active">Hoạt động</option>
+                    <option value="rejected">Từ chối</option>
+                    <option value="cancelled">Đã hủy</option>
+                    <option value="archived">Lưu trữ</option>
                   </>
                 ) : (
                   <>
-                    <option value="completed">✅ Hoàn thành</option>
-                    <option value="archived">📦 Đã thanh lý</option>
-                    <option value="cancelled">🚫 Đã hủy</option>
+                    <option value="completed">Hoàn thành</option>
+                    <option value="archived">Lưu trữ</option>
+                    <option value="cancelled">Đã hủy</option>
                   </>
                 )}
               </select>
@@ -893,7 +912,7 @@ export default function DocumentsPage() {
                   setPage(1);
                 }}
               >
-                <option value="all">📄 Tất cả loại VB</option>
+                <option value="all">Tất cả loại văn bản</option>
                 {documentTypesData?.map((type) => (
                   <option key={type.id} value={type.id}>
                     {type.name}
@@ -910,10 +929,10 @@ export default function DocumentsPage() {
                   setPage(1);
                 }}
               >
-                <option value="all">🔒 Tất cả mức bảo mật</option>
-                <option value="normal">🔓 Thường</option>
-                <option value="confidential">🔐 Mật</option>
-                <option value="secret">🔒 Tối mật</option>
+                <option value="all">Tất cả mức bảo mật</option>
+                <option value="normal">Thường</option>
+                <option value="confidential">Mật</option>
+                <option value="secret">Tối mật</option>
               </select>
             </div>
           </div>
@@ -987,7 +1006,7 @@ export default function DocumentsPage() {
                       <th className="px-2 py-2 text-left text-xs font-medium">ID</th>
                       <th className="px-2 py-2 text-left text-xs font-medium">Tên file</th>
                       <th className="px-2 py-2 text-left text-xs font-medium">Số VB</th>
-                      <th className="px-2 py-2 text-left text-xs font-medium">Loại</th>
+                      <th className="w-40 px-2 py-2 text-left text-xs font-medium">Loại</th>
                       <th className="px-2 py-2 text-left text-xs font-medium">Bảo mật</th>
                       <th className="px-2 py-2 text-left text-xs font-medium">Trạng thái</th>
                       <th className="px-2 py-2 text-left text-xs font-medium">Ngày</th>
@@ -1022,28 +1041,20 @@ export default function DocumentsPage() {
                           )}
                         </td>
                         <td className="px-2 py-3">
-                          {doc.document_type ? (
-                            <span className="text-xs truncate max-w-[100px] inline-block">{doc.document_type.name}</span>
+                          {getDocumentTypeName(doc) ? (
+                            <span className="inline-flex max-w-[152px] items-center gap-1.5 truncate text-xs text-slate-700"><FileType2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />{getDocumentTypeName(doc)}</span>
                           ) : (
                             <span className="text-muted-foreground text-xs">—</span>
                           )}
                         </td>
                         <td className="px-2 py-3">
-                          {doc.confidential_level === 'high' && <Badge variant="destructive" className="text-xs whitespace-nowrap">🔒 Cao</Badge>}
-                          {doc.confidential_level === 'medium' && <Badge variant="outline" className="border-orange-500 text-orange-700 text-xs whitespace-nowrap">🔐 TB</Badge>}
-                          {doc.confidential_level === 'normal' && <Badge variant="secondary" className="text-xs whitespace-nowrap">📄 Thường</Badge>}
+                          {doc.confidential_level === 'high' && <Badge variant="destructive" className="text-xs whitespace-nowrap">Mật</Badge>}
+                          {doc.confidential_level === 'medium' && <Badge variant="outline" className="border-orange-500 text-orange-700 text-xs whitespace-nowrap">Hạn chế</Badge>}
+                          {doc.confidential_level === 'normal' && <Badge variant="secondary" className="text-xs whitespace-nowrap">Thường</Badge>}
                           {!doc.confidential_level && <span className="text-muted-foreground text-xs">—</span>}
                         </td>
                         <td className="px-2 py-3">
-                          {doc.status === 'draft' && <Badge variant="secondary" className="text-xs whitespace-nowrap">📝 Nháp</Badge>}
-                          {doc.status === 'pending_approval' && <Badge variant="outline" className="border-yellow-500 text-yellow-700 bg-yellow-50 text-xs whitespace-nowrap">⏳ Chờ duyệt</Badge>}
-                          {doc.status === 'approved' && <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50 text-xs whitespace-nowrap">✅ Đã duyệt</Badge>}
-                          {doc.status === 'pending_signature' && <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50 text-xs whitespace-nowrap">✍️ Chờ ký</Badge>}
-                          {doc.status === 'completed' && <Badge variant="default" className="bg-green-600 text-white text-xs whitespace-nowrap">✅ Hoàn thành</Badge>}
-                          {doc.status === 'active' && <Badge variant="default" className="bg-green-600 text-white text-xs whitespace-nowrap">✅ Hoạt động</Badge>}
-                          {doc.status === 'rejected' && <Badge variant="destructive" className="bg-red-600 text-white text-xs whitespace-nowrap">❌ Từ chối</Badge>}
-                          {doc.status === 'cancelled' && <Badge variant="outline" className="border-red-500 text-red-700 bg-red-50 text-xs whitespace-nowrap">🚫 Đã hủy</Badge>}
-                          {doc.status === 'archived' && <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50 text-xs whitespace-nowrap">📦 Thanh lý</Badge>}
+                          <StatusTag status={getStatusMeta(doc.status).label} variant={getStatusMeta(doc.status).variant} className="whitespace-nowrap" />
                         </td>
                         <td className="px-2 py-3 text-muted-foreground text-xs whitespace-nowrap">
                           {dayjs(doc.created_at).format("DD/MM/YY")}
@@ -1228,13 +1239,13 @@ export default function DocumentsPage() {
                         {doc.document_number || `#${doc.id}`}
                       </p>
                     </div>
-                    <StatusTag status={doc.status ?? "draft"} variant={doc.status === "active" ? "success" : "default"} />
+                    <StatusTag status={getStatusMeta(doc.status).label} variant={getStatusMeta(doc.status).variant} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                     <div>
                       <span className="text-muted-foreground">Loại:</span>
-                      <p className="font-medium truncate">{doc.document_type?.name || '—'}</p>
+                      <p className="font-medium truncate">{getDocumentTypeName(doc) || '—'}</p>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Ngày:</span>
