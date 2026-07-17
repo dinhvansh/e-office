@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ok } from '../../core/utils/response';
 import { approvalsService } from './approvals.service';
 import { documentsService } from '../documents/documents.service';
+import { toDocumentAttachmentDTO } from '../documents/documents.dto';
 
 const submitSchema = z.object({
   document_id: z.coerce.number().int().positive(),
@@ -54,7 +55,7 @@ export class ApprovalsController {
       req.auth!.userId,
       req.auth!.tenantId
     );
-    res.json(ok({ comments }));
+    res.json(ok({ comments: comments.map((comment: any) => ({ ...comment, attachments: (comment.attachments || []).map(toDocumentAttachmentDTO) })) }));
   };
 
   addComment = async (req: Request, res: Response): Promise<void> => {
@@ -67,7 +68,7 @@ export class ApprovalsController {
       body.body
       , body.attachments as Array<{ file_name: string; file_base64: string; file_type?: string }> | undefined
     );
-    res.status(201).json(ok({ comment }));
+    res.status(201).json(ok({ comment: { ...comment, attachments: (comment.attachments || []).map(toDocumentAttachmentDTO) } }));
   };
 
   viewDocument = async (req: Request, res: Response): Promise<void> => {
