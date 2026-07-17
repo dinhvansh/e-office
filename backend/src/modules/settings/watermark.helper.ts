@@ -176,10 +176,12 @@ export async function applyWatermarkToPdfBytes(
 
   for (const page of pages) {
     const { width, height } = page.getSize();
-    const positions = resolveWatermarkPositions(width, height, config);
     const angle = config.position === 'diagonal' ? resolveDiagonalAngle(width, height) : config.rotation;
     const textWidth = variant.text ? font.widthOfTextAtSize(variant.text, config.fontSize) : 0;
     const textHeight = variant.text ? font.heightAtSize(config.fontSize) : 0;
+    const imageScale = image ? image.scale(config.image_scale) : null;
+    const watermarkSpan = Math.max(textWidth, imageScale?.width || 0);
+    const positions = resolveWatermarkPositions(width, height, config, watermarkSpan);
 
     for (const pos of positions) {
       if ((variant.mode === 'text' || variant.mode === 'both') && variant.text) {
@@ -196,7 +198,7 @@ export async function applyWatermarkToPdfBytes(
       }
 
       if ((variant.mode === 'image' || variant.mode === 'both') && image) {
-        const scaled = image.scale(config.image_scale);
+        const scaled = imageScale!;
         const imageOrigin = resolveRotatedOrigin(pos.x, pos.y, scaled.width, scaled.height, angle);
         page.drawImage(image, {
           x: imageOrigin.x,
@@ -239,7 +241,12 @@ function buildVariant(
   };
 }
 
-function resolveWatermarkPositions(width: number, height: number, config: WatermarkConfig) {
+export function resolveWatermarkPositions(
+  width: number,
+  height: number,
+  config: WatermarkConfig,
+  watermarkSpan = 0,
+) {
   const centerX = width / 2;
   const centerY = height / 2;
 
@@ -264,6 +271,14 @@ function resolveWatermarkPositions(width: number, height: number, config: Waterm
   }
 
   if (config.position === 'diagonal') {
+    // The repeated diagonal anchors are 28% of the page diagonal apart. Long
+    // labels (for example "CHUA HOAN THANH") would overlap at that distance,
+    // producing an unreadable stack of watermark text. Preserve repeat for
+    // compact marks, but render one centered mark when repetition cannot fit.
+    const diagonalLength = Math.hypot(width, height);
+    if (watermarkSpan > diagonalLength * 0.28) {
+      return [resolveDiagonalPoint(width, height, 0.5)];
+    }
     return [0.22, 0.5, 0.78].map((ratio) => resolveDiagonalPoint(width, height, ratio));
   }
 
