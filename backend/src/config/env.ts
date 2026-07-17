@@ -78,6 +78,7 @@ const envSchema = z.object({
   AUTH_COOKIE_DOMAIN: z.string().optional(),
   DISABLE_LICENSE_CHECK: z.string().default("false"),
   RATE_LIMIT_BYPASS_EMAILS: z.string().optional(),
+  INTERNAL_PROVISIONING_KEY: optionalNonEmptyString(),
 }).superRefine((value, ctx) => {
   if (value.NODE_ENV !== "production") return;
 

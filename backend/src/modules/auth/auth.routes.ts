@@ -4,7 +4,6 @@ import { AuthController } from "./auth.controller";
 import { authGuard } from "./auth.middleware";
 import { authLoginLimiter, authRefreshLimiter } from "../../middleware/rate-limiter";
 import { passwordResetController } from "./passwordReset.controller";
-import { registrationController } from "./registration.controller";
 
 const controller = new AuthController();
 
@@ -21,5 +20,3 @@ authRouter.post("/forgot-password", asyncHandler(passwordResetController.request
 authRouter.get("/verify-reset-token/:token", asyncHandler(passwordResetController.verifyResetToken.bind(passwordResetController)));
 authRouter.post("/reset-password", asyncHandler(passwordResetController.resetPassword.bind(passwordResetController)));
 
-// Registration endpoint (public)
-authRouter.post("/register", asyncHandler(registrationController.register.bind(registrationController)));
