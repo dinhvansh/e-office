@@ -127,7 +127,7 @@ export class SignRequestsController {
   listComments = async (req: Request, res: Response): Promise<void> => {
     const id = idSchema.parse(req.params.id);
     const comments = await signRequestsService.listComments(id, req.auth!.tenantId, req.auth!.userId);
-    res.json(ok({ comments: comments.map((comment: any) => ({ ...comment, attachments: (comment.attachments || []).map(toDocumentAttachmentDTO) })) }));
+    res.json(ok({ comments: comments.map((comment: any) => ({ ...comment, attachments: (comment.attachments || []).map((attachment: any) => ({ ...toDocumentAttachmentDTO(attachment), can_withdraw: attachment.can_withdraw })) })) }));
   };
 
   addComment = async (req: Request, res: Response): Promise<void> => {

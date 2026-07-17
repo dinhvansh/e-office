@@ -119,9 +119,9 @@ class SignRequestsService {
   }
 
   async listComments(signRequestId: number, tenantId: number, userId: number) {
-    await this.getSignRequest(signRequestId, tenantId, userId);
+    const request = await this.getSignRequest(signRequestId, tenantId, userId);
 
-    return prisma.sign_request_comments.findMany({
+    const comments = await prisma.sign_request_comments.findMany({
       where: {
         tenant_id: tenantId,
         sign_request_id: signRequestId,
@@ -138,6 +138,12 @@ class SignRequestsService {
       },
       orderBy: { created_at: "asc" },
     });
+    const final = ["completed", "cancelled", "rejected"].includes((request.status || "").toLowerCase());
+    return comments.map((comment) => ({
+      ...comment,
+      can_withdraw: !final && !comment.deleted_at && comment.user_id === userId && Date.now() - comment.created_at.getTime() <= 15 * 60 * 1000,
+      attachments: comment.attachments.map((attachment) => ({ ...attachment, can_withdraw: attachment.status === "ACTIVE" && (attachment.uploaded_by === userId || request.document?.owner_id === userId) })),
+    }));
   }
 
   async addComment(signRequestId: number, tenantId: number, userId: number, body: string, attachments: Array<{ file_name: string; file_base64: string; file_type?: string }> = []) {
