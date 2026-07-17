@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { WorkflowStatusPanel } from '@/components/workflow/WorkflowStatusPanel';
+import { SignRequestDiscussion } from '@/components/sign-requests/sign-request-discussion';
 import { toast } from 'sonner';
 
 type SharePermissionRecord = {
@@ -53,7 +54,9 @@ export default function DocumentFlowPage() {
   const { fetchJson } = useAuth();
   const queryClient = useQueryClient();
   const documentId = params.id as string;
-  const [activeTab, setActiveTab] = useState<'activities' | 'participants'>('activities');
+  const [activeTab, setActiveTab] = useState<'activities' | 'participants' | 'discussion'>(() =>
+    typeof window !== 'undefined' && window.location.hash === '#discussion' ? 'discussion' : 'activities'
+  );
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -528,7 +531,7 @@ export default function DocumentFlowPage() {
             <div className="bg-white rounded-lg shadow-sm border">
               {/* Tabs */}
               <div className="border-b">
-                <div className="flex">
+                <div className="grid grid-cols-3">
                   <button
                     onClick={() => setActiveTab('activities')}
                     className={`flex-1 px-4 py-3 text-sm font-medium ${
@@ -549,6 +552,18 @@ export default function DocumentFlowPage() {
                   >
                     Người tham gia
                   </button>
+                  {document.sign_request_id ? (
+                    <button
+                      onClick={() => setActiveTab('discussion')}
+                      className={`px-3 py-3 text-sm font-medium ${
+                        activeTab === 'discussion'
+                          ? 'border-b-2 border-blue-600 text-blue-600'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Thảo luận
+                    </button>
+                  ) : <div />}
                 </div>
               </div>
 
@@ -556,8 +571,10 @@ export default function DocumentFlowPage() {
               <div className="p-4">
                 {activeTab === 'activities' ? (
                   <FlowActivities activities={activities} />
-                ) : (
+                ) : activeTab === 'participants' ? (
                   <FlowParticipants steps={steps} />
+                ) : (
+                  <SignRequestDiscussion signRequestId={document.sign_request_id} className="border-0 p-0 shadow-none" />
                 )}
               </div>
             </div>

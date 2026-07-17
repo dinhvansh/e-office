@@ -191,7 +191,7 @@ class SignRequestsService {
         type: NotificationType.DOCUMENT_COMMENTED,
         title: "Có bình luận mới trong luồng ký",
         message: `${commenter} đã bình luận trên tài liệu "${document.title || document.original_file_name || "Untitled"}"`,
-        link: `/sign-requests/${signRequestId}/editor#discussion`,
+        link: `/documents/${signRequest.document_id}/flow#discussion`,
       });
     }
 

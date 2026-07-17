@@ -196,7 +196,7 @@ class ApprovalsService {
         type: NotificationType.DOCUMENT_COMMENTED,
         title: 'Có bình luận mới trong luồng phê duyệt',
         message: `${commenter} đã bình luận trên tài liệu "${approval.document.title || approval.document.original_file_name || 'Untitled'}"`,
-        link: `/sign-requests/${signRequestId}/editor#discussion`,
+        link: `/documents/${approval.document_id}/flow#discussion`,
       });
     }
 
