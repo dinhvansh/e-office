@@ -34,6 +34,7 @@ interface SignRequest {
     title: string | null;
     original_file_name: string;
     document_number: string | null;
+    status: string | null;
     document_type?: string | null;
     owner: {
       id: number;
@@ -131,8 +132,8 @@ export default function SignRequestsPage() {
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async ({ signRequestId, documentId }: { signRequestId: number; documentId: number }) => {
-      await fetchJson(`/documents/${documentId}`, { method: 'DELETE' });
       await fetchJson(`/sign-requests/${signRequestId}`, { method: 'DELETE' });
+      await fetchJson(`/documents/${documentId}`, { method: 'DELETE' });
     },
     onSuccess: () => {
       toast.success('Đã xóa văn bản thành công!');
@@ -525,7 +526,7 @@ export default function SignRequestsPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
                               {/* Delete - Draft only */}
-                              {(request.flow_state === 'DRAFT' || request.status === 'draft') && (
+                              {(request.flow_state === 'DRAFT' || request.status === 'draft') && ['draft', 'cancelled'].includes(request.document.status || '') && (
                                 <>
                                   <DropdownMenuItem
                                     onClick={() => handleDelete(request.id, request.document.id)}

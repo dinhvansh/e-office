@@ -1516,6 +1516,10 @@ class SignRequestsService {
    */
   async deleteSignRequest(id: number, tenantId: number, userId: number) {
     const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
+    const document = await documentsRepository.findById(signRequest.document_id, tenantId);
+    if (!document || !["draft", "cancelled"].includes(document.status || "")) {
+      throw ApiError.badRequest("Không thể xóa khi tài liệu đang xử lý. Vui lòng hủy luồng ký trước, sau đó mới xóa tài liệu.", "SIGN_REQUEST_CANCEL_BEFORE_DELETE");
+    }
     await signRequestLifecycleService.deleteDraft(signRequest, id);
 
     // Audit log

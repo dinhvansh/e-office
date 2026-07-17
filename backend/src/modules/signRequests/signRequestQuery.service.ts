@@ -23,7 +23,7 @@ class SignRequestQueryService {
     const totalPages = Math.ceil(total / limit);
     const signRequests = await signRequestsRepository.findMany({
       where,
-      include: { document: { select: { id: true, title: true, original_file_name: true, document_number: true, owner: { select: { id: true, full_name: true, email: true } } } }, signers: { select: { id: true, name: true, email: true, status: true, signed_at: true, signing_order: true, is_internal: true, user_id: true }, orderBy: { signing_order: "asc" } } },
+      include: { document: { select: { id: true, title: true, original_file_name: true, document_number: true, status: true, owner: { select: { id: true, full_name: true, email: true } } } }, signers: { select: { id: true, name: true, email: true, status: true, signed_at: true, signing_order: true, is_internal: true, user_id: true }, orderBy: { signing_order: "asc" } } },
       orderBy: { created_at: "desc" }, skip: (page - 1) * limit, take: limit,
     });
     return { data: signRequests.map((request) => {
