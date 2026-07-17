@@ -14,6 +14,8 @@ import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
 import SignatureModal from '@/components/signature/SignatureModal';
 import { getApiBaseUrl } from '@/lib/env';
 import { WorkflowStatusPanel, type WorkflowStatusSummary } from '@/components/workflow/WorkflowStatusPanel';
+import { DossierAttachments } from '@/components/documents/dossier-attachments';
+import { SignRequestDiscussion } from '@/components/sign-requests/sign-request-discussion';
 
 interface ApprovalDetail {
   id: number;
@@ -470,7 +472,9 @@ export default function ApprovalDetailPage() {
             )}
           </section>
 
-          <section className="order-3 rounded-2xl border bg-white p-5 shadow-sm">
+          <DossierAttachments documentId={approval.document.id} />
+
+          <section className="hidden order-3 rounded-2xl border bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 font-semibold text-slate-950">
                 <Paperclip className="h-4 w-4" />
@@ -515,7 +519,8 @@ export default function ApprovalDetailPage() {
             </div>
           </section>
 
-          <section className="order-2 rounded-2xl border bg-white p-5 shadow-sm">
+          {approval.document.sign_request_id ? <SignRequestDiscussion signRequestId={approval.document.sign_request_id} documentId={approval.document.id} /> : null}
+          <section className="hidden order-2 rounded-2xl border bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 font-semibold text-slate-950">
                 <MessageSquare className="h-4 w-4" />

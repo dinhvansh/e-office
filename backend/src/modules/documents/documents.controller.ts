@@ -87,6 +87,7 @@ const attachmentSchema = z.object({
   file_name: z.string().min(1),
   file_base64: z.string().min(1),
   file_type: z.string().optional(),
+  attachment_kind: z.enum(["SUPPLEMENTAL", "COMMENT_ATTACHMENT"]).optional(),
 });
 const ccEmailsSchema = z.object({
   emails: z.array(z.string().email()),
@@ -239,7 +240,8 @@ export class DocumentsController {
       req.auth!.tenantId,
       req.auth!.userId
     );
-    res.json(ok({ attachments: toDocumentAttachmentDTOs(attachments) }));
+    const capabilities = await documentsService.getAttachmentCapabilities(documentId, req.auth!.tenantId, req.auth!.userId);
+    res.json(ok({ attachments: toDocumentAttachmentDTOs(attachments), ...capabilities }));
   };
 
   addAttachment = async (req: Request, res: Response): Promise<void> => {
@@ -253,6 +255,7 @@ export class DocumentsController {
         file_name: body.file_name,
         file_base64: body.file_base64,
         file_type: body.file_type,
+        attachment_kind: body.attachment_kind,
       }
     );
     res.status(201).json(ok({ attachment: toDocumentAttachmentDTO(attachment) }));
@@ -291,6 +294,15 @@ export class DocumentsController {
     res.setHeader('Content-Type', mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.send(fileBytes);
+  };
+
+  downloadDossier = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    const dossier = await documentsService.getDossierFile(documentId, req.auth!.tenantId, req.auth!.userId);
+    await auditService.record({ tenantId: req.auth!.tenantId, documentId, event: "document.dossier_downloaded", userId: req.auth!.userId, ip: req.ip, ua: req.headers["user-agent"] });
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${dossier.fileName}"`);
+    res.send(dossier.fileBytes);
   };
 
   // Tags endpoints

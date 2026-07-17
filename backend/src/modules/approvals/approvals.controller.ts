@@ -20,6 +20,7 @@ const requestInfoSchema = z.object({
 });
 const commentSchema = z.object({
   body: z.string().min(1).max(2000),
+  attachments: z.array(z.object({ file_name: z.string().min(1), file_base64: z.string().min(1), file_type: z.string().optional() })).max(5).optional(),
 });
 
 const idSchema = z.coerce.number().int().positive();
@@ -64,6 +65,7 @@ export class ApprovalsController {
       req.auth!.userId,
       req.auth!.tenantId,
       body.body
+      , body.attachments as Array<{ file_name: string; file_base64: string; file_type?: string }> | undefined
     );
     res.status(201).json(ok({ comment }));
   };

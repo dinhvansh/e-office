@@ -25,6 +25,7 @@ import { signRequestDraftService, type CreateDraftSignRequestInput } from "./sig
 import { signerManagementService } from "./signerManagement.service";
 import { signRequestLifecycleService } from "./signRequestLifecycle.service";
 import { internalSigningCommandService } from "./internalSigningCommand.service";
+import { documentsService } from "../documents/documents.service";
 import bcrypt from "bcrypt";
 
 export interface SignerInput {
@@ -133,12 +134,13 @@ class SignRequestsService {
             email: true,
           },
         },
+        attachments: { include: { uploader: { select: { id: true, full_name: true, email: true } } } },
       },
       orderBy: { created_at: "asc" },
     });
   }
 
-  async addComment(signRequestId: number, tenantId: number, userId: number, body: string) {
+  async addComment(signRequestId: number, tenantId: number, userId: number, body: string, attachments: Array<{ file_name: string; file_base64: string; file_type?: string }> = []) {
     const content = body.trim();
     if (!content) {
       throw ApiError.badRequest("Comment is required", "COMMENT_REQUIRED");
@@ -195,7 +197,17 @@ class SignRequestsService {
       });
     }
 
-    return comment;
+    for (const attachment of attachments) {
+      await documentsService.addAttachment(signRequest.document_id, tenantId, userId, {
+        ...attachment,
+        attachment_kind: "COMMENT_ATTACHMENT",
+        comment_id: comment.id,
+      });
+    }
+    return prisma.sign_request_comments.findUniqueOrThrow({
+      where: { id: comment.id },
+      include: { user: { select: { id: true, full_name: true, email: true } }, attachments: { include: { uploader: { select: { id: true, full_name: true, email: true } } } } },
+    });
   }
 
   /**

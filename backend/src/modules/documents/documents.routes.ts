@@ -17,6 +17,7 @@ documentsRouter.get("/", requirePermission('documents', 'read'), asyncHandler(co
 documentsRouter.get("/tags/all", requirePermission('documents', 'read'), asyncHandler(controller.getAllTags));
 documentsRouter.get("/:id/download", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.download));
 documentsRouter.get("/:id/download-signed", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.downloadSigned));
+documentsRouter.get("/:id/dossier/download", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.downloadDossier));
 documentsRouter.get("/:id/view", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.view));
 documentsRouter.get("/:id/view-signed", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.viewSigned));
 documentsRouter.get("/:id/attachments", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.listAttachments));

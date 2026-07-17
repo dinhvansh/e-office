@@ -25,6 +25,8 @@ import {
 import { documentFileService, type DocumentFileResult } from "./documentFile.service";
 import { documentLifecycleService } from "./documentLifecycle.service";
 import { outboxDeliveryService } from "../outbox/outboxDelivery.service";
+import { notificationsService } from "../notifications/notifications.service";
+import { NotificationType } from "../notifications/notifications.types";
 
 export interface CreateDocumentInput {
   fileName: string;
@@ -68,6 +70,59 @@ export interface CreateDocumentInput {
 }
 
 class DocumentsService {
+  private crc32(buffer: Buffer) {
+    let crc = 0xffffffff;
+    for (const byte of buffer) {
+      crc ^= byte;
+      for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  // Stored ZIP entries deliberately use no compression. It keeps the archive
+  // implementation dependency-free while retaining every original file byte.
+  private makeZip(entries: Array<{ name: string; content: Buffer }>) {
+    const locals: Buffer[] = [];
+    const central: Buffer[] = [];
+    let offset = 0;
+    for (const entry of entries) {
+      const name = Buffer.from(entry.name.replace(/[\\/:*?"<>|]/g, "_"));
+      const crc = this.crc32(entry.content);
+      const local = Buffer.alloc(30);
+      local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(0x0800, 6);
+      local.writeUInt16LE(0, 8); local.writeUInt16LE(0, 10); local.writeUInt16LE(0, 12);
+      local.writeUInt32LE(crc, 14); local.writeUInt32LE(entry.content.length, 18); local.writeUInt32LE(entry.content.length, 22);
+      local.writeUInt16LE(name.length, 26); local.writeUInt16LE(0, 28);
+      locals.push(local, name, entry.content);
+      const header = Buffer.alloc(46);
+      header.writeUInt32LE(0x02014b50, 0); header.writeUInt16LE(20, 4); header.writeUInt16LE(20, 6); header.writeUInt16LE(0x0800, 8);
+      header.writeUInt16LE(0, 10); header.writeUInt16LE(0, 12); header.writeUInt16LE(0, 14); header.writeUInt32LE(crc, 16);
+      header.writeUInt32LE(entry.content.length, 20); header.writeUInt32LE(entry.content.length, 24); header.writeUInt16LE(name.length, 28);
+      header.writeUInt16LE(0, 30); header.writeUInt16LE(0, 32); header.writeUInt16LE(0, 34); header.writeUInt16LE(0, 36);
+      header.writeUInt32LE(0, 38); header.writeUInt32LE(offset, 42);
+      central.push(header, name);
+      offset += local.length + name.length + entry.content.length;
+    }
+    const centralSize = central.reduce((size, part) => size + part.length, 0);
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(entries.length, 8); end.writeUInt16LE(entries.length, 10);
+    end.writeUInt32LE(centralSize, 12); end.writeUInt32LE(offset, 16);
+    return Buffer.concat([...locals, ...central, end]);
+  }
+  private async canAddAttachment(documentId: number, tenantId: number, userId: number, ownerId: number | null) {
+    if (ownerId === userId) return true;
+    const [activeApprover, activeSigner] = await Promise.all([
+      prisma.document_approvals.findFirst({
+        where: { document_id: documentId, approver_user_id: userId, action: "pending", document: { tenant_id: tenantId } },
+        select: { id: true },
+      }),
+      prisma.signers.findFirst({
+        where: { sign_request: { document_id: documentId, tenant_id: tenantId }, user_id: userId, status: { in: ["pending", "otp_sent"] } },
+        select: { id: true },
+      }),
+    ]);
+    return Boolean(activeApprover || activeSigner);
+  }
   private async resolveDocumentTypeDefaults(
     tenantId: number,
     documentTypeId: number | null | undefined,
@@ -234,14 +289,23 @@ class DocumentsService {
         document: { tenant_id: tenantId },
       },
       orderBy: { uploaded_at: "desc" },
+      include: { uploader: { select: { id: true, full_name: true, email: true } } },
     });
+  }
+
+  async getAttachmentCapabilities(documentId: number, tenantId: number, userId: number) {
+    const document = await documentsRepository.findById(documentId, tenantId);
+    if (!document) throw ApiError.notFound("Document not found", "DOCUMENT_NOT_FOUND");
+    const readDecision = await authorizationService.canAccessDocument(userId, tenantId, documentId, "read");
+    if (!readDecision.allowed) throw ApiError.forbidden("You do not have access to this document", "DOCUMENT_ACCESS_DENIED");
+    return { can_upload: await this.canAddAttachment(documentId, tenantId, userId, document.owner_id) };
   }
 
   async addAttachment(
     documentId: number,
     tenantId: number,
     userId: number,
-    input: { file_name: string; file_base64: string; file_type?: string | null },
+    input: { file_name: string; file_base64: string; file_type?: string | null; attachment_kind?: "SUPPLEMENTAL" | "COMMENT_ATTACHMENT"; comment_id?: number | null },
   ) {
     const document = await documentsRepository.findById(documentId, tenantId);
     if (!document) {
@@ -257,17 +321,7 @@ class DocumentsService {
     // participant. Only the owner or an approver with an active pending task
     // may add it. Later sequential steps are materialized as `waiting`, and
     // completed approvers no longer have `pending` records.
-    const activeApprover = await prisma.document_approvals.findFirst({
-      where: {
-        document_id: documentId,
-        approver_user_id: userId,
-        action: "pending",
-        document: { tenant_id: tenantId },
-      },
-      select: { id: true },
-    });
-
-    if (document.owner_id !== userId && !activeApprover) {
+    if (!(await this.canAddAttachment(documentId, tenantId, userId, document.owner_id))) {
       throw ApiError.forbidden("You do not have permission to add attachments", "DOCUMENT_ATTACHMENT_DENIED");
     }
 
@@ -287,15 +341,37 @@ class DocumentsService {
         file_path: attachmentPath,
         file_size: BigInt(buffer.length),
         file_type: input.file_type || null,
+        attachment_kind: input.attachment_kind || "SUPPLEMENTAL",
+        uploaded_by: userId,
+        comment_id: input.comment_id || null,
       },
+      include: { uploader: { select: { id: true, full_name: true, email: true } } },
     });
 
     await auditService.record({
       tenantId,
       documentId,
-      event: "document.attachment_added",
+      event: input.attachment_kind === "COMMENT_ATTACHMENT" ? "document.comment_attachment_added" : "document.supplemental_added",
       userId,
     });
+
+    const recipients = await prisma.document_approvals.findMany({
+      where: { document_id: documentId, action: "pending", approver_user_id: { not: userId } },
+      select: { approver_user_id: true },
+    });
+    const signingRecipients = await prisma.signers.findMany({
+      where: { sign_request: { document_id: documentId }, status: { in: ["pending", "otp_sent"] }, user_id: { not: null } },
+      select: { user_id: true },
+    });
+    const targetUserIds = new Set([...recipients.map((item) => item.approver_user_id), ...signingRecipients.map((item) => item.user_id!).filter((id) => id !== userId)]);
+    await Promise.all([...targetUserIds].map((recipientId) => notificationsService.createNotification({
+      tenantId,
+      userId: recipientId,
+      type: NotificationType.DOCUMENT_ATTACHMENT_ADDED,
+      title: "Có tài liệu bổ sung cần xem",
+      message: `Tệp "${input.file_name}" đã được bổ sung vào hồ sơ`,
+      link: `/documents/${documentId}/flow`,
+    })));
 
     return attachment;
   }
@@ -408,6 +484,26 @@ class DocumentsService {
     } catch {
       throw ApiError.notFound("Attachment file not found on disk", "ATTACHMENT_FILE_NOT_FOUND");
     }
+  }
+
+  async getDossierFile(documentId: number, tenantId: number, userId: number) {
+    const document = await this.getDocument(documentId, tenantId, userId);
+    const completed = ["completed", "signed", "fully_signed"].includes((document.status || "").toLowerCase()) && Boolean(document.signed_file_path);
+    const primary = completed
+      ? await this.getSignedDocumentFile(documentId, tenantId, userId)
+      : await this.getDocumentFile(documentId, tenantId, userId);
+    const attachments = await this.listAttachments(documentId, tenantId, userId);
+    const files: Array<{ name: string; content: Buffer }> = [{ name: completed ? `signed/${primary.fileName}` : `current/${primary.fileName}`, content: primary.fileBytes }];
+    const manifestAttachments: Array<Record<string, unknown>> = [];
+    for (const attachment of attachments) {
+      const file = await this.getAttachmentFile(attachment.id, tenantId, userId);
+      const archiveName = `attachments/${String(attachment.id).padStart(4, "0")}-${attachment.file_name}`;
+      files.push({ name: archiveName, content: file.fileBytes });
+      manifestAttachments.push({ id: attachment.id, name: attachment.file_name, archive_path: archiveName, kind: attachment.attachment_kind, comment_id: attachment.comment_id, uploaded_at: attachment.uploaded_at, size: attachment.file_size?.toString() ?? null, uploaded_by: attachment.uploader ? { id: attachment.uploader.id, name: attachment.uploader.full_name, email: attachment.uploader.email } : null });
+    }
+    files.push({ name: "manifest.json", content: Buffer.from(JSON.stringify({ document: { id: document.id, title: document.title, status: document.status, hash: document.hash, completed }, primary_file: primary.fileName, attachments: manifestAttachments }, null, 2)) });
+    const baseName = (document.title || document.original_file_name || `document-${documentId}`).replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9._-]+/g, "-");
+    return { fileName: `${baseName}-dossier.zip`, fileBytes: this.makeZip(files) };
   }
 
   async createDocument(input: CreateDocumentInput & {

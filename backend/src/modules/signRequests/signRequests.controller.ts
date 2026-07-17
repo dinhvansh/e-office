@@ -131,8 +131,8 @@ export class SignRequestsController {
 
   addComment = async (req: Request, res: Response): Promise<void> => {
     const id = idSchema.parse(req.params.id);
-    const body = z.object({ body: z.string().min(1).max(2000) }).parse(req.body);
-    const comment = await signRequestsService.addComment(id, req.auth!.tenantId, req.auth!.userId, body.body);
+    const body = z.object({ body: z.string().min(1).max(2000), attachments: z.array(z.object({ file_name: z.string().min(1), file_base64: z.string().min(1), file_type: z.string().optional() })).max(5).optional() }).parse(req.body);
+    const comment = await signRequestsService.addComment(id, req.auth!.tenantId, req.auth!.userId, body.body, body.attachments as Array<{ file_name: string; file_base64: string; file_type?: string }> | undefined);
     res.status(201).json(ok({ comment }));
   };
 

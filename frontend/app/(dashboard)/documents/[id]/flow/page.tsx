@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { WorkflowStatusPanel } from '@/components/workflow/WorkflowStatusPanel';
 import { SignRequestDiscussion } from '@/components/sign-requests/sign-request-discussion';
+import { DossierAttachments } from '@/components/documents/dossier-attachments';
 import { toast } from 'sonner';
 
 type SharePermissionRecord = {
@@ -328,6 +329,24 @@ export default function DocumentFlowPage() {
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Quay lại
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="min-w-0 max-w-full"
+                onClick={async () => {
+                  try {
+                    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+                    const authData = localStorage.getItem('esign.auth');
+                    const token = authData ? JSON.parse(authData).tokens?.accessToken : null;
+                    const response = await fetch(`${apiUrl}/documents/${documentId}/dossier/download`, { headers: { Authorization: `Bearer ${token}` } });
+                    if (!response.ok) throw new Error('Download failed');
+                    const url = URL.createObjectURL(await response.blob()); const link = window.document.createElement('a'); link.href = url; link.download = `${document?.document_number || 'ho-so'}-dossier.zip`; link.click(); URL.revokeObjectURL(url);
+                  } catch (error) { toast.error('Không thể tải bộ hồ sơ'); }
+                }}
+              >
+                <Download className="h-4 w-4 shrink-0 sm:mr-2" />
+                {document?.status === 'completed' ? 'Tải toàn bộ hồ sơ' : 'Tải bộ hồ sơ hiện tại'}
+              </Button>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-start gap-2">
                   <FileText className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
@@ -525,7 +544,8 @@ export default function DocumentFlowPage() {
           {/* Right: discussion and audit activity. Participant state is already shown in the workflow timeline. */}
           <div className={hasWorkflowSteps ? "lg:col-span-3" : "lg:col-span-4"}>
             <div className="space-y-6">
-              {document.sign_request_id ? <SignRequestDiscussion signRequestId={document.sign_request_id} /> : null}
+              {document.sign_request_id ? <SignRequestDiscussion signRequestId={document.sign_request_id} documentId={Number(documentId)} /> : null}
+              <DossierAttachments documentId={Number(documentId)} />
               <section className="rounded-lg border bg-white shadow-sm">
                 <div className="border-b px-4 py-3 text-sm font-semibold text-slate-900">Hoạt động</div>
                 <div className="p-4">

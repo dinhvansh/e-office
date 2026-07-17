@@ -30,6 +30,7 @@ type CombinedTask = {
 import { isApprovalStepComplete } from './approvalCompletion.policy';
 import { workflowStateService } from '../workflows/workflowState.service';
 import { buildWorkflowStatusSummary } from '../signRequests/signRequestFlow.policy';
+import { documentsService } from '../documents/documents.service';
 
 class ApprovalsService {
   /**
@@ -149,12 +150,13 @@ class ApprovalsService {
             email: true,
           },
         },
+        attachments: { include: { uploader: { select: { id: true, full_name: true, email: true } } } },
       },
       orderBy: { created_at: 'asc' },
     });
   }
 
-  async addComment(approvalId: number, userId: number, tenantId: number, body: string) {
+  async addComment(approvalId: number, userId: number, tenantId: number, body: string, attachments: Array<{ file_name: string; file_base64: string; file_type?: string }> = []) {
     const content = body.trim();
     if (!content) {
       throw ApiError.badRequest('Comment is required', 'COMMENT_REQUIRED');
@@ -200,7 +202,16 @@ class ApprovalsService {
       });
     }
 
-    return comment;
+    for (const attachment of attachments) {
+      await documentsService.addAttachment(approval.document_id, tenantId, userId, { ...attachment, attachment_kind: 'COMMENT_ATTACHMENT', comment_id: comment.id });
+    }
+    return prisma.sign_request_comments.findUniqueOrThrow({
+      where: { id: comment.id },
+      include: {
+        user: { select: { id: true, full_name: true, email: true } },
+        attachments: { include: { uploader: { select: { id: true, full_name: true, email: true } } } },
+      },
+    });
   }
 
   /**

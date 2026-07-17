@@ -8,6 +8,7 @@ export enum NotificationType {
   WORKFLOW_COMPLETED = 'workflow_completed',
   DOCUMENT_SHARED = 'document_shared',
   DOCUMENT_COMMENTED = 'document_commented',
+  DOCUMENT_ATTACHMENT_ADDED = 'document_attachment_added',
 }
 
 export interface CreateNotificationData {

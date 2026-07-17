@@ -1,4 +1,4 @@
-import { document_attachments, document_cc_emails, document_types, documents } from '@prisma/client';
+import { document_attachments, document_cc_emails, document_types, documents, users } from '@prisma/client';
 
 type DocumentDTOInput = documents & {
   document_type?: Pick<document_types, 'name'> | null;
@@ -43,19 +43,31 @@ export interface DocumentAttachmentDTO {
   file_size: string | null;
   file_type: string | null;
   uploaded_at: Date;
+  attachment_kind: string;
+  uploaded_by?: { id: number; full_name: string | null; email: string } | null;
+  comment_id: number | null;
 }
 
-export function toDocumentAttachmentDTO(attachment: document_attachments): DocumentAttachmentDTO {
+type AttachmentWithUploader = document_attachments & {
+  uploader?: Pick<users, 'id' | 'full_name' | 'email'> | null;
+};
+
+export function toDocumentAttachmentDTO(attachment: AttachmentWithUploader): DocumentAttachmentDTO {
   return {
     id: attachment.id,
     file_name: attachment.file_name,
     file_size: attachment.file_size == null ? null : attachment.file_size.toString(),
     file_type: attachment.file_type || null,
     uploaded_at: attachment.uploaded_at,
+    attachment_kind: attachment.attachment_kind,
+    uploaded_by: attachment.uploader
+      ? { id: attachment.uploader.id, full_name: attachment.uploader.full_name, email: attachment.uploader.email }
+      : null,
+    comment_id: attachment.comment_id,
   };
 }
 
-export function toDocumentAttachmentDTOs(attachments: document_attachments[] = []): DocumentAttachmentDTO[] {
+export function toDocumentAttachmentDTOs(attachments: AttachmentWithUploader[] = []): DocumentAttachmentDTO[] {
   return attachments.map(toDocumentAttachmentDTO);
 }
 

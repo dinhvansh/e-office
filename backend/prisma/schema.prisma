@@ -60,6 +60,7 @@ model users {
   refresh_sessions     refresh_sessions[]
   notifications notifications[]
   sign_request_comments sign_request_comments[]
+  uploaded_attachments document_attachments[] @relation("attachment_uploader")
 }
 
 model documents {
@@ -141,6 +142,7 @@ model sign_request_comments {
   tenant          tenants       @relation(fields: [tenant_id], references: [id])
   sign_request    sign_requests @relation(fields: [sign_request_id], references: [id], onDelete: Cascade)
   user            users?        @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  attachments     document_attachments[] @relation("comment_attachments")
 
   @@index([tenant_id, sign_request_id])
   @@index([user_id])
@@ -528,11 +530,17 @@ model document_attachments {
   file_path   String
   file_size   BigInt?
   file_type   String?
+  attachment_kind String @default("SUPPLEMENTAL")
+  uploaded_by Int?
+  comment_id  Int?
   uploaded_at DateTime  @default(now())
 
   document    documents @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  uploader    users? @relation("attachment_uploader", fields: [uploaded_by], references: [id], onDelete: SetNull)
+  comment     sign_request_comments? @relation("comment_attachments", fields: [comment_id], references: [id], onDelete: Cascade)
 
   @@index([document_id])
+  @@index([comment_id])
 }
 
 model webhooks {

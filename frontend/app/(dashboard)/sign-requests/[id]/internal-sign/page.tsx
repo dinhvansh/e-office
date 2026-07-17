@@ -9,6 +9,8 @@ import SignatureCanvas from 'react-signature-canvas';
 import InternalSigningSidebar from '@/components/signing/InternalSigningSidebar';
 import PDFSigningViewer from '@/components/pdf/PDFSigningViewer';
 import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
+import { DossierAttachments } from '@/components/documents/dossier-attachments';
+import { SignRequestDiscussion } from '@/components/sign-requests/sign-request-discussion';
 import type { SignFieldType } from '@/lib/sign-field.helper';
 import { toast } from 'sonner';
 
@@ -345,6 +347,10 @@ export default function InternalSigningPage() {
               currentSignerId={mySigner.id}
               approvals={[]}
             />
+            <div className="mt-4 space-y-4">
+              <SignRequestDiscussion signRequestId={signRequestId} documentId={data.sign_request.document.id} />
+              <DossierAttachments documentId={data.sign_request.document.id} />
+            </div>
           </div>
 
           {/* Center: PDF Viewer with Signature Fields */}
