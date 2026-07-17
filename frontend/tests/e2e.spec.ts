@@ -109,6 +109,7 @@ test.describe("WP Sign smoke suite", () => {
     const content = await request.get(`http://127.0.0.1:8025/api/v1/message/${message.ID}`);
     const otp = (JSON.stringify(await content.json()).match(/\b\d{6}\b/) || [])[0];
     expect(otp).toMatch(/^\d{6}$/);
+    if (!otp) throw new Error("Expected a six-digit OTP in email content");
     await page.getByLabel(/Mã OTP/).fill(otp);
     await page.getByRole("button", { name: /Xác thực OTP/ }).click();
     await expect(page.locator("p.text-green-900", { hasText: "Xác thực thành công" })).toBeVisible();

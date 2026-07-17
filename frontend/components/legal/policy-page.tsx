@@ -11,8 +11,8 @@ export function PolicyPage({ title, version, sections }: PolicyPageProps) {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 sm:py-12">
       <article className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-        <Link href="/register" className="text-sm font-medium text-blue-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
-          Back to registration
+        <Link href="/login" className="text-sm font-medium text-blue-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+          Back to login
         </Link>
         <header className="mt-6 border-b border-slate-200 pb-6">
           <p className="text-sm font-medium text-amber-800">{policyMetadata.status}. Not external legal approval.</p>
@@ -34,7 +34,7 @@ export function PolicyPage({ title, version, sections }: PolicyPageProps) {
             administrator. Privacy contact: <a className="text-blue-700 underline underline-offset-2" href={`mailto:${policyMetadata.privacyEmail}`}>{policyMetadata.privacyEmail}</a>.
             Commercial licensing contact: <a className="text-blue-700 underline underline-offset-2" href={`mailto:${policyMetadata.commercialEmail}`}>{policyMetadata.commercialEmail}</a>.
           </p>
-          <div className="mt-4 flex gap-4"><Link className="text-blue-700 underline underline-offset-2" href="/register">Register</Link><Link className="text-blue-700 underline underline-offset-2" href="/login">Log in</Link></div>
+          <div className="mt-4 flex gap-4"><Link className="text-blue-700 underline underline-offset-2" href="/login">Log in</Link></div>
         </footer>
       </article>
     </main>

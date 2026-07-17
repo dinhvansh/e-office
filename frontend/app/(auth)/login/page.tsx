@@ -80,12 +80,12 @@ export default function LoginPage() {
         <button type="submit" disabled={isSubmitting} className="button-primary w-full">
           {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}
         </button>
-        <div className="mt-6 text-center">
+        <div className="hidden">
           <p className="text-sm text-slate-600">
             Chưa có tài khoản?{' '}
-            <a href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
+            <span className="text-slate-500">
               Đăng ký ngay
-            </a>
+            </span>
           </p>
         </div>
         <p className="mt-4 text-center text-xs text-slate-400">Nền tảng E-Office nội bộ.</p>

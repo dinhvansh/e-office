@@ -38,7 +38,7 @@ async function configureAndCreate(request: APIRequestContext, label: string, app
   const workflow = await api(request, '/workflows', { method: 'POST', token: adminToken, data: { name: `${label} workflow`, description: 'Golden Path browser evidence' } });
   expect(workflow.response.ok()).toBeTruthy();
   const workflowId = workflow.body.data.workflow.id as number;
-  for (const [index, userId] of approvalUsers.entries()) {
+  for (const [index, userId] of Array.from(approvalUsers.entries())) {
     const step = await api(request, `/workflows/${workflowId}/steps`, { method: 'POST', token: adminToken, data: { step_name: `${label} approval ${index + 1}`, assignee_type: 'specific_user', assignee_user_id: userId, completion_mode: 'all', participant_role: 'approver' } });
     expect(step.response.ok()).toBeTruthy();
   }
