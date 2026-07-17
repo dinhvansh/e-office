@@ -92,6 +92,111 @@ Browser → Next.js frontend → Express/TypeScript API → PostgreSQL and Redis
 
 For a demo-only database, set `AUTO_INIT_DB=true` explicitly before starting the backend. It runs destructive schema initialization and seed data, so never use it with retained data.
 
+## Deployment guide (first-time self-hosting)
+
+This section is for a small server or VM running Docker Compose. Start with a fresh Ubuntu/Debian server, a DNS name, and a firewall that permits only SSH plus the HTTP/HTTPS ports you intend to publish.
+
+### 1. Prepare the server
+
+Install Docker Engine and the Docker Compose plugin using Docker's official installation guide. Confirm both commands work:
+
+```bash
+docker --version
+docker compose version
+```
+
+Clone the repository and enter it:
+
+```bash
+git clone https://github.com/dinhvansh/e-office.git
+cd e-office
+```
+
+### 2. Create production configuration
+
+Never edit `.env.compose.example` directly. Copy it to `.env` and restrict access to it:
+
+```bash
+cp .env.compose.example .env
+chmod 600 .env
+```
+
+Open `.env` and replace every `GENERATE_...` placeholder with a unique secret. On Linux, a suitable random value can be generated with:
+
+```bash
+openssl rand -base64 48
+```
+
+At minimum, set these values:
+
+```dotenv
+POSTGRES_PASSWORD=<a-long-unique-password>
+JWT_SECRET=<at-least-32-random-characters>
+REFRESH_TOKEN_SECRET=<at-least-32-random-characters>
+APP_BASE_URL=https://office.example.com
+CORS_ORIGIN=https://office.example.com
+NEXT_PUBLIC_API_URL=https://office.example.com/api/v1
+NEXT_PUBLIC_API_BASE_URL=https://office.example.com/api/v1
+AUTO_INIT_DB=false
+SMTP_ENABLED=false
+```
+
+`AUTO_INIT_DB=true` is only for a disposable local demo. It can replace schema/data and seed accounts; do not use it in production. The normal container startup runs `prisma migrate deploy` automatically, so schema migrations are applied without destructive initialization.
+
+### 3. Start the application
+
+Build and start the services:
+
+```bash
+docker compose up -d --build
+docker compose ps
+```
+
+Wait until `db`, `redis`, and `backend` are healthy. Inspect a failed service with:
+
+```bash
+docker compose logs --tail=200 backend
+docker compose logs --tail=200 frontend
+docker compose logs --tail=200 outbox-worker
+```
+
+By default the UI listens on `http://SERVER_IP:3000` and the API on `http://SERVER_IP:4000`. For a public installation, put a TLS reverse proxy such as Caddy, Nginx, or Traefik in front of them and expose only HTTPS. Route `/api/` to port 4000 and all other paths to port 3000. Keep `APP_BASE_URL`, `CORS_ORIGIN`, and both `NEXT_PUBLIC_API_*` values aligned with the public HTTPS URL, then rebuild the frontend after changing them.
+
+### 4. Initial administrator setup
+
+For a retained deployment, do not rely on demo seed data. Complete the initial administrator/bootstrap setup supplied by your deployment process, then create users through Tenant Admin or invitations. The Open Source Core intentionally has no public self-service registration endpoint.
+
+After signing in, configure in this order:
+
+1. Departments and eligible management positions.
+2. Users, their departments, job positions, and roles.
+3. Department manager/support managers where required.
+4. Document types, numbering rules, workflows, and Document Type to Workflow mapping.
+5. SMTP and storage settings, then send a non-sensitive test document through the full flow.
+
+### 5. Storage, mail, and backups
+
+The default Docker volumes are `db_data`, `backend_storage`, and `backend_backups`. Back them up before upgrades. A database-only backup example is:
+
+```bash
+docker compose exec -T db pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > eoffice-$(date +%F).sql
+```
+
+For object storage, configure the `S3_*` values in `.env` and set `FILE_STORAGE_DRIVER` to the supported S3-compatible driver for your deployment. For outbound mail, set `SMTP_ENABLED=true` only after configuring the SMTP host, credentials, sender address, and TLS setting. Treat `.env`, backups, and generated PDFs as sensitive data.
+
+### 6. Upgrade safely
+
+Back up the database and storage first. Then pull a reviewed version and rebuild:
+
+```bash
+git fetch origin
+git pull --ff-only origin main
+docker compose up -d --build
+docker compose ps
+```
+
+The backend applies additive Prisma migrations at startup. Review release notes and migration SQL before upgrading a production system. Do not use `docker compose down -v` unless you explicitly intend to delete the database and stored documents.
+
 ## Storage
 
 Local filesystem storage is the default. S3-compatible storage, including MinIO, is supported for source documents and final artifacts. Artifact metadata and hashes are persisted with the completed request.
