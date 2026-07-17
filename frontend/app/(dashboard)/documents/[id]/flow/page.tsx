@@ -20,6 +20,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ComboboxSelect } from '@/components/ui/combobox-select';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -53,6 +54,12 @@ type SharePositionOption = {
   name: string;
   code?: string;
   is_active?: boolean;
+};
+
+type EffectiveViewer = ShareUserOption & {
+  department?: ShareDepartmentOption | null;
+  position?: { id: number; name: string } | null;
+  reasons: string[];
 };
 
 function getInitials(name?: string, email?: string) {
@@ -263,6 +270,12 @@ export default function DocumentFlowPage() {
     queryFn: () => fetchJson('/positions'),
   });
 
+  const { data: effectiveViewersData, isLoading: isLoadingEffectiveViewers } = useQuery<{ viewers: EffectiveViewer[] }>({
+    queryKey: ['document-effective-viewers', documentId],
+    enabled: shareDialogOpen && isCompleted,
+    queryFn: () => fetchJson(`/documents/${documentId}/access-viewers`),
+  });
+
   const sharePermissions = (sharePermissionsData?.permissions || []).filter((item) => item.permission_source === 'share');
   const shareUsers = shareUsersData || [];
   const shareDepartments = Array.isArray(shareDepartmentsData)
@@ -270,6 +283,7 @@ export default function DocumentFlowPage() {
     : (shareDepartmentsData?.departments || shareDepartmentsData?.data?.departments || shareDepartmentsData?.data || []);
   const sharePositions = ((sharePositionsData?.positions || sharePositionsData?.data?.positions || sharePositionsData?.data || sharePositionsData || []) as SharePositionOption[])
     .filter((item) => item.is_active !== false);
+  const effectiveViewers = effectiveViewersData?.viewers || [];
 
   const getShareSubjectLabel = (permission: SharePermissionRecord) => {
     if (permission.subject_type === 'user') {
@@ -790,6 +804,12 @@ export default function DocumentFlowPage() {
 
             <div className="space-y-3">
               <div className="text-sm font-medium">Đã chia sẻ</div>
+              <Tabs defaultValue="shared">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="shared">Đã chia sẻ ({sharePermissions.length})</TabsTrigger>
+                  <TabsTrigger value="viewers">Đang xem ({effectiveViewers.length})</TabsTrigger>
+                </TabsList>
+                <TabsContent value="shared" className="mt-3">
               {sharePermissions.length === 0 ? (
                 <div className="text-sm text-muted-foreground">Tài liệu này chưa có bản chia sẻ nào.</div>
               ) : (
@@ -829,6 +849,28 @@ export default function DocumentFlowPage() {
                   ))}
                 </div>
               )}
+                </TabsContent>
+                <TabsContent value="viewers" className="mt-3">
+                  {isLoadingEffectiveViewers ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">Đang kiểm tra quyền xem hiệu lực...</p>
+                  ) : effectiveViewers.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">Chưa có người dùng nào được cấp quyền xem.</p>
+                  ) : (
+                    <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                      {effectiveViewers.map((viewer) => (
+                        <div key={viewer.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                          <UserAvatar user={viewer} />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{viewer.full_name || viewer.email}</p>
+                            <p className="truncate text-xs text-muted-foreground">{viewer.email}{viewer.department?.name ? ` · ${viewer.department.name}` : ''}</p>
+                          </div>
+                          <Badge variant="outline" className="shrink-0">Có quyền xem</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
           <DialogFooter>

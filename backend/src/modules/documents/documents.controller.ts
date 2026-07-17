@@ -5,6 +5,7 @@ import { documentsService } from "./documents.service";
 import { toDocumentAttachmentDTO, toDocumentAttachmentDTOs, toDocumentDTO, toDocumentDTOs } from "./documents.dto";
 import { auditService } from "../audit/audit.service";
 import { authorizationService } from "../authorization/authorization.service";
+import { prisma } from "../../config/prisma";
 
 const createSchema = z
   .object({
@@ -419,6 +420,45 @@ export class DocumentsController {
       documentId
     );
     res.json(ok({ permissions: decision }));
+  };
+
+  getEffectiveViewers = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    const users = await prisma.users.findMany({
+      where: { tenant_id: req.auth!.tenantId, status: "active" },
+      select: {
+        id: true,
+        full_name: true,
+        email: true,
+        avatar_url: true,
+        department: { select: { id: true, name: true } },
+        position: { select: { id: true, name: true } },
+      },
+      orderBy: [{ full_name: "asc" }, { email: "asc" }],
+    });
+
+    const decisions = await Promise.all(users.map(async (user) => ({
+      user,
+      permissions: await authorizationService.resolveDocumentPermission(
+        user.id,
+        req.auth!.tenantId,
+        documentId
+      ),
+    })));
+
+    res.json(ok({
+      viewers: decisions
+        .filter((item) => item.permissions.canView)
+        .map((item) => ({
+          id: item.user.id,
+          full_name: item.user.full_name,
+          email: item.user.email,
+          avatar_url: item.user.avatar_url,
+          department: item.user.department,
+          position: item.user.position,
+          reasons: item.permissions.reasons,
+        })),
+    }));
   };
 
   // Versions endpoints
