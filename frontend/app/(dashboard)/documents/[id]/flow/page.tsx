@@ -66,24 +66,24 @@ function getInitials(name?: string, email?: string) {
 
 function UserShareCombobox({
   users,
-  value,
+  values,
   onChange,
 }: {
   users: ShareUserOption[];
-  value: string;
-  onChange: (value: string) => void;
+  values: string[];
+  onChange: (values: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const selectedUser = users.find((user) => String(user.id) === value);
+  const selectedUsers = users.filter((user) => values.includes(String(user.id)));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" aria-expanded={open} className="h-11 w-full justify-between px-3 font-normal">
-          {selectedUser ? (
+          {selectedUsers.length > 0 ? (
             <span className="flex min-w-0 items-center gap-2">
-              <UserAvatar user={selectedUser} />
-              <span className="min-w-0 truncate">{selectedUser.full_name || selectedUser.email}</span>
+              <span className="flex -space-x-2">{selectedUsers.slice(0, 3).map((user) => <UserAvatar key={user.id} user={user} />)}</span>
+              <span className="min-w-0 truncate">Đã chọn {selectedUsers.length} người dùng</span>
             </span>
           ) : (
             <span className="text-muted-foreground">Chọn người dùng...</span>
@@ -101,8 +101,8 @@ function UserShareCombobox({
                 key={user.id}
                 value={`${user.full_name || ''} ${user.email}`}
                 onSelect={() => {
-                  onChange(String(user.id));
-                  setOpen(false);
+                  const userId = String(user.id);
+                  onChange(values.includes(userId) ? values.filter((id) => id !== userId) : [...values, userId]);
                 }}
                 className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2.5"
               >
@@ -111,9 +111,49 @@ function UserShareCombobox({
                   <span className="block truncate text-sm font-medium">{user.full_name || user.email}</span>
                   <span className="block truncate text-xs text-muted-foreground">{user.email}</span>
                 </span>
-                <Check className={cn('h-4 w-4 text-primary', String(user.id) === value ? 'opacity-100' : 'opacity-0')} />
+                <Check className={cn('h-4 w-4 text-primary', values.includes(String(user.id)) ? 'opacity-100' : 'opacity-0')} />
               </CommandItem>
             ))}
+          </CommandGroup>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function DepartmentShareCombobox({
+  departments,
+  values,
+  onChange,
+}: {
+  departments: ShareDepartmentOption[];
+  values: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedDepartments = departments.filter((department) => values.includes(String(department.id)));
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="h-11 w-full justify-between px-3 font-normal">
+          <span className={cn('truncate', selectedDepartments.length === 0 && 'text-muted-foreground')}>
+            {selectedDepartments.length === 0 ? 'Chọn phòng ban...' : `Đã chọn ${selectedDepartments.length} phòng ban`}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" portalled={false}>
+        <Command>
+          <CommandInput placeholder="Tìm phòng ban..." />
+          <CommandEmpty>Không tìm thấy phòng ban phù hợp.</CommandEmpty>
+          <CommandGroup className="max-h-64 overflow-y-auto p-1">
+            {departments.map((department) => {
+              const departmentId = String(department.id);
+              return <CommandItem key={department.id} value={department.name} onSelect={() => onChange(values.includes(departmentId) ? values.filter((id) => id !== departmentId) : [...values, departmentId])} className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{department.name}</span>
+                <Check className={cn('h-4 w-4 text-primary', values.includes(departmentId) ? 'opacity-100' : 'opacity-0')} />
+              </CommandItem>;
+            })}
           </CommandGroup>
         </Command>
       </PopoverContent>
@@ -145,6 +185,7 @@ export default function DocumentFlowPage() {
   const [shareForm, setShareForm] = useState({
     subject_type: 'user' as 'user' | 'department' | 'position_in_department',
     subject_id: '',
+    subject_ids: [] as string[],
     scope_department_id: '',
     can_read: true,
     can_share: false,
@@ -328,12 +369,17 @@ export default function DocumentFlowPage() {
         throw new Error('Chỉ được chia sẻ sau khi tài liệu hoàn thành');
       }
 
-      return fetchJson(`/documents/${documentId}/permissions`, {
+      const subjectIds = shareForm.subject_type === 'position_in_department'
+        ? [shareForm.subject_id]
+        : shareForm.subject_ids;
+      if (subjectIds.length === 0) throw new Error('Vui lòng chọn đối tượng để chia sẻ');
+
+      return Promise.all(subjectIds.map((subjectId) => fetchJson(`/documents/${documentId}/permissions`, {
         method: 'POST',
         body: JSON.stringify({
           permission_source: 'share',
           subject_type: shareForm.subject_type,
-          subject_id: Number(shareForm.subject_id),
+          subject_id: Number(subjectId),
           scope_department_id: shareForm.subject_type === 'position_in_department' ? Number(shareForm.scope_department_id) : undefined,
           can_read: shareForm.can_read,
           can_edit: false,
@@ -341,13 +387,14 @@ export default function DocumentFlowPage() {
           can_share: shareForm.can_share,
           can_delete: false,
         }),
-      });
+      })));
     },
     onSuccess: async () => {
       toast.success('Đã chia sẻ tài liệu');
       setShareForm({
         subject_type: 'user',
         subject_id: '',
+        subject_ids: [],
         scope_department_id: '',
         can_read: true,
         can_share: false,
@@ -656,6 +703,7 @@ export default function DocumentFlowPage() {
                     ...current,
                     subject_type: value as 'user' | 'department' | 'position_in_department',
                     subject_id: '',
+                    subject_ids: [],
                     scope_department_id: '',
                   }))
                 }
@@ -674,8 +722,8 @@ export default function DocumentFlowPage() {
                 <div className="text-sm font-medium">Người dùng</div>
                 <UserShareCombobox
                   users={shareUsers}
-                  value={shareForm.subject_id}
-                  onChange={(value) => setShareForm((current) => ({ ...current, subject_id: value }))}
+                  values={shareForm.subject_ids}
+                  onChange={(values) => setShareForm((current) => ({ ...current, subject_ids: values }))}
                 />
               </div>
             )}
@@ -683,13 +731,10 @@ export default function DocumentFlowPage() {
             {shareForm.subject_type === 'department' && (
               <div className="space-y-2">
                 <div className="text-sm font-medium">Phòng ban</div>
-                <ComboboxSelect
-                  value={shareForm.subject_id}
-                  onChange={(value) => setShareForm((current) => ({ ...current, subject_id: String(value) }))}
-                  options={shareDepartments.map((department: ShareDepartmentOption) => ({ value: String(department.id), label: department.name }))}
-                  placeholder="Chọn phòng ban..."
-                  searchPlaceholder="Tìm phòng ban..."
-                  portalled={false}
+                <DepartmentShareCombobox
+                  departments={shareDepartments}
+                  values={shareForm.subject_ids}
+                  onChange={(values) => setShareForm((current) => ({ ...current, subject_ids: values }))}
                 />
               </div>
             )}
@@ -751,10 +796,20 @@ export default function DocumentFlowPage() {
                 <div className="space-y-2">
                   {sharePermissions.map((permission) => (
                     <div key={permission.id} className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 p-3">
-                      <div className="space-y-2">
+                      <div className="min-w-0 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="secondary">Share</Badge>
-                          <span className="text-sm font-medium">{getShareSubjectLabel(permission)}</span>
+                          {permission.subject_type === 'user' && (() => {
+                            const user = shareUsers.find((item) => item.id === permission.subject_id);
+                            return user ? <UserAvatar user={user} /> : <UserRound className="h-5 w-5 text-muted-foreground" />;
+                          })()}
+                          <div className="min-w-0">
+                            <span className="block truncate text-sm font-medium">{getShareSubjectLabel(permission)}</span>
+                            {permission.subject_type === 'user' && (() => {
+                              const user = shareUsers.find((item) => item.id === permission.subject_id);
+                              return user?.email ? <span className="block truncate text-xs text-muted-foreground">{user.email}</span> : null;
+                            })()}
+                          </div>
+                          <Badge variant="secondary">{permission.subject_type === 'department' ? 'Phòng ban' : permission.subject_type === 'user' ? 'Người dùng' : 'Chức danh'}</Badge>
                         </div>
                         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                           {permission.can_read && <Badge variant="outline">Xem và tải xuống</Badge>}
@@ -784,7 +839,9 @@ export default function DocumentFlowPage() {
               onClick={() => grantShareMutation.mutate()}
               disabled={
                 grantShareMutation.isPending ||
-                !shareForm.subject_id ||
+                (shareForm.subject_type === 'position_in_department'
+                  ? !shareForm.subject_id
+                  : shareForm.subject_ids.length === 0) ||
                 !shareForm.can_read ||
                 (shareForm.subject_type === 'position_in_department' && !shareForm.scope_department_id)
               }
