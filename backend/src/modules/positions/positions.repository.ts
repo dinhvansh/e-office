@@ -28,6 +28,7 @@ export const positionsRepository = {
     page: number;
     limit: number;
     is_active?: boolean;
+    can_manage_department?: boolean;
   }) {
     const { page, limit, is_active } = options;
     const skip = (page - 1) * limit;
@@ -98,6 +99,7 @@ export const positionsRepository = {
     description?: string;
     level?: number;
     is_active?: boolean;
+    can_manage_department?: boolean;
   }) {
     return prisma.positions.create({
       data,

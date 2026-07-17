@@ -37,12 +37,17 @@ const EMPTY_DEPARTMENTS: Department[] = [];
 export default function DepartmentsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
-  const [formData, setFormData] = useState({ name: '', code: '', description: '', parent_id: '' });
+  const [formData, setFormData] = useState({ name: '', code: '', description: '', parent_id: '', manager_id: '', support_manager_ids: [] as number[] });
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null });
   const queryClient = useQueryClient();
   const { fetchJson } = useAuth();
+
+  const { data: activeUsersData } = useQuery({ queryKey: ['active-users'], queryFn: () => fetchJson<any>('/users/active') });
+  const activeUsers: any[] = Array.isArray(activeUsersData) ? activeUsersData : (activeUsersData?.users ?? []);
+  const { data: departmentUsersData } = useQuery({ queryKey: ['department-users', selectedDepartmentId], enabled: !!selectedDepartmentId, queryFn: () => fetchJson<any>(`/users?department_id=${selectedDepartmentId}&limit=100`) });
+  const departmentUsers: any[] = Array.isArray(departmentUsersData) ? departmentUsersData : (departmentUsersData?.users ?? departmentUsersData?.data ?? []);
 
   // Fetch departments tree
   const { data: deptData, isLoading } = useQuery({
@@ -111,7 +116,7 @@ export default function DepartmentsPage() {
     onSuccess: () => {
       setShowCreateModal(false);
       setEditingDept(null);
-      setFormData({ name: '', code: '', description: '', parent_id: '' });
+      setFormData({ name: '', code: '', description: '', parent_id: '', manager_id: '', support_manager_ids: [] });
       toast.success(editingDept ? 'Cập nhật thành công!' : 'Tạo phòng ban thành công!');
       setTimeout(() => {
         queryClient.refetchQueries({ queryKey: ['departments-tree'] });
@@ -169,6 +174,8 @@ export default function DepartmentsPage() {
       code: dept.code || '',
       description: dept.description || '',
       parent_id: dept.parent_id?.toString() || '',
+      manager_id: dept.manager?.id?.toString() || '',
+      support_manager_ids: (dept as any).support_managers?.map((item: any) => item.user_id ?? item.user?.id) ?? [],
     });
     setShowCreateModal(true);
   };
@@ -188,6 +195,7 @@ export default function DepartmentsPage() {
               code: '',
               description: '',
               parent_id: selectedDepartmentId?.toString() || '',
+              manager_id: '', support_manager_ids: [],
             });
             setShowCreateModal(true);
           }}>
@@ -237,6 +245,8 @@ export default function DepartmentsPage() {
                     code: '',
                     description: '',
                     parent_id: dept.id.toString(),
+                    manager_id: '',
+                    support_manager_ids: [],
                   });
                   setShowCreateModal(true);
                 }}
@@ -283,6 +293,12 @@ export default function DepartmentsPage() {
                 </div>
 
                 {/* Table */}
+                {selectedDepartment && (
+                  <div className="rounded-lg border bg-muted/20 p-4">
+                    <div className="flex items-center justify-between mb-3"><div><h4 className="font-semibold">Nhân viên {selectedDepartment.name}</h4><p className="text-xs text-muted-foreground">Danh sách nhân sự thuộc phòng ban đang chọn</p></div><Badge variant="secondary">{departmentUsers.length}</Badge></div>
+                    {departmentUsers.length ? <div className="grid gap-2 sm:grid-cols-2">{departmentUsers.map((user) => <div key={user.id} className="flex items-center gap-2 rounded-md border bg-background px-3 py-2"><div className="h-8 w-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-semibold">{(user.full_name || user.email || '?').slice(0, 2).toUpperCase()}</div><div className="min-w-0"><div className="text-sm font-medium truncate">{user.full_name || user.email}</div><div className="text-xs text-muted-foreground truncate">{user.email}{user.position?.name ? ` · ${user.position.name}` : ''}</div></div></div>)}</div> : <p className="text-sm text-muted-foreground">Phòng ban này chưa có nhân viên.</p>}
+                  </div>
+                )}
                 {displayedDepartments.length > 0 ? (
                   <div className="border rounded-lg overflow-hidden">
                     <table className="w-full">
@@ -404,6 +420,8 @@ export default function DepartmentsPage() {
             if (formData.parent_id) {
               data.parent_id = parseInt(formData.parent_id);
             }
+            if (editingDept && formData.manager_id) data.manager_id = parseInt(formData.manager_id);
+            if (editingDept) data.support_manager_ids = formData.support_manager_ids;
             createDeptMutation.mutate(data);
           }}>
             <div className="space-y-4 py-4">
@@ -417,6 +435,24 @@ export default function DepartmentsPage() {
                   required
                 />
               </div>
+              {editingDept && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="manager_id">Trưởng phòng</Label>
+                    <select id="manager_id" value={formData.manager_id} onChange={(e) => setFormData({ ...formData, manager_id: e.target.value })} className="w-full px-3 py-2 border rounded-md">
+                      <option value="">-- Chưa gán trưởng phòng --</option>
+                      {activeUsers.filter((user) => user.department_id === editingDept.id && user.position?.can_manage_department).map((user) => <option key={user.id} value={user.id}>{user.full_name || user.email} — {user.position?.name}</option>)}
+                    </select>
+                    <p className="text-xs text-muted-foreground">Chỉ hiện nhân sự đang hoạt động trong phòng có chức danh được phép quản lý.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Quản lý hỗ trợ</Label>
+                    <div className="max-h-36 overflow-y-auto rounded-md border p-2 space-y-1">
+                      {activeUsers.filter((user) => user.department_id === editingDept.id && user.position?.can_manage_department && user.id.toString() !== formData.manager_id).map((user) => <label key={user.id} className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-muted text-sm"><input type="checkbox" checked={formData.support_manager_ids.includes(user.id)} onChange={(e) => setFormData({ ...formData, support_manager_ids: e.target.checked ? [...formData.support_manager_ids, user.id] : formData.support_manager_ids.filter((id) => id !== user.id) })} />{user.full_name || user.email} <span className="text-muted-foreground">{user.position?.name}</span></label>)}
+                    </div>
+                  </div>
+                </>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="code">Mã phòng ban *</Label>
                 <Input

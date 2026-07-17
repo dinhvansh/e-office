@@ -12,6 +12,7 @@ export const departmentsRepository = {
         manager: {
           select: { id: true, email: true, full_name: true },
         },
+        support_managers: { include: { user: { select: { id: true, email: true, full_name: true, avatar_url: true, position: { select: { name: true } } } } } },
         _count: {
           select: { users: true, children: true },
         },
@@ -28,6 +29,7 @@ export const departmentsRepository = {
         manager: {
           select: { id: true, email: true, full_name: true },
         },
+        support_managers: { include: { user: { select: { id: true, email: true, full_name: true, avatar_url: true, position: { select: { name: true } } } } } },
         users: {
           select: { id: true, email: true, full_name: true, role: true },
         },
@@ -56,15 +58,19 @@ export const departmentsRepository = {
     });
   },
 
-  async update(id: number, tenantId: number, data: Prisma.departmentsUpdateInput) {
+  async update(id: number, tenantId: number, data: Prisma.departmentsUpdateInput, supportManagerIds?: number[]) {
     const updated = await prisma.departments.updateMany({
       where: { id, tenant_id: tenantId },
       data,
     });
     if (updated.count !== 1) throwNotFound('DEPARTMENT_NOT_FOUND');
+    if (supportManagerIds !== undefined) {
+      await prisma.department_support_managers.deleteMany({ where: { department_id: id } });
+      if (supportManagerIds.length) await prisma.department_support_managers.createMany({ data: supportManagerIds.map(user_id => ({ department_id: id, user_id })) });
+    }
     return prisma.departments.findFirstOrThrow({
       where: { id, tenant_id: tenantId },
-      include: { manager: { select: { id: true, email: true, full_name: true } } },
+      include: { manager: { select: { id: true, email: true, full_name: true } }, support_managers: { include: { user: { select: { id: true, email: true, full_name: true, avatar_url: true, position: { select: { name: true } } } } } } },
     });
   },
 
@@ -102,6 +108,7 @@ export const departmentsRepository = {
         manager: {
           select: { id: true, email: true, full_name: true },
         },
+        support_managers: { include: { user: { select: { id: true, email: true, full_name: true, avatar_url: true, position: { select: { name: true } } } } } },
         _count: {
           select: { users: true },
         },

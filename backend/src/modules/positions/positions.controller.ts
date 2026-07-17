@@ -9,6 +9,7 @@ const createPositionSchema = z.object({
   description: z.string().trim().max(500).nullable().optional(),
   level: z.coerce.number().int().min(0).nullable().optional(),
   is_active: z.boolean().optional(),
+  can_manage_department: z.boolean().optional(),
 });
 
 const updatePositionSchema = createPositionSchema.partial();
@@ -18,6 +19,7 @@ type CreatePositionInput = {
   description?: string | null;
   level?: number | null;
   is_active?: boolean;
+  can_manage_department?: boolean;
 };
 
 const errorMessage = (error: unknown): string => error instanceof Error ? error.message : "Unexpected error";

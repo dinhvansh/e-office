@@ -159,7 +159,7 @@ export class DocumentsRepository {
       where: whereClause,
       include: {
         document_type: true,
-        department: { select: { id: true, code: true, manager_id: true } },
+        department: { select: { id: true, code: true, manager_id: true, support_managers: { select: { user_id: true } } } },
         owner: { select: { id: true, manager_id: true, department_id: true } },
       },
       orderBy: { created_at: "desc" },

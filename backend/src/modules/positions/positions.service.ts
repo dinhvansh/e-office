@@ -26,6 +26,7 @@ export const positionsService = {
     name: string;
     description?: string;
     level?: number;
+    can_manage_department?: boolean;
   }) {
     // Check if code already exists
     const existing = await positionsRepository.findByCode(data.code, tenantId);
@@ -45,6 +46,7 @@ export const positionsService = {
     description?: string;
     level?: number;
     is_active?: boolean;
+    can_manage_department?: boolean;
   }) {
     const existing = await positionsRepository.findById(id, tenantId);
     if (!existing) {

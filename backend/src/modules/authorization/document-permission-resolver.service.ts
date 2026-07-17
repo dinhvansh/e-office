@@ -72,7 +72,7 @@ type ResolverUser = Prisma.usersGetPayload<{
 
 type ResolverDocument = Prisma.documentsGetPayload<{
   include: {
-    department: { select: { id: true; code: true; manager_id: true } };
+    department: { select: { id: true; code: true; manager_id: true; support_managers: { select: { user_id: true } } } };
     owner: { select: { id: true; manager_id: true; department_id: true } };
   };
 }>;
@@ -188,15 +188,18 @@ class DocumentPermissionResolverService {
     user: users,
     document: { department_id: number | null; owner_id: number | null },
     creatorManagerId: number | null,
-    departmentManagerId: number | null
+    departmentManagerId: number | null,
+    supportManagerIds: number[]
   ) {
     const normalized = String(visibilityScope || "company").toLowerCase();
 
     if (normalized === "company" || normalized === "public") {
       return { allowed: true, reason: "Matched visibility scope: COMPANY" };
     }
+    const isDepartmentManager = !!departmentManagerId && departmentManagerId === user.id;
+    const isSupportManager = supportManagerIds.includes(user.id);
     if (normalized === "department") {
-      const allowed = !!document.department_id && !!user.department_id && document.department_id === user.department_id;
+      const allowed = (!!document.department_id && !!user.department_id && document.department_id === user.department_id) || isDepartmentManager || isSupportManager;
       return {
         allowed,
         reason: allowed
@@ -208,8 +211,7 @@ class DocumentPermissionResolverService {
       const sameDepartment =
         !!document.department_id && !!user.department_id && document.department_id === user.department_id;
       const isCreatorManager = !!creatorManagerId && creatorManagerId === user.id;
-      const isDepartmentManager = !!departmentManagerId && departmentManagerId === user.id;
-      const allowed = sameDepartment || isCreatorManager || isDepartmentManager;
+      const allowed = sameDepartment || isCreatorManager || isDepartmentManager || isSupportManager;
       return {
         allowed,
         reason: allowed
@@ -437,7 +439,7 @@ class DocumentPermissionResolverService {
     const document = preloaded?.document ?? await prisma.documents.findFirst({
       where: { id: documentId, tenant_id: tenantId },
       include: {
-        department: { select: { id: true, code: true, manager_id: true } },
+        department: { select: { id: true, code: true, manager_id: true, support_managers: { select: { user_id: true } } } },
         owner: { select: { id: true, manager_id: true, department_id: true } },
       },
     });
@@ -476,7 +478,8 @@ class DocumentPermissionResolverService {
       user,
       document,
       document.owner?.manager_id ?? null,
-      document.department?.manager_id ?? null
+      document.department?.manager_id ?? null,
+      document.department?.support_managers.map((item) => item.user_id) ?? []
     );
 
     if (visibilityDecision.allowed) {

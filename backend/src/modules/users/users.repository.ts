@@ -40,7 +40,7 @@ export const usersRepository = {
           select: { id: true, name: true },
         },
         position: {
-          select: { id: true, code: true, name: true },
+          select: { id: true, code: true, name: true, can_manage_department: true },
         },
         manager: {
           select: { id: true, email: true, full_name: true },

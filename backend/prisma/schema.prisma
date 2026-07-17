@@ -54,6 +54,7 @@ model users {
   audit_logs    audit_logs[]
   user_roles    user_roles[]
   managed_departments departments[] @relation("department_manager")
+  supported_departments department_support_managers[]
   approvals     document_approvals[]
   signers       signers[]     @relation("signer_user") // ✅ Relation to signers
   password_reset_tokens password_reset_tokens[]
@@ -213,6 +214,7 @@ model departments {
   children    departments[] @relation("department_hierarchy")
   manager     users?    @relation("department_manager", fields: [manager_id], references: [id])
   users       users[]   @relation("user_department")
+  support_managers department_support_managers[]
   documents   documents[]
 
   @@unique([tenant_id, code], name: "departments_tenant_id_code_key")
@@ -226,12 +228,25 @@ model positions {
   description String?
   level       Int?
   is_active   Boolean   @default(true)
+  can_manage_department Boolean @default(false)
   created_at  DateTime  @default(now())
   tenant      tenants   @relation(fields: [tenant_id], references: [id])
   users       users[]   @relation("user_position")
 
   @@unique([tenant_id, code])
   @@index([tenant_id])
+}
+
+model department_support_managers {
+  id            Int         @id @default(autoincrement())
+  department_id Int
+  user_id       Int
+  created_at    DateTime    @default(now())
+  department    departments @relation(fields: [department_id], references: [id], onDelete: Cascade)
+  user          users       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([department_id, user_id])
+  @@index([user_id])
 }
 
 model roles {

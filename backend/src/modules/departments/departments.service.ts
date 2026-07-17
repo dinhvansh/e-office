@@ -1,5 +1,6 @@
 import { departmentsRepository } from './departments.repository';
 import { throwError, throwNotFound } from '../../utils/errors';
+import { prisma } from '../../config/prisma';
 
 export const departmentsService = {
   async getDepartments(tenantId: number) {
@@ -22,7 +23,8 @@ export const departmentsService = {
     name: string;
     code?: string;
     parent_id?: number;
-    manager_id?: number;
+    manager_id?: number | null;
+    support_manager_ids?: number[];
     description?: string;
     is_active?: boolean;
   }) {
@@ -52,7 +54,8 @@ export const departmentsService = {
     name?: string;
     code?: string;
     parent_id?: number;
-    manager_id?: number;
+    manager_id?: number | null;
+    support_manager_ids?: number[];
     description?: string;
     is_active?: boolean;
   }) {
@@ -83,7 +86,25 @@ export const departmentsService = {
       }
     }
 
-    return departmentsRepository.update(id, tenantId, data);
+    const managerId = data.manager_id === undefined ? existing.manager_id : data.manager_id;
+    if (managerId) await this.validateManager(tenantId, managerId, id);
+    const supportIds = data.support_manager_ids;
+    if (supportIds !== undefined) {
+      if (new Set(supportIds).size !== supportIds.length) throw new Error('Một người chỉ có thể được gán một lần làm Quản lý hỗ trợ.');
+      if (managerId && supportIds.includes(managerId)) throw new Error('Trưởng phòng không thể đồng thời là Quản lý hỗ trợ.');
+      await Promise.all(supportIds.map(userId => this.validateManager(tenantId, userId, id)));
+    }
+    const { support_manager_ids, ...departmentData } = data;
+    return departmentsRepository.update(id, tenantId, departmentData, supportIds);
+  },
+
+  async validateManager(tenantId: number, userId: number, departmentId: number | null) {
+    const user = await prisma.users.findFirst({
+      where: { id: userId, tenant_id: tenantId, status: 'active', ...(departmentId ? { department_id: departmentId } : {}) },
+      include: { position: { select: { can_manage_department: true, is_active: true } } },
+    });
+    if (!user) throw new Error('Người quản lý phải đang hoạt động và thuộc đúng phòng ban này.');
+    if (!user.position?.is_active || !user.position.can_manage_department) throw new Error('Chỉ người có chức danh được phép quản lý phòng ban mới được gán.');
   },
 
   async deleteDepartment(id: number, tenantId: number) {

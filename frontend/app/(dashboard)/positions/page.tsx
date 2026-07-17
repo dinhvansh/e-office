@@ -22,6 +22,7 @@ interface Position {
   description?: string;
   level?: number;
   is_active: boolean;
+  can_manage_department?: boolean;
   _count?: {
     users: number;
   };
@@ -90,6 +91,7 @@ export default function PositionsPage() {
     name: '',
     description: '',
     level: '1',
+    can_manage_department: false,
   });
 
   // Fetch positions with pagination
@@ -214,11 +216,12 @@ export default function PositionsPage() {
         name: position.name,
         description: position.description || '',
         level: position.level?.toString() || '',
+        can_manage_department: !!position.can_manage_department,
       });
       setSecurityBand(resolveSecurityBand(position.level));
     } else {
       setEditingPosition(null);
-      setFormData({ code: '', name: '', description: '', level: '1' });
+      setFormData({ code: '', name: '', description: '', level: '1', can_manage_department: false });
       setSecurityBand('normal');
     }
     setIsDialogOpen(true);
@@ -227,7 +230,7 @@ export default function PositionsPage() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingPosition(null);
-    setFormData({ code: '', name: '', description: '', level: '1' });
+    setFormData({ code: '', name: '', description: '', level: '1', can_manage_department: false });
     setSecurityBand('normal');
   };
 
@@ -245,6 +248,7 @@ export default function PositionsPage() {
       name: formData.name,
       description: formData.description || undefined,
       level: formData.level ? parseInt(formData.level) : undefined,
+      can_manage_department: formData.can_manage_department,
     };
 
     if (editingPosition) {
@@ -562,6 +566,11 @@ export default function PositionsPage() {
                 Hệ thống sẽ tự quy đổi sang mức kỹ thuật phù hợp khi lưu.
               </p>
             </div>
+
+            <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/40">
+              <input type="checkbox" className="mt-1" checked={formData.can_manage_department} onChange={(e) => setFormData({ ...formData, can_manage_department: e.target.checked })} />
+              <span><span className="font-medium text-sm block">Có thể quản lý phòng ban</span><span className="text-xs text-muted-foreground">Cho phép user mang chức danh này được gán làm Trưởng phòng hoặc Quản lý hỗ trợ.</span></span>
+            </label>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleCloseDialog}>

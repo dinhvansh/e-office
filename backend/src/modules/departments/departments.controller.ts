@@ -9,6 +9,7 @@ const departmentPayloadSchema = z.object({
   name: z.string().trim().min(1, 'Department name is required'),
   parent_id: z.number().int().positive().nullable().optional(),
   manager_id: z.number().int().positive().nullable().optional(),
+  support_manager_ids: z.array(z.number().int().positive()).max(20).optional(),
   description: z.string().trim().max(500).nullable().optional(),
   is_active: z.boolean().optional(),
 });
@@ -19,6 +20,7 @@ type CreateDepartmentInput = {
   code?: string;
   parent_id?: number | null;
   manager_id?: number | null;
+  support_manager_ids?: number[];
   description?: string | null;
   is_active?: boolean;
 };
