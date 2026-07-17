@@ -30,6 +30,7 @@ interface ComboboxSelectProps {
   searchPlaceholder?: string;
   emptyText?: string;
   className?: string;
+  portalled?: boolean;
 }
 
 export function ComboboxSelect({
@@ -40,6 +41,7 @@ export function ComboboxSelect({
   searchPlaceholder = 'Tìm kiếm...',
   emptyText = 'Không tìm thấy.',
   className,
+  portalled = true,
 }: ComboboxSelectProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -60,7 +62,7 @@ export function ComboboxSelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0" align="start">
+      <PopoverContent className="w-full p-0" align="start" portalled={portalled}>
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandEmpty>{emptyText}</CommandEmpty>

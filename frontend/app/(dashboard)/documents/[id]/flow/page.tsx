@@ -91,7 +91,7 @@ function UserShareCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" portalled={false}>
         <Command>
           <CommandInput placeholder="Tìm theo tên hoặc email..." />
           <CommandEmpty>Không tìm thấy người dùng phù hợp.</CommandEmpty>
@@ -665,6 +665,7 @@ export default function DocumentFlowPage() {
                   { value: 'position_in_department', label: 'Chức danh trong phòng ban' },
                 ]}
                 searchPlaceholder="Tìm loại đối tượng..."
+                portalled={false}
               />
             </div>
 
@@ -688,6 +689,7 @@ export default function DocumentFlowPage() {
                   options={shareDepartments.map((department: ShareDepartmentOption) => ({ value: String(department.id), label: department.name }))}
                   placeholder="Chọn phòng ban..."
                   searchPlaceholder="Tìm phòng ban..."
+                  portalled={false}
                 />
               </div>
             )}
@@ -702,6 +704,7 @@ export default function DocumentFlowPage() {
                     options={shareDepartments.map((department: ShareDepartmentOption) => ({ value: String(department.id), label: department.name }))}
                     placeholder="Chọn phòng ban..."
                     searchPlaceholder="Tìm phòng ban..."
+                    portalled={false}
                   />
                 </div>
                 <div className="space-y-2">
@@ -712,6 +715,7 @@ export default function DocumentFlowPage() {
                     options={sharePositions.map((position) => ({ value: String(position.id), label: `${position.name}${position.code ? ` (${position.code})` : ''}` }))}
                     placeholder="Chọn chức danh..."
                     searchPlaceholder="Tìm chức danh..."
+                    portalled={false}
                   />
                 </div>
               </div>
