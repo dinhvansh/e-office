@@ -16,7 +16,7 @@ export function DocumentDownloadMenu({ documentId, documentNumber, originalFileN
     setLoading(kind);
     try {
       const authData = localStorage.getItem('esign.auth'); const token = authData ? JSON.parse(authData).tokens?.accessToken : null;
-      const endpoint = kind === 'dossier' ? 'dossier/download' : (signedFilePath ? 'download-signed' : 'download');
+      const endpoint = kind === 'dossier' ? 'dossier/download' : (completed || signedFilePath ? 'download-signed' : 'download');
       const response = await fetch(`${getApiBaseUrl()}/documents/${documentId}/${endpoint}`, { headers: { Authorization: `Bearer ${token}` } });
       if (!response.ok) throw new Error('Download failed');
       const url = URL.createObjectURL(await response.blob()); const anchor = window.document.createElement('a'); anchor.href = url;

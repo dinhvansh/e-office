@@ -36,6 +36,7 @@ interface ApprovalDetail {
     tenant_id: number;
     document_number?: string | null;
     status?: string | null;
+    signed_file_path?: string | null;
     sign_request_id?: number | null;
     owner: {
       id: number;
@@ -360,7 +361,7 @@ export default function ApprovalDetailPage() {
             </div>
             <p className="mt-1 text-sm text-slate-500">{approval.workflow.name}</p>
           </div>
-          <DocumentDownloadMenu documentId={approval.document.id} documentNumber={approval.document.document_number} originalFileName={approval.document.original_file_name} status={approval.document.status} />
+          <DocumentDownloadMenu documentId={approval.document.id} documentNumber={approval.document.document_number} originalFileName={approval.document.original_file_name} status={approval.document.status} signedFilePath={approval.document.signed_file_path} />
         </div>
       </div>
 

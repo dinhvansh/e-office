@@ -42,6 +42,7 @@ interface SigningData {
       document_number: string;
       file_path: string;
       signed_file_path?: string;
+      status?: string | null;
     };
     signers: Array<{
       id: number;
@@ -321,7 +322,7 @@ export default function InternalSigningPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto">
-              <DocumentDownloadMenu documentId={data.sign_request.document.id} documentNumber={data.sign_request.document.document_number} originalFileName={data.sign_request.document.original_file_name} status={data.sign_request.status} signedFilePath={data.sign_request.document.signed_file_path} />
+              <DocumentDownloadMenu documentId={data.sign_request.document.id} documentNumber={data.sign_request.document.document_number} originalFileName={data.sign_request.document.original_file_name} status={data.sign_request.document.status} signedFilePath={data.sign_request.document.signed_file_path} />
               {alreadySigned ? (
                 <div className="flex items-center gap-2 text-green-600 bg-green-50 px-4 py-2 rounded-lg">
                   <Check className="w-4 h-4" />
