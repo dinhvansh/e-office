@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
 import { FlowTimeline } from '@/components/flow/FlowTimeline';
 import { FlowActivities } from '@/components/flow/FlowActivities';
-import { FlowParticipants } from '@/components/flow/FlowParticipants';
 import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, FileText, Download, RefreshCw, Share2, Trash2, History } from 'lucide-react';
@@ -54,9 +53,6 @@ export default function DocumentFlowPage() {
   const { fetchJson } = useAuth();
   const queryClient = useQueryClient();
   const documentId = params.id as string;
-  const [activeTab, setActiveTab] = useState<'activities' | 'participants' | 'discussion'>(() =>
-    typeof window !== 'undefined' && window.location.hash === '#discussion' ? 'discussion' : 'activities'
-  );
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -526,57 +522,16 @@ export default function DocumentFlowPage() {
             )}
           </div>
 
-          {/* Right: Activities & Participants */}
+          {/* Right: discussion and audit activity. Participant state is already shown in the workflow timeline. */}
           <div className={hasWorkflowSteps ? "lg:col-span-3" : "lg:col-span-4"}>
-            <div className="bg-white rounded-lg shadow-sm border">
-              {/* Tabs */}
-              <div className="border-b">
-                <div className="grid grid-cols-3">
-                  <button
-                    onClick={() => setActiveTab('activities')}
-                    className={`flex-1 px-4 py-3 text-sm font-medium ${
-                      activeTab === 'activities'
-                        ? 'text-blue-600 border-b-2 border-blue-600'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    Hoạt động
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('participants')}
-                    className={`flex-1 px-4 py-3 text-sm font-medium ${
-                      activeTab === 'participants'
-                        ? 'text-blue-600 border-b-2 border-blue-600'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    Người tham gia
-                  </button>
-                  {document.sign_request_id ? (
-                    <button
-                      onClick={() => setActiveTab('discussion')}
-                      className={`px-3 py-3 text-sm font-medium ${
-                        activeTab === 'discussion'
-                          ? 'border-b-2 border-blue-600 text-blue-600'
-                          : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      Thảo luận
-                    </button>
-                  ) : <div />}
-                </div>
-              </div>
-
-              {/* Tab Content */}
-              <div className="p-4">
-                {activeTab === 'activities' ? (
+            <div className="space-y-6">
+              {document.sign_request_id ? <SignRequestDiscussion signRequestId={document.sign_request_id} /> : null}
+              <section className="rounded-lg border bg-white shadow-sm">
+                <div className="border-b px-4 py-3 text-sm font-semibold text-slate-900">Hoạt động</div>
+                <div className="p-4">
                   <FlowActivities activities={activities} />
-                ) : activeTab === 'participants' ? (
-                  <FlowParticipants steps={steps} />
-                ) : (
-                  <SignRequestDiscussion signRequestId={document.sign_request_id} className="border-0 p-0 shadow-none" />
-                )}
-              </div>
+                </div>
+              </section>
             </div>
           </div>
         </div>
