@@ -16,6 +16,7 @@ import { WorkflowStatusPanel } from '@/components/workflow/WorkflowStatusPanel';
 import { SignRequestDiscussion } from '@/components/sign-requests/sign-request-discussion';
 import { DossierAttachments } from '@/components/documents/dossier-attachments';
 import { DocumentDownloadMenu } from '@/components/documents/document-download-menu';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 
 type SharePermissionRecord = {
@@ -57,6 +58,7 @@ export default function DocumentFlowPage() {
   const documentId = params.id as string;
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareForm, setShareForm] = useState({
     subject_type: 'user' as 'user' | 'department' | 'position_in_department',
@@ -67,7 +69,7 @@ export default function DocumentFlowPage() {
   });
 
   // Fetch flow data with auto-refresh to show new signatures
-  const { data: flowData, isLoading, refetch, isFetching, dataUpdatedAt } = useQuery<any>({
+  const { data: flowData, isLoading, refetch, dataUpdatedAt } = useQuery<any>({
     queryKey: ['document-flow', documentId],
     queryFn: async () => {
       const response = await fetchJson(`/documents/${documentId}/flow`);
@@ -405,20 +407,10 @@ export default function DocumentFlowPage() {
                 </Button>
               )}
               {canDelete && (
-                <Button variant="destructive" size="sm" onClick={() => { if (window.confirm('Xóa request và tài liệu? Hành động này không thể hoàn tác.')) deleteMutation.mutate(); }} disabled={deleteMutation.isPending}>
+                <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmOpen(true)} disabled={deleteMutation.isPending}>
                   <Trash2 className="mr-2 h-4 w-4" />{deleteMutation.isPending ? 'Đang xóa...' : 'Xóa request'}
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => refetch()}
-                disabled={isFetching}
-                className="shrink-0"
-                title="Làm mới để xem cập nhật mới nhất"
-              >
-                <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
-              </Button>
               {canShareCompletedDocument && (
                 <Button
                   variant="outline"
@@ -737,6 +729,17 @@ export default function DocumentFlowPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        onConfirm={() => deleteMutation.mutate()}
+        title="Xóa request"
+        description="Request và tài liệu liên quan sẽ bị xóa. Hành động này không thể hoàn tác."
+        confirmText="Xóa request"
+        cancelText="Hủy bỏ"
+        variant="danger"
+        icon="trash"
+      />
     </div>
   );
 }
