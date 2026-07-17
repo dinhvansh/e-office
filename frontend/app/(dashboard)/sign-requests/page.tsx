@@ -476,7 +476,7 @@ export default function SignRequestsPage() {
                         {getStatusBadge(request)}
                       </td>
                       <td className="px-2 py-3">
-                        <div className="flex items-center gap-1 justify-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="hidden" onClick={(e) => e.stopPropagation()}>
                           {/* Edit Workflow Button - Show for draft documents */}
                           {(request.flow_state === 'DRAFT' || request.status === 'draft') && (
                             <Button

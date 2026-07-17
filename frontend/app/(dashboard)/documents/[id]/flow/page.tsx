@@ -217,6 +217,27 @@ export default function DocumentFlowPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const signRequestId = flowData?.document?.sign_request_id;
+      if (!signRequestId) throw new Error('Không tìm thấy request để xóa');
+      await fetchJson(`/sign-requests/${signRequestId}`, { method: 'DELETE' });
+      await fetchJson(`/documents/${documentId}`, { method: 'DELETE' });
+    },
+    onSuccess: () => { toast.success('Đã xóa request và tài liệu'); router.push('/sign-requests'); },
+    onError: (error: any) => toast.error(error?.message || 'Không thể xóa request'),
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: async () => {
+      const signRequestId = flowData?.document?.sign_request_id;
+      if (!signRequestId) throw new Error('Không tìm thấy request để thu hồi');
+      return fetchJson(`/sign-requests/${signRequestId}/revoke`, { method: 'POST' });
+    },
+    onSuccess: () => { toast.success('Đã thu hồi tài liệu'); refetch(); },
+    onError: (error: any) => toast.error(error?.message || 'Không thể thu hồi tài liệu'),
+  });
+
   const grantShareMutation = useMutation({
     mutationFn: async () => {
       if (!isCompleted) {
@@ -305,6 +326,8 @@ export default function DocumentFlowPage() {
   const canManageSignRequest = Boolean(flowData?.can_manage_sign_request && flowData?.document?.sign_request_id);
   const canRemind = canManageSignRequest && ['pending_approval', 'pending_signature', 'in_progress', 'pending'].includes(document.status);
   const canCancel = canManageSignRequest && !['completed', 'cancelled'].includes(document.status);
+  const canDelete = canManageSignRequest && ['draft', 'cancelled'].includes(document.status);
+  const canRevoke = canManageSignRequest && document.status === 'completed';
   const canShareCompletedDocument = isCompleted;
   const hasWorkflowSteps = steps.length > 0;
 
@@ -374,6 +397,16 @@ export default function DocumentFlowPage() {
                   disabled={cancelMutation.isPending}
                 >
                   {cancelMutation.isPending ? 'Đang hủy...' : 'Hủy request'}
+                </Button>
+              )}
+              {canRevoke && (
+                <Button variant="outline" size="sm" onClick={() => { if (window.confirm('Thu hồi tài liệu hoàn thành?')) revokeMutation.mutate(); }} disabled={revokeMutation.isPending}>
+                  {revokeMutation.isPending ? 'Đang thu hồi...' : 'Thu hồi'}
+                </Button>
+              )}
+              {canDelete && (
+                <Button variant="destructive" size="sm" onClick={() => { if (window.confirm('Xóa request và tài liệu? Hành động này không thể hoàn tác.')) deleteMutation.mutate(); }} disabled={deleteMutation.isPending}>
+                  <Trash2 className="mr-2 h-4 w-4" />{deleteMutation.isPending ? 'Đang xóa...' : 'Xóa request'}
                 </Button>
               )}
               <Button
