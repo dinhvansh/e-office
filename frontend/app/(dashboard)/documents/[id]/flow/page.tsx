@@ -325,7 +325,7 @@ export default function DocumentFlowPage() {
   const can_sign = flowData?.can_sign;
   const canManageSignRequest = Boolean(flowData?.can_manage_sign_request && flowData?.document?.sign_request_id);
   const canRemind = canManageSignRequest && ['pending_approval', 'pending_signature', 'in_progress', 'pending'].includes(document.status);
-  const canCancel = canManageSignRequest && !['completed', 'cancelled'].includes(document.status);
+  const canCancel = canManageSignRequest && ['pending_approval', 'pending_signature', 'in_progress'].includes(document.status);
   const canDelete = canManageSignRequest && ['draft', 'cancelled'].includes(document.status);
   const canRevoke = canManageSignRequest && document.status === 'completed';
   const canShareCompletedDocument = isCompleted;
