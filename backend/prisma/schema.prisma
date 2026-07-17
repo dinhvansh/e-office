@@ -138,6 +138,9 @@ model sign_request_comments {
   body            String
   created_at      DateTime      @default(now())
   updated_at      DateTime      @updatedAt
+  edited_at       DateTime?
+  deleted_at      DateTime?
+  deleted_by      Int?
 
   tenant          tenants       @relation(fields: [tenant_id], references: [id])
   sign_request    sign_requests @relation(fields: [sign_request_id], references: [id], onDelete: Cascade)
@@ -531,8 +534,12 @@ model document_attachments {
   file_size   BigInt?
   file_type   String?
   attachment_kind String @default("SUPPLEMENTAL")
+  status      String    @default("ACTIVE")
   uploaded_by Int?
   comment_id  Int?
+  withdrawn_by Int?
+  withdrawn_at DateTime?
+  withdraw_reason String?
   uploaded_at DateTime  @default(now())
 
   document    documents @relation(fields: [document_id], references: [id], onDelete: Cascade)
@@ -541,6 +548,7 @@ model document_attachments {
 
   @@index([document_id])
   @@index([comment_id])
+  @@index([status])
 }
 
 model webhooks {

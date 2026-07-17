@@ -44,6 +44,9 @@ export interface DocumentAttachmentDTO {
   file_type: string | null;
   uploaded_at: Date;
   attachment_kind: string;
+  status: string;
+  withdrawn_at: Date | null;
+  withdraw_reason: string | null;
   uploaded_by?: { id: number; full_name: string | null; email: string } | null;
   comment_id: number | null;
 }
@@ -60,6 +63,9 @@ export function toDocumentAttachmentDTO(attachment: AttachmentWithUploader): Doc
     file_type: attachment.file_type || null,
     uploaded_at: attachment.uploaded_at,
     attachment_kind: attachment.attachment_kind,
+    status: attachment.status,
+    withdrawn_at: attachment.withdrawn_at,
+    withdraw_reason: attachment.withdraw_reason,
     uploaded_by: attachment.uploader
       ? { id: attachment.uploader.id, full_name: attachment.uploader.full_name, email: attachment.uploader.email }
       : null,

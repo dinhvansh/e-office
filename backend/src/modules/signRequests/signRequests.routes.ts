@@ -50,6 +50,8 @@ signRequestsRouter.post(
   requirePermission("sign_requests", "update"),
   asyncHandler(controller.addComment)
 );
+signRequestsRouter.put("/:id/comments/:commentId", requirePermission("sign_requests", "update"), asyncHandler(controller.editComment));
+signRequestsRouter.delete("/:id/comments/:commentId", requirePermission("sign_requests", "update"), asyncHandler(controller.deleteComment));
 signRequestsRouter.post(
   "/:id/fields",
   requirePermission("sign_requests", "update"),

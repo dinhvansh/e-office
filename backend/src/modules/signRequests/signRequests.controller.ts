@@ -137,6 +137,18 @@ export class SignRequestsController {
     res.status(201).json(ok({ comment: { ...comment, attachments: (comment.attachments || []).map(toDocumentAttachmentDTO) } }));
   };
 
+  editComment = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id); const commentId = idSchema.parse(req.params.commentId);
+    const body = z.object({ body: z.string().min(1).max(2000) }).parse(req.body);
+    const comment = await signRequestsService.editComment(id, commentId, req.auth!.tenantId, req.auth!.userId, body.body);
+    res.json(ok({ comment: { ...comment, attachments: (comment.attachments || []).map(toDocumentAttachmentDTO) } }));
+  };
+  deleteComment = async (req: Request, res: Response): Promise<void> => {
+    const id = idSchema.parse(req.params.id); const commentId = idSchema.parse(req.params.commentId);
+    const comment = await signRequestsService.deleteComment(id, commentId, req.auth!.tenantId, req.auth!.userId);
+    res.json(ok({ comment: { ...comment, attachments: (comment.attachments || []).map(toDocumentAttachmentDTO) } }));
+  };
+
   // Signers Management
 
   addSigner = async (req: Request, res: Response): Promise<void> => {

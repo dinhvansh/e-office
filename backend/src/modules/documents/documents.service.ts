@@ -466,6 +466,9 @@ class DocumentsService {
     if (!attachment) {
       throw ApiError.notFound("Attachment not found", "ATTACHMENT_NOT_FOUND");
     }
+    if (attachment.status === "WITHDRAWN") {
+      throw ApiError.forbidden("This attachment has been withdrawn", "ATTACHMENT_WITHDRAWN");
+    }
 
     const decision = await authorizationService.canAccessDocument(userId, tenantId, attachment.document.id, "read");
     if (!decision.allowed) {
@@ -493,17 +496,29 @@ class DocumentsService {
       ? await this.getSignedDocumentFile(documentId, tenantId, userId)
       : await this.getDocumentFile(documentId, tenantId, userId);
     const attachments = await this.listAttachments(documentId, tenantId, userId);
+    const activeAttachments = attachments.filter((attachment) => attachment.status === "ACTIVE");
     const files: Array<{ name: string; content: Buffer }> = [{ name: completed ? `signed/${primary.fileName}` : `current/${primary.fileName}`, content: primary.fileBytes }];
     const manifestAttachments: Array<Record<string, unknown>> = [];
-    for (const attachment of attachments) {
+    for (const attachment of activeAttachments) {
       const file = await this.getAttachmentFile(attachment.id, tenantId, userId);
       const archiveName = `attachments/${String(attachment.id).padStart(4, "0")}-${attachment.file_name}`;
       files.push({ name: archiveName, content: file.fileBytes });
       manifestAttachments.push({ id: attachment.id, name: attachment.file_name, archive_path: archiveName, kind: attachment.attachment_kind, comment_id: attachment.comment_id, uploaded_at: attachment.uploaded_at, size: attachment.file_size?.toString() ?? null, uploaded_by: attachment.uploader ? { id: attachment.uploader.id, name: attachment.uploader.full_name, email: attachment.uploader.email } : null });
     }
-    files.push({ name: "manifest.json", content: Buffer.from(JSON.stringify({ document: { id: document.id, title: document.title, status: document.status, hash: document.hash, completed }, primary_file: primary.fileName, attachments: manifestAttachments }, null, 2)) });
+    files.push({ name: "manifest.json", content: Buffer.from(JSON.stringify({ document: { id: document.id, title: document.title, status: document.status, hash: document.hash, completed }, primary_file: primary.fileName, attachments: manifestAttachments, withdrawn_attachments: attachments.filter((attachment) => attachment.status === "WITHDRAWN").map((attachment) => ({ id: attachment.id, name: attachment.file_name, status: attachment.status, reason: attachment.withdraw_reason, withdrawn_at: attachment.withdrawn_at })) }, null, 2)) });
     const baseName = (document.title || document.original_file_name || `document-${documentId}`).replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9._-]+/g, "-");
     return { fileName: `${baseName}-dossier.zip`, fileBytes: this.makeZip(files) };
+  }
+
+  async withdrawAttachment(documentId: number, attachmentId: number, tenantId: number, userId: number, reason: string) {
+    const attachment = await prisma.document_attachments.findFirst({ where: { id: attachmentId, document_id: documentId, document: { tenant_id: tenantId } }, include: { document: { select: { owner_id: true } } } });
+    if (!attachment) throw ApiError.notFound("Attachment not found", "ATTACHMENT_NOT_FOUND");
+    if (attachment.status === "WITHDRAWN") throw ApiError.conflict("Attachment is already withdrawn", "ATTACHMENT_ALREADY_WITHDRAWN");
+    const canWithdrawOwnUpload = attachment.uploaded_by === userId && await this.canAddAttachment(documentId, tenantId, userId, attachment.document.owner_id);
+    if (attachment.document.owner_id !== userId && !canWithdrawOwnUpload) throw ApiError.forbidden("You cannot withdraw this attachment", "ATTACHMENT_WITHDRAW_DENIED");
+    const updated = await prisma.document_attachments.update({ where: { id: attachmentId }, data: { status: "WITHDRAWN", withdrawn_by: userId, withdrawn_at: new Date(), withdraw_reason: reason }, include: { uploader: { select: { id: true, full_name: true, email: true } } } });
+    await auditService.record({ tenantId, documentId, event: "document.attachment_withdrawn", userId });
+    return updated;
   }
 
   async createDocument(input: CreateDocumentInput & {

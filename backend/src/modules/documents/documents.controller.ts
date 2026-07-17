@@ -89,6 +89,7 @@ const attachmentSchema = z.object({
   file_type: z.string().optional(),
   attachment_kind: z.enum(["SUPPLEMENTAL", "COMMENT_ATTACHMENT"]).optional(),
 });
+const withdrawAttachmentSchema = z.object({ reason: z.string().trim().min(3).max(1000) });
 const ccEmailsSchema = z.object({
   emails: z.array(z.string().email()),
 });
@@ -303,6 +304,14 @@ export class DocumentsController {
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${dossier.fileName}"`);
     res.send(dossier.fileBytes);
+  };
+
+  withdrawAttachment = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    const attachmentId = idSchema.parse(req.params.attachmentId);
+    const { reason } = withdrawAttachmentSchema.parse(req.body);
+    const attachment = await documentsService.withdrawAttachment(documentId, attachmentId, req.auth!.tenantId, req.auth!.userId, reason);
+    res.json(ok({ attachment: toDocumentAttachmentDTO(attachment) }));
   };
 
   // Tags endpoints

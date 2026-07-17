@@ -210,6 +210,34 @@ class SignRequestsService {
     });
   }
 
+  private async getEditableComment(signRequestId: number, commentId: number, tenantId: number, userId: number) {
+    const [request, comment] = await Promise.all([
+      this.getSignRequest(signRequestId, tenantId, userId),
+      prisma.sign_request_comments.findFirst({ where: { id: commentId, sign_request_id: signRequestId, tenant_id: tenantId } }),
+    ]);
+    if (!comment) throw ApiError.notFound("Comment not found", "COMMENT_NOT_FOUND");
+    if (comment.user_id !== userId) throw ApiError.forbidden("You can only change your own comment", "COMMENT_OWNER_REQUIRED");
+    if (comment.deleted_at) throw ApiError.conflict("Comment has already been deleted", "COMMENT_DELETED");
+    if (["completed", "cancelled", "rejected"].includes((request.status || "").toLowerCase())) throw ApiError.forbidden("Comments are locked for this request state", "COMMENT_LOCKED");
+    if (Date.now() - comment.created_at.getTime() > 15 * 60 * 1000) throw ApiError.forbidden("Comments can only be changed within 15 minutes", "COMMENT_EDIT_WINDOW_EXPIRED");
+    return { request, comment };
+  }
+
+  async editComment(signRequestId: number, commentId: number, tenantId: number, userId: number, body: string) {
+    const content = body.trim(); if (!content || content.length > 2000) throw ApiError.badRequest("Comment must be 1-2000 characters", "COMMENT_INVALID");
+    const { request } = await this.getEditableComment(signRequestId, commentId, tenantId, userId);
+    const comment = await prisma.sign_request_comments.update({ where: { id: commentId }, data: { body: content, edited_at: new Date() }, include: { user: { select: { id: true, full_name: true, email: true } }, attachments: { include: { uploader: { select: { id: true, full_name: true, email: true } } } } } });
+    await auditService.record({ tenantId, documentId: request.document_id, event: "sign_request.comment_edited", userId });
+    return comment;
+  }
+
+  async deleteComment(signRequestId: number, commentId: number, tenantId: number, userId: number) {
+    const { request } = await this.getEditableComment(signRequestId, commentId, tenantId, userId);
+    const comment = await prisma.sign_request_comments.update({ where: { id: commentId }, data: { deleted_at: new Date(), deleted_by: userId }, include: { user: { select: { id: true, full_name: true, email: true } }, attachments: { include: { uploader: { select: { id: true, full_name: true, email: true } } } } } });
+    await auditService.record({ tenantId, documentId: request.document_id, event: "sign_request.comment_deleted", userId });
+    return comment;
+  }
+
   /**
    * Get sign requests created by the current user with pagination
    */
