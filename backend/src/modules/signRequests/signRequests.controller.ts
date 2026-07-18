@@ -52,7 +52,7 @@ const draftConfigSchema = z.object({
 
 export class SignRequestsController {
   private isEditableStatus(status?: string | null) {
-    return status === 'draft' || status === 'rejected';
+    return status === 'draft' || status === 'rejected' || status === 'cancelled';
   }
 
   list = async (req: Request, res: Response): Promise<void> => {

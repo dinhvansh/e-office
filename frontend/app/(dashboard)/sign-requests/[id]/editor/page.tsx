@@ -88,7 +88,7 @@ export default function SignRequestEditorPage() {
 
   const signRequest = editorData?.signRequest;
   const isEditable =
-    signRequest?.flow_state === 'DRAFT' || signRequest?.status === 'draft' || signRequest?.status === 'rejected';
+    signRequest?.flow_state === 'DRAFT' || ['draft', 'rejected', 'cancelled'].includes(signRequest?.status ?? '');
   const isReadOnly = !isEditable;
   const canCancelAndRecreate = Boolean(signRequest && !['completed', 'cancelled'].includes(signRequest.status ?? ''));
 
@@ -272,7 +272,7 @@ export default function SignRequestEditorPage() {
                     {signRequest?.document?.title || signRequest?.document?.original_file_name || 'Chỉnh sửa trình ký'}
                   </h1>
                   <span className={`rounded px-2 py-1 text-xs font-medium ${isEditable ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {signRequest?.status === 'rejected' ? 'Bị từ chối' : isEditable ? 'Nháp' : 'Đã gửi'}
+                    {signRequest?.status === 'rejected' ? 'Bị từ chối' : signRequest?.status === 'cancelled' ? 'Đã hủy — có thể sửa và gửi lại' : isEditable ? 'Nháp' : 'Đã gửi'}
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-slate-500">

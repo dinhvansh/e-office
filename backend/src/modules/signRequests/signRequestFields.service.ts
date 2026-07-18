@@ -219,7 +219,7 @@ export class SignRequestFieldsService {
     }
 
     // Allow editing draft and rejected sign requests
-    if (signRequest.status !== 'draft' && signRequest.status !== 'rejected') {
+    if (!['draft', 'rejected', 'cancelled'].includes(signRequest.status)) {
       throw ApiError.badRequest('Cannot edit fields after sign request is sent');
     }
 
@@ -285,7 +285,7 @@ export class SignRequestFieldsService {
     }
 
     // Allow editing draft and rejected sign requests
-    if (signRequest.status !== 'draft' && signRequest.status !== 'rejected') {
+    if (!['draft', 'rejected', 'cancelled'].includes(signRequest.status)) {
       throw ApiError.badRequest('Cannot delete fields after sign request is sent');
     }
 

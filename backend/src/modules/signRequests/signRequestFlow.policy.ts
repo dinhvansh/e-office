@@ -52,11 +52,11 @@ export function buildWorkflowStatusSummary(input: {
 }
 
 export function isEditableSignRequestStatus(status: string | null | undefined): boolean {
-  return status === "draft" || status === "rejected";
+  return status === "draft" || status === "rejected" || status === "cancelled";
 }
 
 export function canSendSignRequestStatus(status: string | null | undefined): boolean {
-  return status !== "completed" && status !== "cancelled";
+  return status !== "completed";
 }
 
 export function buildSignRequestFlowHints(

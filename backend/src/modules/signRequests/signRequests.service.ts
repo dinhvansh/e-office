@@ -448,11 +448,11 @@ class SignRequestsService {
     this.ensureSendableStatus(signRequest.status || "");
     await this.validateSignFieldsIfNeeded(id);
 
-    if (signRequest.status === "rejected") {
-      await this.prepareRejectedForResubmission(id, tenantId, userId);
+    if (["rejected", "cancelled"].includes(signRequest.status)) {
+      await this.prepareResubmission(id, tenantId, userId);
     }
 
-    if (signRequest.status === "draft" || signRequest.status === "rejected") {
+    if (["draft", "rejected", "cancelled"].includes(signRequest.status)) {
       const runtime = await documentWorkflowOrchestratorService.beginRuntimeFlow(id, tenantId, userId);
 
       if (runtime.phase === "approval") {
@@ -670,9 +670,9 @@ class SignRequestsService {
     }
   }
 
-  private async prepareRejectedForResubmission(signRequestId: number, tenantId: number, userId: number) {
+  private async prepareResubmission(signRequestId: number, tenantId: number, userId: number) {
     const signRequest = await this.getSignRequest(signRequestId, tenantId);
-    if (signRequest.status !== "rejected") {
+    if (!['rejected', 'cancelled'].includes(signRequest.status)) {
       return;
     }
 

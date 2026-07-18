@@ -588,14 +588,14 @@ class DocumentPermissionResolverService {
     }
 
     const status = currentStatus;
-    if (isOwner && !["DRAFT", "REJECTED"].includes(status)) {
+    if (isOwner && !["DRAFT", "REJECTED", "CANCELLED"].includes(status)) {
       if (resolved.canEdit) {
         resolved.canEdit = false;
-        reasons.push("Edit denied because creator can only edit in DRAFT or REJECTED");
+        reasons.push("Edit denied because creator can only edit in DRAFT, REJECTED, or CANCELLED");
       }
       if (resolved.canDelete) {
         resolved.canDelete = false;
-        reasons.push("Delete denied because creator can only delete in DRAFT or REJECTED");
+        reasons.push("Delete denied because creator can only delete in DRAFT, REJECTED, or CANCELLED");
       }
     }
 
