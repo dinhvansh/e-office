@@ -25,9 +25,10 @@ interface FlowTimelineProps {
   steps: FlowStep[];
   canApprove: boolean;
   canSign: boolean;
+  currentUserId?: number;
 }
 
-export function FlowTimeline({ steps, canApprove, canSign }: FlowTimelineProps) {
+export function FlowTimeline({ steps, canApprove, canSign, currentUserId }: FlowTimelineProps) {
   const router = useRouter();
 
   const getStatusIcon = (status: FlowStep['status']) => {
@@ -84,7 +85,7 @@ export function FlowTimeline({ steps, canApprove, canSign }: FlowTimelineProps) 
   };
 
   const handleStepAction = (step: FlowStep) => {
-    if (step.type === 'approval' && canApprove) {
+    if (step.type === 'approval' && canApprove && step.user?.id === currentUserId) {
       // Navigate to approval detail page
       const approvalId = step.id.replace('approval-', '');
       router.push(`/approvals/${approvalId}`);
@@ -104,8 +105,8 @@ export function FlowTimeline({ steps, canApprove, canSign }: FlowTimelineProps) 
       <div className="space-y-4">
         {steps.map((step, index) => {
           const isCurrentUserStep = 
-            (step.type === 'approval' && canApprove && step.status === 'pending') ||
-            (step.type === 'signing' && canSign && step.status === 'pending');
+            (step.type === 'approval' && canApprove && step.user?.id === currentUserId && step.status === 'pending') ||
+            (step.type === 'signing' && canSign && step.user?.id === currentUserId && step.status === 'pending');
 
           return (
             <div key={step.id} className="relative">

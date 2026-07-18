@@ -182,7 +182,7 @@ function UserAvatar({ user }: { user: ShareUserOption }) {
 export default function DocumentFlowPage() {
   const params = useParams();
   const router = useRouter();
-  const { fetchJson } = useAuth();
+  const { fetchJson, user } = useAuth();
   const queryClient = useQueryClient();
   const documentId = params.id as string;
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -632,6 +632,7 @@ export default function DocumentFlowPage() {
               steps={steps}
               canApprove={can_approve}
               canSign={can_sign}
+              currentUserId={user?.id}
             />
           </div>
 
