@@ -459,9 +459,9 @@ export default function SignRequestsPage() {
                         {getStatusBadge(request)}
                       </td>
                       <td className="px-2 py-3">
-                        <div className="hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                           {/* Edit Workflow Button - Show for draft documents */}
-                          {(request.flow_state === 'DRAFT' || request.status === 'draft') && (
+                          {(request.flow_state === 'DRAFT' || request.status === 'draft' || request.status === 'cancelled') && (
                             <Button
                               size="sm"
                               onClick={() => router.push(`/sign-requests/${request.id}/editor`)}
@@ -690,7 +690,7 @@ export default function SignRequestsPage() {
                   </div>
 
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    {(request.flow_state === 'DRAFT' || request.status === 'draft') && (
+                    {(request.flow_state === 'DRAFT' || request.status === 'draft' || request.status === 'cancelled') && (
                       <Button size="sm" onClick={() => router.push(`/sign-requests/${request.id}/editor`)} className="flex-1 bg-blue-600 text-white text-xs h-8">
                         <Edit className="w-3.5 h-3.5 mr-1" />Chỉnh sửa
                       </Button>
@@ -710,7 +710,7 @@ export default function SignRequestsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
-                        {(request.flow_state === 'DRAFT' || request.status === 'draft') && (
+                        {(request.flow_state === 'DRAFT' || request.status === 'draft' || request.status === 'cancelled') && (
                           <DropdownMenuItem onClick={() => handleDelete(request.id, request.document.id)} className="text-red-600">
                             <Trash2 className="w-4 h-4 mr-2" />Xóa
                           </DropdownMenuItem>
