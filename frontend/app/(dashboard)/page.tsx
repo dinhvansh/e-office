@@ -194,7 +194,6 @@ export default function DashboardPage() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
                     outerRadius={typeof window !== "undefined" && window.innerWidth < 768 ? 50 : 80}
                     dataKey="value"
                   >
