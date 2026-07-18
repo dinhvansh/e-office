@@ -291,6 +291,12 @@ export default function SignRequestsPage() {
     if (request.flow_state === 'AWAITING_SIGNATURES' || request.status === 'pending' || request.status === 'in_progress') {
       return <Badge className="bg-yellow-500 hover:bg-yellow-600">Chờ ký</Badge>;
     }
+    if (request.flow_state === 'GENERATING_ARTIFACT' || request.status === 'generating_artifact') {
+      return <Badge className="bg-blue-500 hover:bg-blue-600">Đang tạo PDF</Badge>;
+    }
+    if (request.flow_state === 'ARTIFACT_FAILED' || request.status === 'artifact_failed') {
+      return <Badge variant="destructive">Lỗi tạo PDF</Badge>;
+    }
     return <Badge variant="secondary">Nháp</Badge>;
   };
 

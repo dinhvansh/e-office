@@ -3,8 +3,8 @@ export type SignRequestFlowSigner = {
 };
 
 export type SignRequestFlowHints = {
-  flow_state: "DRAFT" | "COMPLETED" | "CANCELLED" | "REJECTED" | "AWAITING_APPROVAL" | "AWAITING_SIGNATURES";
-  next_action: "EDIT_AND_SEND" | "VIEW_COMPLETED" | "REVIEW_STATUS" | "WAIT_FOR_APPROVAL" | "WAIT_FOR_SIGNING";
+  flow_state: "DRAFT" | "COMPLETED" | "CANCELLED" | "REJECTED" | "AWAITING_APPROVAL" | "AWAITING_SIGNATURES" | "GENERATING_ARTIFACT" | "ARTIFACT_FAILED";
+  next_action: "EDIT_AND_SEND" | "VIEW_COMPLETED" | "REVIEW_STATUS" | "WAIT_FOR_APPROVAL" | "WAIT_FOR_SIGNING" | "WAIT_FOR_ARTIFACT";
   flow_counters: {
     total_signers: number;
     pending: number;
@@ -85,6 +85,12 @@ export function buildSignRequestFlowHints(
   } else if (status === "pending" || status === "in_progress" || pending > 0 || waitingSigning > 0) {
     flowState = "AWAITING_SIGNATURES";
     nextAction = "WAIT_FOR_SIGNING";
+  } else if (status === "generating_artifact") {
+    flowState = "GENERATING_ARTIFACT";
+    nextAction = "WAIT_FOR_ARTIFACT";
+  } else if (status === "artifact_failed") {
+    flowState = "ARTIFACT_FAILED";
+    nextAction = "REVIEW_STATUS";
   }
 
   return {
