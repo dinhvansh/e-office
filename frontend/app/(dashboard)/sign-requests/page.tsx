@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
-import { PenTool, Eye, Search, Edit, Upload, GitBranch, MoreVertical, Trash2, XCircle, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { PenTool, Eye, Search, Edit, Upload, GitBranch, MoreVertical, Trash2, XCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -163,19 +163,6 @@ export default function SignRequestsPage() {
   });
 
   // Revoke mutation
-  const revokeMutation = useMutation({
-    mutationFn: async (signRequestId: number) => {
-      await fetchJson(`/sign-requests/${signRequestId}/revoke`, { method: 'POST' });
-    },
-    onSuccess: () => {
-      toast.success('Đã thu hồi văn bản thành công!');
-      queryClient.invalidateQueries({ queryKey: ['my-sign-requests'] });
-    },
-    onError: (error: any) => {
-      toast.error('Lỗi: ' + (error.message || 'Không thể thu hồi văn bản'));
-    },
-  });
-
   // Delete handler
   const handleDelete = (signRequestId: number, documentId: number) => {
     confirmDestructive({
@@ -203,16 +190,6 @@ export default function SignRequestsPage() {
   };
 
   // Revoke handler
-  const handleRevoke = (signRequestId: number) => {
-    confirmDestructive({
-      title: 'Thu hồi yêu cầu ký',
-      targetName: `Yêu cầu ký #${signRequestId}`,
-      description: 'Yêu cầu sẽ trở về trạng thái nháp và cần được ký lại.',
-      confirmLabel: 'Thu hồi yêu cầu',
-      errorMessage: 'Không thể thu hồi yêu cầu ký. Vui lòng thử lại.',
-    }, () => revokeMutation.mutateAsync(signRequestId));
-  };
-
   // Check if current user is a pending internal signer
   const isCurrentUserPendingSigner = (request: SignRequest) => {
     if (!user?.id) return false;
@@ -525,7 +502,7 @@ export default function SignRequestsPage() {
                                 size="sm"
                                 variant="ghost"
                                 className="h-7 w-7 p-0"
-                                disabled={deleteMutation.isPending || cancelMutation.isPending || revokeMutation.isPending}
+                                disabled={deleteMutation.isPending || cancelMutation.isPending}
                               >
                                 <MoreVertical className="w-3.5 h-3.5" />
                               </Button>
@@ -556,22 +533,6 @@ export default function SignRequestsPage() {
                                   >
                                     <XCircle className="w-4 h-4 mr-2" />
                                     {cancelMutation.isPending ? 'Đang hủy...' : 'Hủy luồng ký'}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                </>
-                              )}
-
-                              {/* Revoke - Completed internal documents only */}
-                              {(request.flow_state === 'COMPLETED' || request.status === 'completed' || request.progress.percentage === 100) && 
-                               request.signers.every(s => s.is_internal) && (
-                                <>
-                                  <DropdownMenuItem
-                                    onClick={() => handleRevoke(request.id)}
-                                    disabled={revokeMutation.isPending}
-                                    className="text-purple-600 focus:text-purple-600"
-                                  >
-                                    <RotateCcw className="w-4 h-4 mr-2" />
-                                    {revokeMutation.isPending ? 'Đang thu hồi...' : 'Thu hồi văn bản'}
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                 </>

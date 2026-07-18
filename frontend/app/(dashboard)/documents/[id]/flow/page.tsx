@@ -368,16 +368,6 @@ export default function DocumentFlowPage() {
     onError: (error: any) => toast.error(error?.message || 'Không thể xóa request'),
   });
 
-  const revokeMutation = useMutation({
-    mutationFn: async () => {
-      const signRequestId = flowData?.document?.sign_request_id;
-      if (!signRequestId) throw new Error('Không tìm thấy request để thu hồi');
-      return fetchJson(`/sign-requests/${signRequestId}/revoke`, { method: 'POST' });
-    },
-    onSuccess: () => { toast.success('Đã thu hồi tài liệu'); refetch(); },
-    onError: (error: any) => toast.error(error?.message || 'Không thể thu hồi tài liệu'),
-  });
-
   const grantShareMutation = useMutation({
     mutationFn: async () => {
       if (!isCompleted) {
@@ -473,7 +463,6 @@ export default function DocumentFlowPage() {
   const canRemind = canManageSignRequest && ['pending_approval', 'pending_signature', 'in_progress', 'pending'].includes(document.status);
   const canCancel = canManageSignRequest && ['pending_approval', 'pending_signature', 'in_progress'].includes(document.status);
   const canDelete = canManageSignRequest && ['draft', 'cancelled'].includes(document.status);
-  const canRevoke = canManageSignRequest && document.status === 'completed';
   const canShareCompletedDocument = isCompleted && Boolean(flowData?.can_share);
   const canViewCompletedDocument = isCompleted;
   const hasWorkflowSteps = steps.length > 0;
@@ -544,11 +533,6 @@ export default function DocumentFlowPage() {
                   disabled={cancelMutation.isPending}
                 >
                   {cancelMutation.isPending ? 'Đang hủy...' : 'Hủy request'}
-                </Button>
-              )}
-              {canRevoke && (
-                <Button variant="outline" size="sm" onClick={() => { if (window.confirm('Thu hồi tài liệu hoàn thành?')) revokeMutation.mutate(); }} disabled={revokeMutation.isPending}>
-                  {revokeMutation.isPending ? 'Đang thu hồi...' : 'Thu hồi'}
                 </Button>
               )}
               {canDelete && (

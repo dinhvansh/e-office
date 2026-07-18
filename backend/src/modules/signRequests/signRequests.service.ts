@@ -1533,24 +1533,6 @@ class SignRequestsService {
     return { deleted: true };
   }
 
-  /**
-   * Revoke completed internal document
-   * Reset to draft status for re-signing
-   */
-  async revokeSignRequest(id: number, tenantId: number, userId: number) {
-    const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
-    await signRequestLifecycleService.revokeCompleted(signRequest, id, tenantId);
-
-    // Audit log
-    await auditService.record({
-      tenantId,
-      documentId: signRequest.document_id,
-      event: 'sign.revoked',
-      userId,
-    });
-
-    return this.getSignRequest(id, tenantId);
-  }
 }
 
 export const signRequestsService = new SignRequestsService();

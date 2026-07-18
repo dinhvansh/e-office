@@ -432,14 +432,6 @@ export class SignRequestsController {
     res.json(ok({ deleted: true }));
   };
 
-  // Revoke completed internal document
-  revoke = async (req: Request, res: Response): Promise<void> => {
-    const id = idSchema.parse(req.params.id);
-    
-    await signRequestsService.revokeSignRequest(id, req.auth!.tenantId, req.auth!.userId);
-    res.json(ok({ revoked: true }));
-  };
-
   // Internal Signing (no OTP required)
   signInternal = async (req: Request, res: Response): Promise<void> => {
     const id = idSchema.parse(req.params.id);
