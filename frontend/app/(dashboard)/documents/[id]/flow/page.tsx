@@ -489,7 +489,6 @@ export default function DocumentFlowPage() {
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Quay lại
               </Button>
-              <DocumentDownloadMenu documentId={Number(documentId)} documentNumber={document.document_number} originalFileName={document.original_file_name} status={document.status} signedFilePath={document.signed_file_path} />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-start gap-2">
                   <FileText className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
@@ -512,6 +511,7 @@ export default function DocumentFlowPage() {
               </div>
             </div>
             <div className="flex w-full flex-wrap items-center justify-end gap-2 overflow-hidden lg:w-auto lg:flex-nowrap">
+              <DocumentDownloadMenu documentId={Number(documentId)} documentNumber={document.document_number} originalFileName={document.original_file_name} status={document.status} signedFilePath={document.signed_file_path} />
               {canRemind && (
                 <Button
                   variant="outline"
