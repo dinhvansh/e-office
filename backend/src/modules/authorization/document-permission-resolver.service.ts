@@ -1,6 +1,7 @@
 import { document_permissions, Prisma, users } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { DocumentTypePolicyV2, normalizeDocumentTypePolicyV2 } from "../settings/document-type-policy.helper";
+import { hasDepartmentLeadershipAccess } from "../departments/department-leadership-access.service";
 
 
 export type ResolvedDocumentPermissions = {
@@ -187,19 +188,15 @@ class DocumentPermissionResolverService {
     visibilityScope: string | null | undefined,
     user: users,
     document: { department_id: number | null; owner_id: number | null },
-    creatorManagerId: number | null,
-    departmentManagerId: number | null,
-    supportManagerIds: number[]
+    isDepartmentLeader: boolean
   ) {
     const normalized = String(visibilityScope || "company").toLowerCase();
 
     if (normalized === "company" || normalized === "public") {
       return { allowed: true, reason: "Matched visibility scope: COMPANY" };
     }
-    const isDepartmentManager = !!departmentManagerId && departmentManagerId === user.id;
-    const isSupportManager = supportManagerIds.includes(user.id);
     if (normalized === "department") {
-      const allowed = (!!document.department_id && !!user.department_id && document.department_id === user.department_id) || isDepartmentManager || isSupportManager;
+      const allowed = (!!document.department_id && !!user.department_id && document.department_id === user.department_id) || isDepartmentLeader;
       return {
         allowed,
         reason: allowed
@@ -210,8 +207,7 @@ class DocumentPermissionResolverService {
     if (normalized === "department_and_manager") {
       const sameDepartment =
         !!document.department_id && !!user.department_id && document.department_id === user.department_id;
-      const isCreatorManager = !!creatorManagerId && creatorManagerId === user.id;
-      const allowed = sameDepartment || isCreatorManager || isDepartmentManager || isSupportManager;
+      const allowed = sameDepartment || isDepartmentLeader;
       return {
         allowed,
         reason: allowed
@@ -473,13 +469,12 @@ class DocumentPermissionResolverService {
       ? this.resolveAclSnapshotPolicies(preloaded.aclPolicies, currentStatus)
       : await this.resolveAclSnapshotPermissions(documentId, user, currentStatus);
 
+    const isDepartmentLeader = await hasDepartmentLeadershipAccess(userId, tenantId, document.department_id);
     const visibilityDecision = this.matchesVisibilityScope(
       document.visibility_scope,
       user,
       document,
-      document.owner?.manager_id ?? null,
-      document.department?.manager_id ?? null,
-      document.department?.support_managers.map((item) => item.user_id) ?? []
+      isDepartmentLeader
     );
 
     if (visibilityDecision.allowed) {
