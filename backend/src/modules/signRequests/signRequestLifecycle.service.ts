@@ -5,6 +5,7 @@ import { signersRepository } from "../signers/signers.repository";
 import { workflowStateService } from "../workflows/workflowState.service";
 import { signRequestsRepository } from "./signRequests.repository";
 import { isEditableSignRequestStatus } from "./signRequestFlow.policy";
+import { workflowCancellationService } from "../workflows/workflowCancellation.service";
 
 class SignRequestLifecycleService {
   async cancel(
@@ -14,26 +15,15 @@ class SignRequestLifecycleService {
     userId: number,
     reason?: string,
   ) {
-    if (signRequest.status === "completed" || signRequest.status === "cancelled") {
+    if (signRequest.status === "completed" || signRequest.status === "cancelled" || signRequest.status === "archived") {
       throw ApiError.badRequest(
         `Cannot cancel sign request with status: ${signRequest.status}`,
         "SIGN_REQUEST_CANCEL_DENIED",
       );
     }
 
-    await prisma.sign_requests.update({
-      where: { id, tenant_id: tenantId },
-      data: {
-        status: "cancelled",
-        cancellation_reason: reason || "Không có lý do",
-        cancelled_at: new Date(),
-        cancelled_by: userId,
-      },
-    });
-
-    if (signRequest.document_id) {
-      await documentsRepository.update(signRequest.document_id, { status: "draft" });
-    }
+    if (!signRequest.document_id) throw ApiError.badRequest("Document is required", "DOCUMENT_REQUIRED");
+    await workflowCancellationService.cancel({ documentId: signRequest.document_id, tenantId, userId, reason });
   }
 
   async retrySignedArtifactGeneration(
