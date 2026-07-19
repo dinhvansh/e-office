@@ -51,7 +51,7 @@ export class DocumentFlowService {
     });
 
     // 1. Get document with all relations
-    const document = await prisma.documents.findFirst({
+    const loadedDocument = await prisma.documents.findFirst({
       where: {
         id: documentId,
         tenant_id: tenantId,
@@ -65,7 +65,10 @@ export class DocumentFlowService {
             full_name: true,
           },
         },
-        workflow_instance: {
+        workflow_instances: {
+          where: { status: 'in_progress' },
+          orderBy: { run_number: 'desc' },
+          take: 1,
           include: {
             workflow: true,
           },
@@ -106,9 +109,15 @@ export class DocumentFlowService {
       },
     });
 
-    if (!document) {
+    if (!loadedDocument) {
       throw new Error('Document not found');
     }
+    const currentWorkflowInstance = loadedDocument.workflow_instances[0] || null;
+    const document = {
+      ...loadedDocument,
+      workflow_instance: currentWorkflowInstance,
+      approvals: loadedDocument.approvals.filter((approval) => approval.workflow_instance_id === currentWorkflowInstance?.id),
+    };
 
     // 2. Build phases
     const phases: FlowPhase[] = [];

@@ -3,11 +3,13 @@ import { z } from 'zod';
 import { ok } from '../../core/utils/response';
 import { workflowsService } from './workflows.service';
 import { workflowAssigneeTypes, workflowCompletionModes } from './workflowStepAssignment';
+import { workflowApprovalModes, type WorkflowApprovalMode } from './workflowApprovalMode';
 
 const createWorkflowSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   document_type_id: z.coerce.number().int().positive().optional(),
+  approval_mode: z.enum(workflowApprovalModes).optional(),
 });
 
 const updateWorkflowSchema = z.object({
@@ -15,6 +17,7 @@ const updateWorkflowSchema = z.object({
   description: z.string().optional(),
   document_type_id: z.coerce.number().int().positive().optional(),
   is_active: z.boolean().optional(),
+  approval_mode: z.enum(workflowApprovalModes).optional(),
 });
 
 const createStepSchema = z.object({
@@ -84,7 +87,7 @@ export class WorkflowsController {
   };
 
   create = async (req: Request, res: Response): Promise<void> => {
-    const body = createWorkflowSchema.parse(req.body) as { name: string; description?: string; document_type_id?: number };
+    const body = createWorkflowSchema.parse(req.body) as { name: string; description?: string; document_type_id?: number; approval_mode?: WorkflowApprovalMode };
     const workflow = await workflowsService.createWorkflow(
       body,
       req.auth!.tenantId,

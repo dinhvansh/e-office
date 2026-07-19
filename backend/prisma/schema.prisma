@@ -99,7 +99,7 @@ model documents {
   tags               document_tags[]
   permissions        document_permissions[]
   versions           document_versions[]
-  workflow_instance  workflow_instances?
+  workflow_instances workflow_instances[]
   approvals          document_approvals[]
   sign_fields        sign_request_fields[]
   cc_emails          document_cc_emails[]
@@ -409,6 +409,7 @@ model workflows {
   created_for_doc   Int?
   based_on_template Int?
   is_active         Boolean   @default(true)
+  approval_mode     String    @default("sequential")
   created_by        Int?
   created_at        DateTime  @default(now())
   
@@ -455,6 +456,7 @@ model workflow_instances {
   workflow_id     Int
   current_step_id Int?
   status          String    @default("in_progress") // 'in_progress', 'completed', 'rejected', 'cancelled'
+  run_number      Int       @default(1)
   started_at      DateTime  @default(now())
   completed_at    DateTime?
   
@@ -462,7 +464,10 @@ model workflow_instances {
   workflow        workflows @relation(fields: [workflow_id], references: [id])
   current_step    workflow_steps? @relation("current_step", fields: [current_step_id], references: [id])
   
-  @@unique([document_id])
+  approvals document_approvals[]
+
+  @@unique([document_id, run_number])
+  @@index([document_id, status])
 }
 
 model document_approvals {
@@ -470,6 +475,7 @@ model document_approvals {
   document_id       Int
   workflow_id       Int
   workflow_step_id  Int
+  workflow_instance_id Int
   approver_user_id  Int
   action            String    @default("pending") // 'pending', 'approved', 'rejected', 'request_info'
   comment           String?
@@ -482,7 +488,10 @@ model document_approvals {
   document          documents @relation(fields: [document_id], references: [id])
   workflow          workflows @relation(fields: [workflow_id], references: [id])
   workflow_step     workflow_steps @relation(fields: [workflow_step_id], references: [id])
+  workflow_instance workflow_instances @relation(fields: [workflow_instance_id], references: [id])
   approver          users @relation(fields: [approver_user_id], references: [id])
+
+  @@index([workflow_instance_id])
 }
 
 model sign_request_fields {

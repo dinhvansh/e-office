@@ -922,11 +922,8 @@ class DocumentsService {
         await tx.sign_requests.delete({ where: { id: document.sign_request_id } });
       }
 
-      const workflowInstance = await tx.workflow_instances.findUnique({ where: { document_id: document.id } });
-      if (workflowInstance) {
-        await tx.document_approvals.deleteMany({ where: { document_id: document.id } });
-        await tx.workflow_instances.delete({ where: { document_id: document.id } });
-      }
+      await tx.document_approvals.deleteMany({ where: { document_id: document.id } });
+      await tx.workflow_instances.deleteMany({ where: { document_id: document.id } });
 
       await documentsRepository.delete(document.id, tx);
     });
@@ -1049,6 +1046,7 @@ class DocumentsService {
         is_template: false,
         created_for_doc: documentId,
         based_on_template: templateId,
+        approval_mode: template.approval_mode,
         created_by: userId,
         is_active: true,
       },
@@ -1115,6 +1113,7 @@ class DocumentsService {
         is_template: false,
         created_for_doc: documentId,
         based_on_template: template.is_template ? template.id : template.based_on_template || template.id,
+        approval_mode: template.approval_mode,
         created_by: userId,
         is_active: true,
       }
@@ -1209,11 +1208,6 @@ class DocumentsService {
       // Has workflow - submit for approval
       const { approvalsService } = await import('../approvals/approvals.service');
       await approvalsService.submitForApproval(documentId, finalWorkflowId, tenantId, userId);
-      
-      // Update status
-      await documentsRepository.update(documentId, {
-        status: 'pending_approval',
-      });
     } else {
       // No workflow - direct approve (simple approval without workflow)
       // Just mark as approved

@@ -11,9 +11,9 @@ class SigningProgressService {
   async getSignerStepCompletionConfig(documentId: number, signingOrder: number) {
     const document = await prisma.documents.findUnique({
       where: { id: documentId },
-      select: { workflow_instance: { select: { workflow_id: true } } },
+      select: { workflow_instances: { where: { status: 'in_progress' }, orderBy: { run_number: 'desc' }, take: 1, select: { workflow_id: true } } },
     });
-    const workflowId = document?.workflow_instance?.workflow_id;
+    const workflowId = document?.workflow_instances[0]?.workflow_id;
     if (!workflowId) return { completionMode: "all" as WorkflowCompletionMode, minRequired: 1 };
 
     const step = await prisma.workflow_steps.findFirst({

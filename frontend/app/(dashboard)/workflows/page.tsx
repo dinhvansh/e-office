@@ -17,6 +17,13 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  approvalModeContent,
+  DEFAULT_APPROVAL_MODE,
+  normalizeApprovalMode,
+  type ApprovalMode,
+} from '@/lib/workflow-approval-mode';
 
 interface WorkflowStep {
   id: number;
@@ -38,8 +45,21 @@ interface WorkflowData {
   name: string;
   description: string | null;
   is_active: boolean;
+  approval_mode?: ApprovalMode | null;
   steps: WorkflowStep[];
 }
+
+interface WorkflowFormData {
+  name: string;
+  description: string;
+  approval_mode: ApprovalMode;
+}
+
+const DEFAULT_WORKFLOW_FORM_DATA: WorkflowFormData = {
+  name: '',
+  description: '',
+  approval_mode: DEFAULT_APPROVAL_MODE,
+};
 
 interface StepFormData {
   step_name: string;
@@ -71,7 +91,7 @@ export default function WorkflowsPage() {
   // Workflow dialog
   const [isWorkflowDialogOpen, setIsWorkflowDialogOpen] = useState(false);
   const [editingWorkflow, setEditingWorkflow] = useState<WorkflowData | null>(null);
-  const [workflowFormData, setWorkflowFormData] = useState({ name: '', description: '' });
+  const [workflowFormData, setWorkflowFormData] = useState<WorkflowFormData>(DEFAULT_WORKFLOW_FORM_DATA);
   
   // Step management dialog
   const [isStepDialogOpen, setIsStepDialogOpen] = useState(false);
@@ -95,7 +115,10 @@ export default function WorkflowsPage() {
     queryKey: ['workflows'],
     queryFn: async () => {
       const data = await fetchJson<{ workflows: WorkflowData[] }>('/workflows');
-      return data.workflows;
+      return data.workflows.map((workflow) => ({
+        ...workflow,
+        approval_mode: normalizeApprovalMode(workflow.approval_mode),
+      }));
     },
   });
 
@@ -140,7 +163,7 @@ export default function WorkflowsPage() {
       toast.success(editingWorkflow ? 'Cập nhật thành công!' : 'Tạo mới thành công!');
       setIsWorkflowDialogOpen(false);
       setEditingWorkflow(null);
-      setWorkflowFormData({ name: '', description: '' });
+      setWorkflowFormData(DEFAULT_WORKFLOW_FORM_DATA);
       queryClient.invalidateQueries({ queryKey: ['workflows'] });
     },
     onError: (error: any) => {
@@ -288,7 +311,7 @@ export default function WorkflowsPage() {
   // Handlers
   const handleCreateWorkflow = () => {
     setEditingWorkflow(null);
-    setWorkflowFormData({ name: '', description: '' });
+    setWorkflowFormData(DEFAULT_WORKFLOW_FORM_DATA);
     setIsWorkflowDialogOpen(true);
   };
 
@@ -297,6 +320,7 @@ export default function WorkflowsPage() {
     setWorkflowFormData({
       name: workflow.name,
       description: workflow.description || '',
+      approval_mode: normalizeApprovalMode(workflow.approval_mode),
     });
     setIsWorkflowDialogOpen(true);
   };
@@ -808,6 +832,29 @@ export default function WorkflowsPage() {
                 placeholder="Mô tả quy trình..."
                 rows={3}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="workflow-approval-mode">Chế độ duyệt</Label>
+              <Select
+                value={workflowFormData.approval_mode}
+                onValueChange={(value) =>
+                  setWorkflowFormData({
+                    ...workflowFormData,
+                    approval_mode: normalizeApprovalMode(value),
+                  })
+                }
+              >
+                <SelectTrigger id="workflow-approval-mode" aria-label="Chế độ duyệt">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sequential">{approvalModeContent.sequential.label}</SelectItem>
+                  <SelectItem value="parallel">{approvalModeContent.parallel.label}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                {approvalModeContent[workflowFormData.approval_mode].description}
+              </p>
             </div>
           </div>
           <DialogFooter>

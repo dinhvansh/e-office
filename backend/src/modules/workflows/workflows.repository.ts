@@ -1,5 +1,6 @@
 import { prisma } from '../../config/prisma';
 import type { Prisma } from '@prisma/client';
+import type { WorkflowApprovalMode } from './workflowApprovalMode';
 
 export class WorkflowsRepository {
   // Workflows
@@ -54,6 +55,7 @@ export class WorkflowsRepository {
     description?: string;
     document_type_id?: number;
     created_by?: number;
+    approval_mode?: WorkflowApprovalMode;
   }) {
     return prisma.workflows.create({
       data,
@@ -69,6 +71,7 @@ export class WorkflowsRepository {
     description?: string;
     document_type_id?: number;
     is_active?: boolean;
+    approval_mode?: WorkflowApprovalMode;
   }) {
     return prisma.workflows.update({
       where: { id },

@@ -18,8 +18,10 @@ async function prepare(page: Page) {
   });
   await page.addInitScript(() => window.localStorage.setItem('esign.auth', JSON.stringify({ tokens: { accessToken: 'ux016' }, user: { id: 1, email: 'admin@example.test', role: 'super_admin' }, tenant: { id: 1, name: 'UX', plan: 'test', status: 'active' }, permissions: [] })));
   await page.goto('/sign-requests/create');
+  await page.locator('input[type="file"]').setInputFiles({ name: 'workflow-preview.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n') });
   await page.getByRole('combobox').click();
   await page.getByRole('option', { name: 'Hợp đồng thử nghiệm (HD)' }).click();
+  await page.getByRole('button', { name: /Tiếp tục/ }).click();
 }
 
 async function expectVietnamesePreview(page: Page) {

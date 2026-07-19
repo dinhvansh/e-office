@@ -11,6 +11,7 @@ import {
   type WorkflowAssigneeType,
   type WorkflowCompletionMode,
 } from './workflowStepAssignment';
+import { normalizeWorkflowApprovalMode, type WorkflowApprovalMode } from './workflowApprovalMode';
 
 type WorkflowStepPreviewInput = {
   approver_type: string | null;
@@ -169,6 +170,7 @@ class WorkflowsService {
       name: string;
       description?: string;
       document_type_id?: number;
+      approval_mode?: WorkflowApprovalMode;
     },
     tenantId: number,
     userId: number
@@ -201,6 +203,7 @@ class WorkflowsService {
 
     return workflowsRepository.create({
       ...data,
+      approval_mode: normalizeWorkflowApprovalMode(data.approval_mode),
       tenant_id: tenantId,
       created_by: userId,
     });
@@ -213,6 +216,7 @@ class WorkflowsService {
       description?: string;
       document_type_id?: number;
       is_active?: boolean;
+      approval_mode?: WorkflowApprovalMode;
     },
     tenantId: number
   ) {
@@ -234,7 +238,12 @@ class WorkflowsService {
       }
     }
 
-    return workflowsRepository.update(id, data);
+    return workflowsRepository.update(id, {
+      ...data,
+      ...(data.approval_mode !== undefined
+        ? { approval_mode: normalizeWorkflowApprovalMode(data.approval_mode) }
+        : {}),
+    });
   }
 
   async deleteWorkflow(id: number, tenantId: number) {

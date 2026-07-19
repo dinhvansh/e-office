@@ -154,15 +154,9 @@ class DocumentWorkflowOrchestratorService {
       throw ApiError.badRequest("Approval flow requires a linked document", "DOCUMENT_REQUIRED");
     }
 
-    const draftSigners = await signersRepository.findBySignRequest(signRequestId);
-    for (const signer of draftSigners) {
-      await signersRepository.update(signer.id, { status: "waiting_approval" });
-    }
-
-    await signRequestsRepository.updateStatus(signRequestId, tenantId, "pending_approval");
-    await documentsRepository.update(documentId, { status: "pending_approval" });
-
     const { approvalsService } = await import("../approvals/approvals.service");
+    // Runtime creation owns the atomic transition of the document, linked sign
+    // request, draft signers, workflow instance, and approval rows.
     await approvalsService.submitForApproval(documentId, workflowId, tenantId, userId);
   }
 
@@ -484,6 +478,7 @@ class DocumentWorkflowOrchestratorService {
         is_template: false,
         created_for_doc: documentId,
         based_on_template: templateId,
+        approval_mode: template.approval_mode,
         created_by: userId,
         is_active: true,
       },
@@ -547,6 +542,7 @@ class DocumentWorkflowOrchestratorService {
         is_template: false,
         created_for_doc: documentId,
         based_on_template: template.is_template ? template.id : template.based_on_template || template.id,
+        approval_mode: template.approval_mode,
         created_by: userId,
         is_active: true,
       },

@@ -515,10 +515,13 @@ class SignRequestsService {
     let externalSignersReminded = 0;
 
     if (signRequest.document_id) {
-      const document = await prisma.documents.findUnique({
+      const loadedDocument = await prisma.documents.findUnique({
         where: { id: signRequest.document_id },
         include: {
-          workflow_instance: {
+          workflow_instances: {
+            where: { status: 'in_progress' },
+            orderBy: { run_number: 'desc' },
+            take: 1,
             include: {
               workflow: true,
               current_step: true,
@@ -530,11 +533,14 @@ class SignRequestsService {
         },
       });
 
-      const currentStepId = document?.workflow_instance?.current_step_id || null;
+      const activeWorkflowInstance = loadedDocument?.workflow_instances[0] || null;
+      const document = loadedDocument ? { ...loadedDocument, workflow_instance: activeWorkflowInstance } : null;
+      const currentStepId = activeWorkflowInstance?.current_step_id || null;
       if (currentStepId) {
         const pendingApprovals = await prisma.document_approvals.findMany({
           where: {
             document_id: signRequest.document_id,
+            workflow_instance_id: activeWorkflowInstance!.id,
             workflow_step_id: currentStepId,
             action: "pending",
           },
@@ -685,12 +691,14 @@ class SignRequestsService {
       },
     });
 
-    await prisma.document_approvals.deleteMany({
-      where: { document_id: signRequest.document_id },
-    });
-
-    await prisma.workflow_instances.deleteMany({
-      where: { document_id: signRequest.document_id },
+    // Keep the historical runtime and its approval rows immutable. A new,
+    // numbered runtime is created by submitForApproval during this resubmission.
+    await prisma.workflow_instances.updateMany({
+      where: { document_id: signRequest.document_id, status: 'in_progress' },
+      data: {
+        status: signRequest.status === 'cancelled' ? 'cancelled' : 'rejected',
+        completed_at: new Date(),
+      },
     });
 
     const signers = await signersRepository.findBySignRequest(signRequestId);

@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import type { DbClient } from '../../config/prisma';
 import { isWorkflowAssigneeType, resolveAssigneeType } from '../workflows/workflowStepAssignment';
 
 export class ApprovalsRepository {
@@ -6,20 +7,27 @@ export class ApprovalsRepository {
   async createWorkflowInstance(data: {
     document_id: number;
     workflow_id: number;
-    current_step_id?: number;
+    current_step_id?: number | null;
     status?: string;
-  }) {
-    return prisma.workflow_instances.create({
+  }, db: DbClient = prisma) {
+    const latest = await db.workflow_instances.findFirst({
+      where: { document_id: data.document_id },
+      orderBy: { run_number: 'desc' },
+      select: { run_number: true },
+    });
+    return db.workflow_instances.create({
       data: {
         ...data,
+        run_number: (latest?.run_number || 0) + 1,
         status: data.status || 'in_progress',
       },
     });
   }
 
   async findWorkflowInstance(documentId: number) {
-    return prisma.workflow_instances.findUnique({
-      where: { document_id: documentId },
+    return prisma.workflow_instances.findFirst({
+      where: { document_id: documentId, status: 'in_progress' },
+      orderBy: { run_number: 'desc' },
       include: {
         workflow: {
           include: {
@@ -38,8 +46,10 @@ export class ApprovalsRepository {
     status?: string;
     completed_at?: Date;
   }) {
+    const instance = await this.findWorkflowInstance(documentId);
+    if (!instance) throw new Error('Active workflow instance not found');
     return prisma.workflow_instances.update({
-      where: { document_id: documentId },
+      where: { id: instance.id },
       data,
     });
   }
@@ -49,6 +59,7 @@ export class ApprovalsRepository {
     document_id: number;
     workflow_id: number;
     workflow_step_id: number;
+    workflow_instance_id: number;
     approver_user_id: number;
     due_date?: Date;
   }) {
@@ -64,13 +75,15 @@ export class ApprovalsRepository {
     document_id: number;
     workflow_id: number;
     workflow_step_id: number;
+    workflow_instance_id: number;
     approver_user_id: number;
     due_date?: Date;
-  }>) {
-    return prisma.document_approvals.createMany({
+    action?: string;
+  }>, db: DbClient = prisma) {
+    return db.document_approvals.createMany({
       data: approvals.map(a => ({
         ...a,
-        action: 'pending',
+        action: a.action || 'pending',
       })),
     });
   }
@@ -94,8 +107,10 @@ export class ApprovalsRepository {
       where: {
         approver_user_id: userId,
         action: 'pending', // Only pending, not waiting
+        workflow_instance: { status: 'in_progress' },
         document: {
           tenant_id: tenantId,
+          status: 'pending_approval',
         },
       },
       include: {
@@ -200,7 +215,12 @@ export class ApprovalsRepository {
     });
 
     if (assigneeType === 'specific_user' && (step.assignee_user_id || step.approver_id)) {
-      approverIds.push(step.assignee_user_id || step.approver_id);
+      const assignedUserId = step.assignee_user_id || step.approver_id;
+      const assignedUser = await prisma.users.findFirst({
+        where: { id: assignedUserId, tenant_id: tenantId, status: 'active' },
+        select: { id: true },
+      });
+      if (assignedUser) approverIds.push(assignedUser.id);
       return [...new Set(approverIds)];
     }
 
