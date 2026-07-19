@@ -38,7 +38,7 @@ export interface PaginatedResult<T> {
 
 export class DocumentsRepository {
   async listByTenant(tenantId: number, noSigningOnly = false, db: DbClient = prisma): Promise<documents[]> {
-    const whereClause: Prisma.documentsWhereInput = { tenant_id: tenantId };
+    const whereClause: Prisma.documentsWhereInput = { tenant_id: tenantId, status: { not: 'archived' } };
     
     if (noSigningOnly) {
       // Only documents whose document type doesn't require digital signing
@@ -67,7 +67,7 @@ export class DocumentsRepository {
     const limit = params.limit || 10;
     const skip = (page - 1) * limit;
 
-    const whereClause: Prisma.documentsWhereInput = { tenant_id: tenantId };
+    const whereClause: Prisma.documentsWhereInput = { tenant_id: tenantId, ...(status ? {} : { status: { not: 'archived' } }) };
     
     if (noSigningOnly) {
       // Only documents whose document type doesn't require digital signing

@@ -89,6 +89,10 @@ model documents {
   issued_date        DateTime?
   sign_request_id    Int?          @unique
   created_at         DateTime      @default(now())
+  archived_at        DateTime?
+  archived_by        Int?
+  archive_reason     String?
+  previous_status    String?
   tenant             tenants       @relation(fields: [tenant_id], references: [id])
   owner              users?        @relation("documents_owner", fields: [owner_id], references: [id])
   document_type      document_types? @relation(fields: [document_type_id], references: [id])
@@ -107,6 +111,7 @@ model documents {
 
   @@index([department_id])
   @@index([sign_request_id])
+  @@index([tenant_id, archived_at])
 }
 
 model sign_requests {
@@ -123,12 +128,18 @@ model sign_requests {
   cancelled_at        DateTime?  // Thời gian hủy
   cancelled_by        Int?       // User ID người hủy
   created_at          DateTime   @default(now())
+  archived_at         DateTime?
+  archived_by         Int?
+  archive_reason      String?
+  previous_status     String?
   tenant              tenants    @relation(fields: [tenant_id], references: [id])
   document            documents  @relation("document_all_sign_requests", fields: [document_id], references: [id])
   linked_document     documents? @relation("document_sign_request")
   signers             signers[]
   fields              sign_request_fields[]
   comments            sign_request_comments[]
+
+  @@index([tenant_id, archived_at])
 }
 
 model sign_request_comments {

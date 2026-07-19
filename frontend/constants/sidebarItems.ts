@@ -13,7 +13,8 @@ import {
   Workflow,
   CheckSquare,
   Briefcase,
-  LucideIcon
+  LucideIcon,
+  Archive
 } from "lucide-react";
 
 export interface SidebarItem {
@@ -155,5 +156,6 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
         requiredPermissions: ["webhooks:read"]
       },
     ]
-  }
+  },
+  { groupLabel: "Lưu trữ", items: [{ label: "Lưu trữ", href: "/archive", icon: Archive, caption: "Tài liệu đã lưu trữ", color: "text-slate-600", requiredPermissions: ["archive:view"] }] }
 ];

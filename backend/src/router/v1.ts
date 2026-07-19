@@ -19,6 +19,7 @@ import documentFlowRouter from "../modules/documentFlow/documentFlow.routes";
 import notificationsRouter from "../modules/notifications/notifications.routes";
 import settingsRouter from "../modules/settings/settings.routes";
 import { provisioningRouter } from "../modules/provisioning/provisioning.routes";
+import { archiveRouter } from "../modules/archive/archive.routes";
 
 export const v1Router = Router();
 
@@ -42,5 +43,6 @@ v1Router.use("/audit", auditRouter);
 v1Router.use("/webhooks", webhooksRouter);
 v1Router.use("/notifications", notificationsRouter);
 v1Router.use("/settings", settingsRouter);
+v1Router.use("/archive", archiveRouter);
 // Service-to-service only. This must remain behind network controls in deployment.
 v1Router.use("/internal/provisioning", provisioningRouter);

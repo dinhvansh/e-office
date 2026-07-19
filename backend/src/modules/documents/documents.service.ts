@@ -876,9 +876,14 @@ class DocumentsService {
 
   async deleteDocument(documentId: number, tenantId: number, userId?: number): Promise<void> {
     const document = await this.getDocument(documentId, tenantId);
+    const hasWorkflowHistory = !!document.sign_request_id || await prisma.workflow_instances.count({ where: { document_id: document.id } }) > 0 || await prisma.document_approvals.count({ where: { document_id: document.id } }) > 0;
+    if (hasWorkflowHistory) {
+      await documentLifecycleService.archive(document, userId || 0);
+      return;
+    }
     
     // ✅ Status check: Only allow delete for 'draft' or 'cancelled' status
-    if (!canHardDeleteDocumentStatus(document.status)) {
+    if (document.status !== 'draft' || !canHardDeleteDocumentStatus(document.status)) {
       throw ApiError.badRequest(
         `Không thể xóa tài liệu đang ở trạng thái "${document.status}". Chỉ có thể xóa tài liệu ở trạng thái "Nháp" hoặc "Đã hủy". Vui lòng hủy luồng ký/phê duyệt trước khi xóa.`,
         "DOCUMENT_DELETE_DENIED_STATUS"
@@ -1220,7 +1225,7 @@ class DocumentsService {
   }
 
   async archiveDocument(documentId: number, tenantId: number, userId: number): Promise<void> {
-    await documentLifecycleService.archive(await this.getDocument(documentId, tenantId, userId));
+    await documentLifecycleService.archive(await this.getDocument(documentId, tenantId, userId), userId);
   }
 
   async cancelDocument(documentId: number, tenantId: number, userId: number): Promise<void> {

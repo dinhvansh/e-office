@@ -4,7 +4,7 @@ import { DbClient, prisma } from "../../config/prisma";
 export class SignRequestsRepository {
   listByTenant(tenantId: number, db: DbClient = prisma) {
     return db.sign_requests.findMany({
-      where: { tenant_id: tenantId },
+      where: { tenant_id: tenantId, status: { not: "archived" } },
       include: { signers: true, document: true },
       orderBy: { created_at: "desc" },
     });

@@ -16,7 +16,7 @@ class SignRequestQueryService {
   }
 
   async getMySignRequests(userId: number, tenantId: number, status?: string, page = 1, limit = 10) {
-    const where: Prisma.sign_requestsWhereInput = { tenant_id: tenantId, document: { owner_id: userId } };
+    const where: Prisma.sign_requestsWhereInput = { tenant_id: tenantId, status: { not: "archived" }, document: { owner_id: userId, status: { not: "archived" } } };
     if (status === "pending") where.status = { in: ["pending_approval", "pending", "in_progress"] };
     else if (status) where.status = status;
     const total = await prisma.sign_requests.count({ where });

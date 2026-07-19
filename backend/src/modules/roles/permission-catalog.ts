@@ -26,6 +26,9 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
   { resource: "documents", action: "update", description: "Update documents" },
   { resource: "documents", action: "delete", description: "Delete documents" },
   { resource: "documents", action: "share", description: "Share documents" },
+  { resource: "archive", action: "view", description: "View archived documents and requests" },
+  { resource: "archive", action: "restore", description: "Restore archived documents and requests" },
+  { resource: "archive", action: "delete_permanently", description: "Permanently delete archived records" },
 
   { resource: "document_types", action: "create", description: "Create document types" },
   { resource: "document_types", action: "read", description: "View document types" },
