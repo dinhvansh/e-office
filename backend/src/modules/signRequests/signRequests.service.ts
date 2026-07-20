@@ -1520,25 +1520,15 @@ class SignRequestsService {
   }
 
   /**
-   * Delete sign request (draft only)
+   * Apply the linked document's delete/archive lifecycle policy.
    */
   async deleteSignRequest(id: number, tenantId: number, userId: number) {
     const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
     const document = await documentsRepository.findById(signRequest.document_id, tenantId);
-    if (!document || !["draft", "cancelled"].includes(document.status || "")) {
-      throw ApiError.badRequest("Không thể xóa khi tài liệu đang xử lý. Vui lòng hủy luồng ký trước, sau đó mới xóa tài liệu.", "SIGN_REQUEST_CANCEL_BEFORE_DELETE");
-    }
-    await signRequestLifecycleService.deleteDraft(signRequest, id);
+    if (!document) throw ApiError.notFound("Document not found", "DOCUMENT_NOT_FOUND");
+    await documentsService.deleteDocument(document.id, tenantId, userId);
 
-    // Audit log
-    await auditService.record({
-      tenantId,
-      documentId: signRequest.document_id,
-      event: 'sign.deleted',
-      userId,
-    });
-
-    return { deleted: true };
+    return { success: true };
   }
 
 }

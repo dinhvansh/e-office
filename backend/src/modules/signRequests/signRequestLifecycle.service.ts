@@ -4,7 +4,6 @@ import { documentsRepository } from "../documents/documents.repository";
 import { signersRepository } from "../signers/signers.repository";
 import { workflowStateService } from "../workflows/workflowState.service";
 import { signRequestsRepository } from "./signRequests.repository";
-import { isEditableSignRequestStatus } from "./signRequestFlow.policy";
 import { workflowCancellationService } from "../workflows/workflowCancellation.service";
 
 class SignRequestLifecycleService {
@@ -57,9 +56,13 @@ class SignRequestLifecycleService {
     return { status: "generating_artifact" };
   }
 
+  /**
+   * Legacy low-level helper retained for current service contracts. Production
+   * delete endpoints use DocumentsService so lifecycle history is checked first.
+   */
   async deleteDraft(signRequest: { status: string }, id: number) {
-    if (!isEditableSignRequestStatus(signRequest.status)) {
-      throw ApiError.badRequest("Chỉ có thể xóa văn bản ở trạng thái nháp", "SIGN_REQUEST_DELETE_DENIED");
+    if (signRequest.status !== "draft") {
+      throw ApiError.badRequest("Only draft sign requests can be hard deleted", "SIGN_REQUEST_DELETE_DENIED");
     }
     await prisma.sign_request_fields.deleteMany({ where: { sign_request_id: id } });
     await prisma.signers.deleteMany({ where: { sign_request_id: id } });

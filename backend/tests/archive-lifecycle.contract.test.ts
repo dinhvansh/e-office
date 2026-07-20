@@ -4,9 +4,11 @@ import path from "node:path";
 import test from "node:test";
 const root=path.resolve(__dirname,"..",".."); const read=(p:string)=>fs.readFileSync(path.join(root,p),"utf8");
 test("archive lifecycle preserves history, excludes operational queries, and restores to cancelled",()=>{
- const docs=read("src/modules/documents/documents.service.ts"), lifecycle=read("src/modules/documents/documentLifecycle.service.ts"), repo=read("src/modules/documents/documents.repository.ts"), signs=read("src/modules/signRequests/signRequests.repository.ts"), approvals=read("src/modules/approvals/approvals.repository.ts"), routes=read("src/modules/archive/archive.routes.ts");
- assert.match(docs,/hasWorkflowHistory/); assert.match(docs,/documentLifecycleService\.archive/);
+ const docs=read("src/modules/documents/documents.service.ts"), lifecycle=read("src/modules/documents/documentLifecycle.service.ts"), requests=read("src/modules/signRequests/signRequests.service.ts"), repo=read("src/modules/documents/documents.repository.ts"), signs=read("src/modules/signRequests/signRequests.repository.ts"), approvals=read("src/modules/approvals/approvals.repository.ts"), routes=read("src/modules/archive/archive.routes.ts");
+ assert.match(docs,/hasLifecycleHistory/); assert.match(docs,/getDocumentDeleteDisposition/); assert.match(docs,/documentLifecycleService\.archive/);
  assert.match(lifecycle,/status: "archived"/); assert.match(lifecycle,/DOCUMENT_ARCHIVED/); assert.match(lifecycle,/status: "cancelled"/); assert.match(lifecycle,/DOCUMENT_RESTORED/);
+ assert.match(lifecycle,/activeRunCount/); assert.match(lifecycle,/canArchiveDocumentStatus/); assert.doesNotMatch(lifecycle,/workflow_instances\.updateMany/);
+ assert.match(requests,/documentsService\.deleteDocument\(document\.id, tenantId, userId\)/);
  assert.match(repo,/status: \{ not: 'archived' \}/); assert.match(signs,/status: \{ not: "archived" \}/); assert.match(approvals,/status: 'pending_approval'/);
  assert.match(routes,/requirePermission\("archive", "view"\)/); assert.match(routes,/requirePermission\("archive", "restore"\)/); assert.doesNotMatch(routes,/delete_permanently/);
 });

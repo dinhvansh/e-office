@@ -13,7 +13,7 @@ import { prisma } from "../../config/prisma";
 import { CreateDocumentData, documentsRepository } from "./documents.repository";
 import { authorizationService } from "../authorization/authorization.service";
 import { documentQueriesService } from "./documentQueries.service";
-import { canHardDeleteDocumentStatus } from "./documentLifecycle.policy";
+import { getDocumentDeleteDisposition } from "./documentLifecycle.policy";
 import { documentWorkflowOrchestratorService } from "./documentWorkflowOrchestrator.service";
 import { permissionsService } from "./permissions.service";
 import {
@@ -876,35 +876,7 @@ class DocumentsService {
 
   async deleteDocument(documentId: number, tenantId: number, userId?: number): Promise<void> {
     const document = await this.getDocument(documentId, tenantId);
-    const hasWorkflowHistory = !!document.sign_request_id || await prisma.workflow_instances.count({ where: { document_id: document.id } }) > 0 || await prisma.document_approvals.count({ where: { document_id: document.id } }) > 0;
-    if (hasWorkflowHistory) {
-      await documentLifecycleService.archive(document, userId || 0);
-      return;
-    }
-    
-    // ✅ Status check: Only allow delete for 'draft' or 'cancelled' status
-    if (document.status !== 'draft' || !canHardDeleteDocumentStatus(document.status)) {
-      throw ApiError.badRequest(
-        `Không thể xóa tài liệu đang ở trạng thái "${document.status}". Chỉ có thể xóa tài liệu ở trạng thái "Nháp" hoặc "Đã hủy". Vui lòng hủy luồng ký/phê duyệt trước khi xóa.`,
-        "DOCUMENT_DELETE_DENIED_STATUS"
-      );
-    }
-    
-    // ✅ Check sign request status if exists
-    if (document.sign_request_id) {
-      const signRequest = await prisma.sign_requests.findUnique({
-        where: { id: document.sign_request_id },
-        include: { signers: true }
-      });
-      
-      if (signRequest && signRequest.status === 'pending') {
-        throw ApiError.badRequest(
-          "Tài liệu đang có luồng ký đang chờ xử lý. Vui lòng hủy luồng ký trước khi xóa tài liệu.",
-          "DOCUMENT_HAS_PENDING_SIGNATURES"
-        );
-      }
-    }
-    
+
     // Authorization check: owner/admin/explicit policy with deny precedence
     if (userId) {
       const decision = await authorizationService.canAccessDocument(userId, tenantId, documentId, "delete");
@@ -912,19 +884,63 @@ class DocumentsService {
         throw ApiError.forbidden("You can only delete allowed documents", "DOCUMENT_DELETE_DENIED");
       }
     }
+
+    const [workflowRunCount, approvalCount, submittedRequestCount, signingHistoryCount, submissionAuditCount] = await Promise.all([
+      prisma.workflow_instances.count({ where: { document_id: document.id } }),
+      prisma.document_approvals.count({ where: { document_id: document.id } }),
+      prisma.sign_requests.count({ where: { document_id: document.id, status: { not: "draft" } } }),
+      prisma.signers.count({
+        where: {
+          sign_request: { document_id: document.id },
+          OR: [
+            { signed_at: { not: null } },
+            { signature_data: { not: null } },
+            { status: { in: ["signed", "completed", "rejected", "cancelled"] } },
+          ],
+        },
+      }),
+      prisma.audit_logs.count({
+        where: {
+          document_id: document.id,
+          event: { in: ["sign.sent", "sign.submitted_for_approval", "sign.cancelled", "sign.internal_rejected"] },
+        },
+      }),
+    ]);
+    const hasLifecycleHistory = workflowRunCount + approvalCount + submittedRequestCount + signingHistoryCount + submissionAuditCount > 0;
+    const disposition = getDocumentDeleteDisposition(document.status, hasLifecycleHistory);
+
+    if (disposition === "archive") {
+      await documentLifecycleService.archive(document, userId || 0);
+      return;
+    }
+    if (disposition === "deny") {
+      throw ApiError.badRequest(
+        document.status === "draft" && hasLifecycleHistory
+          ? "Draft documents with workflow or signing history cannot be permanently deleted"
+          : "Active and completed documents cannot be deleted or archived",
+        document.status === "draft" && hasLifecycleHistory
+          ? "DOCUMENT_DRAFT_HAS_LIFECYCLE_HISTORY"
+          : "DOCUMENT_DELETE_DENIED_STATUS",
+      );
+    }
     
     // Database runtime records are deleted atomically. Files are intentionally
     // not removed here; storage cleanup must remain retryable/outside the DB transaction.
     await prisma.$transaction(async (tx) => {
       await tx.audit_logs.deleteMany({ where: { document_id: document.id } });
 
-      if (document.sign_request_id) {
+      const signRequests = await tx.sign_requests.findMany({
+        where: { document_id: document.id },
+        select: { id: true },
+      });
+      const signRequestIds = signRequests.map((request) => request.id);
+      if (signRequestIds.length > 0) {
         await tx.sign_request_field_values.deleteMany({
-          where: { field: { sign_request_id: document.sign_request_id } },
+          where: { field: { sign_request_id: { in: signRequestIds } } },
         });
-        await tx.sign_request_fields.deleteMany({ where: { sign_request_id: document.sign_request_id } });
-        await tx.signers.deleteMany({ where: { sign_request_id: document.sign_request_id } });
-        await tx.sign_requests.delete({ where: { id: document.sign_request_id } });
+        await tx.sign_request_fields.deleteMany({ where: { sign_request_id: { in: signRequestIds } } });
+        await tx.signers.deleteMany({ where: { sign_request_id: { in: signRequestIds } } });
+        await tx.sign_requests.deleteMany({ where: { id: { in: signRequestIds } } });
       }
 
       await tx.document_approvals.deleteMany({ where: { document_id: document.id } });

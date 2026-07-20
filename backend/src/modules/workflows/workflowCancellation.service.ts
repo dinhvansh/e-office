@@ -1,12 +1,14 @@
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../core/errors/api-error";
 
-class WorkflowCancellationService {
+export class WorkflowCancellationService {
+  constructor(private readonly database = prisma) {}
+
   async cancel(input: { documentId: number; tenantId: number; userId: number; reason?: string }): Promise<void> {
-    const document = await prisma.documents.findFirst({ where: { id: input.documentId, tenant_id: input.tenantId }, select: { id: true, status: true, sign_request_id: true } });
+    const document = await this.database.documents.findFirst({ where: { id: input.documentId, tenant_id: input.tenantId }, select: { id: true, status: true, sign_request_id: true } });
     if (!document) throw ApiError.notFound("Document not found", "DOCUMENT_NOT_FOUND");
     if (["archived", "cancelled", "completed"].includes(document.status || "")) throw ApiError.badRequest("Document cannot be cancelled", "DOCUMENT_CANCEL_DENIED");
-    await prisma.$transaction(async (tx) => {
+    await this.database.$transaction(async (tx) => {
       await tx.documents.update({ where: { id: document.id }, data: { status: "cancelled" } });
       if (document.sign_request_id) {
         await tx.sign_requests.update({ where: { id: document.sign_request_id }, data: { status: "cancelled", cancellation_reason: input.reason || "Cancelled", cancelled_at: new Date(), cancelled_by: input.userId } });

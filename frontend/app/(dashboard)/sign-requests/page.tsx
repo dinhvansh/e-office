@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
-import { PenTool, Eye, Search, Edit, Upload, GitBranch, MoreVertical, Trash2, XCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Archive, PenTool, Eye, Search, Edit, Upload, GitBranch, MoreVertical, Trash2, XCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,7 @@ import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import { useDestructiveConfirmation } from '@/components/providers/destructive-confirmation-provider';
 import { AsyncErrorState } from '@/components/ui/async-state';
+import { getSignRequestLifecycleActions } from '@/lib/document-lifecycle';
 
 interface SignRequest {
   id: number;
@@ -131,12 +132,11 @@ export default function SignRequestsPage() {
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: async ({ signRequestId, documentId }: { signRequestId: number; documentId: number }) => {
+    mutationFn: async ({ signRequestId }: { signRequestId: number; archive: boolean }) => {
       await fetchJson(`/sign-requests/${signRequestId}`, { method: 'DELETE' });
-      await fetchJson(`/documents/${documentId}`, { method: 'DELETE' });
     },
-    onSuccess: () => {
-      toast.success('Đã xóa văn bản thành công!');
+    onSuccess: (_data, variables) => {
+      toast.success(variables.archive ? 'Đã chuyển yêu cầu ký vào Lưu trữ.' : 'Đã xóa bản nháp thành công!');
       queryClient.invalidateQueries({ queryKey: ['my-sign-requests'] });
     },
     onError: (error: any) => {
@@ -164,14 +164,17 @@ export default function SignRequestsPage() {
 
   // Revoke mutation
   // Delete handler
-  const handleDelete = (signRequestId: number, documentId: number) => {
+  const handleDelete = (signRequestId: number, archive: boolean) => {
     confirmDestructive({
-      title: 'Xóa yêu cầu ký',
+      title: archive ? 'Lưu trữ yêu cầu ký' : 'Xóa yêu cầu ký',
       targetName: `Yêu cầu ký #${signRequestId}`,
-      description: 'Yêu cầu ký và văn bản liên quan sẽ bị xóa. Hành động này không thể hoàn tác.',
-      confirmLabel: 'Xóa yêu cầu ký',
-      errorMessage: 'Không thể xóa yêu cầu ký. Vui lòng thử lại.',
-    }, () => deleteMutation.mutateAsync({ signRequestId, documentId }));
+      description: archive
+        ? 'Yêu cầu ký đã kết thúc sẽ được chuyển vào Lưu trữ. Toàn bộ lịch sử và tài liệu ký được giữ nguyên.'
+        : 'Bản nháp chưa từng gửi sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.',
+      confirmLabel: archive ? 'Lưu trữ' : 'Xóa bản nháp',
+      errorMessage: archive ? 'Không thể lưu trữ yêu cầu ký.' : 'Không thể xóa bản nháp.',
+      destructive: !archive,
+    }, () => deleteMutation.mutateAsync({ signRequestId, archive }));
   };
 
   // Cancel handler - open dialog with reason input
@@ -461,7 +464,7 @@ export default function SignRequestsPage() {
                       <td className="px-2 py-3">
                         <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                           {/* Edit Workflow Button - Show for draft documents */}
-                          {(request.flow_state === 'DRAFT' || request.status === 'draft' || request.status === 'cancelled') && (
+                          {(getSignRequestLifecycleActions(request.status, request.flow_state).canDelete || getSignRequestLifecycleActions(request.status, request.flow_state).canArchive) && (
                             <Button
                               size="sm"
                               onClick={() => router.push(`/sign-requests/${request.id}/editor`)}
@@ -508,23 +511,25 @@ export default function SignRequestsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
-                              {/* Delete - Draft only */}
-                              {(request.flow_state === 'DRAFT' || request.status === 'draft' || request.status === 'cancelled') && ['draft', 'cancelled'].includes(request.document.status || '') && (
+                              {(getSignRequestLifecycleActions(request.status, request.flow_state).canDelete || getSignRequestLifecycleActions(request.status, request.flow_state).canArchive) && (
                                 <>
                                   <DropdownMenuItem
-                                    onClick={() => handleDelete(request.id, request.document.id)}
+                                    onClick={() => handleDelete(request.id, getSignRequestLifecycleActions(request.status, request.flow_state).canArchive)}
                                     disabled={deleteMutation.isPending}
-                                    className="text-red-600 focus:text-red-600"
+                                    className={getSignRequestLifecycleActions(request.status, request.flow_state).canArchive ? "text-orange-600 focus:text-orange-600" : "text-red-600 focus:text-red-600"}
                                   >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    {deleteMutation.isPending ? 'Đang xóa...' : 'Xóa văn bản'}
+                                    {getSignRequestLifecycleActions(request.status, request.flow_state).canArchive
+                                      ? <Archive className="w-4 h-4 mr-2" />
+                                      : <Trash2 className="w-4 h-4 mr-2" />}
+                                    {deleteMutation.isPending
+                                      ? 'Đang xử lý...'
+                                      : getSignRequestLifecycleActions(request.status, request.flow_state).canArchive ? 'Lưu trữ' : 'Xóa bản nháp'}
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                 </>
                               )}
 
-                              {/* Cancel - Pending/In Progress only */}
-                              {(request.flow_state === 'AWAITING_SIGNATURES' || request.status === 'pending' || request.status === 'in_progress') && (
+                              {getSignRequestLifecycleActions(request.status, request.flow_state).canCancel && (
                                 <>
                                   <DropdownMenuItem
                                     onClick={() => handleCancel(request.id)}
@@ -539,7 +544,7 @@ export default function SignRequestsPage() {
                               )}
 
                               {/* External Signer Actions */}
-                              {request.signers.some(s => !s.is_internal) && !['cancelled', 'completed'].includes(request.status) && (
+                              {request.signers.some(s => !s.is_internal) && (getSignRequestLifecycleActions(request.status, request.flow_state).canDelete || getSignRequestLifecycleActions(request.status, request.flow_state).canCancel) && (
                                 <>
                                   <DropdownMenuItem
                                     onClick={() => handleCopySigningLink(request)}
@@ -690,7 +695,7 @@ export default function SignRequestsPage() {
                   </div>
 
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    {(request.flow_state === 'DRAFT' || request.status === 'draft' || request.status === 'cancelled') && (
+                    {(getSignRequestLifecycleActions(request.status, request.flow_state).canDelete || getSignRequestLifecycleActions(request.status, request.flow_state).canArchive) && (
                       <Button size="sm" onClick={() => router.push(`/sign-requests/${request.id}/editor`)} className="flex-1 bg-blue-600 text-white text-xs h-8">
                         <Edit className="w-3.5 h-3.5 mr-1" />Chỉnh sửa
                       </Button>
@@ -710,17 +715,23 @@ export default function SignRequestsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
-                        {(request.flow_state === 'DRAFT' || request.status === 'draft' || request.status === 'cancelled') && (
-                          <DropdownMenuItem onClick={() => handleDelete(request.id, request.document.id)} className="text-red-600">
-                            <Trash2 className="w-4 h-4 mr-2" />Xóa
+                        {(getSignRequestLifecycleActions(request.status, request.flow_state).canDelete || getSignRequestLifecycleActions(request.status, request.flow_state).canArchive) && (
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(request.id, getSignRequestLifecycleActions(request.status, request.flow_state).canArchive)}
+                            className={getSignRequestLifecycleActions(request.status, request.flow_state).canArchive ? "text-orange-600" : "text-red-600"}
+                          >
+                            {getSignRequestLifecycleActions(request.status, request.flow_state).canArchive
+                              ? <Archive className="w-4 h-4 mr-2" />
+                              : <Trash2 className="w-4 h-4 mr-2" />}
+                            {getSignRequestLifecycleActions(request.status, request.flow_state).canArchive ? 'Lưu trữ' : 'Xóa'}
                           </DropdownMenuItem>
                         )}
-                        {(request.flow_state === 'AWAITING_SIGNATURES' || request.status === 'pending' || request.status === 'in_progress') && (
+                        {getSignRequestLifecycleActions(request.status, request.flow_state).canCancel && (
                           <DropdownMenuItem onClick={() => handleCancel(request.id)} className="text-orange-600">
                             <XCircle className="w-4 h-4 mr-2" />Hủy
                           </DropdownMenuItem>
                         )}
-                        {request.signers.some(s => !s.is_internal) && (
+                        {request.signers.some(s => !s.is_internal) && (getSignRequestLifecycleActions(request.status, request.flow_state).canDelete || getSignRequestLifecycleActions(request.status, request.flow_state).canCancel) && (
                           <>
                             <DropdownMenuItem onClick={() => handleCopySigningLink(request)}>📋 Copy link</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleResendEmail(request.id)}>📧 Gửi lại</DropdownMenuItem>

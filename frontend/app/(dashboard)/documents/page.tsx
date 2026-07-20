@@ -30,6 +30,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreVertical } from "lucide-react";
 import { useDestructiveConfirmation } from "@/components/providers/destructive-confirmation-provider";
 import { AsyncErrorState } from "@/components/ui/async-state";
+import { getDocumentLifecycleActions } from "@/lib/document-lifecycle";
 
 const documentStatusMeta: Record<string, { label: string; variant: "success" | "pending" | "warning" | "danger" | "info" | "default" }> = {
   draft: { label: "Nháp", variant: "default" },
@@ -58,7 +59,6 @@ export default function DocumentsPage() {
   const canCreateDocuments = hasPermission("documents:create");
   const canUpdateDocuments = hasPermission("documents:update");
   const canDeleteDocuments = hasPermission("documents:delete");
-  const canUpdateSignRequests = hasPermission("sign_requests:update");
   const confirmDestructive = useDestructiveConfirmation();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
@@ -474,59 +474,17 @@ export default function DocumentsPage() {
     }
   };
 
-  // Cancel sign request state
-  const [cancelDialog, setCancelDialog] = useState<{ open: boolean; signRequestId: number | null; reason: string }>({
-    open: false,
-    signRequestId: null,
-    reason: '',
-  });
-
-  const cancelSignRequestMutation = useMutation({
-    mutationFn: async ({ signRequestId, reason }: { signRequestId: number; reason: string }) => {
-      await fetchJson(`/sign-requests/${signRequestId}/cancel`, {
-        method: "POST",
-        body: JSON.stringify({ reason }),
-      });
-    },
-    onSuccess: () => {
-      toast.success("Đã hủy luồng ký! Email thông báo đã được gửi đến tất cả người ký.");
-      setCancelDialog({ open: false, signRequestId: null, reason: '' });
-      queryClient.invalidateQueries({ queryKey: ["documents"] });
-    },
-    onError: (error: any) => {
-      const message = typeof error === 'string' ? error : error?.message || 'Có lỗi xảy ra';
-      toast.error(`Lỗi: ${message}`);
-    },
-  });
-
-  const handleCancelSignRequest = (signRequestId: number) => {
-    if (!canUpdateSignRequests) {
-      toast.error("Bạn không có quyền hủy luồng ký");
-      return;
-    }
-    setCancelDialog({ open: true, signRequestId, reason: '' });
-  };
-
-  const confirmCancelSignRequest = () => {
-    if (cancelDialog.signRequestId) {
-      cancelSignRequestMutation.mutate({
-        signRequestId: cancelDialog.signRequestId,
-        reason: cancelDialog.reason || 'Không có lý do',
-      });
-    }
-  };
-
   // Archive document mutation
   const archiveDocumentMutation = useMutation({
     mutationFn: async (documentId: number) => {
       await fetchJson(`/documents/${documentId}/archive`, { method: 'POST' });
     },
     onSuccess: () => {
-      toast.success('Đã thanh lý tài liệu');
+      toast.success('Đã chuyển tài liệu vào Lưu trữ');
       queryClient.invalidateQueries({ queryKey: ['documents'] });
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Không thể thanh lý');
+      toast.error(error?.message || 'Không thể lưu trữ');
     },
   });
 
@@ -550,11 +508,12 @@ export default function DocumentsPage() {
       return;
     }
     confirmDestructive({
-      title: 'Thanh lý tài liệu',
+      title: 'Lưu trữ tài liệu',
       targetName: `Tài liệu #${documentId}`,
-      description: 'Tài liệu sẽ được chuyển sang trạng thái thanh lý và không còn trong danh sách đang hoạt động.',
-      confirmLabel: 'Thanh lý tài liệu',
-      errorMessage: 'Không thể thanh lý tài liệu. Vui lòng thử lại.',
+      description: 'Tài liệu đã bị từ chối hoặc hủy sẽ được chuyển vào Lưu trữ. Toàn bộ lịch sử được giữ nguyên.',
+      confirmLabel: 'Lưu trữ',
+      errorMessage: 'Không thể lưu trữ tài liệu. Vui lòng thử lại.',
+      destructive: false,
     }, () => archiveDocumentMutation.mutateAsync(documentId));
   };
 
@@ -1030,8 +989,7 @@ export default function DocumentsPage() {
                               </Button>
                             )}
                             
-                            {/* Delete button - always show for draft */}
-                            {canDeleteDocuments && doc.status === "draft" && (
+                            {canDeleteDocuments && getDocumentLifecycleActions(doc.status).canDelete && (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -1043,46 +1001,29 @@ export default function DocumentsPage() {
                               </Button>
                             )}
                             
-                            {/* Other action buttons only for non-archived/cancelled */}
-                            {doc.status !== 'archived' && doc.status !== 'cancelled' && doc.status !== 'draft' && (
-                              <>
-                                {canUpdateSignRequests && (doc.status === "pending_approval" || doc.status === "pending_signature") && doc.sign_request_id && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 px-2 text-xs hover:bg-red-50 hover:text-red-600 whitespace-nowrap"
-                                    onClick={() => handleCancelSignRequest(doc.sign_request_id!)}
-                                    title="Hủy luồng ký"
-                                  >
-                                    ❌ Hủy
-                                  </Button>
-                                )}
-                                {/* Archive tab actions - only for completed */}
-                                {canUpdateDocuments && doc.status === 'completed' && (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2 text-xs hover:bg-orange-50 whitespace-nowrap"
-                                      onClick={() => handleArchiveDocument(doc.id)}
-                                      title="Thanh lý"
-                                    >
-                                      <Archive className="w-3 h-3 text-orange-600 mr-1" />
-                                      Thanh lý
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2 text-xs hover:bg-red-50 whitespace-nowrap"
-                                      onClick={() => handleCancelDocument(doc.id)}
-                                      title="Hủy tài liệu"
-                                    >
-                                      <XCircle className="w-3 h-3 text-red-600 mr-1" />
-                                      Hủy
-                                    </Button>
-                                  </>
-                                )}
-                              </>
+                            {canUpdateDocuments && getDocumentLifecycleActions(doc.status).canArchive && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs hover:bg-orange-50 whitespace-nowrap"
+                                onClick={() => handleArchiveDocument(doc.id)}
+                                title="Lưu trữ"
+                              >
+                                <Archive className="w-3 h-3 text-orange-600 mr-1" />
+                                Lưu trữ
+                              </Button>
+                            )}
+                            {canUpdateDocuments && getDocumentLifecycleActions(doc.status).canCancel && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs hover:bg-red-50 whitespace-nowrap"
+                                onClick={() => handleCancelDocument(doc.id)}
+                                title="Hủy tài liệu"
+                              >
+                                <XCircle className="w-3 h-3 text-red-600 mr-1" />
+                                Hủy
+                              </Button>
                             )}
                           </div>
                         </td>
@@ -1212,18 +1153,19 @@ export default function DocumentsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {doc.status !== 'archived' && doc.status !== 'cancelled' && doc.status !== 'draft' && (
-                          <>
-                            {canUpdateSignRequests && (doc.status === "pending_approval" || doc.status === "pending_signature") && doc.sign_request_id && (
-                              <DropdownMenuItem onClick={() => handleCancelSignRequest(doc.sign_request_id!)} className="text-red-600">
-                                <XCircle className="w-4 h-4 mr-2" />Hủy luồng ký
-                              </DropdownMenuItem>
-                            )}
-                          </>
+                        {canUpdateDocuments && getDocumentLifecycleActions(doc.status).canCancel && (
+                          <DropdownMenuItem onClick={() => handleCancelDocument(doc.id)} className="text-red-600">
+                            <XCircle className="w-4 h-4 mr-2" />Hủy
+                          </DropdownMenuItem>
                         )}
-                        {canDeleteDocuments && doc.status === 'draft' && (
+                        {canDeleteDocuments && getDocumentLifecycleActions(doc.status).canDelete && (
                           <DropdownMenuItem onClick={() => handleDelete(doc.id)} className="text-red-600">
                             <Trash2 className="w-4 h-4 mr-2" />Xóa
+                          </DropdownMenuItem>
+                        )}
+                        {canUpdateDocuments && getDocumentLifecycleActions(doc.status).canArchive && (
+                          <DropdownMenuItem onClick={() => handleArchiveDocument(doc.id)} className="text-orange-600">
+                            <Archive className="w-4 h-4 mr-2" />Lưu trữ
                           </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
@@ -1369,56 +1311,6 @@ export default function DocumentsPage() {
         }}
       />
 
-      {/* Cancel Sign Request Dialog */}
-      {cancelDialog.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
-                  <span className="text-xl">❌</span>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">Hủy luồng ký</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Email thông báo sẽ được gửi đến tất cả người ký
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cancel-reason">
-                  Lý do hủy <span className="text-muted-foreground">(tùy chọn)</span>
-                </Label>
-                <textarea
-                  id="cancel-reason"
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="VD: Tài liệu cần chỉnh sửa lại nội dung..."
-                  value={cancelDialog.reason}
-                  onChange={(e) => setCancelDialog({ ...cancelDialog, reason: e.target.value })}
-                />
-              </div>
-
-              <div className="flex gap-2 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setCancelDialog({ open: false, signRequestId: null, reason: '' })}
-                  disabled={cancelSignRequestMutation.isPending}
-                >
-                  Đóng
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={confirmCancelSignRequest}
-                  disabled={cancelSignRequestMutation.isPending}
-                >
-                  {cancelSignRequestMutation.isPending ? "Đang hủy..." : "Xác nhận hủy"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
