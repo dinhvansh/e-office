@@ -1,15 +1,88 @@
 "use client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Archive, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/providers/auth-provider";
+import { useI18n } from "@/components/providers/i18n-provider";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DestructiveConfirmationDialog } from "@/components/ui/destructive-confirmation-dialog";
+import { formatDateTime } from "@/lib/locale-format";
+import { getDocumentStatusMeta } from "@/lib/status-localization";
 
-type Item={id:number;title:string|null;document_number:string|null;previous_status:string|null;archived_at:string|null;archived_by:number|null;sign_request?:{id:number}|null};
-export default function ArchivePage(){const{fetchJson,hasPermission}=useAuth();const qc=useQueryClient();const[s,setS]=useState("");const[selected,setSelected]=useState<Item|null>(null);const q=useQuery({queryKey:["archive",s],enabled:hasPermission("archive:view"),queryFn:()=>fetchJson<{documents:Item[]}>(`/archive/documents${s?`?search=${encodeURIComponent(s)}`:""}`)});const m=useMutation({mutationFn:(id:number)=>fetchJson(`/archive/documents/${id}/restore`,{method:"POST"}),onSuccess:()=>{toast.success("Đã khôi phục về Đã hủy");qc.invalidateQueries({queryKey:["archive"]});setSelected(null)},onError:()=>toast.error("Không thể khôi phục tài liệu")});return <div className="space-y-6"><PageHeader icon={Archive} title="Lưu trữ" description="Tài liệu đã lưu trữ"/><Card><CardContent className="space-y-4 p-4"><Input value={s} onChange={e=>setS(e.target.value)} placeholder="Tìm tài liệu"/>{!q.data?.documents.length?<EmptyState icon={Archive} title="Archive trống" description="Không có tài liệu lưu trữ."/>:q.data.documents.map(d=><div className="flex justify-between rounded border p-3" key={d.id}><div><b>{d.document_number||`#${d.id}`} · {d.title||"Không tiêu đề"}</b><p className="text-sm text-slate-500">Trước: {d.previous_status||"—"} · {d.archived_at?new Date(d.archived_at).toLocaleString("vi-VN"):"—"} · Request {d.sign_request?.id||"—"}</p></div>{hasPermission("archive:restore")&&<Button variant="outline" disabled={m.isPending} onClick={()=>setSelected(d)}><RotateCcw className="mr-2 h-4 w-4"/>Khôi phục</Button>}</div>)}</CardContent></Card><DestructiveConfirmationDialog open={!!selected} onOpenChange={v=>!v&&setSelected(null)} title="Khôi phục tài liệu" targetName={selected?.title||"tài liệu"} description="Tài liệu sẽ trở về trạng thái Đã hủy. Các workflow, approval và phiên ký cũ không được kích hoạt lại." confirmLabel="Khôi phục" destructive={false} onConfirm={()=>m.mutateAsync(selected!.id)}/></div>}
+type Item = {
+  id: number;
+  title: string | null;
+  document_number: string | null;
+  previous_status: string | null;
+  archived_at: string | null;
+  archived_by: number | null;
+  sign_request?: { id: number } | null;
+};
+
+export default function ArchivePage() {
+  const { fetchJson, hasPermission } = useAuth();
+  const { locale, t } = useI18n();
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Item | null>(null);
+  const archiveQuery = useQuery({
+    queryKey: ["archive", search],
+    enabled: hasPermission("archive:view"),
+    queryFn: () => fetchJson<{ documents: Item[] }>(`/archive/documents${search ? `?search=${encodeURIComponent(search)}` : ""}`),
+  });
+  const restoreMutation = useMutation({
+    mutationFn: (id: number) => fetchJson(`/archive/documents/${id}/restore`, { method: "POST" }),
+    onSuccess: () => {
+      toast.success(t("archive.restore.success"));
+      queryClient.invalidateQueries({ queryKey: ["archive"] });
+      setSelected(null);
+    },
+    onError: () => toast.error(t("archive.restore.error")),
+  });
+
+  return (
+    <div className="space-y-6">
+      <PageHeader icon={Archive} title={t("archive.title")} description={t("archive.description")} />
+      <Card>
+        <CardContent className="space-y-4 p-4">
+          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("archive.searchPlaceholder")} />
+          {!archiveQuery.data?.documents.length ? (
+            <EmptyState icon={Archive} title={t("archive.emptyTitle")} description={t("archive.emptyDescription")} />
+          ) : archiveQuery.data.documents.map((document) => (
+            <div className="flex justify-between rounded border p-3" key={document.id}>
+              <div>
+                <b>{document.document_number || `#${document.id}`} · {document.title || t("common.untitled")}</b>
+                <p className="text-sm text-slate-500">
+                  {t("archive.previousStatus")}: {getDocumentStatusMeta(document.previous_status, t).label}
+                  {" · "}{t("archive.archivedAt")}: {document.archived_at ? formatDateTime(document.archived_at, locale) : "—"}
+                  {" · "}{t("archive.request")}: {document.sign_request?.id || "—"}
+                </p>
+              </div>
+              {hasPermission("archive:restore") && (
+                <Button variant="outline" disabled={restoreMutation.isPending} onClick={() => setSelected(document)}>
+                  <RotateCcw className="mr-2 h-4 w-4" />{t("common.restore")}
+                </Button>
+              )}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+      <DestructiveConfirmationDialog
+        open={!!selected}
+        onOpenChange={(open) => !open && setSelected(null)}
+        title={t("archive.restore.title")}
+        targetName={selected?.title || t("archive.restore.target")}
+        description={t("archive.restore.description")}
+        confirmLabel={t("common.restore")}
+        destructive={false}
+        onConfirm={() => restoreMutation.mutateAsync(selected!.id)}
+      />
+    </div>
+  );
+}

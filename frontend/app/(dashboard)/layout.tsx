@@ -12,6 +12,8 @@ import { ChevronLeft, ChevronRight, Settings, LogOut, User, FileSignature, Uploa
 import { LoadingBar } from "@/components/ui/loading-bar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { MobileBottomNav } from "@/components/ui/mobile-nav";
+import { useI18n } from "@/components/providers/i18n-provider";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +25,7 @@ import {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { tokens, user, tenant, logout, isLoading, permissions } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -38,7 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [isLoading, router, tokens]);
 
   if (isLoading) {
-    return <div className="flex h-screen items-center justify-center text-slate-500">Đang tải workspace...</div>;
+    return <div className="flex h-screen items-center justify-center text-slate-500">{t("navigation.loadingWorkspace")}</div>;
   }
 
   if (!tokens) {
@@ -73,9 +76,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Toggle Button - Desktop only */}
           <button 
             onClick={() => setIsCollapsed(!isCollapsed)}
-            aria-label={isCollapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"}
+            aria-label={isCollapsed ? t("navigation.expand") : t("navigation.collapse")}
             className="hidden md:block absolute -right-3 top-6 bg-white border border-slate-200 rounded-full p-1.5 shadow-md hover:shadow-lg hover:bg-slate-50 text-slate-600 transition-all duration-200 z-50"
-            title={isCollapsed ? "Mở rộng" : "Thu gọn"}
+            title={isCollapsed ? t("navigation.expand") : t("navigation.collapse")}
           >
             {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
           </button>
@@ -83,7 +86,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Close Button - Mobile only */}
           <button 
             onClick={() => setIsMobileMenuOpen(false)}
-            aria-label="Đóng menu điều hướng"
+            aria-label={t("navigation.close")}
             className="md:hidden absolute right-4 top-4 p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
             <X className="w-5 h-5 text-slate-600" />
@@ -112,7 +115,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {!isCollapsed ? (
                   <h3 className="px-4 mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                     <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                    {group.groupLabel}
+                    {t(group.groupLabelKey)}
                   </h3>
                 ) : (
                   <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mx-2 mb-3 mt-1" />
@@ -126,7 +129,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <Link
                         key={item.href}
                         href={item.href}
-                        title={isCollapsed ? item.label : ""}
+                        title={isCollapsed ? t(item.labelKey) : ""}
                         className={cn(
                           "group rounded-lg text-sm transition-all duration-200 flex relative",
                           isCollapsed 
@@ -152,9 +155,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         
                         {!isCollapsed && (
                           <div className="flex-1 min-w-0">
-                            <p className={cn("font-semibold leading-tight", active ? "text-white" : "text-slate-900 group-hover:text-blue-600")}>{item.label}</p>
-                            {item.caption && (
-                              <p className={cn("text-[11px] truncate mt-0.5", active ? "text-blue-100" : "text-slate-500 group-hover:text-slate-600")}>{item.caption}</p>
+                            <p className={cn("font-semibold leading-tight", active ? "text-white" : "text-slate-900 group-hover:text-blue-600")}>{t(item.labelKey)}</p>
+                            {item.captionKey && (
+                              <p className={cn("text-[11px] truncate mt-0.5", active ? "text-blue-100" : "text-slate-500 group-hover:text-slate-600")}>{t(item.captionKey)}</p>
                             )}
                           </div>
                         )}
@@ -162,9 +165,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         {/* Tooltip when collapsed */}
                         {isCollapsed && (
                           <div className="absolute left-full ml-3 bg-slate-900 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none shadow-xl">
-                            <div className="font-semibold">{item.label}</div>
-                            {item.caption && (
-                              <div className="text-slate-300 text-[10px] mt-0.5">{item.caption}</div>
+                            <div className="font-semibold">{t(item.labelKey)}</div>
+                            {item.captionKey && (
+                              <div className="text-slate-300 text-[10px] mt-0.5">{t(item.captionKey)}</div>
                             )}
                             {/* Arrow */}
                             <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-slate-900" />
@@ -184,7 +187,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Mobile Hamburger Menu */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              aria-label="Mở menu điều hướng"
+              aria-label={t("navigation.open")}
               className="md:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <Menu className="w-5 h-5 text-slate-600" />
@@ -216,26 +219,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <LanguageSwitcher />
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/profile')}>
                     <User className="mr-2 h-4 w-4" />
-                    <span>Thông tin cá nhân</span>
+                    <span>{t("common.user.profile")}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/profile?tab=avatar')}>
                     <Upload className="mr-2 h-4 w-4" />
-                    <span>Upload Avatar</span>
+                    <span>{t("common.user.avatar")}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/profile?tab=signature')}>
                     <FileSignature className="mr-2 h-4 w-4" />
-                    <span>Cài đặt chữ ký</span>
+                    <span>{t("common.user.signature")}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/settings/tenant')}>
                     <Settings className="mr-2 h-4 w-4" />
-                    <span>Cài đặt</span>
+                    <span>{t("common.user.settings")}</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-600 focus:text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />
-                    <span>Đăng xuất</span>
+                    <span>{t("common.user.logout")}</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

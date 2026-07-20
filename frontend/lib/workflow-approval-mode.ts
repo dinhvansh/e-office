@@ -1,22 +1,24 @@
+import type { TranslationKey } from '@/i18n';
+
 export const APPROVAL_MODES = ['sequential', 'parallel'] as const;
 
 export type ApprovalMode = (typeof APPROVAL_MODES)[number];
 
 export const DEFAULT_APPROVAL_MODE: ApprovalMode = 'sequential';
 
-export const approvalModeContent: Record<
+export const approvalModeTranslationKeys: Record<
   ApprovalMode,
-  { label: string; description: string; previewHint: string }
+  { label: TranslationKey; description: TranslationKey; previewHint: TranslationKey }
 > = {
   sequential: {
-    label: 'Duyệt tuần tự',
-    description: 'Người duyệt xử lý lần lượt theo thứ tự từng bước.',
-    previewHint: 'Các bước được kích hoạt lần lượt theo thứ tự.',
+    label: 'workflow.approvalMode.sequential',
+    description: 'workflow.approvalMode.sequentialDescription',
+    previewHint: 'workflow.approvalMode.sequentialPreview',
   },
   parallel: {
-    label: 'Duyệt song song',
-    description: 'Tất cả người duyệt được yêu cầu xử lý cùng lúc. Workflow chỉ tiếp tục khi tất cả đã duyệt.',
-    previewHint: 'Tất cả bước duyệt được kích hoạt đồng thời.',
+    label: 'workflow.approvalMode.parallel',
+    description: 'workflow.approvalMode.parallelDescription',
+    previewHint: 'workflow.approvalMode.parallelPreview',
   },
 };
 

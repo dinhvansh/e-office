@@ -19,11 +19,12 @@ import { Switch } from '@/components/ui/switch';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  approvalModeContent,
+  approvalModeTranslationKeys,
   DEFAULT_APPROVAL_MODE,
   normalizeApprovalMode,
   type ApprovalMode,
 } from '@/lib/workflow-approval-mode';
+import { useI18n } from '@/components/providers/i18n-provider';
 
 interface WorkflowStep {
   id: number;
@@ -85,6 +86,7 @@ const DEFAULT_STEP_FORM_DATA: StepFormData = {
 
 export default function WorkflowsPage() {
   const { fetchJson, user, permissions } = useAuth();
+  const { t } = useI18n();
   const canCreateWorkflows = user?.role === 'super_admin' || permissions.includes('workflows:create');
   const queryClient = useQueryClient();
   
@@ -834,7 +836,7 @@ export default function WorkflowsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="workflow-approval-mode">Chế độ duyệt</Label>
+              <Label htmlFor="workflow-approval-mode">{t("workflow.approvalMode.label")}</Label>
               <Select
                 value={workflowFormData.approval_mode}
                 onValueChange={(value) =>
@@ -844,28 +846,28 @@ export default function WorkflowsPage() {
                   })
                 }
               >
-                <SelectTrigger id="workflow-approval-mode" aria-label="Chế độ duyệt">
+                <SelectTrigger id="workflow-approval-mode" aria-label={t("workflow.approvalMode.label")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sequential">{approvalModeContent.sequential.label}</SelectItem>
-                  <SelectItem value="parallel">{approvalModeContent.parallel.label}</SelectItem>
+                  <SelectItem value="sequential">{t(approvalModeTranslationKeys.sequential.label)}</SelectItem>
+                  <SelectItem value="parallel">{t(approvalModeTranslationKeys.parallel.label)}</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground">
-                {approvalModeContent[workflowFormData.approval_mode].description}
+                {t(approvalModeTranslationKeys[workflowFormData.approval_mode].description)}
               </p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsWorkflowDialogOpen(false)}>
-              Hủy
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() => saveWorkflowMutation.mutate()}
               disabled={!workflowFormData.name.trim() || saveWorkflowMutation.isPending}
             >
-              {saveWorkflowMutation.isPending ? 'Đang lưu...' : 'Lưu'}
+              {saveWorkflowMutation.isPending ? t("common.saving") : t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>

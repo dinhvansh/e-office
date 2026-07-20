@@ -23,6 +23,8 @@ import { toast } from 'sonner';
 import { useDestructiveConfirmation } from '@/components/providers/destructive-confirmation-provider';
 import { AsyncErrorState } from '@/components/ui/async-state';
 import { getSignRequestLifecycleActions } from '@/lib/document-lifecycle';
+import { useI18n } from '@/components/providers/i18n-provider';
+import { getSignRequestStatusMeta } from '@/lib/status-localization';
 
 interface SignRequest {
   id: number;
@@ -63,6 +65,7 @@ interface SignRequest {
 }
 
 export default function SignRequestsPage() {
+  const { t } = useI18n();
   const { fetchJson, user } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -136,11 +139,13 @@ export default function SignRequestsPage() {
       await fetchJson(`/sign-requests/${signRequestId}`, { method: 'DELETE' });
     },
     onSuccess: (_data, variables) => {
-      toast.success(variables.archive ? 'Đã chuyển yêu cầu ký vào Lưu trữ.' : 'Đã xóa bản nháp thành công!');
+      toast.success(variables.archive
+        ? t("signRequests.lifecycle.archiveSuccess")
+        : t("signRequests.lifecycle.deleteSuccess"));
       queryClient.invalidateQueries({ queryKey: ['my-sign-requests'] });
     },
     onError: (error: any) => {
-      toast.error('Lỗi: ' + (error.message || 'Không thể xóa văn bản'));
+      toast.error(error.message || t("signRequests.lifecycle.deleteError"));
     },
   });
 
@@ -153,12 +158,12 @@ export default function SignRequestsPage() {
       });
     },
     onSuccess: () => {
-      toast.success('Đã hủy luồng ký! Email thông báo đã được gửi đến tất cả người ký.');
+      toast.success(t("signRequests.lifecycle.cancelSuccess"));
       setCancelDialog({ open: false, signRequestId: null, reason: '' });
       queryClient.invalidateQueries({ queryKey: ['my-sign-requests'] });
     },
     onError: (error: any) => {
-      toast.error('Lỗi: ' + (error.message || 'Không thể hủy luồng ký'));
+      toast.error(error.message || t("signRequests.lifecycle.cancelError"));
     },
   });
 
@@ -166,13 +171,13 @@ export default function SignRequestsPage() {
   // Delete handler
   const handleDelete = (signRequestId: number, archive: boolean) => {
     confirmDestructive({
-      title: archive ? 'Lưu trữ yêu cầu ký' : 'Xóa yêu cầu ký',
-      targetName: `Yêu cầu ký #${signRequestId}`,
+      title: archive ? t("signRequests.lifecycle.archiveTitle") : t("signRequests.lifecycle.deleteTitle"),
+      targetName: t("signRequests.lifecycle.requestTarget", { id: signRequestId }),
       description: archive
-        ? 'Yêu cầu ký đã kết thúc sẽ được chuyển vào Lưu trữ. Toàn bộ lịch sử và tài liệu ký được giữ nguyên.'
-        : 'Bản nháp chưa từng gửi sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.',
-      confirmLabel: archive ? 'Lưu trữ' : 'Xóa bản nháp',
-      errorMessage: archive ? 'Không thể lưu trữ yêu cầu ký.' : 'Không thể xóa bản nháp.',
+        ? t("signRequests.lifecycle.archiveDescription")
+        : t("signRequests.lifecycle.deleteDescription"),
+      confirmLabel: archive ? t("signRequests.actions.archive") : t("signRequests.actions.deleteDraft"),
+      errorMessage: archive ? t("signRequests.lifecycle.archiveError") : t("signRequests.lifecycle.deleteError"),
       destructive: !archive,
     }, () => deleteMutation.mutateAsync({ signRequestId, archive }));
   };
@@ -256,28 +261,19 @@ export default function SignRequestsPage() {
   const pagination = response?.pagination;
 
   const getStatusBadge = (request: SignRequest) => {
-    if (request.flow_state === 'CANCELLED' || request.status === 'cancelled') {
-      return <Badge variant="secondary" className="bg-gray-500 text-white">Đã hủy</Badge>;
-    }
-    if (request.flow_state === 'REJECTED' || request.progress.rejected > 0) {
-      return <Badge variant="destructive">Đã từ chối</Badge>;
-    }
-    if (request.flow_state === 'COMPLETED' || request.status === 'completed' || request.progress.percentage === 100) {
-      return <Badge className="bg-green-500 hover:bg-green-600">Đã hoàn thành</Badge>;
-    }
-    if (request.flow_state === 'AWAITING_APPROVAL' || request.status === 'pending_approval') {
-      return <Badge className="bg-amber-500 hover:bg-amber-600">Chờ duyệt</Badge>;
-    }
-    if (request.flow_state === 'AWAITING_SIGNATURES' || request.status === 'pending' || request.status === 'in_progress') {
-      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Chờ ký</Badge>;
-    }
-    if (request.flow_state === 'GENERATING_ARTIFACT' || request.status === 'generating_artifact') {
-      return <Badge className="bg-blue-500 hover:bg-blue-600">Đang tạo PDF</Badge>;
-    }
-    if (request.flow_state === 'ARTIFACT_FAILED' || request.status === 'artifact_failed') {
-      return <Badge variant="destructive">Lỗi tạo PDF</Badge>;
-    }
-    return <Badge variant="secondary">Nháp</Badge>;
+    const meta = getSignRequestStatusMeta({
+      status: request.status,
+      flowState: request.flow_state,
+      rejected: request.progress.rejected,
+      percentage: request.progress.percentage,
+    }, t);
+    if (meta.variant === 'cancelled') return <Badge variant="secondary" className="bg-gray-500 text-white">{meta.label}</Badge>;
+    if (meta.variant === 'rejected' || meta.variant === 'failed') return <Badge variant="destructive">{meta.label}</Badge>;
+    if (meta.variant === 'completed') return <Badge className="bg-green-500 hover:bg-green-600">{meta.label}</Badge>;
+    if (meta.variant === 'pendingApproval') return <Badge className="bg-amber-500 hover:bg-amber-600">{meta.label}</Badge>;
+    if (meta.variant === 'pendingSignature') return <Badge className="bg-yellow-500 hover:bg-yellow-600">{meta.label}</Badge>;
+    if (meta.variant === 'generating') return <Badge className="bg-blue-500 hover:bg-blue-600">{meta.label}</Badge>;
+    return <Badge variant="secondary">{meta.label}</Badge>;
   };
 
   const getProgressColor = (percentage: number, rejected: number, status: string) => {
@@ -338,7 +334,7 @@ export default function SignRequestsPage() {
               : 'border-transparent text-gray-600 hover:text-gray-900'
           }`}
         >
-          Tất cả {pagination && `(${pagination.total})`}
+          {t("signRequests.filters.all")} {pagination && `(${pagination.total})`}
         </button>
         <button
           onClick={() => handleFilterChange('pending')}
@@ -348,7 +344,7 @@ export default function SignRequestsPage() {
               : 'border-transparent text-gray-600 hover:text-gray-900'
           }`}
         >
-          Chờ ký
+          {t("signRequests.status.pendingSignature")}
         </button>
         <button
           onClick={() => handleFilterChange('completed')}
@@ -358,7 +354,7 @@ export default function SignRequestsPage() {
               : 'border-transparent text-gray-600 hover:text-gray-900'
           }`}
         >
-          Đã hoàn thành
+          {t("signRequests.status.completed")}
         </button>
         <button
           onClick={() => handleFilterChange('rejected')}
@@ -368,7 +364,7 @@ export default function SignRequestsPage() {
               : 'border-transparent text-gray-600 hover:text-gray-900'
           }`}
         >
-          Đã từ chối
+          {t("signRequests.status.rejected")}
         </button>
       </div>
 
@@ -468,7 +464,7 @@ export default function SignRequestsPage() {
                             <Button
                               size="sm"
                               onClick={() => router.push(`/sign-requests/${request.id}/editor`)}
-                              title="Chỉnh sửa luồng ký"
+                              title={t("signRequests.actions.edit")}
                               className="bg-blue-600 hover:bg-blue-700 text-white h-7 w-7 p-0"
                             >
                               <Edit className="w-3.5 h-3.5" />
@@ -492,7 +488,7 @@ export default function SignRequestsPage() {
                             size="sm"
                             variant="outline"
                             onClick={() => router.push(`/documents/${request.document.id}/flow`)}
-                            title="Xem tài liệu"
+                            title={t("signRequests.actions.view")}
                             className="hidden h-7 w-7 p-0"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -522,8 +518,8 @@ export default function SignRequestsPage() {
                                       ? <Archive className="w-4 h-4 mr-2" />
                                       : <Trash2 className="w-4 h-4 mr-2" />}
                                     {deleteMutation.isPending
-                                      ? 'Đang xử lý...'
-                                      : getSignRequestLifecycleActions(request.status, request.flow_state).canArchive ? 'Lưu trữ' : 'Xóa bản nháp'}
+                                      ? t("common.processing")
+                                      : getSignRequestLifecycleActions(request.status, request.flow_state).canArchive ? t("common.archive") : t("signRequests.actions.deleteDraft")}
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                 </>
@@ -537,7 +533,7 @@ export default function SignRequestsPage() {
                                     className="text-orange-600 focus:text-orange-600"
                                   >
                                     <XCircle className="w-4 h-4 mr-2" />
-                                    {cancelMutation.isPending ? 'Đang hủy...' : 'Hủy luồng ký'}
+                                    {cancelMutation.isPending ? t("signRequests.actions.cancelling") : t("signRequests.actions.cancel")}
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                 </>
@@ -697,7 +693,7 @@ export default function SignRequestsPage() {
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     {(getSignRequestLifecycleActions(request.status, request.flow_state).canDelete || getSignRequestLifecycleActions(request.status, request.flow_state).canArchive) && (
                       <Button size="sm" onClick={() => router.push(`/sign-requests/${request.id}/editor`)} className="flex-1 bg-blue-600 text-white text-xs h-8">
-                        <Edit className="w-3.5 h-3.5 mr-1" />Chỉnh sửa
+                        <Edit className="w-3.5 h-3.5 mr-1" />{t("common.edit")}
                       </Button>
                     )}
                     {isCurrentUserPendingSigner(request) && isCurrentUserTurn(request) && (
@@ -706,7 +702,7 @@ export default function SignRequestsPage() {
                       </Button>
                     )}
                     <Button size="sm" variant="outline" onClick={() => router.push(`/documents/${request.document.id}/flow`)} className="flex-1 text-xs h-8">
-                      <Eye className="w-3.5 h-3.5 mr-1" />Xem
+                        <Eye className="w-3.5 h-3.5 mr-1" />{t("common.view")}
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -723,12 +719,12 @@ export default function SignRequestsPage() {
                             {getSignRequestLifecycleActions(request.status, request.flow_state).canArchive
                               ? <Archive className="w-4 h-4 mr-2" />
                               : <Trash2 className="w-4 h-4 mr-2" />}
-                            {getSignRequestLifecycleActions(request.status, request.flow_state).canArchive ? 'Lưu trữ' : 'Xóa'}
+                            {getSignRequestLifecycleActions(request.status, request.flow_state).canArchive ? t("common.archive") : t("common.delete")}
                           </DropdownMenuItem>
                         )}
                         {getSignRequestLifecycleActions(request.status, request.flow_state).canCancel && (
                           <DropdownMenuItem onClick={() => handleCancel(request.id)} className="text-orange-600">
-                            <XCircle className="w-4 h-4 mr-2" />Hủy
+                            <XCircle className="w-4 h-4 mr-2" />{t("common.cancel")}
                           </DropdownMenuItem>
                         )}
                         {request.signers.some(s => !s.is_internal) && (getSignRequestLifecycleActions(request.status, request.flow_state).canDelete || getSignRequestLifecycleActions(request.status, request.flow_state).canCancel) && (
@@ -784,19 +780,19 @@ export default function SignRequestsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
             <div className="p-6">
-              <h3 className="text-lg font-semibold mb-2">Hủy luồng ký</h3>
+              <h3 className="text-lg font-semibold mb-2">{t("signRequests.actions.cancel")}</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Vui lòng nhập lý do hủy. Email thông báo sẽ được gửi đến tất cả người ký.
+                {t("signRequests.lifecycle.cancelInstructions")}
               </p>
               
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-2">
-                  Lý do hủy <span className="text-red-500">*</span>
+                  {t("signRequests.lifecycle.cancelReason")} <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   rows={4}
                   className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="VD: Tài liệu cần chỉnh sửa lại nội dung..."
+                  placeholder={t("signRequests.lifecycle.cancelPlaceholder")}
                   value={cancelDialog.reason}
                   onChange={(e) => setCancelDialog({ ...cancelDialog, reason: e.target.value })}
                 />
@@ -808,14 +804,16 @@ export default function SignRequestsPage() {
                   onClick={() => setCancelDialog({ open: false, signRequestId: null, reason: '' })}
                   disabled={cancelMutation.isPending}
                 >
-                  Đóng
+                  {t("common.close")}
                 </Button>
                 <Button
                   variant="destructive"
                   onClick={confirmCancel}
                   disabled={cancelMutation.isPending || !cancelDialog.reason.trim()}
                 >
-                  {cancelMutation.isPending ? 'Đang hủy...' : 'Xác nhận hủy'}
+                  {cancelMutation.isPending
+                    ? t("signRequests.actions.cancelling")
+                    : t("signRequests.lifecycle.confirmCancel")}
                 </Button>
               </div>
             </div>

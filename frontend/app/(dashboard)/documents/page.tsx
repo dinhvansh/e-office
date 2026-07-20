@@ -31,28 +31,17 @@ import { MoreVertical } from "lucide-react";
 import { useDestructiveConfirmation } from "@/components/providers/destructive-confirmation-provider";
 import { AsyncErrorState } from "@/components/ui/async-state";
 import { getDocumentLifecycleActions } from "@/lib/document-lifecycle";
-
-const documentStatusMeta: Record<string, { label: string; variant: "success" | "pending" | "warning" | "danger" | "info" | "default" }> = {
-  draft: { label: "Nháp", variant: "default" },
-  pending_approval: { label: "Chờ phê duyệt", variant: "pending" },
-  approved: { label: "Đã phê duyệt", variant: "success" },
-  pending_signature: { label: "Chờ ký", variant: "info" },
-  completed: { label: "Hoàn thành", variant: "success" },
-  active: { label: "Hoạt động", variant: "success" },
-  rejected: { label: "Từ chối", variant: "danger" },
-  cancelled: { label: "Đã hủy", variant: "danger" },
-  archived: { label: "Lưu trữ", variant: "warning" },
-};
+import { useI18n } from "@/components/providers/i18n-provider";
+import { getDocumentStatusMeta } from "@/lib/status-localization";
 
 const getDocumentTypeName = (document: DocumentRecord): string | null => {
   if (typeof document.document_type === "string") return document.document_type;
   return document.document_type?.name || null;
 };
 
-const getStatusMeta = (status: string | null) => documentStatusMeta[status || "draft"] || { label: status || "Nháp", variant: "default" as const };
-
 export default function DocumentsPage() {
   const { fetchJson, hasPermission } = useAuth();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const router = useRouter();
   const canReadDocuments = hasPermission("documents:read");
@@ -309,7 +298,7 @@ export default function DocumentsPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => fetchJson(`/documents/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Xóa tài liệu thành công!");
+      toast.success(t("documents.lifecycle.deleteSuccess"));
       queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
     onError: (error: any) => {
@@ -345,15 +334,15 @@ export default function DocumentsPage() {
 
   const handleDelete = (id: number) => {
     if (!canDeleteDocuments) {
-      toast.error("Bạn không có quyền xóa tài liệu");
+      toast.error(t("documents.lifecycle.deleteDenied"));
       return;
     }
     confirmDestructive({
-      title: 'Xóa tài liệu',
-      targetName: `Tài liệu #${id}`,
-      description: 'Tài liệu sẽ bị xóa và không thể khôi phục từ màn hình này.',
-      confirmLabel: 'Xóa tài liệu',
-      errorMessage: 'Không thể xóa tài liệu. Vui lòng thử lại.',
+      title: t("documents.actions.delete"),
+      targetName: t("documents.lifecycle.documentTarget", { id }),
+      description: t("documents.lifecycle.deleteDescription"),
+      confirmLabel: t("documents.actions.delete"),
+      errorMessage: t("documents.lifecycle.deleteError"),
     }, () => deleteMutation.mutateAsync(id));
   };
 
@@ -480,11 +469,11 @@ export default function DocumentsPage() {
       await fetchJson(`/documents/${documentId}/archive`, { method: 'POST' });
     },
     onSuccess: () => {
-      toast.success('Đã chuyển tài liệu vào Lưu trữ');
+      toast.success(t("documents.lifecycle.archiveSuccess"));
       queryClient.invalidateQueries({ queryKey: ['documents'] });
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Không thể lưu trữ');
+      toast.error(error?.message || t("documents.lifecycle.archiveError"));
     },
   });
 
@@ -494,40 +483,40 @@ export default function DocumentsPage() {
       await fetchJson(`/documents/${documentId}/cancel`, { method: 'POST' });
     },
     onSuccess: () => {
-      toast.success('Đã hủy tài liệu');
+      toast.success(t("documents.lifecycle.cancelSuccess"));
       queryClient.invalidateQueries({ queryKey: ['documents'] });
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Không thể hủy');
+      toast.error(error?.message || t("documents.lifecycle.cancelError"));
     },
   });
 
   const handleArchiveDocument = (documentId: number) => {
     if (!canUpdateDocuments) {
-      toast.error("Bạn không có quyền cập nhật tài liệu");
+      toast.error(t("documents.lifecycle.updateDenied"));
       return;
     }
     confirmDestructive({
-      title: 'Lưu trữ tài liệu',
-      targetName: `Tài liệu #${documentId}`,
-      description: 'Tài liệu đã bị từ chối hoặc hủy sẽ được chuyển vào Lưu trữ. Toàn bộ lịch sử được giữ nguyên.',
-      confirmLabel: 'Lưu trữ',
-      errorMessage: 'Không thể lưu trữ tài liệu. Vui lòng thử lại.',
+      title: t("documents.actions.archive"),
+      targetName: t("documents.lifecycle.documentTarget", { id: documentId }),
+      description: t("documents.lifecycle.archiveDescription"),
+      confirmLabel: t("documents.actions.archive"),
+      errorMessage: t("documents.lifecycle.archiveError"),
       destructive: false,
     }, () => archiveDocumentMutation.mutateAsync(documentId));
   };
 
   const handleCancelDocument = (documentId: number) => {
     if (!canUpdateDocuments) {
-      toast.error("Bạn không có quyền cập nhật tài liệu");
+      toast.error(t("documents.lifecycle.updateDenied"));
       return;
     }
     confirmDestructive({
-      title: 'Hủy tài liệu',
-      targetName: `Tài liệu #${documentId}`,
-      description: 'Tài liệu sẽ bị hủy và các bước xử lý tiếp theo sẽ không thể tiếp tục.',
-      confirmLabel: 'Hủy tài liệu',
-      errorMessage: 'Không thể hủy tài liệu. Vui lòng thử lại.',
+      title: t("documents.actions.cancel"),
+      targetName: t("documents.lifecycle.documentTarget", { id: documentId }),
+      description: t("documents.lifecycle.cancelDescription"),
+      confirmLabel: t("documents.actions.cancel"),
+      errorMessage: t("documents.lifecycle.cancelError"),
     }, () => cancelDocumentMutation.mutateAsync(documentId));
   };
 
@@ -958,7 +947,7 @@ export default function DocumentsPage() {
                           {!doc.confidential_level && <span className="text-muted-foreground text-xs">—</span>}
                         </td>
                         <td className="px-2 py-3">
-                          <StatusTag status={getStatusMeta(doc.status).label} variant={getStatusMeta(doc.status).variant} className="whitespace-nowrap" />
+                          <StatusTag status={getDocumentStatusMeta(doc.status, t).label} variant={getDocumentStatusMeta(doc.status, t).variant} className="whitespace-nowrap" />
                         </td>
                         <td className="px-2 py-3 text-muted-foreground text-xs whitespace-nowrap">
                           {dayjs(doc.created_at).format("DD/MM/YY")}
@@ -970,7 +959,7 @@ export default function DocumentsPage() {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7"
-                              title="Xem"
+                              title={t("common.view")}
                               onClick={() => handleView(doc.id)}
                             >
                               <Eye className="w-3.5 h-3.5" />
@@ -982,7 +971,7 @@ export default function DocumentsPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7"
-                                title="Tải xuống"
+                                title={t("common.download")}
                                 onClick={() => handleDownload(doc.id, doc.original_file_name || doc.title || `document-${doc.id}.pdf`, doc)}
                               >
                                 <Download className="w-3.5 h-3.5" />
@@ -995,7 +984,7 @@ export default function DocumentsPage() {
                                 size="icon"
                                 className="h-7 w-7 hover:bg-destructive/10 hover:text-destructive"
                                 onClick={() => handleDelete(doc.id)}
-                                title="Xóa"
+                                title={t("common.delete")}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
@@ -1007,10 +996,10 @@ export default function DocumentsPage() {
                                 size="sm"
                                 className="h-7 px-2 text-xs hover:bg-orange-50 whitespace-nowrap"
                                 onClick={() => handleArchiveDocument(doc.id)}
-                                title="Lưu trữ"
+                                title={t("common.archive")}
                               >
                                 <Archive className="w-3 h-3 text-orange-600 mr-1" />
-                                Lưu trữ
+                                {t("common.archive")}
                               </Button>
                             )}
                             {canUpdateDocuments && getDocumentLifecycleActions(doc.status).canCancel && (
@@ -1019,10 +1008,10 @@ export default function DocumentsPage() {
                                 size="sm"
                                 className="h-7 px-2 text-xs hover:bg-red-50 whitespace-nowrap"
                                 onClick={() => handleCancelDocument(doc.id)}
-                                title="Hủy tài liệu"
+                                title={t("documents.actions.cancel")}
                               >
                                 <XCircle className="w-3 h-3 text-red-600 mr-1" />
-                                Hủy
+                                {t("common.cancel")}
                               </Button>
                             )}
                           </div>
@@ -1125,7 +1114,7 @@ export default function DocumentsPage() {
                         {doc.document_number || `#${doc.id}`}
                       </p>
                     </div>
-                    <StatusTag status={getStatusMeta(doc.status).label} variant={getStatusMeta(doc.status).variant} />
+                    <StatusTag status={getDocumentStatusMeta(doc.status, t).label} variant={getDocumentStatusMeta(doc.status, t).variant} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs mb-3">
@@ -1141,10 +1130,10 @@ export default function DocumentsPage() {
 
                   <div className="flex items-center gap-2" onClick={stopRowNavigation}>
                     <Button size="sm" variant="outline" onClick={() => router.push(`/documents/${doc.id}/flow`)} className="flex-1 text-xs h-8">
-                      <Eye className="w-3.5 h-3.5 mr-1" />Xem
+                      <Eye className="w-3.5 h-3.5 mr-1" />{t("common.view")}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => handleDownload(doc.id)} className="flex-1 text-xs h-8">
-                      <Download className="w-3.5 h-3.5 mr-1" />Tải
+                      <Download className="w-3.5 h-3.5 mr-1" />{t("common.downloadShort")}
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -1155,17 +1144,17 @@ export default function DocumentsPage() {
                       <DropdownMenuContent align="end">
                         {canUpdateDocuments && getDocumentLifecycleActions(doc.status).canCancel && (
                           <DropdownMenuItem onClick={() => handleCancelDocument(doc.id)} className="text-red-600">
-                            <XCircle className="w-4 h-4 mr-2" />Hủy
+                            <XCircle className="w-4 h-4 mr-2" />{t("common.cancel")}
                           </DropdownMenuItem>
                         )}
                         {canDeleteDocuments && getDocumentLifecycleActions(doc.status).canDelete && (
                           <DropdownMenuItem onClick={() => handleDelete(doc.id)} className="text-red-600">
-                            <Trash2 className="w-4 h-4 mr-2" />Xóa
+                            <Trash2 className="w-4 h-4 mr-2" />{t("common.delete")}
                           </DropdownMenuItem>
                         )}
                         {canUpdateDocuments && getDocumentLifecycleActions(doc.status).canArchive && (
                           <DropdownMenuItem onClick={() => handleArchiveDocument(doc.id)} className="text-orange-600">
-                            <Archive className="w-4 h-4 mr-2" />Lưu trữ
+                            <Archive className="w-4 h-4 mr-2" />{t("common.archive")}
                           </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>

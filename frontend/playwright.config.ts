@@ -30,4 +30,15 @@ export default defineConfig({
       },
     },
   ],
+  webServer: process.env.PLAYWRIGHT_MANAGED_SERVER === "1" ? {
+    command: "npx next dev --webpack -p 3211",
+    url: baseURL,
+    reuseExistingServer: false,
+    timeout: 120_000,
+    env: {
+      ...process.env,
+      NEXT_PUBLIC_API_BASE_URL: "http://127.0.0.1:4010/api/v1",
+      NEXT_PUBLIC_API_URL: "http://127.0.0.1:4010/api/v1",
+    },
+  } : undefined,
 });

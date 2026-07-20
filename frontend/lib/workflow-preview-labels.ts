@@ -1,10 +1,24 @@
-export const workflowPreviewLabels = {
-  loading: 'Đang tải quy trình...',
-  title: 'Quy trình phê duyệt',
-  steps: (count: number) => `${count} bước`,
-  missingApprover: 'Chưa có thông tin người phê duyệt',
+import type { TranslationKey } from '@/i18n';
+
+export const workflowPreviewKeys = {
+  loading: 'workflow.preview.loading',
+  title: 'workflow.preview.title',
+  steps: 'workflow.preview.steps',
+  missingApprover: 'workflow.preview.missingApprover',
   approverTypes: {
-    user: 'Người dùng', role: 'Vai trò', department: 'Phòng ban', manager: 'Quản lý',
+    user: 'workflow.preview.approverType.user',
+    role: 'workflow.preview.approverType.role',
+    department: 'workflow.preview.approverType.department',
+    manager: 'workflow.preview.approverType.manager',
   },
-  dueInDays: (days: number) => `${days} ngày`,
-} as const;
+  dueInDays: 'workflow.preview.dueInDays',
+  parallelMarker: 'workflow.preview.parallelMarker',
+} as const satisfies {
+  loading: TranslationKey;
+  title: TranslationKey;
+  steps: TranslationKey;
+  missingApprover: TranslationKey;
+  approverTypes: Record<'user' | 'role' | 'department' | 'manager', TranslationKey>;
+  dueInDays: TranslationKey;
+  parallelMarker: TranslationKey;
+};

@@ -32,6 +32,8 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import dayjs from 'dayjs';
+import { useI18n } from '@/components/providers/i18n-provider';
+import { getApprovalStatusLabel } from '@/lib/status-localization';
 
 interface Approval {
   id: number;
@@ -81,6 +83,7 @@ interface ApiResponse {
 
 export default function ApprovalsPage() {
   const { fetchJson } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
 
   // State
@@ -148,28 +151,28 @@ export default function ApprovalsPage() {
       {/* Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <MetricCard
-          title="Tổng số"
+          title={t("approvals.metrics.total")}
           value={statistics.total}
           icon={FileText}
           iconColor="text-blue-600"
           iconBgColor="bg-blue-100"
         />
         <MetricCard
-          title="Chờ duyệt"
+          title={getApprovalStatusLabel('pending', t)}
           value={statistics.pending}
           icon={Clock}
           iconColor="text-orange-600"
           iconBgColor="bg-orange-100"
         />
         <MetricCard
-          title="Đã duyệt"
+          title={getApprovalStatusLabel('approved', t)}
           value={statistics.approved}
           icon={CheckCircle2}
           iconColor="text-green-600"
           iconBgColor="bg-green-100"
         />
         <MetricCard
-          title="Từ chối"
+          title={getApprovalStatusLabel('rejected', t)}
           value={statistics.rejected}
           icon={XCircle}
           iconColor="text-red-600"
@@ -179,17 +182,17 @@ export default function ApprovalsPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4">Bộ lọc</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-4">{t("approvals.filters.title")}</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Search */}
           <div className="space-y-2">
-            <Label htmlFor="search">Tìm kiếm</Label>
+            <Label htmlFor="search">{t("approvals.filters.search")}</Label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 id="search"
-                placeholder="Mã, tên tài liệu..."
+                placeholder={t("approvals.filters.searchPlaceholder")}
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -203,7 +206,7 @@ export default function ApprovalsPage() {
 
           {/* Status Filter */}
           <div className="space-y-2">
-            <Label htmlFor="status">Trạng thái</Label>
+            <Label htmlFor="status">{t("approvals.filters.status")}</Label>
             <Select
               value={status || "all"}
               onValueChange={(value) => {
@@ -213,21 +216,21 @@ export default function ApprovalsPage() {
               disabled={isLoading}
             >
               <SelectTrigger id="status">
-                <SelectValue placeholder="Tất cả trạng thái" />
+                <SelectValue placeholder={t("approvals.filters.allStatuses")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                <SelectItem value="pending">Chờ duyệt</SelectItem>
-                <SelectItem value="approved">Đã duyệt</SelectItem>
-                <SelectItem value="rejected">Từ chối</SelectItem>
-                <SelectItem value="info_requested">Yêu cầu bổ sung</SelectItem>
+                <SelectItem value="all">{t("approvals.filters.allStatuses")}</SelectItem>
+                <SelectItem value="pending">{getApprovalStatusLabel('pending', t)}</SelectItem>
+                <SelectItem value="approved">{getApprovalStatusLabel('approved', t)}</SelectItem>
+                <SelectItem value="rejected">{getApprovalStatusLabel('rejected', t)}</SelectItem>
+                <SelectItem value="info_requested">{getApprovalStatusLabel('info_requested', t)}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* Document Type Filter */}
           <div className="space-y-2">
-            <Label htmlFor="docType">Loại văn bản</Label>
+            <Label htmlFor="docType">{t("approvals.filters.documentType")}</Label>
             <Select
               value={documentTypeId || "all"}
               onValueChange={(value) => {
@@ -237,10 +240,10 @@ export default function ApprovalsPage() {
               disabled={isLoading}
             >
               <SelectTrigger id="docType">
-                <SelectValue placeholder="Tất cả loại" />
+                <SelectValue placeholder={t("approvals.filters.allDocumentTypes")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả loại</SelectItem>
+                <SelectItem value="all">{t("approvals.filters.allDocumentTypes")}</SelectItem>
                 {documentTypes?.map((type: any) => (
                   <SelectItem key={type.id} value={type.id.toString()}>
                     {type.name}
@@ -252,10 +255,10 @@ export default function ApprovalsPage() {
 
           {/* Creator Filter */}
           <div className="space-y-2">
-            <Label htmlFor="creator">Người tạo</Label>
+            <Label htmlFor="creator">{t("approvals.filters.creator")}</Label>
             <Input
               id="creator"
-              placeholder="Tên hoặc email..."
+              placeholder={t("approvals.filters.creatorPlaceholder")}
               value={creatorSearch}
               onChange={(e) => {
                 setCreatorSearch(e.target.value);
@@ -269,7 +272,7 @@ export default function ApprovalsPage() {
         {/* Sort */}
         <div className="flex items-center gap-4">
           <div className="space-y-2 flex-1">
-            <Label htmlFor="sort">Sắp xếp theo</Label>
+            <Label htmlFor="sort">{t("approvals.filters.sort")}</Label>
             <Select
               value={`${sortBy}-${sortOrder}`}
               onValueChange={(value) => {
@@ -284,10 +287,10 @@ export default function ApprovalsPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="created_at-desc">Mới nhất</SelectItem>
-                <SelectItem value="created_at-asc">Cũ nhất</SelectItem>
-                <SelectItem value="document_number-asc">Mã văn bản A-Z</SelectItem>
-                <SelectItem value="document_number-desc">Mã văn bản Z-A</SelectItem>
+                <SelectItem value="created_at-desc">{t("approvals.filters.newest")}</SelectItem>
+                <SelectItem value="created_at-asc">{t("approvals.filters.oldest")}</SelectItem>
+                <SelectItem value="document_number-asc">{t("approvals.filters.documentNumberAsc")}</SelectItem>
+                <SelectItem value="document_number-desc">{t("approvals.filters.documentNumberDesc")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -423,7 +426,7 @@ export default function ApprovalsPage() {
                           variant="outline"
                           onClick={() => router.push(`/approvals/${item.id}`)}
                         >
-                          Xem
+                          {t("common.view")}
                         </Button>
                       </td>
                     </tr>

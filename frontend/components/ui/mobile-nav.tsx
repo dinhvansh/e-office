@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/providers/i18n-provider";
 
 const PRIMARY_NAV_LIMIT = 4;
 
@@ -19,6 +20,7 @@ const isItemActive = (pathname: string, item: SidebarItem) =>
 
 export function MobileBottomNav({ groups }: { groups: SidebarGroup[] }) {
   const pathname = usePathname();
+  const { t } = useI18n();
   const items = groups.flatMap((group) => group.items);
   const primaryItems = items.slice(0, PRIMARY_NAV_LIMIT);
   const overflowItems = items.slice(PRIMARY_NAV_LIMIT);
@@ -26,7 +28,7 @@ export function MobileBottomNav({ groups }: { groups: SidebarGroup[] }) {
   const columnCount = overflowItems.length > 0 ? primaryItems.length + 1 : primaryItems.length;
 
   return (
-    <nav aria-label="Điều hướng chính trên thiết bị di động" className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-lg safe-area-inset-bottom">
+    <nav aria-label={t("navigation.mobile")} className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-lg safe-area-inset-bottom">
       <div className="grid h-16 w-full" style={{ gridTemplateColumns: `repeat(${columnCount || 1}, minmax(0, 1fr))` }}>
         {primaryItems.map((item) => {
           const Icon = item.icon;
@@ -43,21 +45,21 @@ export function MobileBottomNav({ groups }: { groups: SidebarGroup[] }) {
               )}
             >
               <Icon className={cn("w-5 h-5 transition-transform", active && "scale-110")} />
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span className="text-[10px] font-medium">{t(item.labelKey)}</span>
             </Link>
           );
         })}
         {overflowItems.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger
-              aria-label="Mở thêm mục điều hướng"
+              aria-label={t("navigation.moreOpen")}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-inset",
                 hasActiveOverflowItem ? "text-blue-600 bg-blue-50" : "text-slate-600 hover:text-blue-600 hover:bg-slate-50",
               )}
             >
               <MoreHorizontal className={cn("w-5 h-5", hasActiveOverflowItem && "scale-110")} />
-              <span className="text-[10px] font-medium">Thêm</span>
+              <span className="text-[10px] font-medium">{t("navigation.more")}</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="end" className="mb-2 max-h-80 w-64 overflow-y-auto">
               {overflowItems.map((item) => {
@@ -66,7 +68,7 @@ export function MobileBottomNav({ groups }: { groups: SidebarGroup[] }) {
                   <DropdownMenuItem key={item.href} asChild>
                     <Link href={item.href} aria-current={isItemActive(pathname, item) ? "page" : undefined} className="flex cursor-pointer items-center gap-3">
                       <Icon className={cn("h-4 w-4", item.color)} />
-                      <span>{item.label}</span>
+                      <span>{t(item.labelKey)}</span>
                     </Link>
                   </DropdownMenuItem>
                 );

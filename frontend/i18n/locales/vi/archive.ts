@@ -1,0 +1,15 @@
+export const archive = {
+  "archive.title": "Lưu trữ",
+  "archive.description": "Tài liệu đã lưu trữ",
+  "archive.searchPlaceholder": "Tìm tài liệu",
+  "archive.emptyTitle": "Kho lưu trữ trống",
+  "archive.emptyDescription": "Không có tài liệu lưu trữ.",
+  "archive.previousStatus": "Trạng thái trước",
+  "archive.archivedAt": "Lưu trữ lúc",
+  "archive.request": "Yêu cầu ký",
+  "archive.restore.title": "Khôi phục tài liệu",
+  "archive.restore.description": "Tài liệu sẽ trở về trạng thái Đã hủy. Các workflow, approval và phiên ký cũ không được kích hoạt lại.",
+  "archive.restore.success": "Đã khôi phục về Đã hủy",
+  "archive.restore.error": "Không thể khôi phục tài liệu",
+  "archive.restore.target": "tài liệu",
+} as const;

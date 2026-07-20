@@ -16,146 +16,147 @@ import {
   LucideIcon,
   Archive
 } from "lucide-react";
+import type { TranslationKey } from "@/i18n";
 
 export interface SidebarItem {
-  label: string;
+  labelKey: TranslationKey;
   href: string;
   icon: LucideIcon;
-  caption?: string;
+  captionKey?: TranslationKey;
   color?: string;
   requiredPermissions?: string[];
   requiredRoles?: string[];
 }
 
 export interface SidebarGroup {
-  groupLabel: string;
+  groupLabelKey: TranslationKey;
   items: SidebarItem[];
 }
 
 export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
   {
-    groupLabel: "Workspace",
+    groupLabelKey: "navigation.group.workspace",
     items: [
       {
-        label: "Tổng quan",
+        labelKey: "navigation.dashboard.label",
         href: "/",
         icon: LayoutDashboard,
-        caption: "Số liệu hệ thống",
+        captionKey: "navigation.dashboard.caption",
         color: "text-blue-600"
       },
       {
-        label: "Quy trình ký",
+        labelKey: "navigation.signRequests.label",
         href: "/sign-requests",
         icon: PenTool,
-        caption: "Theo dõi tiến độ",
+        captionKey: "navigation.signRequests.caption",
         color: "text-green-600"
       },
       {
-        label: "Tài liệu",
+        labelKey: "navigation.documents.label",
         href: "/documents",
         icon: FileText,
-        caption: "Upload & quản trị",
+        captionKey: "navigation.documents.caption",
         color: "text-purple-600",
         requiredPermissions: ["documents:read"]
       },
       {
-        label: "Công việc của tôi",
+        labelKey: "navigation.myTasks.label",
         href: "/my-tasks",
         icon: CheckSquare,
-        caption: "Phê duyệt & Ký điện tử",
+        captionKey: "navigation.myTasks.caption",
         color: "text-amber-600"
       },
     ]
   },
   {
-    groupLabel: "Tổ chức",
+    groupLabelKey: "navigation.group.organization",
     items: [
       {
-        label: "Người dùng",
+        labelKey: "navigation.users.label",
         href: "/users",
         icon: Users,
-        caption: "Quản lý tài khoản",
+        captionKey: "navigation.users.caption",
         color: "text-indigo-600",
         requiredPermissions: ["users:read"]
       },
       {
-        label: "Phòng ban",
+        labelKey: "navigation.departments.label",
         href: "/departments",
         icon: Building,
-        caption: "Cấu trúc tổ chức",
+        captionKey: "navigation.departments.caption",
         color: "text-teal-600",
         requiredPermissions: ["departments:read"]
       },
       {
-        label: "Vai trò & Quyền",
+        labelKey: "navigation.roles.label",
         href: "/roles",
         icon: Shield,
-        caption: "Phân quyền hệ thống",
+        captionKey: "navigation.roles.caption",
         color: "text-rose-600",
         requiredPermissions: ["roles:read"]
       },
       {
-        label: "Chức danh",
+        labelKey: "navigation.positions.label",
         href: "/positions",
         icon: Briefcase,
-        caption: "Quản lý chức danh",
+        captionKey: "navigation.positions.caption",
         color: "text-violet-600",
         requiredPermissions: ["positions:read"]
       },
     ]
   },
   {
-    groupLabel: "Cấu hình",
+    groupLabelKey: "navigation.group.configuration",
     items: [
       {
-        label: "Hệ thống & SMTP",
+        labelKey: "navigation.system.label",
         href: "/settings/system",
         icon: Mail,
-        caption: "Email, test SMTP & watermark",
+        captionKey: "navigation.system.caption",
         color: "text-emerald-600",
         requiredPermissions: ["settings:read"]
       },
       {
-        label: "Loại văn bản",
+        labelKey: "navigation.documentTypes.label",
         href: "/document-types",
         icon: FileType,
-        caption: "Phân loại & đánh số",
+        captionKey: "navigation.documentTypes.caption",
         color: "text-orange-600",
         requiredPermissions: ["document_types:read"]
       },
       {
-        label: "Quy trình phê duyệt",
+        labelKey: "navigation.workflows.label",
         href: "/workflows",
         icon: Workflow,
-        caption: "Cấu hình workflow",
+        captionKey: "navigation.workflows.caption",
         color: "text-blue-600",
         requiredPermissions: ["workflows:read"]
       },
       {
-        label: "Tổ chức ngoài",
+        labelKey: "navigation.externalOrgs.label",
         href: "/external-orgs",
         icon: Building2,
-        caption: "Đối tác & cơ quan",
+        captionKey: "navigation.externalOrgs.caption",
         color: "text-cyan-600",
         requiredPermissions: ["external_orgs:read"]
       },
       {
-        label: "Doanh nghiệp",
+        labelKey: "navigation.tenant.label",
         href: "/settings/tenant",
         icon: Settings,
-        caption: "Branding & domain",
+        captionKey: "navigation.tenant.caption",
         color: "text-slate-600",
         requiredPermissions: ["settings:read"]
       },
       {
-        label: "Webhooks",
+        labelKey: "navigation.webhooks.label",
         href: "/webhooks",
         icon: Webhook,
-        caption: "Thông báo tự động",
+        captionKey: "navigation.webhooks.caption",
         color: "text-amber-600",
         requiredPermissions: ["webhooks:read"]
       },
     ]
   },
-  { groupLabel: "Lưu trữ", items: [{ label: "Lưu trữ", href: "/archive", icon: Archive, caption: "Tài liệu đã lưu trữ", color: "text-slate-600", requiredPermissions: ["archive:view"] }] }
+  { groupLabelKey: "navigation.group.archive", items: [{ labelKey: "navigation.archive.label", href: "/archive", icon: Archive, captionKey: "navigation.archive.caption", color: "text-slate-600", requiredPermissions: ["archive:view"] }] }
 ];
