@@ -25,6 +25,8 @@ import {
   type ApprovalMode,
 } from '@/lib/workflow-approval-mode';
 import { useI18n } from '@/components/providers/i18n-provider';
+import { WorkflowListFlowSummary } from '@/components/workflow/WorkflowListFlowSummary';
+import { WorkflowPreview } from '@/components/workflow/WorkflowPreview';
 
 interface WorkflowStep {
   id: number;
@@ -39,6 +41,7 @@ interface WorkflowStep {
   completion_mode?: 'any_one' | 'all' | 'min_n';
   min_required?: number | null;
   participant_role: 'approver' | 'signer';
+  approver_name?: string | null;
 }
 
 interface WorkflowData {
@@ -48,6 +51,7 @@ interface WorkflowData {
   is_active: boolean;
   approval_mode?: ApprovalMode | null;
   steps: WorkflowStep[];
+  document_type?: { id: number; name: string; code?: string | null } | null;
 }
 
 interface WorkflowFormData {
@@ -94,6 +98,7 @@ export default function WorkflowsPage() {
   const [isWorkflowDialogOpen, setIsWorkflowDialogOpen] = useState(false);
   const [editingWorkflow, setEditingWorkflow] = useState<WorkflowData | null>(null);
   const [workflowFormData, setWorkflowFormData] = useState<WorkflowFormData>(DEFAULT_WORKFLOW_FORM_DATA);
+  const [previewWorkflow, setPreviewWorkflow] = useState<WorkflowData | null>(null);
   
   // Step management dialog
   const [isStepDialogOpen, setIsStepDialogOpen] = useState(false);
@@ -431,6 +436,30 @@ export default function WorkflowsPage() {
     }
   };
 
+  const getApprovalFlowSteps = (workflow: WorkflowData) => workflow.steps
+    .filter((step) => step.participant_role !== 'signer')
+    .sort((first, second) => first.step_order - second.step_order)
+    .map((step, index) => {
+      const assignedUser = Array.isArray(users)
+        ? users.find((candidate: any) => candidate.id === step.assignee_user_id || candidate.id === step.approver_id)
+        : undefined;
+      const assignedDepartment = Array.isArray(departments)
+        ? departments.find((candidate: any) => candidate.id === step.assignee_department_id)
+        : undefined;
+      const assignedPosition = Array.isArray(positions)
+        ? positions.find((candidate: any) => candidate.id === step.assignee_position_id)
+        : undefined;
+      const label = step.approver_name
+        || assignedUser?.full_name
+        || assignedUser?.email
+        || assignedPosition?.name
+        || assignedDepartment?.name
+        || step.step_name
+        || t("workflow.flow.stepFallback", { index: index + 1 });
+
+      return { id: step.id, label };
+    });
+
   const getDefaultCompletionModeForAssignee = (type: StepFormData['assignee_type']) => {
     return type === 'position_in_department' ? 'any_one' : 'all';
   };
@@ -597,7 +626,7 @@ export default function WorkflowsPage() {
                       Mô tả
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      Số bước
+                      {t("workflow.flow.column")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Trạng thái
@@ -624,8 +653,15 @@ export default function WorkflowsPage() {
                           {workflow.description || 'Không có mô tả'}
                         </p>
                       </td>
-                      <td className="px-6 py-4 align-top text-sm text-gray-700">
-                        <span className="font-medium text-gray-900">{workflow.steps.length}</span> bước
+                      <td className="min-w-80 px-6 py-4 align-top text-sm text-gray-700" onClick={stopCardNavigation}>
+                        <WorkflowListFlowSummary
+                          workflowId={workflow.id}
+                          workflowName={workflow.name}
+                          approvalMode={workflow.approval_mode}
+                          steps={getApprovalFlowSteps(workflow)}
+                          documentTypeName={workflow.document_type?.name}
+                          onViewFlow={() => setPreviewWorkflow(workflow)}
+                        />
                       </td>
                       <td className="px-6 py-4 align-top">
                         <Badge
@@ -703,10 +739,18 @@ export default function WorkflowsPage() {
                     {workflow.description || 'Không có mô tả'}
                   </p>
 
-                  <div className="flex items-center justify-between gap-3 text-sm text-gray-600">
-                    <span>
-                      <span className="font-medium text-gray-900">{workflow.steps.length}</span> bước
-                    </span>
+                  <div onClick={stopCardNavigation}>
+                    <WorkflowListFlowSummary
+                      workflowId={workflow.id}
+                      workflowName={workflow.name}
+                      approvalMode={workflow.approval_mode}
+                      steps={getApprovalFlowSteps(workflow)}
+                      documentTypeName={workflow.document_type?.name}
+                      onViewFlow={() => setPreviewWorkflow(workflow)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 text-sm text-gray-600">
                     <div className="flex items-center gap-1" onClick={stopCardNavigation}>
                       <Button
                         size="sm"
@@ -809,6 +853,18 @@ export default function WorkflowsPage() {
           </CardContent>
         </Card>
       )}
+      {/* Read-only workflow preview */}
+      <Dialog open={!!previewWorkflow} onOpenChange={(open) => !open && setPreviewWorkflow(null)}>
+        <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {t("workflow.flow.dialogTitle", { name: previewWorkflow?.name || "" })}
+            </DialogTitle>
+          </DialogHeader>
+          {previewWorkflow && <WorkflowPreview workflowId={previewWorkflow.id} />}
+        </DialogContent>
+      </Dialog>
+
       {/* Create/Edit Workflow Dialog */}
       <Dialog open={isWorkflowDialogOpen} onOpenChange={setIsWorkflowDialogOpen}>
         <DialogContent className="max-w-2xl">

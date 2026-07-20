@@ -19,4 +19,13 @@ export const workflow = {
   "workflow.preview.approverType.manager": "Manager",
   "workflow.preview.dueInDays": "{count} days",
   "workflow.preview.parallelMarker": "Concurrent",
+  "workflow.flow.column": "Approval flow",
+  "workflow.flow.stepCount": "{count} approval steps",
+  "workflow.flow.simultaneous": "At the same time",
+  "workflow.flow.empty": "No approval steps configured",
+  "workflow.flow.view": "View flow",
+  "workflow.flow.viewFor": "View flow for {name}",
+  "workflow.flow.dialogTitle": "Approval flow: {name}",
+  "workflow.flow.stepFallback": "Step {index}",
+  "workflow.flow.documentType": "Type: {name}",
 } satisfies MessageShape<typeof vi>;

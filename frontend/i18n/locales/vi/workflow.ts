@@ -16,4 +16,13 @@ export const workflow = {
   "workflow.preview.approverType.manager": "Quản lý",
   "workflow.preview.dueInDays": "{count} ngày",
   "workflow.preview.parallelMarker": "Đồng thời",
+  "workflow.flow.column": "Luồng phê duyệt",
+  "workflow.flow.stepCount": "{count} bước duyệt",
+  "workflow.flow.simultaneous": "Đồng thời",
+  "workflow.flow.empty": "Chưa cấu hình bước duyệt",
+  "workflow.flow.view": "Xem luồng",
+  "workflow.flow.viewFor": "Xem luồng của {name}",
+  "workflow.flow.dialogTitle": "Luồng phê duyệt: {name}",
+  "workflow.flow.stepFallback": "Bước {index}",
+  "workflow.flow.documentType": "Loại: {name}",
 } as const;
