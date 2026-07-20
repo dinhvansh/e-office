@@ -30,6 +30,8 @@ interface CanvasClickContext extends OverlayContext {
 
 interface PDFCoreViewerProps {
   pdfUrl?: string | null;
+  withCredentials?: boolean;
+  fitMode?: 'width' | 'page';
   loading?: boolean;
   error?: string | null;
   loadingLabel?: string;
@@ -47,6 +49,8 @@ interface PDFCoreViewerProps {
 
 export default function PDFCoreViewer({
   pdfUrl,
+  withCredentials = false,
+  fitMode = 'width',
   loading = false,
   error = null,
   loadingLabel = 'Đang tải PDF...',
@@ -94,6 +98,16 @@ export default function PDFCoreViewer({
     return Math.max(280, container.clientWidth - paddingLeft - paddingRight - fitPadding);
   }, [fitPadding]);
 
+  const getAvailableHeight = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return 640;
+
+    const styles = window.getComputedStyle(container);
+    const paddingTop = Number.parseFloat(styles.paddingTop || '0') || 0;
+    const paddingBottom = Number.parseFloat(styles.paddingBottom || '0') || 0;
+    return Math.max(320, container.clientHeight - paddingTop - paddingBottom - fitPadding);
+  }, [fitPadding]);
+
   useEffect(() => {
     isAutoFitEnabledRef.current = isAutoFitEnabled;
   }, [isAutoFitEnabled]);
@@ -110,7 +124,9 @@ export default function PDFCoreViewer({
     }
 
     let cancelled = false;
-    const loadingTask = pdfjsLib.getDocument(pdfUrl);
+    const loadingTask = pdfjsLib.getDocument(
+      withCredentials ? { url: pdfUrl, withCredentials: true } : pdfUrl,
+    );
 
     const loadPdf = async () => {
       try {
@@ -136,7 +152,7 @@ export default function PDFCoreViewer({
       cancelled = true;
       void loadingTask.destroy();
     };
-  }, [pdfUrl]);
+  }, [pdfUrl, withCredentials]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -167,18 +183,21 @@ export default function PDFCoreViewer({
 
     const requestVersion = ++fitRequestVersionRef.current;
 
-    const fitWidth = async () => {
+    const fitDocument = async () => {
       const page = await pdfDoc.getPage(currentPage);
       if (!isAutoFitEnabledRef.current || requestVersion !== fitRequestVersionRef.current) return;
       const viewport = page.getViewport({ scale: 1 });
       const availableWidth = getAvailableWidth();
       const fitWidthScale = availableWidth / viewport.width;
+      const fitScale = fitMode === 'page'
+        ? Math.min(fitWidthScale, getAvailableHeight() / viewport.height)
+        : fitWidthScale;
       if (!isAutoFitEnabledRef.current || requestVersion !== fitRequestVersionRef.current) return;
-      setScale(Math.max(minScale, Math.min(maxScale, fitWidthScale)));
+      setScale(Math.max(minScale, Math.min(maxScale, fitScale)));
     };
 
     fitFrameRef.current = requestAnimationFrame(() => {
-      fitWidth();
+      fitDocument();
     });
 
     return () => {
@@ -187,7 +206,7 @@ export default function PDFCoreViewer({
         fitFrameRef.current = null;
       }
     };
-  }, [autoFitTick, currentPage, getAvailableWidth, isAutoFitEnabled, maxScale, minScale, pdfDoc]);
+  }, [autoFitTick, currentPage, fitMode, getAvailableHeight, getAvailableWidth, isAutoFitEnabled, maxScale, minScale, pdfDoc]);
 
   useEffect(() => {
     if (!pdfDoc || !canvasRef.current) return;
@@ -288,7 +307,7 @@ export default function PDFCoreViewer({
       fitFrameRef.current = null;
     }
     setIsAutoFitEnabled(false);
-    setScale((current) => Math.min(current + 0.2, 3));
+    setScale((current) => Math.min(current + 0.2, maxScale));
   };
 
   const handleZoomOut = () => {
@@ -298,18 +317,42 @@ export default function PDFCoreViewer({
       fitFrameRef.current = null;
     }
     setIsAutoFitEnabled(false);
-    setScale((current) => Math.max(current - 0.2, 0.5));
+    setScale((current) => Math.max(current - 0.2, minScale));
   };
 
-  const handleFitToWidth = async () => {
+  const handleFit = async () => {
     if (!pdfDoc || !containerRef.current) return;
     const page = await pdfDoc.getPage(currentPage);
     const viewport = page.getViewport({ scale: 1 });
     const availableWidth = getAvailableWidth();
     const fitWidthScale = availableWidth / viewport.width;
+    const fitScale = fitMode === 'page'
+      ? Math.min(fitWidthScale, getAvailableHeight() / viewport.height)
+      : fitWidthScale;
     setIsAutoFitEnabled(true);
-    setScale(Math.max(minScale, Math.min(maxScale, fitWidthScale)));
+    setScale(Math.max(minScale, Math.min(maxScale, fitScale)));
   };
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      fitRequestVersionRef.current += 1;
+      if (fitFrameRef.current !== null) {
+        cancelAnimationFrame(fitFrameRef.current);
+        fitFrameRef.current = null;
+      }
+      setIsAutoFitEnabled(false);
+      const step = event.deltaY < 0 ? 0.1 : -0.1;
+      setScale((current) => Math.max(minScale, Math.min(maxScale, current + step)));
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [maxScale, minScale]);
 
   useEffect(() => {
     if (!enableDragPan || !containerRef.current) return;
@@ -389,7 +432,7 @@ export default function PDFCoreViewer({
           <Button variant="outline" size="sm" onClick={handleZoomIn}>
             <ZoomIn className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={handleFitToWidth} title="Vừa chiều ngang">
+          <Button variant="outline" size="sm" onClick={handleFit} title={fitMode === 'page' ? 'Vừa một trang' : 'Vừa chiều ngang'}>
             <Maximize2 className="h-4 w-4" />
           </Button>
         </div>

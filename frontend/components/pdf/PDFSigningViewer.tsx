@@ -24,6 +24,8 @@ interface SignatureField {
 
 interface PDFSigningViewerProps {
   pdfUrl: string;
+  withCredentials?: boolean;
+  fitMode?: 'width' | 'page';
   fields: SignatureField[];
   signerId: number;
   onFieldClick: (field: SignatureField) => void;
@@ -37,6 +39,8 @@ interface PDFSigningViewerProps {
 
 export default function PDFSigningViewer({
   pdfUrl,
+  withCredentials = false,
+  fitMode = 'width',
   fields,
   signerId,
   onFieldClick,
@@ -94,13 +98,16 @@ export default function PDFSigningViewer({
   };
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-lg border bg-card p-4" aria-labelledby="signing-fields-heading">
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <section className="shrink-0 rounded-lg border bg-card p-3" aria-labelledby="signing-fields-heading">
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 id="signing-fields-heading" className="font-semibold">Các trường cần hoàn thành</h2><p className="text-sm text-muted-foreground" aria-live="polite">{completedCount}/{myFields.length} đã hoàn thành</p></div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">{myFields.map((field) => { const done = field.id in fieldValues || completedFieldIds.includes(field.id); return <button key={`list-${field.id}`} type="button" onClick={() => openField(field)} disabled={done || (guidedMode && field.id !== currentFieldId && !done)} className="rounded border p-3 text-left focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"><span className="font-medium">{getResolvedFieldLabel(field)}</span><span className="ml-2 text-sm text-muted-foreground">{done ? 'Đã hoàn thành' : 'Bắt buộc'}</span></button>; })}</div>
       </section>
+    <div className="min-h-0 flex-1">
     <PDFCoreViewer
       pdfUrl={pdfUrl}
+      withCredentials={withCredentials}
+      fitMode={fitMode}
       loading={!pdfUrl}
       loadingLabel="Đang tải PDF..."
       errorTitle="Không thể tải PDF"
@@ -257,6 +264,7 @@ export default function PDFSigningViewer({
         );
       }}
     />
+    </div>
     <SignatureModal
       open={!!activeSignatureField}
       signerName="Người ký"

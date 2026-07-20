@@ -44,7 +44,27 @@ const approval = {
   approver: { id: 7, email: "approver@example.test", full_name: "Approver" },
 };
 
-test("assigned approver sees only tenant-scoped pending approvals", async () => {
+const approvedApproval = {
+  ...approval,
+  id: 52,
+  action: "approved",
+  acted_at: new Date("2026-07-14T01:00:00Z"),
+};
+
+const visibleApprovalWhere = {
+  approver_user_id: 7,
+  document: { tenant_id: 2, status: { not: "archived" } },
+  OR: [
+    {
+      action: "pending",
+      workflow_instance: { status: "in_progress" },
+      document: { status: "pending_approval" },
+    },
+    { action: { in: ["approved", "rejected", "request_info", "info_requested"] } },
+  ],
+};
+
+test("approval list keeps terminal history while pending remains active-run scoped", async () => {
   const whereClauses: unknown[] = [];
   (prisma.document_approvals as unknown as { findMany: unknown }).findMany = async ({ where }: { where: unknown }) => {
     whereClauses.push(where);
@@ -54,37 +74,57 @@ test("assigned approver sees only tenant-scoped pending approvals", async () => 
   const result = await approvalsService.getMyPendingApprovals(7, 2);
   assert.equal(result.approvals.length, 1);
   assert.equal(result.statistics.pending, 1);
-  const actionableWhere = {
-    approver_user_id: 7,
-    action: "pending",
-    workflow_instance: { status: "in_progress" },
-    document: { tenant_id: 2, status: "pending_approval" },
-  };
-  assert.deepEqual(whereClauses[0], actionableWhere);
-  assert.deepEqual(whereClauses[1], actionableWhere);
+  assert.deepEqual(whereClauses[0], visibleApprovalWhere);
+  assert.deepEqual(whereClauses[1], visibleApprovalWhere);
 });
 
-test("combined tasks scope pending approvals to the assigned user and tenant", async () => {
+test("combined tasks keep completed approvals and scope pending approvals to the active run", async () => {
   let approvalWhere: unknown;
   (prisma.users as unknown as { findFirst: unknown }).findFirst = async () => ({ email: "approver@example.test" });
   (prisma.document_approvals as unknown as { findMany: unknown }).findMany = async ({ where }: { where: unknown }) => {
     approvalWhere = where;
-    return [approval];
+    return [approval, approvedApproval];
   };
   (prisma.sign_requests as unknown as { findMany: unknown }).findMany = async ({ where }: { where: unknown }) => {
-    assert.deepEqual(where, { tenant_id: 2 });
+    assert.deepEqual(where, {
+      tenant_id: 2,
+      status: { not: "archived" },
+      document: { status: { not: "archived" } },
+    });
     return [];
   };
 
   const result = await approvalsService.getMyCombinedTasks(7, 2);
-  assert.equal(result.tasks.length, 1);
+  assert.equal(result.tasks.length, 2);
   assert.equal(result.tasks[0].task_id, 51);
-  assert.deepEqual(approvalWhere, {
-    approver_user_id: 7,
-    action: "pending",
-    workflow_instance: { status: "in_progress" },
-    document: { tenant_id: 2, status: "pending_approval" },
-  });
+  assert.equal(result.tasks[1].task_id, 52);
+  assert.equal(result.statistics.approval_pending, 1);
+  assert.equal(result.statistics.completed, 1);
+  assert.deepEqual(approvalWhere, visibleApprovalWhere);
+});
+
+test("combined tasks hide stale pending signers but keep completed signer history", async () => {
+  (prisma.users as unknown as { findFirst: unknown }).findFirst = async () => ({ email: "approver@example.test" });
+  (prisma.document_approvals as unknown as { findMany: unknown }).findMany = async () => [];
+  (prisma.sign_requests as unknown as { findMany: unknown }).findMany = async () => [
+    {
+      id: 61,
+      document_id: 101,
+      status: "cancelled",
+      created_at: new Date("2026-07-14T00:00:00Z"),
+      document: approval.document,
+      signers: [
+        { id: 71, status: "pending", signing_order: 1 },
+        { id: 72, status: "completed", signing_order: 1 },
+      ],
+    },
+  ];
+
+  const result = await approvalsService.getMyCombinedTasks(7, 2, { taskType: "signing" });
+
+  assert.deepEqual(result.tasks.map((task) => task.task_id), [72]);
+  assert.equal(result.statistics.signing_pending, 0);
+  assert.equal(result.statistics.completed, 1);
 });
 
 test("an unassigned user cannot approve a task even when RBAC allows approval updates", async () => {

@@ -311,8 +311,8 @@ export default function SignRequestsPage() {
       <div className="flex items-center justify-between">
         <PageHeader
           icon={PenTool}
-          title="Yêu cầu Ký điện tử"
-          description="Theo dõi và quản lý các yêu cầu ký điện tử bạn đã tạo"
+          title="Yêu cầu Ký duyệt"
+          description="Theo dõi và quản lý các yêu cầu ký duyệt bạn đã tạo"
           iconColor="text-green-600"
         />
         <Button

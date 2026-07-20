@@ -11,6 +11,7 @@ import { prisma } from "../../config/prisma";
 import { createSigningSession, getSigningSessionErrorCode, isSigningSessionValid, PUBLIC_SIGNING_COOKIE_PATH, SIGNING_SESSION_COOKIE, SIGNING_SESSION_TTL_SECONDS } from "./signingSession.service";
 import { publicSigningCommandService } from "./publicSigningCommand.service";
 import { buildPreOtpSigningMetadata, buildVerifiedSigningMetadata } from "./publicSigning.response";
+import { documentsService } from "../documents/documents.service";
 
 const parseCookies = (cookieHeader?: string): Record<string, string> => {
   if (!cookieHeader) return {};
@@ -34,7 +35,7 @@ const requireSigningSession = (req: Request, signerId: number, signRequestId: nu
 };
 
 const sendOtpSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().optional(),
 });
 
 const submitSignatureSchema = z.object({
@@ -77,11 +78,6 @@ export class PublicSignController {
       throw ApiError.notFound("Invalid signing link", "INVALID_SIGNING_LINK");
     }
 
-    if (!hasSigningSession(req, signer.id, signer.sign_request_id, signer.otp)) {
-      res.json(ok(buildPreOtpSigningMetadata({ signer, signRequest: signer.sign_request })));
-      return;
-    }
-
     if (signer.status === "signed" || signer.status === "completed") {
       res.json(
         ok({
@@ -91,6 +87,11 @@ export class PublicSignController {
           ...buildVerifiedSigningMetadata({ signer, signRequest: signer.sign_request }),
         }),
       );
+      return;
+    }
+
+    if (!hasSigningSession(req, signer.id, signer.sign_request_id, signer.otp)) {
+      res.json(ok(buildPreOtpSigningMetadata({ signer, signRequest: signer.sign_request })));
       return;
     }
 
@@ -134,13 +135,19 @@ export class PublicSignController {
     } catch {
       throw ApiError.notFound("Document file not found");
     }
+    const watermarkedBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded({
+      fileBytes: pdfBuffer,
+      mimeType: "application/pdf",
+      documentStatus: document.status,
+      tenantId: document.tenant_id,
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
       `inline; filename="${document.original_file_name || "document.pdf"}"`,
     );
-    res.send(Buffer.from(pdfBuffer));
+    res.send(watermarkedBuffer || Buffer.from(pdfBuffer));
   };
 
   sendOtp = async (req: Request, res: Response): Promise<void> => {
@@ -157,7 +164,7 @@ export class PublicSignController {
     if (!signer) {
       throw ApiError.notFound("Invalid signing link");
     }
-    if (signer.email !== body.email) {
+    if (body.email && signer.email !== body.email) {
       throw ApiError.badRequest("Email does not match", "SIGNER_EMAIL_MISMATCH");
     }
 
@@ -230,11 +237,18 @@ export class PublicSignController {
       throw ApiError.notFound("Signed PDF file not found");
     }
 
+    const watermarkedBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded({
+      fileBytes: pdfBuffer,
+      mimeType: "application/pdf",
+      documentStatus: document.status,
+      tenantId: document.tenant_id,
+    });
+    const responseBuffer = watermarkedBuffer || Buffer.from(pdfBuffer);
     const filename = `${document.document_number || document.original_file_name || "document"}_signed.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Length", pdfBuffer.byteLength);
-    res.send(Buffer.from(pdfBuffer));
+    res.setHeader("Content-Length", responseBuffer.byteLength);
+    res.send(responseBuffer);
   };
 
   submitSignature = async (req: Request, res: Response): Promise<void> => {

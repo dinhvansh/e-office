@@ -81,7 +81,7 @@ class SignRequestsService {
 
     if (!signer) {
       throw ApiError.notFound(
-        "Báº¡n khÃ´ng pháº£i lÃ  ngÆ°á»i kÃ½ cá»§a tÃ i liá»‡u nÃ y",
+        "Bạn không phải là người ký của tài liệu này",
         "SIGNER_NOT_FOUND"
       );
     }
@@ -446,6 +446,7 @@ class SignRequestsService {
     const signRequest = await this.ensureCanManageSignRequest(id, tenantId, userId);
 
     this.ensureSendableStatus(signRequest.status || "");
+    await documentWorkflowOrchestratorService.validateDraftRequirements(id, tenantId);
     await this.validateSignFieldsIfNeeded(id);
 
     if (["rejected", "cancelled"].includes(signRequest.status)) {
@@ -950,7 +951,6 @@ class SignRequestsService {
         signRequestId,
         {
           includeAuditTrail: false,
-          addWatermark: true,
         }
       );
       const artifactBytes = await readStoredFile(storageService, signedPdfPath);
@@ -1035,21 +1035,21 @@ class SignRequestsService {
 
     if (signer.status === "signed" || signer.status === "completed") {
       throw ApiError.badRequest(
-        "Báº¡n Ä‘Ã£ kÃ½ tÃ i liá»‡u nÃ y rá»“i",
+        "Bạn đã ký tài liệu này rồi",
         "ALREADY_SIGNED"
       );
     }
 
     if (signer.status === "rejected") {
       throw ApiError.badRequest(
-        "Báº¡n Ä‘Ã£ tá»« chá»‘i tÃ i liá»‡u nÃ y",
+        "Bạn đã từ chối tài liệu này",
         "ALREADY_REJECTED"
       );
     }
 
     if (signer.status !== "pending") {
       throw ApiError.badRequest(
-        "ChÆ°a Ä‘áº¿n lÆ°á»£t báº¡n xá»­ lÃ½ tÃ i liá»‡u nÃ y",
+        "Chưa đến lượt bạn xử lý tài liệu này",
         "SIGNER_NOT_ACTIVE"
       );
     }
@@ -1092,7 +1092,7 @@ class SignRequestsService {
         tenant_id: tenantId,
         sign_request_id: signRequestId,
         user_id: userId,
-        body: `Tá»« chá»‘i kÃ½: ${reason}`,
+        body: `Từ chối ký: ${reason}`,
       },
     });
 
@@ -1122,15 +1122,15 @@ class SignRequestsService {
         tenantId,
         userId: document.owner.id,
         type: NotificationType.APPROVAL_REJECTED,
-        title: "TÃ i liá»‡u bá»‹ tá»« chá»‘i kÃ½",
-        message: `TÃ i liá»‡u "${document.title || signRequest.title || "Untitled"}" Ä‘Ã£ bá»‹ tá»« chá»‘i bá»Ÿi ${actor?.full_name || actor?.email || "ngÆ°á»i kÃ½"}`,
+        title: "Tài liệu bị từ chối ký",
+        message: `Tài liệu "${document.title || signRequest.title || "Untitled"}" đã bị từ chối bởi ${actor?.full_name || actor?.email || "người ký"}`,
         link: `/documents/${document.id}/flow`,
       }).catch((error) => console.error("Failed to create sign rejection notification:", error));
     }
 
     return {
       success: true,
-      message: "ÄÃ£ tá»« chá»‘i kÃ½ tÃ i liá»‡u",
+      message: "Đã từ chối ký tài liệu",
       signer_id: signer.id,
       status: "rejected",
     };
@@ -1407,6 +1407,11 @@ class SignRequestsService {
         role?: string;
         external_org_id?: number | null;
       }>;
+      internal_signers?: Array<{
+        user_id: number;
+        signing_order?: number;
+        role?: "signer";
+      }>;
       workflow_steps?: Array<{
         step_name: string;
         approver_type?: string;
@@ -1427,6 +1432,53 @@ class SignRequestsService {
         signRequest.document_id,
         payload.workflow_steps
       );
+    }
+
+    if (payload.internal_signers) {
+      const requestedUserIds = [...new Set(payload.internal_signers.map((signer) => signer.user_id))];
+      if (requestedUserIds.length !== payload.internal_signers.length) {
+        throw ApiError.badRequest("Internal signers must be unique", "DUPLICATE_INTERNAL_SIGNER");
+      }
+      const activeUsers = requestedUserIds.length
+        ? await prisma.users.findMany({
+            where: { id: { in: requestedUserIds }, tenant_id: tenantId, status: "active" },
+            select: { id: true, email: true, full_name: true },
+          })
+        : [];
+      if (activeUsers.length !== requestedUserIds.length) {
+        throw ApiError.badRequest("An internal signer is inactive or outside the tenant", "INVALID_INTERNAL_SIGNER");
+      }
+
+      const activeUserById = new Map(activeUsers.map((user) => [user.id, user]));
+      const existingInternal = (await signersRepository.findBySignRequest(signRequestId))
+        .filter((signer) => signer.is_internal);
+      const requestedUserIdSet = new Set(requestedUserIds);
+      for (const signer of existingInternal) {
+        if (!signer.user_id || !requestedUserIdSet.has(signer.user_id)) {
+          await prisma.sign_request_fields.deleteMany({ where: { assigned_signer_id: signer.id } });
+          await signersRepository.delete(signer.id);
+        }
+      }
+
+      const remainingInternal = (await signersRepository.findBySignRequest(signRequestId))
+        .filter((signer) => signer.is_internal && signer.user_id);
+      const existingByUserId = new Map(remainingInternal.map((signer) => [signer.user_id as number, signer]));
+      for (let index = 0; index < payload.internal_signers.length; index += 1) {
+        const input = payload.internal_signers[index];
+        const user = activeUserById.get(input.user_id)!;
+        const existing = existingByUserId.get(input.user_id);
+        const data = {
+          email: user.email,
+          name: user.full_name || user.email,
+          role: "signer",
+          signing_order: input.signing_order || index + 1,
+          status: "draft",
+          is_internal: true,
+          user: { connect: { id: user.id } },
+        };
+        if (existing) await signersRepository.update(existing.id, data);
+        else await signersRepository.create({ ...data, sign_request: { connect: { id: signRequestId } } });
+      }
     }
 
     const existingSigners = await signersRepository.findBySignRequest(signRequestId);

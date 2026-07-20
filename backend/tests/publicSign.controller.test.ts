@@ -12,10 +12,12 @@ import { PublicSignController } from "../src/modules/public/publicSign.controlle
 import { PublicSigningCommandService } from "../src/modules/public/publicSigningCommand.service";
 import { createSigningSession, SIGNING_SESSION_COOKIE } from "../src/modules/public/signingSession.service";
 import { signersService } from "../src/modules/signers/signers.service";
+import { documentsService } from "../src/modules/documents/documents.service";
 
 const originalFindUnique = prisma.signers.findUnique;
 const originalStorageGet = storageService.get;
 const originalSendOtp = signersService.sendOtp;
+const originalWatermark = documentsService.getWatermarkedDocumentBufferIfNeeded;
 
 const replaceFindUnique = (value: unknown) => {
   (prisma.signers as unknown as { findUnique: unknown }).findUnique = value;
@@ -29,6 +31,7 @@ afterEach(() => {
   replaceFindUnique(originalFindUnique);
   replaceStorageGet(originalStorageGet);
   (signersService as unknown as { sendOtp: unknown }).sendOtp = originalSendOtp;
+  (documentsService as unknown as { getWatermarkedDocumentBufferIfNeeded: unknown }).getWatermarkedDocumentBufferIfNeeded = originalWatermark;
 });
 
 const signer = {
@@ -77,12 +80,55 @@ test("an invitation token cannot fetch the original PDF before OTP verification"
 test("a verified signing session can fetch the original PDF", async () => {
   replaceFindUnique(async () => signer);
   replaceStorageGet(async () => Readable.from(Buffer.from("pdf")));
+  (documentsService as unknown as { getWatermarkedDocumentBufferIfNeeded: unknown }).getWatermarkedDocumentBufferIfNeeded = async () => null;
   const res = response();
   const session = createSigningSession(signer.id, signer.sign_request_id, signer.otp);
 
   await new PublicSignController().getDocument(controllerRequest(`${SIGNING_SESSION_COOKIE}=${encodeURIComponent(session)}`), res as unknown as Response);
   assert.deepEqual(res.body, Buffer.from("pdf"));
   assert.equal(res.headers.get("Content-Type"), "application/pdf");
+});
+
+test("a verified signing session receives the in-progress delivery watermark", async () => {
+  replaceFindUnique(async () => ({
+    ...signer,
+    sign_request: {
+      ...signer.sign_request,
+      document: { ...signer.sign_request.document, tenant_id: 1, status: "in_progress" },
+    },
+  }));
+  replaceStorageGet(async () => Readable.from(Buffer.from("canonical-pdf")));
+  (documentsService as unknown as { getWatermarkedDocumentBufferIfNeeded: unknown }).getWatermarkedDocumentBufferIfNeeded = async () => Buffer.from("in-progress-watermark");
+  const res = response();
+  const session = createSigningSession(signer.id, signer.sign_request_id, signer.otp);
+
+  await new PublicSignController().getDocument(controllerRequest(`${SIGNING_SESSION_COOKIE}=${encodeURIComponent(session)}`), res as unknown as Response);
+
+  assert.deepEqual(res.body, Buffer.from("in-progress-watermark"));
+});
+
+test("public signed download applies the same delivery watermark policy", async () => {
+  replaceFindUnique(async () => ({
+    ...signer,
+    sign_request: {
+      ...signer.sign_request,
+      document: {
+        ...signer.sign_request.document,
+        tenant_id: 1,
+        status: "completed",
+        document_number: "DOC-30",
+        signed_file_path: "storage/1/signed_30.pdf",
+      },
+    },
+  }));
+  replaceStorageGet(async () => Readable.from(Buffer.from("canonical-pdf")));
+  (documentsService as unknown as { getWatermarkedDocumentBufferIfNeeded: unknown }).getWatermarkedDocumentBufferIfNeeded = async () => Buffer.from("watermarked-pdf");
+  const res = response();
+
+  await new PublicSignController().downloadSignedPdf(controllerRequest(), res as unknown as Response);
+
+  assert.deepEqual(res.body, Buffer.from("watermarked-pdf"));
+  assert.equal(res.headers.get("Content-Length"), Buffer.byteLength("watermarked-pdf"));
 });
 
 test("an expired signing session cannot fetch the original PDF", async () => {
@@ -111,6 +157,46 @@ test("a post-sign session cannot submit another signature", async () => {
     otp: "123456",
     fieldValues: [],
   }), (error: unknown) => error instanceof ApiError && error.statusCode === 400);
+});
+
+test("a completed signer sees the completion page after refresh without another OTP", async () => {
+  replaceFindUnique(async () => ({
+    ...signer,
+    status: "signed",
+    signed_at: new Date("2026-07-20T10:38:48.250Z"),
+  }));
+  const res = response();
+
+  await new PublicSignController().getSigningPage(controllerRequest(), res as unknown as Response);
+
+  assert.deepEqual(res.body, {
+    success: true,
+    data: {
+      already_signed: true,
+      signed_at: new Date("2026-07-20T10:38:48.250Z"),
+      message: "You have already signed this document",
+      signer: {
+        id: signer.id,
+        name: undefined,
+        email: undefined,
+        role: undefined,
+        status: "signed",
+      },
+      sign_request: {
+        id: signer.sign_request.id,
+        title: undefined,
+        message: undefined,
+        deadline: undefined,
+        created_at: undefined,
+      },
+      document: {
+        id: signer.sign_request.document.id,
+        title: undefined,
+        original_file_name: signer.sign_request.document.original_file_name,
+        created_at: undefined,
+      },
+    },
+  });
 });
 
 test("OTP verification reports the stable OTP_INVALID code", async () => {
@@ -156,7 +242,7 @@ test("expired OTP verification returns the stable OTP_EXPIRED code", async () =>
   } as unknown as Request, response() as unknown as Response), (error: unknown) => error instanceof ApiError && error.code === "OTP_EXPIRED");
 });
 
-test("OTP resend returns expiry and cooldown metadata without exposing delivery details", async () => {
+test("OTP resend resolves the recipient from the signing token without exposing delivery details", async () => {
   replaceFindUnique(async () => ({ ...signer, email: "signer@example.test" }));
   (signersService as unknown as { sendOtp: unknown }).sendOtp = async () => ({
     otp: "123456",
@@ -167,7 +253,7 @@ test("OTP resend returns expiry and cooldown metadata without exposing delivery 
 
   await new PublicSignController().sendOtp({
     params: { token: signer.signing_token },
-    body: { email: "signer@example.test" },
+    body: {},
   } as unknown as Request, res as unknown as Response);
 
   assert.deepEqual(res.body, { success: true, data: { otp_sent: true, otp_expires_at: "2026-07-14T10:00:00.000Z", resend_cooldown_seconds: 30 } });

@@ -18,6 +18,8 @@ const originals = {
   deleteDocument: documentsService.deleteDocument,
   ccCreate: prisma.document_cc_emails.create,
   userFindUnique: prisma.users.findUnique,
+  documentTypeFindFirst: prisma.document_types.findFirst,
+  tenantSettingFindFirst: prisma.tenant_settings.findFirst,
   transaction: prisma.$transaction,
 };
 
@@ -34,6 +36,8 @@ afterEach(() => {
   replace(documentsService, "deleteDocument", originals.deleteDocument);
   replace(prisma.document_cc_emails, "create", originals.ccCreate);
   replace(prisma.users, "findUnique", originals.userFindUnique);
+  replace(prisma.document_types, "findFirst", originals.documentTypeFindFirst);
+  replace(prisma.tenant_settings, "findFirst", originals.tenantSettingFindFirst);
   replace(prisma, "$transaction", originals.transaction);
 });
 
@@ -44,6 +48,24 @@ function installDocumentCreation(documentId = 30) {
     id: documentId,
     title: "Synthetic document",
     original_file_name: "source.pdf",
+  }));
+  replace(prisma.document_types, "findFirst", async () => ({
+    id: 7,
+    tenant_id: 1,
+    require_numbering: false,
+    require_approval: false,
+    require_digital_signing: true,
+    default_workflow_id: null,
+    default_workflow: null,
+  }));
+  replace(prisma.tenant_settings, "findFirst", async () => null);
+  replace(prisma.users, "findUnique", async () => ({
+    id: 2,
+    tenant_id: 1,
+    department_id: null,
+    user_roles: [],
+    full_name: "Owner",
+    email: "owner@example.test",
   }));
 }
 
@@ -58,7 +80,7 @@ test("workflow package creation failure compensates the document record", async 
   installDocumentCreation();
   replace(documentWorkflowOrchestratorService, "prepareDraftPackage", async () => { throw new Error("workflow failure"); });
 
-  await expectCompensatedFailure({ fileName: "source.pdf", storagePath: "storage/source.pdf", forceSignRequest: true });
+  await expectCompensatedFailure({ fileName: "source.pdf", storagePath: "storage/source.pdf", documentTypeId: 7, forceSignRequest: true });
 });
 
 test("ACL persistence failure compensates the document record", async () => {
@@ -81,6 +103,7 @@ test("CC persistence failure after workflow preparation compensates the document
   await expectCompensatedFailure({
     fileName: "source.pdf",
     storagePath: "storage/source.pdf",
+    documentTypeId: 7,
     forceSignRequest: true,
     ccEmails: ["cc@example.test"],
   });

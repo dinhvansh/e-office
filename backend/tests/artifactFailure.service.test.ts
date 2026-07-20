@@ -19,7 +19,7 @@ afterEach(() => {
   (storageService as unknown as { get: unknown }).get = originalStorageGet;
 });
 
-function installArtifactTransactionHarness(initialStatus: string, transitions: string[]) {
+function installArtifactTransactionHarness(initialStatus: string, transitions: string[], emailOutboxes: Array<Record<string, unknown>> = []) {
   let status = initialStatus;
   const tx = {
     documents: {
@@ -27,11 +27,19 @@ function installArtifactTransactionHarness(initialStatus: string, transitions: s
       update: async ({ data }: { data: { status: string } }) => { status = data.status; transitions.push(`document:${status}`); },
     },
     sign_requests: {
-      findUnique: async () => ({ document_id: 30, status, document: { status, signed_file_path: null, hash: null } }),
+      findUnique: async () => ({
+        id: 20,
+        tenant_id: 1,
+        document_id: 30,
+        title: "Signing test",
+        status,
+        document: { status, signed_file_path: null, hash: null, title: "Signing test", document_number: "DOC-30" },
+        signers: [{ id: 7, name: "External signer", email: "external@example.test", signing_token: "stable-token", is_internal: false, status: "signed" }],
+      }),
       update: async ({ data }: { data: { status: string } }) => { status = data.status; transitions.push(`request:${status}`); },
     },
     audit_logs: { create: async ({ data }: { data: { event: string } }) => { transitions.push(data.event); } },
-    outbox_events: { create: async () => undefined },
+    outbox_events: { create: async ({ data }: { data: Record<string, unknown> }) => { emailOutboxes.push(data); } },
   };
   (prisma as unknown as { $transaction: unknown }).$transaction = async (operation: unknown) =>
     (operation as (client: typeof tx) => unknown)(tx);
@@ -56,7 +64,8 @@ test("a missing Unicode font marks the artifact failed without completing the do
 
 test("worker success persists one readable, hashed artifact and duplicate processing is a no-op", async () => {
   const transitions: string[] = [];
-  installArtifactTransactionHarness("generating_artifact", transitions);
+  const emailOutboxes: Array<Record<string, unknown>> = [];
+  installArtifactTransactionHarness("generating_artifact", transitions, emailOutboxes);
   let generationCalls = 0;
   (prisma.sign_requests as unknown as { findUnique: unknown }).findUnique = async () => ({
     document_id: 30,
@@ -69,6 +78,20 @@ test("worker success persists one readable, hashed artifact and duplicate proces
   await signedArtifactWorker.processSignedArtifactEvent({ payload: { sign_request_id: 20 } });
   assert.deepEqual(transitions, ["document:completed", "request:completed", "artifact.generation_succeeded"]);
   assert.equal(generationCalls, 1);
+  assert.equal(emailOutboxes.length, 1);
+  assert.equal(emailOutboxes[0].deduplication_key, "signed-artifact-ready:20:external-signer:7");
+  assert.deepEqual(emailOutboxes[0].payload, {
+    template: "sign_completed",
+    data: {
+      tenantId: 1,
+      recipientEmail: "external@example.test",
+      recipientName: "External signer",
+      documentTitle: "Signing test",
+      documentNumber: "DOC-30",
+      signerName: "External signer",
+      documentUrl: "http://localhost:3000/sign/stable-token",
+    },
+  });
 });
 
 test("retry action only requeues a failed artifact", async () => {

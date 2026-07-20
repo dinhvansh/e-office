@@ -16,6 +16,8 @@ export interface DocumentFileResult {
   mimeType: string;
   documentStatus: string | null;
   tenantId: number;
+  documentId: number;
+  sourceKind: "original" | "signed";
 }
 
 const mimeTypes: Record<string, string> = {
@@ -46,7 +48,7 @@ class DocumentFileService {
       const fileBytes = path.isAbsolute(document.file_path)
         ? await fs.readFile(document.file_path)
         : await readStoredFile(storageService, document.file_path);
-      return { fileBytes: Buffer.from(fileBytes), fileName, mimeType: mimeTypes[ext.toLowerCase()] || "application/octet-stream", documentStatus: document.status || null, tenantId: document.tenant_id };
+      return { fileBytes: Buffer.from(fileBytes), fileName, mimeType: mimeTypes[ext.toLowerCase()] || "application/octet-stream", documentStatus: document.status || null, tenantId: document.tenant_id, documentId: document.id, sourceKind: "original" };
     } catch {
       throw ApiError.notFound("File not found on disk", "FILE_NOT_FOUND");
     }
@@ -62,7 +64,7 @@ class DocumentFileService {
       const fileBytes = path.isAbsolute(document.signed_file_path)
         ? await fs.readFile(document.signed_file_path)
         : await readStoredFile(storageService, document.signed_file_path);
-      return { fileBytes: Buffer.from(fileBytes), fileName, mimeType: "application/pdf", documentStatus: document.status || null, tenantId: document.tenant_id };
+      return { fileBytes: Buffer.from(fileBytes), fileName, mimeType: "application/pdf", documentStatus: document.status || null, tenantId: document.tenant_id, documentId: document.id, sourceKind: "signed" };
     } catch {
       throw ApiError.notFound("Signed file not found on disk", "FILE_NOT_FOUND");
     }

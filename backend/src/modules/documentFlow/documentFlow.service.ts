@@ -66,9 +66,7 @@ export class DocumentFlowService {
           },
         },
         workflow_instances: {
-          where: { status: 'in_progress' },
           orderBy: { run_number: 'desc' },
-          take: 1,
           include: {
             workflow: true,
           },
@@ -112,7 +110,12 @@ export class DocumentFlowService {
     if (!loadedDocument) {
       throw new Error('Document not found');
     }
-    const currentWorkflowInstance = loadedDocument.workflow_instances[0] || null;
+    // Prefer the actionable run while a request is active. Once the request is
+    // closed there is no in-progress run, so fall back to the latest run rather
+    // than hiding the completed/rejected workflow and its approvals.
+    const currentWorkflowInstance = loadedDocument.workflow_instances.find(
+      (instance) => instance.status === 'in_progress'
+    ) || loadedDocument.workflow_instances[0] || null;
     const document = {
       ...loadedDocument,
       workflow_instance: currentWorkflowInstance,
@@ -277,6 +280,7 @@ export class DocumentFlowService {
         id: document.id,
         title: document.title,
         document_number: document.document_number,
+        original_file_name: document.original_file_name,
         status: document.status,
         sign_request_id: document.sign_request?.id || null,
         document_type: document.document_type?.name,
@@ -291,6 +295,25 @@ export class DocumentFlowService {
       phases,
       steps,
       activities,
+      workflow_runs: loadedDocument.workflow_instances.map((instance) => ({
+        id: instance.id,
+        run_number: instance.run_number,
+        status: instance.status,
+        workflow_name: instance.workflow.name,
+        started_at: instance.started_at.toISOString(),
+        completed_at: instance.completed_at?.toISOString() || null,
+        approvals: loadedDocument.approvals
+          .filter((approval) => approval.workflow_instance_id === instance.id)
+          .map((approval) => ({
+            id: approval.id,
+            step_order: approval.workflow_step.step_order,
+            step_name: approval.workflow_step.step_name,
+            actor: approval.approver?.full_name || approval.approver?.email || null,
+            action: approval.action,
+            acted_at: approval.acted_at?.toISOString() || null,
+            comment: approval.comment || null,
+          })),
+      })),
       status_summary: this.buildStatusSummary(document, userId),
       // User permissions for actions
       can_approve: this.canUserApprove(document, userId),
@@ -314,12 +337,29 @@ export class DocumentFlowService {
     }
   }
 
-  private buildStatusSummary(document: { status: string | null; owner: { id: number }; sign_request?: { status: string | null; deadline: Date | null; signers: Array<{ status: string | null }> } | null }, userId: number) {
+  private buildStatusSummary(document: {
+    status: string | null;
+    owner: { id: number };
+    approvals?: Array<{ action: string | null }>;
+    sign_request?: { status: string | null; deadline: Date | null; signers: Array<{ status: string | null }> } | null;
+  }, userId: number) {
     const status = document.sign_request?.status || document.status || 'draft';
     const signers = document.sign_request?.signers || [];
-    const completed = signers.filter((signer) => ['signed', 'completed'].includes(signer.status || '')).length;
+    const approvals = document.approvals || [];
+    const hasSigningSteps = signers.length > 0;
+    const completed = hasSigningSteps
+      ? signers.filter((signer) => ['signed', 'completed'].includes(signer.status || '')).length
+      : approvals.filter((approval) => approval.action === 'approved').length;
+    const total = hasSigningSteps ? signers.length : approvals.length;
     const actor = status === 'pending_approval' ? 'approver' : ['pending', 'pending_signature', 'in_progress'].includes(status) ? 'signer' : ['generating_artifact', 'artifact_failed'].includes(status) ? 'system' : status === 'draft' ? 'requester' : null;
-    return { status, current_actor: actor, next_action: status === 'artifact_failed' ? 'RETRY_ARTIFACT' : 'REVIEW_STATUS', progress: { completed, total: signers.length }, deadline: document.sign_request?.deadline?.toISOString() || null, can_retry_artifact: status === 'artifact_failed' && document.owner.id === userId };
+    return {
+      status,
+      current_actor: actor,
+      next_action: status === 'artifact_failed' ? 'RETRY_ARTIFACT' : 'REVIEW_STATUS',
+      progress: { completed, total, kind: hasSigningSteps ? 'signing' : 'approval' },
+      deadline: document.sign_request?.deadline?.toISOString() || null,
+      can_retry_artifact: status === 'artifact_failed' && document.owner.id === userId,
+    };
   }
 
   private mapSignerStatus(status: string): FlowStep['status'] {

@@ -84,17 +84,12 @@ export class ApprovalsController {
       req.auth!.tenantId,
       req.auth!.userId
     );
-    const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
+    const delivery = await documentsService.prepareDocumentDelivery(file);
 
     res.setHeader('Content-Type', file.mimeType || 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${file.fileName}"`);
 
-    if (watermarkBuffer) {
-      res.send(watermarkBuffer);
-      return;
-    }
-
-    res.send(file.fileBytes);
+    res.send(delivery.fileBytes);
   };
 
   downloadDocument = async (req: Request, res: Response): Promise<void> => {
@@ -110,17 +105,12 @@ export class ApprovalsController {
       req.auth!.tenantId,
       req.auth!.userId
     );
-    const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
+    const delivery = await documentsService.prepareDocumentDelivery(file);
 
     res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
 
-    if (watermarkBuffer) {
-      res.send(watermarkBuffer);
-      return;
-    }
-
-    res.send(file.fileBytes);
+    res.send(delivery.fileBytes);
   };
 
   // Submit document for approval

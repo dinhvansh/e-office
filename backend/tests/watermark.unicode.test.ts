@@ -13,8 +13,8 @@ test("watermark embeds Vietnamese Unicode text into a valid PDF", async () => {
     const input = await PDFDocument.create();
     input.addPage([300, 300]);
     const bytes = await applyWatermarkToPdfBytes(await input.save(), {
-      enabled: true, text: "ÄÃ£ kÃ½ - Nguyá»…n VÄƒn A", draft_text: "", in_progress_text: "", completed_text: "", draft_mode: "none", in_progress_mode: "none", completed_mode: "none", draft_image_data: "", draft_image_mime_type: "", in_progress_image_data: "", in_progress_image_mime_type: "", completed_image_data: "", completed_image_mime_type: "", font_family: "helvetica", position: "center", opacity: .2, fontSize: 20, rotation: 0, color: "#000000", repeat: false, image_scale: .3,
-    }, { mode: "text", text: "ÄÃ£ kÃ½ - Nguyá»…n VÄƒn A", image_data: "", image_mime_type: "" });
+      enabled: true, text: "Đã ký - Nguyễn Văn A", draft_text: "", in_progress_text: "", completed_text: "", draft_mode: "none", in_progress_mode: "none", completed_mode: "none", draft_image_data: "", draft_image_mime_type: "", in_progress_image_data: "", in_progress_image_mime_type: "", completed_image_data: "", completed_image_mime_type: "", font_family: "helvetica", position: "center", opacity: .2, fontSize: 20, rotation: 0, color: "#000000", repeat: false, image_scale: .3,
+    }, { mode: "text", text: "Đã ký - Nguyễn Văn A", image_data: "", image_mime_type: "" });
     assert.ok(bytes.byteLength > 1000);
     await PDFDocument.load(bytes);
   } finally { process.env.PDF_UNICODE_FONT_PATH = previous; }

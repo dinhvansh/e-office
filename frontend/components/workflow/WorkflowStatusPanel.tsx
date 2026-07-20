@@ -7,7 +7,7 @@ export type WorkflowStatusSummary = {
   status: string;
   current_actor: 'requester' | 'approver' | 'signer' | 'system' | null;
   next_action: string;
-  progress: { completed: number; total: number };
+  progress: { completed: number; total: number; kind?: 'approval' | 'signing' };
   deadline: string | null;
   can_retry_artifact: boolean;
 };
@@ -52,7 +52,7 @@ export function WorkflowStatusPanel({ summary, onRetryArtifact, retrying = false
       </div>
       <div className="grid gap-3 text-sm sm:grid-cols-3">
         <div><p className="text-muted-foreground">Đang xử lý</p><p className="flex items-center gap-1 font-medium"><UserRound className="h-4 w-4" aria-hidden="true" />{safe.current_actor ? actorCopy[safe.current_actor] : 'Không có bước đang chờ'}</p></div>
-        <div><p className="text-muted-foreground">Tiến độ</p><p className="font-medium">{safe.progress.completed}/{safe.progress.total} người đã ký</p></div>
+        <div><p className="text-muted-foreground">Tiến độ</p><p className="font-medium">{safe.progress.completed}/{safe.progress.total} {safe.progress.kind === 'approval' ? 'bước đã phê duyệt' : 'người đã ký'}</p></div>
         <div><p className="text-muted-foreground">Hạn xử lý</p><p className="font-medium">{safe.deadline ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium' }).format(new Date(safe.deadline)) : 'Chưa đặt hạn'}</p></div>
       </div>
       {isFailure && safe.can_retry_artifact && onRetryArtifact ? <Button type="button" variant="outline" onClick={onRetryArtifact} disabled={retrying}><RefreshCw className={retrying ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />{retrying ? 'Đang thử lại' : 'Thử tạo lại PDF'}</Button> : null}

@@ -34,6 +34,7 @@ type PrepareDraftPackageInput = {
   documentType?: {
     default_workflow_id?: number | null;
     require_approval?: boolean | null;
+    require_digital_signing?: boolean | null;
   } | null;
 };
 
@@ -53,15 +54,39 @@ class DocumentWorkflowOrchestratorService {
       await tx.documents.update({ where: { id: input.documentId }, data: { sign_request_id: signRequest.id } });
 
       const workflow = await this.resolveWorkflowSnapshot(input, tx);
+
+      const approverSteps = workflow?.steps.filter(
+        (step) => step.participant_role === "approver" || !step.participant_role
+      ) || [];
+      if (input.documentType?.require_approval && approverSteps.length === 0) {
+        throw ApiError.badRequest(
+          "At least one approval step is required for this document type",
+          "APPROVAL_STEP_REQUIRED"
+        );
+      }
+
       const workflowSignerCount = await this.seedWorkflowSigners(
         signRequest.id, workflow?.steps || [], input.tenantId, input.ownerId, tx,
       );
       await this.seedManualSigners(signRequest.id, input.signers || [], input.tenantId, workflowSignerCount, tx);
+
+      if (input.documentType?.require_digital_signing) {
+        const signerCount = await tx.signers.count({
+          where: { sign_request_id: signRequest.id, role: "signer" },
+        });
+        if (signerCount === 0) {
+          throw ApiError.badRequest(
+            "At least one valid internal or external signer is required",
+            "SIGNER_REQUIRED"
+          );
+        }
+      }
       return { signRequest, workflow };
     });
   }
 
   async beginRuntimeFlow(signRequestId: number, tenantId: number, userId: number) {
+    await this.validateDraftRequirements(signRequestId, tenantId);
     const signRequest = await signRequestsRepository.findById(signRequestId, tenantId);
     if (!signRequest) {
       throw ApiError.notFound("Sign request not found", "SIGN_REQUEST_NOT_FOUND");
@@ -108,6 +133,76 @@ class DocumentWorkflowOrchestratorService {
     return {
       phase: activation.completedWithoutSigners ? ("completed" as const) : ("signing" as const),
     };
+  }
+
+  async validateDraftRequirements(signRequestId: number, tenantId: number) {
+    const signRequest = await signRequestsRepository.findById(signRequestId, tenantId);
+    if (!signRequest) {
+      throw ApiError.notFound("Sign request not found", "SIGN_REQUEST_NOT_FOUND");
+    }
+
+    const documentType = signRequest.document?.document_type_id
+      ? await prisma.document_types.findFirst({
+          where: { id: signRequest.document.document_type_id, tenant_id: tenantId, is_active: true },
+          select: { require_approval: true, require_digital_signing: true },
+        })
+      : null;
+
+    if (!documentType || (!documentType.require_approval && !documentType.require_digital_signing)) {
+      throw ApiError.badRequest(
+        "Document type must require approval or digital signing",
+        "DOCUMENT_TYPE_NOT_SIGN_REQUEST_CAPABLE"
+      );
+    }
+
+    const documentWorkflow = await prisma.workflows.findFirst({
+      where: {
+        tenant_id: tenantId,
+        created_for_doc: signRequest.document_id,
+        is_active: true,
+      },
+      include: { steps: { orderBy: { step_order: "asc" } } },
+      orderBy: { id: "desc" },
+    });
+
+    const approverSteps = documentWorkflow?.steps.filter(
+      (step) => step.participant_role === "approver" || !step.participant_role
+    ) || [];
+    if (documentType.require_approval && approverSteps.length === 0) {
+      throw ApiError.badRequest(
+        "At least one approval step is required for this document type",
+        "APPROVAL_STEP_REQUIRED"
+      );
+    }
+
+    if (documentType.require_digital_signing) {
+      const internalSignerUserIds = signRequest.signers
+        .filter((signer) => signer.is_internal && signer.user_id)
+        .map((signer) => signer.user_id as number);
+      const activeInternalUsers = internalSignerUserIds.length
+        ? await prisma.users.findMany({
+            where: { id: { in: internalSignerUserIds }, tenant_id: tenantId, status: "active" },
+            select: { id: true },
+          })
+        : [];
+      const activeInternalUserIds = new Set(activeInternalUsers.map((user) => user.id));
+      const hasValidSigner = signRequest.signers.some((signer) => {
+        if (signer.role && signer.role !== "signer") return false;
+        if (signer.is_internal) {
+          return !!signer.user_id && activeInternalUserIds.has(signer.user_id);
+        }
+        return !!signer.email?.trim() && !!signer.name?.trim();
+      });
+
+      if (!hasValidSigner) {
+        throw ApiError.badRequest(
+          "At least one valid internal or external signer is required",
+          "SIGNER_REQUIRED"
+        );
+      }
+    }
+
+    return { documentType, documentWorkflow };
   }
 
   async activateSigningPhase(signRequestId: number, tenantId: number) {

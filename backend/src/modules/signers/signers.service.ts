@@ -161,7 +161,6 @@ class SignersService {
         signer.sign_request_id,
         {
           includeAuditTrail: allSigned,
-          addWatermark: !allSigned
         }
       );
       

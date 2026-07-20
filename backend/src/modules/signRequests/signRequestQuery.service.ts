@@ -4,6 +4,7 @@ import { authorizationService } from "../authorization/authorization.service";
 import { signRequestsRepository } from "./signRequests.repository";
 import { buildSignRequestFlowHints } from "./signRequestFlow.policy";
 import type { SignRequestFlowSigner } from "./signRequestFlow.policy";
+import { buildSignRequestProgress } from "./signRequestProgress.policy";
 
 class SignRequestQueryService {
   async listSignRequests(tenantId: number, userId: number) {
@@ -23,12 +24,27 @@ class SignRequestQueryService {
     const totalPages = Math.ceil(total / limit);
     const signRequests = await signRequestsRepository.findMany({
       where,
-      include: { document: { select: { id: true, title: true, original_file_name: true, document_number: true, status: true, owner: { select: { id: true, full_name: true, email: true } } } }, signers: { select: { id: true, name: true, email: true, status: true, signed_at: true, signing_order: true, is_internal: true, user_id: true }, orderBy: { signing_order: "asc" } } },
+      include: { document: { select: { id: true, title: true, original_file_name: true, document_number: true, status: true, document_type: { select: { name: true } }, owner: { select: { id: true, full_name: true, email: true } }, workflow_instances: { orderBy: { run_number: "desc" }, take: 1, select: { approvals: { select: { action: true } } } } } }, signers: { select: { id: true, name: true, email: true, status: true, signed_at: true, signing_order: true, is_internal: true, user_id: true }, orderBy: { signing_order: "asc" } } },
       orderBy: { created_at: "desc" }, skip: (page - 1) * limit, take: limit,
     });
     return { data: signRequests.map((request) => {
-      const flowRequest = request as typeof request & { signers: SignRequestFlowSigner[] };
-      return { ...flowRequest, ...buildSignRequestFlowHints(flowRequest.status, flowRequest.signers) };
+      const flowRequest = request as typeof request & {
+        signers: SignRequestFlowSigner[];
+        document: {
+          document_type: { name: string } | null;
+          workflow_instances: Array<{ approvals: Array<{ action: string | null }> }>;
+        };
+      };
+      const approvals = flowRequest.document.workflow_instances[0]?.approvals || [];
+      return {
+        ...flowRequest,
+        document: {
+          ...flowRequest.document,
+          document_type: flowRequest.document.document_type?.name || null,
+        },
+        ...buildSignRequestFlowHints(flowRequest.status, flowRequest.signers),
+        progress: buildSignRequestProgress(flowRequest.signers, approvals),
+      };
     }), pagination: { page, limit, total, totalPages, hasNext: page < totalPages, hasPrev: page > 1 } };
   }
 }

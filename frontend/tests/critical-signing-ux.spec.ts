@@ -21,29 +21,64 @@ const verifiedResponse = {
 };
 
 async function mockSigningApi(page: import('@playwright/test').Page, verifyBody: unknown, postOtpBody: unknown = verifiedResponse) {
-  let metadataCalls = 0;
+  let sessionVerified = false;
+  let documentCalls = 0;
+  let documentCookie = '';
+  const appOrigin = new URL(process.env.PLAYWRIGHT_BASE_URL!).origin;
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': appOrigin,
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
   await page.route(new RegExp(`/public/sign/${token}$`), async (route) => {
-    metadataCalls += 1;
-    await route.fulfill({ json: metadataCalls === 1 ? preOtpResponse : postOtpBody });
+    await route.fulfill({ headers: corsHeaders, json: sessionVerified ? postOtpBody : preOtpResponse });
   });
   await page.route(`**/public/sign/${token}/verify-otp`, async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      return route.fulfill({ status: 204, headers: corsHeaders });
+    }
     const failed = (verifyBody as { success?: boolean }).success === false;
-    await route.fulfill({ status: failed ? 400 : 200, json: verifyBody });
+    sessionVerified = !failed;
+    await route.fulfill({
+      status: failed ? 400 : 200,
+      headers: {
+        ...corsHeaders,
+        ...(failed ? {} : { 'Set-Cookie': 'esign_signing_session=test-session; Path=/public/sign; HttpOnly; SameSite=Lax' }),
+      },
+      json: verifyBody,
+    });
   });
+  await page.route(`**/public/sign/${token}/document`, async (route) => {
+    documentCalls += 1;
+    documentCookie = route.request().headers().cookie || '';
+    await route.fulfill({
+      contentType: 'application/pdf',
+      headers: corsHeaders,
+      body: '%PDF-1.4\n%%EOF',
+    });
+  });
+  return {
+    getDocumentCalls: () => documentCalls,
+    getDocumentCookie: () => documentCookie,
+  };
 }
 
 async function verifyOtp(page: import('@playwright/test').Page) {
-  await page.getByPlaceholder('Nhập mã OTP').fill('123456');
-  await page.getByRole('button', { name: /xác thực otp/i }).click();
+  await page.getByLabel('Mã OTP').fill('123456');
+  await page.getByRole('button', { name: /xác thực và tiếp tục/i }).click();
 }
 
 test.describe('critical external signing recovery', () => {
   test('a valid OTP opens the signing surface', async ({ page }) => {
-    await mockSigningApi(page, { success: true, data: { verified: true } });
+    const api = await mockSigningApi(page, { success: true, data: { verified: true } });
     await page.goto(`/sign/${token}`);
+    expect(api.getDocumentCalls()).toBe(0);
     await verifyOtp(page);
     await expect(page.getByRole('heading', { name: 'Yêu cầu ký thử nghiệm' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: '📄 Tài liệu' })).toBeVisible();
+    await expect(page.getByText('Đã xác thực')).toBeVisible();
+    await expect.poll(api.getDocumentCalls).toBeGreaterThan(0);
+    expect(api.getDocumentCookie()).toContain('esign_signing_session=test-session');
   });
 
   test('missing post-OTP document data renders a recoverable Vietnamese error', async ({ page }) => {
@@ -59,7 +94,7 @@ test.describe('critical external signing recovery', () => {
       await mockSigningApi(page, { success: false, error: { code, message: 'OTP rejected' } });
       await page.goto(`/sign/${token}`);
       await verifyOtp(page);
-      await expect(page.getByRole('button', { name: /xác thực otp/i })).toBeVisible();
+      await expect(page.getByRole('button', { name: /xác thực và tiếp tục/i })).toBeVisible();
       await expect(page.getByText('Yêu cầu ký thử nghiệm')).toBeVisible();
     });
   }
@@ -69,7 +104,7 @@ test.describe('OTP recovery controls', () => {
   test('accepts a pasted six-digit code and exposes mobile/autofill attributes', async ({ page }) => {
     await mockSigningApi(page, { success: false, error: { code: 'OTP_INVALID' } });
     await page.goto(`/sign/${token}`);
-    const input = page.getByPlaceholder('Nhập mã OTP');
+    const input = page.getByLabel('Mã OTP');
     await expect(input).toHaveAttribute('inputmode', 'numeric');
     await expect(input).toHaveAttribute('autocomplete', 'one-time-code');
     await input.evaluate((element) => {
@@ -78,16 +113,15 @@ test.describe('OTP recovery controls', () => {
       element.dispatchEvent(event);
     });
     await expect(input).toHaveValue('123456');
-    await expect(page.getByRole('button', { name: /xác thực otp/i })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /xác thực và tiếp tục/i })).toBeEnabled();
   });
 
   test('shows cooldown and safe delivery recovery after resend responses', async ({ page }) => {
     await page.route(new RegExp(`/public/sign/${token}$`), route => route.fulfill({ json: preOtpResponse }));
     await page.route(`**/public/sign/${token}/send-otp`, route => route.fulfill({ json: { success: true, data: { otp_sent: true, otp_expires_at: new Date(Date.now() + 60_000).toISOString(), resend_cooldown_seconds: 30 } } }));
     await page.goto(`/sign/${token}`);
-    await page.getByRole('button', { name: /gửi lại otp/i }).click();
-    await expect(page.getByText(/Mã hết hạn sau/)).toBeVisible();
-    await expect(page.getByText(/Bạn có thể gửi lại mã sau/)).toBeVisible();
-    await expect(page.getByRole('button', { name: /gửi lại otp/i })).toBeDisabled();
+    await page.getByRole('button', { name: /gửi lại mã/i }).click();
+    await expect(page.getByText(/Còn hiệu lực/)).toBeVisible();
+    await expect(page.getByRole('button', { name: /gửi lại sau/i })).toBeDisabled();
   });
 });

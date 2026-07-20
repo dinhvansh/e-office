@@ -7,11 +7,6 @@ import * as path from 'path';
 import { storageService } from '../../core/storage/storage.service';
 import { readStoredFile } from '../../core/storage/fileStorage';
 import { normalizeStoredFieldBox, pctToPdfBox } from './coordinate.helper';
-import {
-  applyWatermarkToPdfBytes,
-  getTenantWatermarkConfig,
-  resolveWatermarkVariantForStatus,
-} from '../settings/watermark.helper';
 
 type PdfFieldValue =
   | Prisma.sign_request_field_valuesGetPayload<{ include: { field: true; signer: true } }>
@@ -51,7 +46,6 @@ export class PdfGenerationService {
     signRequestId: number,
     options: {
       includeAuditTrail?: boolean;
-      addWatermark?: boolean;
     } = {}
   ): Promise<string> {
     console.log(`[Progressive PDF] Starting for sign request ${signRequestId}`);
@@ -145,19 +139,15 @@ export class PdfGenerationService {
       await this.drawFieldValue(pdfDoc, pages, fieldValue, font);
     }
 
-    // 6. Add watermark if needed
-    if (options.addWatermark) {
-      await this.addWatermark(pdfDoc, signRequest.document.tenant_id, signRequest.document.status);
-      console.log(`[Progressive PDF] Added watermark`);
-    }
-
-    // 7. Add audit trail page if needed
+    // 6. Add audit trail page if needed. Watermarks are deliberately applied
+    // only at delivery time so the canonical stored artifact and its hash stay
+    // stable and every download channel follows the same tenant policy.
     if (options.includeAuditTrail) {
       await this.createAuditTrailPage(pdfDoc, signRequest);
       console.log(`[Progressive PDF] Added audit trail`);
     }
 
-    // 8. Save PDF with appropriate filename
+    // 7. Save PDF with appropriate filename
     const signedPdfBytes = await pdfDoc.save();
     const filePath = await this.saveProgressivePdf(
       signedPdfBytes,
@@ -165,39 +155,12 @@ export class PdfGenerationService {
       options.includeAuditTrail || false
     );
 
-    // 9. Cleanup old signing files
+    // 8. Cleanup old signing files
     await this.cleanupOldSigningFiles(signRequest.document.id, filePath);
 
     console.log(`[Progressive PDF] Completed: ${filePath}`);
 
     return filePath;
-  }
-
-  /**
-   * Add watermark to all pages
-   */
-  private async addWatermark(pdfDoc: PDFDocument, tenantId: number, documentStatus?: string | null): Promise<void> {
-    const config = await getTenantWatermarkConfig(tenantId);
-    const variant = resolveWatermarkVariantForStatus(config, documentStatus || 'in_progress');
-    if (!variant) {
-      return;
-    }
-
-    const updatedBytes = await applyWatermarkToPdfBytes(await pdfDoc.save(), config, {
-      ...variant,
-      text: variant.text,
-    });
-    const updatedDoc = await PDFDocument.load(updatedBytes);
-    const pages = pdfDoc.getPages();
-    const nextPages = updatedDoc.getPages();
-
-    while (pages.length > 0) {
-      pdfDoc.removePage(0);
-      pages.shift();
-    }
-
-    const copiedPages = await pdfDoc.copyPages(updatedDoc, nextPages.map((_, index) => index));
-    copiedPages.forEach((page) => pdfDoc.addPage(page));
   }
 
   /**
@@ -341,10 +304,8 @@ export class PdfGenerationService {
     // 6. Add audit trail page
     await this.createAuditTrailPage(pdfDoc, signRequest);
 
-    // 7. Apply completed watermark configuration if enabled
-    await this.addWatermark(pdfDoc, signRequest.document.tenant_id, 'completed');
-
-    // 8. Save signed PDF
+    // 7. Save the canonical signed PDF without a watermark. Delivery endpoints
+    // apply the completed tenant variant consistently for internal/public/ZIP.
     const signedPdfBytes = await pdfDoc.save();
     const signedFilePath = await this.saveSignedPdf(
       signedPdfBytes,

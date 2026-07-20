@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma";
 import { storageService } from "../../core/storage/storage.service";
 import { readStoredFile } from "../../core/storage/fileStorage";
 import { workflowStateService } from "../workflows/workflowState.service";
+import { outboxDeliveryService } from "../outbox/outboxDelivery.service";
 import { pdfGenerationService } from "./pdfGeneration.service";
 
 type ArtifactEvent = {
@@ -67,7 +68,12 @@ export async function processSignedArtifactEvent(event: ArtifactEvent): Promise<
     await prisma.$transaction(async (tx) => {
       const current = await tx.sign_requests.findUnique({
         where: { id: signRequestId },
-        include: { document: { select: { status: true, signed_file_path: true, hash: true } } },
+        include: {
+          document: { select: { status: true, signed_file_path: true, hash: true, title: true, document_number: true } },
+          signers: {
+            select: { id: true, name: true, email: true, signing_token: true, is_internal: true, status: true },
+          },
+        },
       });
       if (!current) throw new Error("Sign request not found for signed artifact event");
       if (current.status === "completed" && current.document.signed_file_path && current.document.hash) return;
@@ -89,6 +95,28 @@ export async function processSignedArtifactEvent(event: ArtifactEvent): Promise<
       await tx.audit_logs.create({
         data: { document_id: current.document_id, event: "artifact.generation_succeeded" },
       });
+
+      const frontendUrl = (process.env.APP_BASE_URL || process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
+      for (const signer of current.signers) {
+        if (signer.is_internal || !signer.email || !signer.signing_token) continue;
+        if (!['signed', 'completed'].includes(signer.status || '')) continue;
+        await outboxDeliveryService.enqueueEmail(tx, {
+          tenantId: current.tenant_id,
+          aggregateType: "signer",
+          aggregateId: signer.id,
+          template: "sign_completed",
+          data: {
+            tenantId: current.tenant_id,
+            recipientEmail: signer.email,
+            recipientName: signer.name || signer.email,
+            documentTitle: current.title || current.document.title || "Tài liệu",
+            documentNumber: current.document.document_number || undefined,
+            signerName: signer.name || signer.email,
+            documentUrl: `${frontendUrl}/sign/${signer.signing_token}`,
+          },
+          deduplicationKey: `signed-artifact-ready:${current.id}:external-signer:${signer.id}`,
+        });
+      }
     });
   } catch (error) {
     await markArtifactFailed(signRequestId);

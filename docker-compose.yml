@@ -93,6 +93,8 @@ services:
   outbox-worker:
     build: ./backend
     command: sh -c "npx prisma migrate deploy && exec node dist/workers/outbox.worker.js"
+    healthcheck:
+      disable: true
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}

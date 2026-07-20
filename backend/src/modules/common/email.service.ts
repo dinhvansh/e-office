@@ -559,10 +559,10 @@ Xem tài liệu: ${data.documentUrl}`;
           </div>
           <div class="content">
             <p>Xin chào <strong>${data.recipientName}</strong>,</p>
-            <p><strong>${data.signerName}</strong> đã ký thành công tài liệu:</p>
+            <p>Tài liệu sau đã được ký và tạo bản hoàn tất thành công:</p>
             <p><strong>${docInfo}</strong></p>
-            <p>Bạn có thể xem tài liệu đã ký trong hệ thống.</p>
-            ${data.documentUrl ? `<p><a href="${data.documentUrl}" class="button">Xem tài liệu</a></p>` : ''}
+            <p>Liên kết bên dưới có thể được sử dụng lại để xem và tải bản PDF đã ký khi cần.</p>
+            ${data.documentUrl ? `<p><a href="${data.documentUrl}" class="button">Xem và tải tài liệu đã ký</a></p>` : ''}
           </div>
           <div class="footer">
             <p>Email này được gửi tự động từ WP Sign.</p>
@@ -579,9 +579,9 @@ Xem tài liệu: ${data.documentUrl}`;
       html,
       text: `Xin chào ${data.recipientName}
 
-${data.signerName} đã ký thành công tài liệu: ${docInfo}${data.documentUrl ? `
+Tài liệu đã được ký và tạo bản hoàn tất thành công: ${docInfo}${data.documentUrl ? `
 
-Xem tài liệu: ${data.documentUrl}` : ''}`,
+Xem và tải tài liệu đã ký: ${data.documentUrl}` : ''}`,
     });
   }
 

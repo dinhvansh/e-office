@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 
-interface InternalSigner {
+export interface InternalSigner {
   user_id: number;
   name: string;
   email: string;
@@ -21,9 +21,10 @@ interface InternalSignersSelectorProps {
   signers: InternalSigner[];
   onChange: (signers: InternalSigner[]) => void;
   allowEdit?: boolean; // For Flexible mode
+  signerOnly?: boolean;
 }
 
-export function InternalSignersSelector({ signers, onChange, allowEdit = false }: InternalSignersSelectorProps) {
+export function InternalSignersSelector({ signers, onChange, allowEdit = false, signerOnly = false }: InternalSignersSelectorProps) {
   const { fetchJson } = useAuth();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
@@ -205,8 +206,7 @@ export function InternalSignersSelector({ signers, onChange, allowEdit = false }
                       placeholder="-- Chọn người ký --"
                     />
 
-                    {/* Role Selector */}
-                    <Select
+                    {!signerOnly && <Select
                       value={signer.role}
                       onValueChange={(value) => handleUpdateSigner(index, 'role', value as 'signer' | 'approver')}
                     >
@@ -217,7 +217,7 @@ export function InternalSignersSelector({ signers, onChange, allowEdit = false }
                         <SelectItem value="signer">✍️ Người ký</SelectItem>
                         <SelectItem value="approver">✅ Người phê duyệt</SelectItem>
                       </SelectContent>
-                    </Select>
+                    </Select>}
                   </>
                 ) : (
                   <>

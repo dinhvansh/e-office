@@ -2,6 +2,10 @@ export type SignRequestFlowSigner = {
   status: string | null;
 };
 
+export type SignRequestFlowApproval = {
+  action: string | null;
+};
+
 export type SignRequestFlowHints = {
   flow_state: "DRAFT" | "COMPLETED" | "CANCELLED" | "REJECTED" | "AWAITING_APPROVAL" | "AWAITING_SIGNATURES" | "GENERATING_ARTIFACT" | "ARTIFACT_FAILED";
   next_action: "EDIT_AND_SEND" | "VIEW_COMPLETED" | "REVIEW_STATUS" | "WAIT_FOR_APPROVAL" | "WAIT_FOR_SIGNING" | "WAIT_FOR_ARTIFACT";
@@ -19,7 +23,7 @@ export type WorkflowStatusSummary = {
   status: string;
   current_actor: "requester" | "approver" | "signer" | "system" | null;
   next_action: SignRequestFlowHints["next_action"] | "RETRY_ARTIFACT";
-  progress: { completed: number; total: number };
+  progress: { completed: number; total: number; kind: "approval" | "signing" };
   deadline: string | null;
   can_retry_artifact: boolean;
 };
@@ -27,12 +31,18 @@ export type WorkflowStatusSummary = {
 export function buildWorkflowStatusSummary(input: {
   status: string | null | undefined;
   signers: readonly SignRequestFlowSigner[];
+  approvals?: readonly SignRequestFlowApproval[];
   deadline?: Date | string | null;
   canRetryArtifact?: boolean;
 }): WorkflowStatusSummary {
   const hints = buildSignRequestFlowHints(input.status, input.signers);
   const status = input.status || "draft";
-  const completed = input.signers.filter((signer) => ["signed", "completed"].includes(signer.status ?? "")).length;
+  const approvals = input.approvals || [];
+  const hasSigners = input.signers.length > 0;
+  const completed = hasSigners
+    ? input.signers.filter((signer) => ["signed", "completed"].includes(signer.status ?? "")).length
+    : approvals.filter((approval) => approval.action === "approved").length;
+  const total = hasSigners ? input.signers.length : approvals.length;
   const waitingApproval = hints.flow_counters.waiting_approval > 0 || status === "pending_approval";
   const waitingSigning = hints.flow_counters.waiting_signing > 0 || hints.flow_counters.pending > 0 || ["pending", "in_progress", "pending_signature"].includes(status);
   const actor = status === "draft" ? "requester"
@@ -45,7 +55,7 @@ export function buildWorkflowStatusSummary(input: {
     status,
     current_actor: actor,
     next_action: status === "artifact_failed" ? "RETRY_ARTIFACT" : hints.next_action,
-    progress: { completed, total: input.signers.length },
+    progress: { completed, total, kind: hasSigners ? "signing" : "approval" },
     deadline: input.deadline ? new Date(input.deadline).toISOString() : null,
     can_retry_artifact: status === "artifact_failed" && Boolean(input.canRetryArtifact),
   };

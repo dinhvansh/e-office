@@ -509,7 +509,7 @@ export class DocumentsController {
       req.auth!.tenantId,
       req.auth!.userId
     );
-    const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
+    const delivery = await documentsService.prepareDocumentDelivery(file);
 
     await auditService.record({
       tenantId: req.auth!.tenantId,
@@ -524,12 +524,7 @@ export class DocumentsController {
     res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
 
-    if (watermarkBuffer) {
-      res.send(watermarkBuffer);
-      return;
-    }
-
-    res.send(file.fileBytes);
+    res.send(delivery.fileBytes);
   };
 
   view = async (req: Request, res: Response): Promise<void> => {
@@ -539,7 +534,7 @@ export class DocumentsController {
       req.auth!.tenantId,
       req.auth!.userId
     );
-    const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
+    const delivery = await documentsService.prepareDocumentDelivery(file);
 
     await auditService.record({
       tenantId: req.auth!.tenantId,
@@ -554,12 +549,7 @@ export class DocumentsController {
     res.setHeader('Content-Type', file.mimeType || 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${file.fileName}"`);
 
-    if (watermarkBuffer) {
-      res.send(watermarkBuffer);
-      return;
-    }
-
-    res.send(file.fileBytes);
+    res.send(delivery.fileBytes);
   };
 
   downloadSigned = async (req: Request, res: Response): Promise<void> => {
@@ -569,7 +559,7 @@ export class DocumentsController {
       req.auth!.tenantId,
       req.auth!.userId
     );
-    const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
+    const delivery = await documentsService.prepareDocumentDelivery(file);
 
     await auditService.record({
       tenantId: req.auth!.tenantId,
@@ -584,12 +574,7 @@ export class DocumentsController {
     res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
 
-    if (watermarkBuffer) {
-      res.send(watermarkBuffer);
-      return;
-    }
-
-    res.send(file.fileBytes);
+    res.send(delivery.fileBytes);
   };
 
   viewSigned = async (req: Request, res: Response): Promise<void> => {
@@ -599,7 +584,7 @@ export class DocumentsController {
       req.auth!.tenantId,
       req.auth!.userId
     );
-    const watermarkBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded(file);
+    const delivery = await documentsService.prepareDocumentDelivery(file);
 
     await auditService.record({
       tenantId: req.auth!.tenantId,
@@ -619,12 +604,7 @@ export class DocumentsController {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
-    if (watermarkBuffer) {
-      res.send(watermarkBuffer);
-      return;
-    }
-    
-    res.send(file.fileBytes);
+    res.send(delivery.fileBytes);
   };
 
   submitForApproval = async (req: Request, res: Response): Promise<void> => {

@@ -35,6 +35,11 @@ const draftConfigSchema = z.object({
       external_org_id: z.number().int().positive().optional().nullable(),
     })
   ),
+  internal_signers: z.array(z.object({
+    user_id: z.number().int().positive(),
+    signing_order: z.number().int().positive().optional(),
+    role: z.literal('signer').optional(),
+  })).optional(),
   workflow_steps: z
     .array(
       z.object({
@@ -73,29 +78,8 @@ export class SignRequestsController {
       limit
     );
     
-    // Calculate progress for each request
-    const requestsWithProgress = result.data.map((sr) => {
-      const requestWithSigners = sr as typeof sr & {
-        signers?: Array<{ status: string | null }>;
-      };
-      const totalSigners = requestWithSigners.signers?.length || 0;
-      const signedCount = requestWithSigners.signers?.filter((signer) => signer.status === 'signed' || signer.status === 'completed').length || 0;
-      const rejectedCount = requestWithSigners.signers?.filter((signer) => signer.status === 'rejected').length || 0;
-      
-      return {
-        ...sr,
-        progress: {
-          total: totalSigners,
-          signed: signedCount,
-          rejected: rejectedCount,
-          pending: totalSigners - signedCount - rejectedCount,
-          percentage: totalSigners > 0 ? Math.round((signedCount / totalSigners) * 100) : 0
-        }
-      };
-    });
-    
     res.json(ok({ 
-      sign_requests: requestsWithProgress,
+      sign_requests: result.data,
       pagination: result.pagination
     }));
   };
@@ -382,6 +366,11 @@ export class SignRequestsController {
           name: string;
           role?: string;
           external_org_id?: number | null;
+        }>;
+        internal_signers?: Array<{
+          user_id: number;
+          signing_order?: number;
+          role?: 'signer';
         }>;
         workflow_steps?: Array<{
           step_name: string;

@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { WorkflowStatusPanel } from '@/components/workflow/WorkflowStatusPanel';
+import { WorkflowRunHistory } from '@/components/workflow/WorkflowRunHistory';
 import { SignRequestDiscussion } from '@/components/sign-requests/sign-request-discussion';
 import { DossierAttachments } from '@/components/documents/dossier-attachments';
 import { DocumentDownloadMenu } from '@/components/documents/document-download-menu';
@@ -651,6 +652,7 @@ export default function DocumentFlowPage() {
             <div className="space-y-6">
               {document.sign_request_id ? <SignRequestDiscussion signRequestId={document.sign_request_id} documentId={Number(documentId)} readOnly={isCompleted} /> : null}
               <DossierAttachments documentId={Number(documentId)} readOnly={isCompleted} />
+              <WorkflowRunHistory runs={flowData.workflow_runs} />
               <section className="rounded-lg border bg-white shadow-sm">
                 <div className="border-b px-4 py-3 text-sm font-semibold text-slate-900">Hoạt động</div>
                 <div className="p-4">

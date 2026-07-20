@@ -8,12 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import SignatureModal from '@/components/signature/SignatureModal';
-import ProgressHeader from '@/components/signing/ProgressHeader';
 import SigningSidebar from '@/components/signing/SigningSidebar';
 import ConfirmationDialog from '@/components/ui/confirmation-dialog';
 import ThankYouPage from '@/components/signing/ThankYouPage';
 import { toast } from 'sonner';
-import { CheckCircle, FileText, Mail, User, Clock, Play } from 'lucide-react';
+import { FileText, Mail, User, Clock, Play } from 'lucide-react';
 import { getPublicApiBaseUrl } from '@/lib/env';
 import { AsyncListSkeleton } from '@/components/ui/async-state';
 
@@ -68,7 +67,6 @@ export default function PublicSigningPage() {
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<SigningData | null>(null);
-  const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
@@ -116,7 +114,7 @@ export default function PublicSigningPage() {
 
       const signingData = result.data as SigningData;
       setData(signingData);
-      setEmail(signingData.signer.email || '');
+      setOtpVerified(Boolean(signingData.document && signingData.sign_request?.id && signingData.signer?.id));
 
       // Check if already signed
       if (signingData.already_signed) {
@@ -146,7 +144,7 @@ export default function PublicSigningPage() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({}),
           credentials: 'include',
         }
       );
@@ -567,260 +565,169 @@ export default function PublicSigningPage() {
     );
   }
 
+  if (!otpVerified) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <header className="border-b bg-white">
+          <div className="mx-auto flex h-24 max-w-7xl items-center justify-between px-5 sm:px-8">
+            <div className="flex items-center gap-3">
+              <Image src="/logo.png" alt="WP Sign" width={56} height={56} priority className="h-14 w-14 rounded-2xl object-contain shadow-sm" />
+              <div>
+                <div className="text-2xl font-bold tracking-tight text-slate-900">WP Sign</div>
+                <div className="text-sm font-medium text-slate-500">Nền tảng ký duyệt điện tử</div>
+              </div>
+            </div>
+            <div className="hidden rounded-full bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 sm:block">Chờ xác thực</div>
+          </div>
+        </header>
+
+        <main className="flex min-h-[calc(100vh-6rem)] items-center justify-center px-4 py-10 sm:px-6">
+          <div className="w-full max-w-2xl">
+            <div className="mb-6 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
+                <FileText className="h-7 w-7 text-blue-600" />
+              </div>
+              <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{data.sign_request.title || 'Ký tài liệu'}</h1>
+              <p className="mt-2 text-base text-slate-500">Xác thực danh tính để xem và ký tài liệu.</p>
+            </div>
+
+            <section className="rounded-3xl border bg-white p-7 shadow-xl shadow-slate-200/60 sm:p-10">
+              <div className="mb-6 text-center">
+                <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">Nhập mã xác thực</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-500">Mã OTP gồm 6 số đã được gửi trong email yêu cầu ký.</p>
+              </div>
+
+              <div className="mx-auto max-w-md space-y-5">
+                <div>
+                  <Label htmlFor="otp" className="text-sm font-medium text-slate-700">Mã OTP</Label>
+                  <Input
+                    id="otp"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]*"
+                    value={otp}
+                    onPaste={(event) => {
+                      event.preventDefault();
+                      setOtp(event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6));
+                    }}
+                    onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="••••••"
+                    maxLength={6}
+                    autoFocus
+                    className="mt-2 h-16 text-center font-mono text-3xl font-semibold tracking-[0.45em]"
+                  />
+                </div>
+
+                <Button onClick={handleVerifyOtp} disabled={otp.length !== 6 || verifying} className="h-14 w-full text-base font-semibold">
+                  {verifying ? 'Đang xác thực...' : 'Xác thực và tiếp tục'}
+                </Button>
+
+                <div className="flex items-center justify-between gap-3 text-sm text-slate-500">
+                  <span aria-live="polite">
+                    {otpExpiresAt ? `Còn hiệu lực ${Math.max(0, Math.ceil((new Date(otpExpiresAt).getTime() - now) / 1000))} giây` : 'Mã chỉ dùng một lần'}
+                  </span>
+                  <button type="button" onClick={handleSendOtp} disabled={now < resendAvailableAt} className="font-medium text-blue-600 hover:underline disabled:text-slate-400 disabled:no-underline">
+                    {now < resendAvailableAt ? `Gửi lại sau ${Math.ceil((resendAvailableAt - now) / 1000)}s` : 'Gửi lại mã'}
+                  </button>
+                </div>
+                <p className="sr-only" aria-live="polite">{otpFeedback}</p>
+              </div>
+            </section>
+
+            <p className="mt-5 text-center text-sm text-slate-400">Được bảo vệ bởi WP Sign</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 xl:flex">
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto py-8">
-        <div className="max-w-5xl mx-auto px-4 lg:px-8">
-        {/* Progress Header (Guided Mode) */}
-        {guidedMode && (
-          <ProgressHeader
-            currentIndex={currentFieldIndex}
-            totalFields={myFields.length}
-            fields={myFields}
-            completedFields={completedFields}
-          />
-        )}
+      <div className="min-w-0 flex-1 overflow-y-auto py-3 sm:py-4">
+        <div className="mx-auto max-w-[1600px] px-3 sm:px-4 lg:px-6">
 
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex items-start gap-4">
-            <FileText className="w-12 h-12 text-blue-600 flex-shrink-0" />
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                {data.sign_request.title || 'Ký tài liệu'}
-              </h1>
-              {data.sign_request.message && (
-                <p className="text-gray-600 mb-4">{data.sign_request.message}</p>
-              )}
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-600">Người ký:</span>
-                  <span className="font-semibold">{data.signer.name}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-600">Email:</span>
-                  <span className="font-semibold">{data.signer.email}</span>
-                </div>
-                {data.sign_request.deadline && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-600">Hạn ký:</span>
-                    <span className="font-semibold">
-                      {new Date(data.sign_request.deadline).toLocaleDateString('vi-VN')}
-                    </span>
-                  </div>
+        <div className="sticky top-0 z-20 mb-4 rounded-lg border bg-white px-4 py-3 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <Image src="/logo.png" alt="WP Sign" width={42} height={42} priority className="h-10 w-10 shrink-0 rounded-xl object-contain" />
+              <div className="hidden shrink-0 sm:block">
+                <p className="font-bold leading-5 text-slate-950">WP Sign</p>
+                <p className="text-xs text-slate-500">Nền tảng ký duyệt</p>
+              </div>
+              <div className="hidden h-9 w-px shrink-0 bg-slate-200 sm:block" />
+              <div className="min-w-0">
+                <h1 className="truncate text-base font-semibold text-gray-900 sm:text-lg">
+                  {data.sign_request.title || 'Ký tài liệu'}
+                </h1>
+                {data.sign_request.message && (
+                  <p className="mt-0.5 truncate text-xs text-gray-500 sm:text-sm">{data.sign_request.message}</p>
                 )}
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* OTP Verification */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Xác thực OTP</h2>
-          
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                disabled={true}
-                className="mt-1 bg-gray-50"
-                title="Email được lấy từ thông tin người ký"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Email của người ký (không thể thay đổi)
-              </p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600 sm:text-sm">
+              <span className="flex items-center gap-1.5"><User className="h-4 w-4 text-gray-400" />{data.signer.name}</span>
+              {data.signer.email && <span className="flex items-center gap-1.5"><Mail className="h-4 w-4 text-gray-400" />{data.signer.email}</span>}
+              {data.sign_request.deadline && (
+                <span className="flex items-center gap-1.5"><Clock className="h-4 w-4 text-gray-400" />Hạn {new Date(data.sign_request.deadline).toLocaleDateString('vi-VN')}</span>
+              )}
+              <span className={`rounded-full px-2.5 py-1 font-medium ${otpVerified ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                {otpVerified ? 'Đã xác thực' : 'Chờ xác thực'}
+              </span>
             </div>
-
-            {/* OTP input */}
-            <div>
-              <Label htmlFor="otp">Mã OTP (6 số)</Label>
-              <Input
-                id="otp"
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]*"
-                value={otp}
-                onPaste={(event) => {
-                  event.preventDefault();
-                  setOtp(event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6));
-                  setOtpVerified(false);
-                }}
-                onChange={(e) => {
-                  setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
-                  setOtpVerified(false); // Reset verified when OTP changes
-                }}
-                placeholder="Nhập mã OTP từ email"
-                maxLength={6}
-                className="mt-1"
-                disabled={otpVerified}
-              />
-              <p className="mt-2 text-sm text-slate-600" aria-live="polite">
-                {otpExpiresAt ? `Mã hết hạn sau ${Math.max(0, Math.ceil((new Date(otpExpiresAt).getTime() - now) / 1000))} giây.` : 'Yêu cầu mã OTP để bắt đầu xác thực.'}
-              </p>
-              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-900 font-medium mb-1">
-                  📧 Mã OTP đã được gửi trong email yêu cầu ký
-                </p>
-                <p className="text-xs text-blue-700">
-                  1️⃣ Nhập mã OTP từ email<br/>
-                  2️⃣ Click &quot;Xác thực OTP&quot; để xác nhận<br/>
-                  3️⃣ Bắt đầu ký tài liệu<br/>
-                  🔄 Nếu không tìm thấy hoặc hết hạn, nhấn &quot;Gửi lại OTP&quot;
-                </p>
-              </div>
-            </div>
-
-            {/* Verify and Resend buttons */}
-            <div className="grid grid-cols-2 gap-3">
-              <Button 
-                onClick={handleVerifyOtp}
-                disabled={!otp || otp.length !== 6 || otpVerified || verifying}
-                className="w-full"
-              >
-                {verifying ? '⏳ Đang xác thực...' : otpVerified ? '✅ Đã xác thực' : '🔐 Xác thực OTP'}
-              </Button>
-              <Button 
-                onClick={handleSendOtp} 
-                variant="outline"
-                className="w-full"
-                disabled={now < resendAvailableAt}
-              >
-                {otpSent ? '🔄 Gửi lại OTP' : '📧 Gửi lại OTP'}
-              </Button>
-            </div>
-            {now < resendAvailableAt && <p className="text-sm text-slate-600" aria-live="polite">Bạn có thể gửi lại mã sau {Math.ceil((resendAvailableAt - now) / 1000)} giây.</p>}
-            <p className="sr-only" aria-live="polite">{otpFeedback}</p>
-            
-            {otpVerified && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-900 font-medium">
-                  ✅ Xác thực thành công! Bạn có thể bắt đầu ký tài liệu.
-                </p>
-              </div>
-            )}
           </div>
         </div>
 
         {/* Signing Options - Guided or Modal */}
         {!guidedMode && otpVerified && myFields.length > 0 && Object.keys(fieldSignatures).length === 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            {/* Option 1: Guided Mode */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-2xl shadow-2xl p-6 cursor-pointer hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
-                 onClick={handleStartGuided} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleStartGuided(); } }}>
-              <div className="relative z-10 text-white">
-                <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm mb-4">
-                  <Play className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-bold mb-2">Hướng dẫn từng bước</h3>
-                <p className="text-blue-50 text-sm mb-4">
-                  Hệ thống dẫn bạn qua từng vị trí cần ký
-                </p>
-                <div className="flex items-center gap-2 text-white text-sm">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Dễ dàng & nhanh chóng</span>
-                </div>
-              </div>
+          <div className="mb-4 flex flex-col gap-3 rounded-lg border bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Chọn cách ký</p>
+              <p className="mt-0.5 text-xs text-gray-500">Có {myFields.length} vị trí cần hoàn thành trên tài liệu.</p>
             </div>
-
-            {/* Option 2: Modal Mode */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-green-500 via-teal-500 to-cyan-500 rounded-2xl shadow-2xl p-6 cursor-pointer hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
-                 onClick={handleOpenSignatureModal} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleOpenSignatureModal(); } }}>
-              <div className="relative z-10 text-white">
-                <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm mb-4">
-                  <FileText className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-bold mb-2">Ký một lần</h3>
-                <p className="text-green-50 text-sm mb-4">
-                  Tạo chữ ký và áp dụng cho tất cả vị trí
-                </p>
-                <div className="flex items-center gap-2 text-white text-sm">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Nhanh gọn & tiện lợi</span>
-                </div>
-              </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={handleStartGuided}>
+                <Play className="mr-2 h-4 w-4" />
+                Hướng dẫn từng bước
+              </Button>
+              <Button type="button" onClick={handleOpenSignatureModal}>
+                <FileText className="mr-2 h-4 w-4" />
+                Tạo chữ ký
+              </Button>
             </div>
           </div>
         )}
 
-        {/* Start Guided Button - Beautiful Design (Fallback) */}
+        {/* Resume guided signing */}
         {!guidedMode && otpVerified && myFields.length > 0 && Object.keys(fieldSignatures).length > 0 && (
-          <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-2xl shadow-2xl p-8 mb-6">
-            {/* Animated Background */}
-            <div className="absolute inset-0 bg-white opacity-10">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent animate-pulse"></div>
+          <div className="mb-4 flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-900">Tiến độ ký: {completedFields.length}/{myFields.length}</p>
+              <p className="mt-0.5 text-xs text-blue-700">Tiếp tục đến vị trí chưa hoàn thành.</p>
             </div>
-            
-            {/* Content */}
-            <div className="relative z-10">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                {/* Left Side - Info */}
-                <div className="flex-1 text-white">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                      <Play className="w-6 h-6 text-white" />
-                    </div>
-                    <h3 className="text-2xl font-bold">
-                      Chế độ hướng dẫn ký
-                    </h3>
-                  </div>
-                  <p className="text-blue-50 text-lg mb-2">
-                    Hệ thống sẽ dẫn bạn qua từng vị trí cần ký
-                  </p>
-                  <div className="flex items-center gap-2 text-white">
-                    <div className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-sm font-bold backdrop-blur-sm">
-                      {myFields.length}
-                    </div>
-                    <span className="text-blue-50">vị trí cần ký</span>
-                  </div>
-                </div>
-                
-                {/* Right Side - Button */}
-                <div className="flex-shrink-0">
-                  <Button
-                    onClick={handleStartGuided}
-                    className="bg-white text-blue-600 hover:bg-blue-50 shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-200 px-8 py-6 text-lg font-bold"
-                    size="lg"
-                  >
-                    <Play className="w-6 h-6 mr-2" />
-                    Bắt đầu ngay
-                  </Button>
-                </div>
-              </div>
-              
-              {/* Features */}
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center gap-2 text-white text-sm">
-                  <CheckCircle className="w-5 h-5" />
-                  <span>Hướng dẫn từng bước</span>
-                </div>
-                <div className="flex items-center gap-2 text-white text-sm">
-                  <CheckCircle className="w-5 h-5" />
-                  <span>Tự động cuộn trang</span>
-                </div>
-                <div className="flex items-center gap-2 text-white text-sm">
-                  <CheckCircle className="w-5 h-5" />
-                  <span>Dễ dàng & nhanh chóng</span>
-                </div>
-              </div>
-            </div>
+            <Button type="button" variant="outline" onClick={handleStartGuided} className="border-blue-300 bg-white text-blue-700 hover:bg-blue-100">
+              <Play className="mr-2 h-4 w-4" />
+              Tiếp tục hướng dẫn
+            </Button>
           </div>
         )}
 
         {/* PDF Viewer with Signature Fields */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-          <h2 className="text-lg font-semibold p-4 border-b">📄 Tài liệu</h2>
-          <div className="h-[700px]">
+        {otpVerified && (
+        <div className="mb-4 overflow-hidden rounded-lg border bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <h2 className="flex items-center gap-2 font-semibold"><FileText className="h-4 w-4 text-gray-500" />Xem tài liệu</h2>
+            {guidedMode && <span className="text-xs font-medium text-blue-700">Vị trí {Math.min(currentFieldIndex + 1, myFields.length)}/{myFields.length}</span>}
+          </div>
+          <div className="h-[calc(100vh-190px)] min-h-[640px]">
             <PDFSigningViewer
-              pdfUrl={`${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || ''}/public/sign/${token}/document`}
+              pdfUrl={otpVerified
+                ? `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || ''}/public/sign/${token}/document`
+                : ''}
+              withCredentials
+              fitMode="page"
               fields={data.fields || []}
               signerId={data.signer.id}
               onFieldClick={handleFieldClick}
@@ -833,6 +740,7 @@ export default function PublicSigningPage() {
             />
           </div>
         </div>
+        )}
 
         {/* Signature Section - Hidden in guided mode or when using field signatures */}
         {otpVerified && !guidedMode && Object.keys(fieldSignatures).length === 0 && (

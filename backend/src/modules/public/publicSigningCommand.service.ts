@@ -87,15 +87,16 @@ export class PublicSigningCommandService {
       });
       if (updated.count !== 1) return { updated, allSigned: false };
 
-      await tx.outbox_events.create({
-        data: {
+      await tx.outbox_events.createMany({
+        data: [{
           tenant_id: signer.sign_request.tenant_id,
           aggregate_type: "signer",
           aggregate_id: String(signer.id),
           event_type: "SIGNATURE_SUBMITTED",
           payload: { signer_id: signer.id, sign_request_id: signer.sign_request_id },
           deduplication_key: `signature-submitted:${signer.id}`,
-        },
+        }],
+        skipDuplicates: true,
       });
 
       const currentSigners = await tx.signers.findMany({
@@ -110,15 +111,16 @@ export class PublicSigningCommandService {
         signRequestStatus: allSigned ? "generating_artifact" : "in_progress",
       });
       if (allSigned) {
-        await tx.outbox_events.create({
-          data: {
+        await tx.outbox_events.createMany({
+          data: [{
             tenant_id: signer.sign_request.tenant_id,
             aggregate_type: "sign_request",
             aggregate_id: String(signer.sign_request_id),
             event_type: "SIGNED_ARTIFACT_REQUESTED",
             payload: { sign_request_id: signer.sign_request_id, document_id: signer.sign_request.document_id },
             deduplication_key: `signed-artifact:${signer.sign_request_id}`,
-          },
+          }],
+          skipDuplicates: true,
         });
       }
       if (!allSigned && signer.sign_request.workflow_type === "sequential") {
@@ -129,15 +131,16 @@ export class PublicSigningCommandService {
             data: { status: "pending" },
           });
           if (activated.count > 0) {
-            await tx.outbox_events.create({
-              data: {
+            await tx.outbox_events.createMany({
+              data: [{
                 tenant_id: signer.sign_request.tenant_id,
                 aggregate_type: "sign_request",
                 aggregate_id: String(signer.sign_request_id),
                 event_type: "SIGNER_ACTIVATED",
                 payload: { sign_request_id: signer.sign_request_id, signing_order: nextOrder },
                 deduplication_key: `signer-activated:${signer.sign_request_id}:${nextOrder}`,
-              },
+              }],
+              skipDuplicates: true,
             });
           }
         }

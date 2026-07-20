@@ -35,8 +35,10 @@ interface SignRequest {
     title: string | null;
     original_file_name: string;
     document_number: string | null;
+    signed_file_path?: string | null;
   };
   signers: Signer[];
+  progress?: { total: number; signed: number; rejected: number; pending: number; percentage: number; kind: 'approval' | 'signing' };
   status_summary?: WorkflowStatusSummary;
 }
 
@@ -70,8 +72,8 @@ export default function SignRequestDetailPage() {
       try {
         const token = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('esign.auth') || '{}')?.tokens?.accessToken : '';
         
-        // Use signed version if sign request is completed
-        const endpoint = signRequest.status === 'completed' 
+        // Approval-only requests can complete without producing a signed artifact.
+        const endpoint = signRequest.document.signed_file_path
           ? `/documents/${signRequest.document.id}/view-signed`
           : `/documents/${signRequest.document.id}/view`;
         
@@ -162,9 +164,10 @@ export default function SignRequestDetailPage() {
     );
   }
 
-  const signedCount = signRequest.signers.filter(s => s.status === 'signed' || s.status === 'completed').length;
-  const totalSigners = signRequest.signers.length;
-  const progress = totalSigners > 0 ? Math.round((signedCount / totalSigners) * 100) : 0;
+  const signedCount = signRequest.progress?.signed ?? signRequest.signers.filter(s => s.status === 'signed' || s.status === 'completed').length;
+  const totalSigners = signRequest.progress?.total ?? signRequest.signers.length;
+  const progress = signRequest.progress?.percentage ?? (totalSigners > 0 ? Math.round((signedCount / totalSigners) * 100) : 0);
+  const approvalOnly = signRequest.progress?.kind === 'approval';
 
   // Sort signers by signing order
   const sortedSigners = [...signRequest.signers].sort((a, b) => {
@@ -247,13 +250,13 @@ export default function SignRequestDetailPage() {
           {/* Progress Card */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Tiến độ ký</CardTitle>
+              <CardTitle className="text-lg">{approvalOnly ? 'Tiến độ phê duyệt' : 'Tiến độ ký'}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between text-sm mb-2">
-                    <span>Đã ký: {signedCount}/{totalSigners}</span>
+                    <span>{approvalOnly ? 'Đã phê duyệt' : 'Đã ký'}: {signedCount}/{totalSigners}</span>
                     <span className="font-semibold">{progress}%</span>
                   </div>
                   <div className="h-3 bg-gray-200 rounded-full overflow-hidden">

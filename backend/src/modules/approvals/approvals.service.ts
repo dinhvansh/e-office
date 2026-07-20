@@ -27,6 +27,36 @@ type CombinedTask = {
   due_date: Date | null;
   [key: string]: unknown;
 };
+
+const historicalApprovalActions = ['approved', 'rejected', 'request_info', 'info_requested'] as const;
+const visibleSignerStatuses = ['pending', 'otp_sent', 'signed', 'completed', 'rejected'] as const;
+const closedSignRequestStatuses = new Set(['cancelled', 'archived', 'completed', 'rejected']);
+
+function buildVisibleApprovalTaskWhere(userId: number, tenantId: number): Prisma.document_approvalsWhereInput {
+  return {
+    approver_user_id: userId,
+    document: { tenant_id: tenantId, status: { not: 'archived' } },
+    OR: [
+      {
+        action: 'pending',
+        workflow_instance: { status: 'in_progress' },
+        document: { status: 'pending_approval' },
+      },
+      { action: { in: [...historicalApprovalActions] } },
+    ],
+  };
+}
+
+function normalizeApprovalStatusFilter(status: string): string {
+  return status === 'info_requested' ? 'request_info' : status;
+}
+
+function isVisibleSignerTask(signerStatus: string | null, signRequestStatus: string | null): boolean {
+  if (!signerStatus) return false;
+  if (['signed', 'completed', 'rejected'].includes(signerStatus)) return true;
+  return ['pending', 'otp_sent'].includes(signerStatus)
+    && !closedSignRequestStatuses.has(String(signRequestStatus || '').toLowerCase());
+}
 import { isApprovalStepComplete } from './approvalCompletion.policy';
 import { normalizeWorkflowApprovalMode } from '../workflows/workflowApprovalMode';
 import {
@@ -79,8 +109,8 @@ async function createApprovalTaskNotification(
       tenant_id: input.tenantId,
       user_id: input.approver.id,
       type: NotificationType.APPROVAL_REQUEST,
-      title: 'YÃªu cáº§u phÃª duyá»‡t má»›i',
-      message: `TÃ i liá»‡u "${input.document.title || 'Untitled'}" cáº§n phÃª duyá»‡t cá»§a báº¡n`,
+      title: 'Yêu cầu phê duyệt mới',
+      message: `Tài liệu "${input.document.title || 'Untitled'}" cần phê duyệt của bạn`,
       link: `/approvals?filter=pending&approvalId=${input.approvalId}`,
     },
   });
@@ -515,7 +545,7 @@ class ApprovalsService {
           document: { title: document.title, document_number: document.document_number },
           submitterName: submitter?.full_name || submitter?.email || 'Unknown',
           workflowName: workflow.name,
-          stepName: activeApproval.workflow_step.step_name || `BÆ°á»›c ${activeApproval.workflow_step.step_order}`,
+          stepName: activeApproval.workflow_step.step_name || `Bước ${activeApproval.workflow_step.step_order}`,
           dueDate: activeApproval.due_date || dueDate,
           approvalUrl,
         });
@@ -729,7 +759,7 @@ class ApprovalsService {
             document: activatedApproval.document,
             submitterName: activatedApproval.document.owner?.full_name || activatedApproval.document.owner?.email || 'Unknown',
             workflowName: approval.workflow.name,
-            stepName: nextStepForTransition.step_name || `BÆ°á»›c ${nextStepForTransition.step_order}`,
+            stepName: nextStepForTransition.step_name || `Bước ${nextStepForTransition.step_order}`,
             dueDate: activatedApproval.due_date || new Date(),
             approvalUrl,
           });
@@ -1150,7 +1180,8 @@ class ApprovalsService {
   }
 
   /**
-   * Get my pending approvals with filters, pagination, search, sort
+   * Get my visible approvals with filters, pagination, search, sort.
+   * Pending rows are active-run scoped; terminal rows remain visible as history.
    */
   async getMyPendingApprovals(
     userId: number,
@@ -1170,13 +1201,7 @@ class ApprovalsService {
     const limit = options?.limit || 10;
     const skip = (page - 1) * limit;
 
-    // Build where clause - simplified to avoid nested complexity
-    const where: Prisma.document_approvalsWhereInput = {
-      approver_user_id: userId,
-      action: 'pending',
-      workflow_instance: { status: 'in_progress' },
-      document: { tenant_id: tenantId, status: 'pending_approval' },
-    };
+    const where = buildVisibleApprovalTaskWhere(userId, tenantId);
 
     // For complex filters, we'll filter in memory after fetching
     // This is simpler and avoids Prisma nested where issues
@@ -1216,6 +1241,11 @@ class ApprovalsService {
       });
     }
 
+    if (options?.status) {
+      const requestedStatus = normalizeApprovalStatusFilter(options.status);
+      allApprovals = allApprovals.filter((approval) => approval.action === requestedStatus);
+    }
+
     // Search filter (document title, number)
     if (options?.search) {
       const searchLower = options.search.toLowerCase();
@@ -1247,12 +1277,7 @@ class ApprovalsService {
 
     // Calculate statistics from filtered approvals
     const allApprovalsForUser = await prisma.document_approvals.findMany({
-      where: {
-        approver_user_id: userId,
-        action: 'pending',
-        workflow_instance: { status: 'in_progress' },
-        document: { tenant_id: tenantId, status: 'pending_approval' },
-      },
+      where: buildVisibleApprovalTaskWhere(userId, tenantId),
       select: { action: true },
     });
     
@@ -1261,7 +1286,7 @@ class ApprovalsService {
       pending: allApprovalsForUser.filter(a => a.action === 'pending').length,
       approved: allApprovalsForUser.filter(a => a.action === 'approved').length,
       rejected: allApprovalsForUser.filter(a => a.action === 'rejected').length,
-      info_requested: allApprovalsForUser.filter(a => a.action === 'info_requested').length
+      info_requested: allApprovalsForUser.filter(a => ['request_info', 'info_requested'].includes(a.action)).length
     };
 
     return {
@@ -1348,12 +1373,7 @@ class ApprovalsService {
     // Get approvals if taskType is 'approval' or undefined (all)
     if (!options?.taskType || options.taskType === 'approval') {
       const approvals = await prisma.document_approvals.findMany({
-        where: {
-          approver_user_id: userId,
-          action: 'pending',
-          workflow_instance: { status: 'in_progress' },
-          document: { tenant_id: tenantId, status: 'pending_approval' },
-        },
+        where: buildVisibleApprovalTaskWhere(userId, tenantId),
         include: {
           document: {
             include: {
@@ -1390,7 +1410,11 @@ class ApprovalsService {
       // ✅ Only get signers that are ready to sign (pending, otp_sent)
       // ❌ Exclude waiting_signing (waiting for their turn)
       const signRequests = await prisma.sign_requests.findMany({
-        where: { tenant_id: tenantId },
+        where: {
+          tenant_id: tenantId,
+          status: { not: 'archived' },
+          document: { status: { not: 'archived' } },
+        },
         include: {
           signers: {
             where: {
@@ -1399,9 +1423,7 @@ class ApprovalsService {
                 { user_id: userId },
                 ...(currentUser?.email ? [{ email: currentUser.email }] : []),
               ],
-              status: {
-                in: ['pending', 'otp_sent', 'signed', 'rejected'] // Exclude waiting_signing, waiting_approval
-              }
+              status: { in: [...visibleSignerStatuses] }
             }
           },
           document: {
@@ -1416,23 +1438,25 @@ class ApprovalsService {
       // Filter by tenant and map to tasks
       signRequests.forEach((signRequest) => {
         if (signRequest.signers.length > 0) {
-          signRequest.signers.forEach((signer) => {
-            allTasks.push({
-              task_type: 'signing',
-              task_id: signer.id,
-              sign_request_id: signRequest.id,
-              document_id: signRequest.document_id,
-              document_number: signRequest.document.document_number,
-              document_title: signRequest.document.title,
-              document_type: signRequest.document.document_type,
-              owner: signRequest.document.owner,
-              status: signer.status, // pending, otp_sent, signed, rejected
-              signing_order: signer.signing_order,
-              created_at: signRequest.created_at,
-              due_date: null, // Signers don't have due dates
-              next_action: ['pending', 'otp_sent'].includes(signer.status || '') ? 'SIGN_NOW' : 'VIEW_STATUS',
+          signRequest.signers
+            .filter((signer) => isVisibleSignerTask(signer.status, signRequest.status))
+            .forEach((signer) => {
+              allTasks.push({
+                task_type: 'signing',
+                task_id: signer.id,
+                sign_request_id: signRequest.id,
+                document_id: signRequest.document_id,
+                document_number: signRequest.document.document_number,
+                document_title: signRequest.document.title,
+                document_type: signRequest.document.document_type,
+                owner: signRequest.document.owner,
+                status: signer.status, // pending, otp_sent, signed, completed, rejected
+                signing_order: signer.signing_order,
+                created_at: signRequest.created_at,
+                due_date: null, // Signers don't have due dates
+                next_action: ['pending', 'otp_sent'].includes(signer.status || '') ? 'SIGN_NOW' : 'VIEW_STATUS',
+              });
             });
-          });
         }
       });
     }
@@ -1478,7 +1502,7 @@ class ApprovalsService {
       signing_pending: allTasks.filter(t => t.task_type === 'signing' && (t.status === 'pending' || t.status === 'otp_sent')).length,
       completed: allTasks.filter(t => 
         (t.task_type === 'approval' && t.status === 'approved') ||
-        (t.task_type === 'signing' && t.status === 'signed')
+        (t.task_type === 'signing' && (t.status === 'signed' || t.status === 'completed'))
       ).length,
     };
 

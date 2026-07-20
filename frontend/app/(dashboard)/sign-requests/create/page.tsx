@@ -13,6 +13,7 @@ import { WorkflowPreview } from '@/components/workflow/WorkflowPreview';
 import { AttachmentsSection } from '@/components/documents/AttachmentsSection';
 import { CCEmailsSection } from '@/components/documents/CCEmailsSection';
 import { Signer, SignersSection } from '@/components/documents/SignersSection';
+import { InternalSigner, InternalSignersSelector } from '@/components/documents/InternalSignersSelector';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -46,9 +47,11 @@ interface ExistingSignRequestResponse {
     } | null;
     signers?: Array<{
       id: number;
+      user_id?: number | null;
       email?: string | null;
       name?: string | null;
       role?: string | null;
+      signing_order?: number | null;
       is_internal?: boolean | null;
       position_data?: Record<string, unknown> | null;
     }>;
@@ -100,6 +103,7 @@ export default function CreateSignRequestPage() {
   const [customizedSteps, setCustomizedSteps] = useState<any[] | null>(null);
   const [adhocSteps, setAdhocSteps] = useState<any[] | null>(null);
   const [signers, setSigners] = useState<Signer[]>([]);
+  const [internalSigners, setInternalSigners] = useState<InternalSigner[]>([]);
   const [ccEmails, setCcEmails] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
   const submittingRef = useRef(false);
@@ -121,8 +125,16 @@ export default function CreateSignRequestPage() {
       if (!isEditMode && !file) errors.file = 'Vui lòng chọn tệp trước khi tiếp tục.';
       if (!documentTypeId) errors.documentType = 'Vui lòng chọn loại văn bản.';
     }
-    if (step === 2 && selectedDocType?.require_approval && workflowMode === 'adhoc' && !adhocStepsRef.current?.length) errors.workflow = 'Vui lòng thêm ít nhất một bước xử lý.';
-    if (step === 3) signers.forEach((signer, index) => { if (!signer.name || !signer.email) errors[`signer-${index}`] = 'Mỗi người ký cần có họ tên và email.'; });
+    if (step === 2 && selectedDocType?.require_approval && !hasConfiguredApprovalStep) {
+      errors.workflow = 'Loại văn bản này cần ít nhất một bước phê duyệt hợp lệ.';
+    }
+    if (step === 3) {
+      signers.forEach((signer, index) => { if (!signer.name || !signer.email) errors[`signer-${index}`] = 'Mỗi người ký cần có họ tên và email.'; });
+      internalSigners.forEach((signer, index) => { if (!signer.user_id || !signer.name || !signer.email) errors[`internal-signer-${index}`] = 'Vui lòng chọn người ký nội bộ hợp lệ.'; });
+      if (selectedDocType?.require_digital_signing && !hasConfiguredSigner) {
+        errors.signerRequired = 'Loại văn bản này cần ít nhất một người ký nội bộ hoặc bên ngoài.';
+      }
+    }
     setStepErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -130,8 +142,8 @@ export default function CreateSignRequestPage() {
   const nextStep = () => { if (validateStep(currentStep)) setCurrentStep((step) => Math.min(4, step + 1)); };
 
   const { data: documentTypes } = useQuery({
-    queryKey: ['document-types', 'create-purpose'],
-    queryFn: async () => fetchJson<DocumentType[]>('/document-types?purpose=create'),
+    queryKey: ['document-types', 'sign-request-purpose'],
+    queryFn: async () => fetchJson<DocumentType[]>('/document-types?purpose=sign_request'),
   });
 
   const { data: workflowsData } = useQuery({
@@ -180,6 +192,40 @@ export default function CreateSignRequestPage() {
     () => (Array.isArray(workflowsData) ? workflowsData.filter((workflow: any) => workflow.is_active) : []),
     [workflowsData],
   );
+
+  const templateWorkflowSteps = useMemo(() => {
+    if (!selectedWorkflowId) return [];
+    const workflow = activeWorkflows.find((item: any) => item.id === selectedWorkflowId);
+    return Array.isArray(workflow?.steps) ? workflow.steps : [];
+  }, [activeWorkflows, selectedWorkflowId]);
+
+  const effectiveWorkflowSteps = useMemo(() => {
+    if (workflowMode === 'adhoc') {
+      return (adhocSteps || []).map((step: any) => ({ ...step, participant_role: 'approver' }));
+    }
+    if (workflowMode === 'flexible' && customizedSteps) return customizedSteps;
+    return templateWorkflowSteps;
+  }, [adhocSteps, customizedSteps, templateWorkflowSteps, workflowMode]);
+
+  const existingInternalSignerCount = useMemo(
+    () => (existingSignRequestData?.sign_request?.signers || []).filter((signer) => signer.is_internal).length,
+    [existingSignRequestData],
+  );
+  const workflowSignerStepCount = effectiveWorkflowSteps.filter(
+    (step: any) => step.participant_role === 'signer',
+  ).length;
+  const configuredInternalSignerCount =
+    workflowMode === 'no_approval'
+      ? internalSigners.length
+      : isEditMode && workflowMode === 'strict'
+      ? existingInternalSignerCount
+      : isEditMode && workflowMode === 'flexible' && customizedSteps === null
+        ? existingInternalSignerCount
+        : workflowSignerStepCount;
+  const hasConfiguredApprovalStep = effectiveWorkflowSteps.some(
+    (step: any) => step.participant_role !== 'signer',
+  );
+  const hasConfiguredSigner = signers.length + configuredInternalSignerCount > 0;
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -247,6 +293,17 @@ export default function CreateSignRequestPage() {
       }));
 
     setSigners(externalSigners);
+    setInternalSigners(
+      (signRequest.signers || [])
+        .filter((signer) => signer.is_internal && signer.user_id)
+        .map((signer, index) => ({
+          user_id: signer.user_id as number,
+          name: signer.name || signer.email || '',
+          email: signer.email || '',
+          signing_order: signer.signing_order || index + 1,
+          role: 'signer' as const,
+        })),
+    );
     });
   }, [existingSignRequestData, isEditMode]);
 
@@ -293,18 +350,28 @@ export default function CreateSignRequestPage() {
         throw new Error('Vui lòng chọn loại văn bản');
       }
 
+      if (!selectedDocType || (!selectedDocType.require_approval && !selectedDocType.require_digital_signing)) {
+        throw new Error('Loại văn bản không hỗ trợ luồng phê duyệt hoặc ký điện tử');
+      }
+
       if (selectedDocType?.require_approval) {
-        if (workflowMode === 'adhoc' && (!adhocStepsRef.current || adhocStepsRef.current.length === 0)) {
-          throw new Error('Vui lòng thêm ít nhất một bước phê duyệt hoặc ký');
+        if (!hasConfiguredApprovalStep) {
+          throw new Error('Loại văn bản này cần ít nhất một bước phê duyệt hợp lệ');
         }
-        if (workflowMode === 'flexible' && (!customizedStepsRef.current || customizedStepsRef.current.length === 0)) {
-          throw new Error('Workflow đang được tùy chỉnh nhưng chưa có bước nào hợp lệ');
-        }
+      }
+
+      if (selectedDocType.require_digital_signing && !hasConfiguredSigner) {
+        throw new Error('Loại văn bản này cần ít nhất một người ký nội bộ hoặc bên ngoài');
       }
 
       for (const signer of signers) {
         if (!signer.email || !signer.name) {
           throw new Error('Vui lòng nhập đủ tên và email người ký ngoài');
+        }
+      }
+      for (const signer of internalSigners) {
+        if (!signer.user_id || !signer.email || !signer.name) {
+          throw new Error('Vui lòng chọn người ký nội bộ hợp lệ');
         }
       }
 
@@ -319,6 +386,13 @@ export default function CreateSignRequestPage() {
               role: signer.role || 'signer',
               external_org_id: signer.externalOrgId || null,
             })),
+            internal_signers: workflowMode === 'no_approval'
+              ? internalSigners.map((signer) => ({
+                  user_id: signer.user_id,
+                  signing_order: signer.signing_order,
+                  role: 'signer',
+                }))
+              : undefined,
             workflow_steps:
               selectedDocType?.require_approval && workflowMode === 'flexible' ? customizedStepsRef.current : null,
           }),
@@ -374,15 +448,22 @@ export default function CreateSignRequestPage() {
         payload.adhoc_steps = adhocStepsRef.current;
       }
 
-      if (signers.length > 0) {
-        payload.signers = signers.map((signer, index) => ({
+      const directSigners = [
+        ...internalSigners.map((signer, index) => ({
           email: signer.email,
           name: signer.name,
           order: index + 1,
+          type: 'manual' as const,
+        })),
+        ...signers.map((signer, index) => ({
+          email: signer.email,
+          name: signer.name,
+          order: internalSigners.length + index + 1,
           type: signer.type,
           external_org_id: signer.externalOrgId,
-        }));
-      }
+        })),
+      ];
+      if (directSigners.length > 0) payload.signers = directSigners;
 
       if (ccEmails.length > 0) payload.cc_emails = ccEmails;
       if (attachments.length > 0) {
@@ -556,6 +637,12 @@ export default function CreateSignRequestPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {selectedDocType && (
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {selectedDocType.require_approval && <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-800">Yêu cầu phê duyệt</span>}
+                  {selectedDocType.require_digital_signing && <span className="rounded-full bg-blue-100 px-2 py-1 text-blue-800">Yêu cầu ký điện tử</span>}
+                </div>
+              )}
               {stepErrors.file && <p className="text-sm text-destructive" role="alert">{stepErrors.file}</p>}
               {stepErrors.documentType && <p className="text-sm text-destructive" role="alert">{stepErrors.documentType}</p>}
             </div>
@@ -623,6 +710,7 @@ export default function CreateSignRequestPage() {
                   )}
                 </div>
               )}
+              {stepErrors.workflow && <p className="text-sm text-destructive" role="alert">{stepErrors.workflow}</p>}
             </CardContent>
           </Card>
         )}
@@ -630,9 +718,9 @@ export default function CreateSignRequestPage() {
         {currentStep === 3 && <Card>
           <CardContent className="space-y-6 p-6">
             <div>
-              <h3 className="text-lg font-semibold">3. Người ký ngoài và thông tin bổ sung</h3>
+              <h3 className="text-lg font-semibold">3. Người ký và thông tin bổ sung</h3>
               <p className="mt-1 text-sm text-slate-500">
-                Nếu cần thêm hoặc bớt người ký ngoài, hãy xử lý ở đây. Editor sẽ không còn là nơi thêm người ký nữa.
+                Chọn người ký nội bộ hoặc khai báo người ký bên ngoài. Chỉ cần ít nhất một người ký hợp lệ thuộc một trong hai nhóm.
               </p>
             </div>
 
@@ -641,11 +729,25 @@ export default function CreateSignRequestPage() {
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
-                    <p>{!selectedDocType ? 'Chọn loại văn bản trước, sau đó anh có thể thêm người ký bên ngoài ngay tại đây.' : 'Khai báo tại đây nếu có người ký bên ngoài hệ thống. Danh sách này sẽ đi cùng luồng khi mở editor.'}</p>
+                    <p>{!selectedDocType ? 'Chọn loại văn bản trước, sau đó có thể thêm người ký nội bộ hoặc bên ngoài.' : 'Có thể để trống một nhóm nếu nhóm còn lại đã có ít nhất một người ký hợp lệ. Danh sách sẽ đi cùng luồng khi mở editor.'}</p>
                   </div>
                 </div>
-                <SignersSection signers={signers} onChange={(value) => { setSigners(value); setHasUnsavedChanges(true); }} externalOrgs={externalOrgs || []} />
-                {Object.values(stepErrors).some((error) => error.includes('người ký')) && <p className="text-sm text-destructive" role="alert">Vui lòng hoàn thiện thông tin người ký.</p>}
+                {workflowMode === 'no_approval' && (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+                    <InternalSignersSelector
+                      signers={internalSigners}
+                      onChange={(value) => { setInternalSigners(value); setHasUnsavedChanges(true); }}
+                      allowEdit
+                      signerOnly
+                    />
+                  </div>
+                )}
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <SignersSection signers={signers} onChange={(value) => { setSigners(value); setHasUnsavedChanges(true); }} externalOrgs={externalOrgs || []} />
+                </div>
+                {Object.entries(stepErrors).some(([key]) => key.startsWith('signer-')) && <p className="text-sm text-destructive" role="alert">Vui lòng hoàn thiện thông tin người ký.</p>}
+                {Object.entries(stepErrors).some(([key]) => key.startsWith('internal-signer-')) && <p className="text-sm text-destructive" role="alert">Vui lòng chọn người ký nội bộ hợp lệ.</p>}
+                {stepErrors.signerRequired && <p className="text-sm text-destructive" role="alert">{stepErrors.signerRequired}</p>}
               </div>
             )}
 
@@ -673,7 +775,7 @@ export default function CreateSignRequestPage() {
           </CardContent>
         </Card>}
 
-        {currentStep === 4 && <Card><CardContent className="space-y-4 p-6"><h3 className="text-lg font-semibold">Rà soát trước khi tạo</h3><div className="grid gap-3 text-sm sm:grid-cols-2"><p><strong>Tài liệu:</strong> {file?.name || existingSignRequestData?.sign_request?.document?.original_file_name}</p><p><strong>Loại văn bản:</strong> {selectedDocType?.name || 'Chưa chọn'}</p><p><strong>Workflow:</strong> {workflowMode === 'no_approval' ? 'Không cần phê duyệt' : workflowMode === 'adhoc' ? `${adhocSteps?.length || 0} bước tùy chỉnh` : workflowMode || 'Chưa cấu hình'}</p><p><strong>Người ký:</strong> {signers.length ? signers.map((signer) => signer.name || signer.email).join(', ') : 'Chưa có'}</p></div><p className="text-sm text-muted-foreground">Kiểm tra lại thông tin. Khi xác nhận, hệ thống sẽ tạo trình ký và chuyển tới editor để đặt trường ký.</p></CardContent></Card>}
+        {currentStep === 4 && <Card><CardContent className="space-y-4 p-6"><h3 className="text-lg font-semibold">Rà soát trước khi tạo</h3><div className="grid gap-3 text-sm sm:grid-cols-2"><p><strong>Tài liệu:</strong> {file?.name || existingSignRequestData?.sign_request?.document?.original_file_name}</p><p><strong>Loại văn bản:</strong> {selectedDocType?.name || 'Chưa chọn'}</p><p><strong>Workflow:</strong> {workflowMode === 'no_approval' ? 'Không cần phê duyệt' : workflowMode === 'adhoc' ? `${adhocSteps?.length || 0} bước tùy chỉnh` : workflowMode || 'Chưa cấu hình'}</p><p><strong>Người ký:</strong> {hasConfiguredSigner ? `${signers.length} bên ngoài, ${configuredInternalSignerCount} nội bộ` : 'Chưa có'}</p></div><p className="text-sm text-muted-foreground">Kiểm tra lại thông tin. Khi xác nhận, hệ thống sẽ tạo trình ký và chuyển tới editor để đặt trường ký.</p></CardContent></Card>}
 
         <div className="sticky bottom-20 z-10 -mx-1 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:static sm:mx-0 sm:flex-row sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
           <Button

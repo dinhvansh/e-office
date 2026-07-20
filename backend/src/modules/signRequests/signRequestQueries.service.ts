@@ -4,6 +4,7 @@ import { prisma } from "../../config/prisma";
 import { buildSignRequestFlowHints, buildWorkflowStatusSummary } from "./signRequestFlow.policy";
 import { normalizeStoredFieldBox } from "./coordinate.helper";
 import { signRequestsRepository } from "./signRequests.repository";
+import { buildSignRequestProgress } from "./signRequestProgress.policy";
 
 class SignRequestQueriesService {
   async getSignRequest(id: number, tenantId: number, userId?: number) {
@@ -18,10 +19,18 @@ class SignRequestQueriesService {
       }
     }
 
-    const workflowSnapshot = await this.getWorkflowSnapshotForDocument(signRequest.document_id, tenantId);
-    const canManage = userId
-      ? (await authorizationService.canAccessDocument(userId, tenantId, signRequest.document_id, "edit")).allowed
-      : false;
+    const [workflowSnapshot, latestRun, canManage] = await Promise.all([
+      this.getWorkflowSnapshotForDocument(signRequest.document_id, tenantId),
+      prisma.workflow_instances.findFirst({
+        where: { document_id: signRequest.document_id, document: { tenant_id: tenantId } },
+        orderBy: { run_number: "desc" },
+        select: { approvals: { select: { action: true } } },
+      }),
+      userId
+        ? authorizationService.canAccessDocument(userId, tenantId, signRequest.document_id, "edit").then((decision) => decision.allowed)
+        : Promise.resolve(false),
+    ]);
+    const approvals = latestRun?.approvals || [];
     return {
       ...signRequest,
       fields: signRequest.fields.map((field) => {
@@ -39,10 +48,12 @@ class SignRequestQueriesService {
         };
       }),
       workflow_snapshot: workflowSnapshot,
+      progress: buildSignRequestProgress(signRequest.signers, approvals),
       ...buildSignRequestFlowHints(signRequest.status, signRequest.signers),
       status_summary: buildWorkflowStatusSummary({
         status: signRequest.status,
         signers: signRequest.signers,
+        approvals,
         deadline: signRequest.deadline,
         canRetryArtifact: canManage,
       }),

@@ -1,6 +1,7 @@
 'use client';
 
-import { CheckCircle, Download, FileText, Calendar, User, Mail, Clock, Printer } from 'lucide-react';
+import Image from 'next/image';
+import { CheckCircle2, Clock, Download, FileText, Printer, ShieldCheck, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ThankYouPageProps {
@@ -8,7 +9,7 @@ interface ThankYouPageProps {
   signerEmail?: string;
   signerRole?: string;
   documentTitle?: string;
-  documentNumber?: string; // ✅ Add document number
+  documentNumber?: string;
   originalFileName?: string;
   signedAt?: string;
   signRequestTitle?: string;
@@ -20,216 +21,94 @@ export default function ThankYouPage({
   signerEmail,
   signerRole,
   documentTitle,
-  documentNumber, // ✅ Add document number
+  documentNumber,
   originalFileName,
   signedAt,
   signRequestTitle,
-  onDownload
+  onDownload,
 }: ThankYouPageProps) {
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return new Date().toLocaleString('vi-VN');
-    return new Date(dateString).toLocaleString('vi-VN');
-  };
-
-  const formatRole = (role?: string) => {
-    switch (role) {
-      case 'signer': return 'Người ký';
-      case 'approver': return 'Người phê duyệt';
-      case 'reviewer': return 'Người xem xét';
-      default: return role || 'Người ký';
-    }
-  };
+  const signedTime = signedAt
+    ? new Date(signedAt).toLocaleString('vi-VN')
+    : 'Không có thông tin';
+  const roleLabel = signerRole === 'approver'
+    ? 'Người phê duyệt'
+    : signerRole === 'reviewer'
+      ? 'Người xem xét'
+      : 'Người ký';
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 p-4">
-      <div className="max-w-4xl w-full">
-        {/* Success Card */}
-        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border-t-8 border-green-500">
-          {/* Header with Animation */}
-          <div className="bg-gradient-to-r from-green-500 to-blue-500 p-8 text-center relative overflow-hidden">
-            <div className="absolute inset-0 bg-white opacity-10">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent animate-pulse"></div>
-            </div>
-            
-            <div className="relative z-10">
-              <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl animate-bounce">
-                <CheckCircle className="w-20 h-20 text-green-600" />
-              </div>
-              
-              <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
-                🎉 Cảm ơn bạn!
-              </h1>
-              
-              <p className="text-xl text-white opacity-90">
-                Tài liệu đã được ký thành công
-              </p>
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex h-24 max-w-7xl items-center justify-between px-5 sm:px-8">
+          <div className="flex items-center gap-3">
+            <Image src="/logo.png" alt="WP Sign" width={56} height={56} priority className="h-14 w-14 rounded-2xl object-contain shadow-sm" />
+            <div>
+              <p className="text-2xl font-bold tracking-tight">WP Sign</p>
+              <p className="text-sm font-medium text-slate-500">Nền tảng ký duyệt điện tử</p>
             </div>
           </div>
-          
-          {/* Content */}
-          <div className="p-8 md:p-12">
-            {/* Signing Time */}
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 rounded-full border border-green-200">
-                <Clock className="w-4 h-4 text-green-600" />
-                <span className="text-sm text-green-800 font-medium">
-                  Thời gian ký: {formatDate(signedAt)}
-                </span>
-              </div>
-            </div>
-            
-            {/* Document Info Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              {/* Left Column - Document Info */}
-              <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-200">
-                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-blue-600" />
-                  Thông tin tài liệu
-                </h3>
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <span className="text-gray-600 block mb-1">Tiêu đề yêu cầu ký</span>
-                    <span className="font-semibold text-gray-900 block">
-                      {signRequestTitle || documentTitle || 'Tài liệu ký điện tử'}
-                    </span>
-                  </div>
-                  {documentNumber && (
-                    <div>
-                      <span className="text-gray-600 block mb-1">🔢 Mã văn bản</span>
-                      <span className="font-mono text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded block">
-                        {documentNumber}
-                      </span>
-                    </div>
-                  )}
-                  {originalFileName && (
-                    <div>
-                      <span className="text-gray-600 block mb-1">File gốc</span>
-                      <span className="font-mono text-xs font-medium text-gray-900 bg-white px-2 py-1 rounded block break-all">
-                        {originalFileName}
-                      </span>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-gray-600 block mb-1">Trạng thái</span>
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Đã ký hoàn tất
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Right Column - Signer Info */}
-              <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-xl p-6 border border-green-200">
-                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <User className="w-5 h-5 text-green-600" />
-                  Thông tin người ký
-                </h3>
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <span className="text-gray-600 block mb-1">Họ và tên</span>
-                    <span className="font-semibold text-gray-900 block">{signerName || 'Khách hàng'}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600 block mb-1">Email</span>
-                    <span className="font-medium text-gray-900 block break-all">{signerEmail || 'N/A'}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600 block mb-1">Vai trò</span>
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      {formatRole(signerRole)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600 block mb-1">Thời gian ký</span>
-                    <span className="font-medium text-gray-900 block">{formatDate(signedAt)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Success Message */}
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 mb-6 border border-green-200">
-              <div className="flex items-start gap-3">
-                <CheckCircle className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold text-green-900 mb-2">
-                    ✅ Tài liệu đã được ký thành công!
-                  </h3>
-                  <p className="text-green-800 text-sm leading-relaxed">
-                    Chữ ký điện tử của bạn đã được lưu trữ an toàn và có giá trị pháp lý 
-                    tương đương với tài liệu ký tay theo quy định của pháp luật Việt Nam.
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            {/* Next Steps */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-6 border border-blue-200">
-              <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                <Mail className="w-5 h-5 text-blue-600" />
-                📧 Tiếp theo
-              </h3>
-              <div className="space-y-2 text-sm text-blue-800">
-                <p className="flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <span>Bạn sẽ nhận được email xác nhận trong vài phút tới</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <span>Tài liệu đã ký sẽ được gửi kèm theo email</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <span>Bạn có thể lưu lại hoặc in trang này làm bằng chứng</span>
-                </p>
-              </div>
-            </div>
-            
-            {/* Action Buttons */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {onDownload && (
-                <Button
-                  onClick={onDownload}
-                  variant="outline"
-                  className="py-6 text-lg border-2 hover:bg-blue-50 hover:border-blue-300"
-                >
-                  <Download className="w-5 h-5 mr-2" />
-                  Tải xuống
-                </Button>
-              )}
-              
-              <Button 
-                onClick={() => window.print()} 
-                variant="outline"
-                className="py-6 text-lg border-2 hover:bg-gray-50"
-              >
-                <Printer className="w-5 h-5 mr-2" />
-                In trang này
-              </Button>
-              
-              <Button 
-                onClick={() => window.close()} 
-                className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white py-6 text-lg shadow-lg hover:shadow-xl transition-all"
-              >
-                ✓ Đóng cửa sổ
-              </Button>
-            </div>
-          </div>
-          
-          {/* Footer */}
-          <div className="bg-gray-50 px-8 py-6 border-t border-gray-200">
-            <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">
-                🔒 Cảm ơn bạn đã sử dụng dịch vụ ký điện tử của chúng tôi
-              </p>
-              <p className="text-xs text-gray-500">
-                Hệ thống ký điện tử an toàn, bảo mật và tuân thủ pháp luật Việt Nam
-              </p>
-            </div>
-          </div>
+          <span className="hidden items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700 sm:inline-flex">
+            <CheckCircle2 className="h-4 w-4" /> Đã hoàn tất
+          </span>
         </div>
-      </div>
+      </header>
+
+      <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-14">
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-200/60">
+          <div className="border-b border-slate-100 px-6 py-9 text-center sm:px-10 sm:py-11">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 ring-8 ring-emerald-50/60">
+              <CheckCircle2 className="h-11 w-11 text-emerald-600" />
+            </div>
+            <h1 className="mt-6 text-3xl font-bold tracking-tight sm:text-4xl">Ký tài liệu thành công</h1>
+            <p className="mx-auto mt-3 max-w-xl text-base leading-7 text-slate-500">
+              Tài liệu đã được ghi nhận và lưu trữ. Bạn có thể tải bản hoàn tất xuống ngay bây giờ.
+            </p>
+            <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
+              <Clock className="h-4 w-4" /> {signedTime}
+            </div>
+          </div>
+
+          <div className="space-y-6 p-6 sm:p-10">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 p-5 sm:p-6">
+                <div className="mb-5 flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><FileText className="h-5 w-5" /></span>
+                  <h2 className="font-semibold">Thông tin tài liệu</h2>
+                </div>
+                <dl className="space-y-4 text-sm">
+                  <div><dt className="text-slate-500">Tên tài liệu</dt><dd className="mt-1 font-semibold text-slate-900">{signRequestTitle || documentTitle || 'Tài liệu ký điện tử'}</dd></div>
+                  {documentNumber && <div><dt className="text-slate-500">Mã tài liệu</dt><dd className="mt-1 font-medium text-slate-900">{documentNumber}</dd></div>}
+                  {originalFileName && <div><dt className="text-slate-500">Tệp gốc</dt><dd className="mt-1 break-all font-medium text-slate-900">{originalFileName}</dd></div>}
+                </dl>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 p-5 sm:p-6">
+                <div className="mb-5 flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><User className="h-5 w-5" /></span>
+                  <h2 className="font-semibold">Thông tin người ký</h2>
+                </div>
+                <dl className="space-y-4 text-sm">
+                  <div><dt className="text-slate-500">Họ và tên</dt><dd className="mt-1 font-semibold text-slate-900">{signerName || 'Người ký'}</dd></div>
+                  {signerEmail && <div><dt className="text-slate-500">Email</dt><dd className="mt-1 break-all font-medium text-slate-900">{signerEmail}</dd></div>}
+                  <div><dt className="text-slate-500">Vai trò</dt><dd className="mt-1 font-medium text-slate-900">{roleLabel}</dd></div>
+                </dl>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 sm:p-5">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+              <div><p className="font-semibold">Bản ký đã sẵn sàng</p><p className="mt-1 leading-6 text-emerald-800">Hệ thống đã lưu thời điểm ký, người ký và lịch sử xử lý cùng tài liệu.</p></div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {onDownload && <Button onClick={onDownload} className="h-12 text-base font-semibold"><Download className="mr-2 h-5 w-5" />Tải tài liệu đã ký</Button>}
+              <Button onClick={() => window.print()} variant="outline" className="h-12 text-base font-semibold"><Printer className="mr-2 h-5 w-5" />In xác nhận</Button>
+            </div>
+          </div>
+        </section>
+
+        <p className="mt-6 text-center text-sm text-slate-400">Được bảo vệ bởi WP Sign</p>
+      </main>
     </div>
   );
 }

@@ -7,9 +7,14 @@ import {
 
 export const documentTypesService = {
   async getDocumentTypes(tenantId: number, filters?: { category?: string; is_active?: boolean }, userId?: number, purpose?: string) {
-    const documentTypes = await documentTypesRepository.findByTenant(tenantId, filters);
+    const allDocumentTypes = await documentTypesRepository.findByTenant(tenantId, filters);
+    const documentTypes = purpose === 'sign_request'
+      ? allDocumentTypes.filter((documentType) =>
+          documentType.is_active && (documentType.require_approval || documentType.require_digital_signing)
+        )
+      : allDocumentTypes;
 
-    if (purpose !== 'create' || !userId) {
+    if (!['create', 'sign_request'].includes(purpose || '') || !userId) {
       return documentTypes;
     }
 

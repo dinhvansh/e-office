@@ -112,7 +112,7 @@ export default function SigningSidebar({
   const progressPercent = totalSigners > 0 ? (signedCount / totalSigners) * 100 : 0;
 
   return (
-    <div className="w-96 bg-white border-l border-gray-200 h-screen overflow-y-auto flex-shrink-0 shadow-lg">
+    <aside className="w-full flex-shrink-0 overflow-hidden border-t border-gray-200 bg-white shadow-sm xl:sticky xl:top-0 xl:h-screen xl:w-80 xl:overflow-y-auto xl:border-l xl:border-t-0">
       {/* Status Badge */}
       <div className="p-4 border-b border-gray-200 bg-yellow-50">
         <div className="flex items-center justify-between mb-2">
@@ -262,6 +262,6 @@ export default function SigningSidebar({
           </div>
         )}
       </div>
-    </div>
+    </aside>
   );
 }

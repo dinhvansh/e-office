@@ -23,6 +23,7 @@ import {
   normalizeDocumentTypePolicyV2,
 } from "../settings/document-type-policy.helper";
 import { documentFileService, type DocumentFileResult } from "./documentFile.service";
+import { completionCertificateService } from "./completionCertificate.service";
 import { documentLifecycleService } from "./documentLifecycle.service";
 import { outboxDeliveryService } from "../outbox/outboxDelivery.service";
 import { notificationsService } from "../notifications/notifications.service";
@@ -499,13 +500,34 @@ class DocumentsService {
 
   async getDossierFile(documentId: number, tenantId: number, userId: number) {
     const document = await this.getDocument(documentId, tenantId, userId);
-    const completed = ["completed", "signed", "fully_signed"].includes((document.status || "").toLowerCase()) && Boolean(document.signed_file_path);
-    const primary = completed
+    const lifecycleCompleted = ["completed", "signed", "fully_signed"].includes((document.status || "").toLowerCase());
+    const hasSignedArtifact = lifecycleCompleted && Boolean(document.signed_file_path);
+    const primary = hasSignedArtifact
       ? await this.getSignedDocumentFile(documentId, tenantId, userId)
       : await this.getDocumentFile(documentId, tenantId, userId);
-    const attachments = await this.listAttachments(documentId, tenantId, userId);
+    const [attachments, workflowRuns] = await Promise.all([
+      this.listAttachments(documentId, tenantId, userId),
+      prisma.workflow_instances.findMany({
+        where: { document_id: documentId, document: { tenant_id: tenantId } },
+        orderBy: { run_number: "asc" },
+        include: {
+          workflow: { select: { id: true, name: true, approval_mode: true } },
+          approvals: {
+            orderBy: { created_at: "asc" },
+            include: {
+              workflow_step: { select: { step_order: true, step_name: true } },
+              approver: { select: { id: true, full_name: true, email: true } },
+            },
+          },
+        },
+      }),
+    ]);
     const activeAttachments = attachments.filter((attachment) => attachment.status === "ACTIVE");
-    const files: Array<{ name: string; content: Buffer }> = [{ name: completed ? `signed/${primary.fileName}` : `current/${primary.fileName}`, content: primary.fileBytes }];
+    const deliveredPrimary = await this.prepareDocumentDelivery(primary);
+    const files: Array<{ name: string; content: Buffer }> = [{
+      name: hasSignedArtifact ? `signed/${primary.fileName}` : `current/${primary.fileName}`,
+      content: deliveredPrimary.fileBytes,
+    }];
     const manifestAttachments: Array<Record<string, unknown>> = [];
     for (const attachment of activeAttachments) {
       const file = await this.getAttachmentFile(attachment.id, tenantId, userId);
@@ -513,7 +535,43 @@ class DocumentsService {
       files.push({ name: archiveName, content: file.fileBytes });
       manifestAttachments.push({ id: attachment.id, name: attachment.file_name, archive_path: archiveName, kind: attachment.attachment_kind, comment_id: attachment.comment_id, uploaded_at: attachment.uploaded_at, size: attachment.file_size?.toString() ?? null, uploaded_by: attachment.uploader ? { id: attachment.uploader.id, name: attachment.uploader.full_name, email: attachment.uploader.email } : null });
     }
-    files.push({ name: "manifest.json", content: Buffer.from(JSON.stringify({ document: { id: document.id, title: document.title, status: document.status, hash: document.hash, completed }, primary_file: primary.fileName, attachments: manifestAttachments, withdrawn_attachments: attachments.filter((attachment) => attachment.status === "WITHDRAWN").map((attachment) => ({ id: attachment.id, name: attachment.file_name, status: attachment.status, reason: attachment.withdraw_reason, withdrawn_at: attachment.withdrawn_at })) }, null, 2)) });
+    const workflowHistory = workflowRuns.map((run) => ({
+      id: run.id,
+      run_number: run.run_number,
+      status: run.status,
+      workflow: run.workflow,
+      started_at: run.started_at,
+      completed_at: run.completed_at,
+      approvals: run.approvals.map((approval) => ({
+        id: approval.id,
+        step_order: approval.workflow_step.step_order,
+        step_name: approval.workflow_step.step_name,
+        actor: {
+          id: approval.approver.id,
+          name: approval.approver.full_name,
+          email: approval.approver.email,
+        },
+        outcome: approval.action,
+        acted_at: approval.acted_at,
+        comment: approval.comment,
+      })),
+    }));
+    files.push({ name: "manifest.json", content: Buffer.from(JSON.stringify({
+      document: {
+        id: document.id,
+        title: document.title,
+        status: document.status,
+        hash: document.hash,
+        completed: lifecycleCompleted,
+        signed_artifact_available: hasSignedArtifact,
+        completion_certificate_applied: deliveredPrimary.certificateApplied,
+        delivery_watermark_applied: deliveredPrimary.watermarkApplied,
+      },
+      primary_file: primary.fileName,
+      workflow_history: workflowHistory,
+      attachments: manifestAttachments,
+      withdrawn_attachments: attachments.filter((attachment) => attachment.status === "WITHDRAWN").map((attachment) => ({ id: attachment.id, name: attachment.file_name, status: attachment.status, reason: attachment.withdraw_reason, withdrawn_at: attachment.withdrawn_at })),
+    }, null, 2)) });
     const baseName = (document.title || document.original_file_name || `document-${documentId}`).replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9._-]+/g, "-");
     return { fileName: `${baseName}-dossier.zip`, fileBytes: this.makeZip(files) };
   }
@@ -591,6 +649,17 @@ class DocumentsService {
         throw ApiError.notFound("Document type not found", "DOCUMENT_TYPE_NOT_FOUND");
       }
 
+      if (
+        input.forceSignRequest &&
+        !documentType.require_approval &&
+        !documentType.require_digital_signing
+      ) {
+        throw ApiError.badRequest(
+          "Document type must require approval or digital signing",
+          "DOCUMENT_TYPE_NOT_SIGN_REQUEST_CAPABLE"
+        );
+      }
+
       documentTypeId = documentType.id;
 
       // Generate document number if required
@@ -606,6 +675,13 @@ class DocumentsService {
           );
         }
       }
+    }
+
+    if (input.forceSignRequest && !documentType) {
+      throw ApiError.badRequest(
+        "Document type is required for a sign request",
+        "DOCUMENT_TYPE_REQUIRED"
+      );
     }
 
     const shouldCreateSignRequest =
@@ -710,6 +786,7 @@ class DocumentsService {
             ? {
                 default_workflow_id: documentType.default_workflow_id,
                 require_approval: documentType.require_approval,
+                require_digital_signing: documentType.require_digital_signing,
               }
             : null,
         });
@@ -1188,6 +1265,26 @@ class DocumentsService {
     tenantId: number;
   }): Promise<Buffer | null> {
     return documentFileService.getWatermarkedBufferIfNeeded(input);
+  }
+
+  async prepareDocumentDelivery(input: DocumentFileResult) {
+    let fileBytes = input.fileBytes;
+    let certificateApplied = false;
+    if (input.mimeType === "application/pdf" && input.sourceKind === "original" && input.documentStatus === "completed") {
+      const certificate = await completionCertificateService.appendApprovalCertificate({
+        documentId: input.documentId,
+        tenantId: input.tenantId,
+        fileBytes,
+      });
+      fileBytes = certificate.fileBytes;
+      certificateApplied = certificate.applied;
+    }
+    const watermarked = await documentFileService.getWatermarkedBufferIfNeeded({ ...input, fileBytes });
+    return {
+      fileBytes: watermarked || fileBytes,
+      certificateApplied,
+      watermarkApplied: Boolean(watermarked),
+    };
   }
 
   /**
