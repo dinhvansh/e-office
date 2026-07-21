@@ -12,6 +12,7 @@ import { canSignerActInOrder, findNextWaitingSigningOrder } from "../signRequest
 import { signersService } from "../signers/signers.service";
 import { workflowStateService } from "../workflows/workflowState.service";
 import { isSigningSessionValid } from "./signingSession.service";
+import { assertPublicSigningActionable } from "./publicSigningLifecycle.policy";
 
 export interface PublicSigningCommandInput {
   invitationToken: string;
@@ -28,11 +29,12 @@ export class PublicSigningCommandService {
   async submit(input: PublicSigningCommandInput): Promise<{ allSigned: boolean }> {
     const signer = await prisma.signers.findUnique({
       where: { signing_token: input.invitationToken },
-      include: { sign_request: true },
+      include: { sign_request: { include: { document: true } } },
     });
     if (!signer) {
       throw ApiError.notFound("Invalid signing link");
     }
+    assertPublicSigningActionable(signer);
     if (!isSigningSessionValid(input.signingSession, signer.id, signer.sign_request_id, signer.otp)) {
       throw ApiError.unauthorized("OTP verification is required", "SIGNING_SESSION_INVALID");
     }
@@ -83,6 +85,9 @@ export class PublicSigningCommandService {
           user_agent: input.userAgent,
           otp: null,
           otp_expire: null,
+          otp_sent_at: null,
+          otp_verified_at: null,
+          otp_attempt_count: 0,
         },
       });
       if (updated.count !== 1) return { updated, allSigned: false };

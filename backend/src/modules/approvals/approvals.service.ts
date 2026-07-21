@@ -857,6 +857,7 @@ class ApprovalsService {
         },
       });
 
+      let lifecycleStatus = 'generating_artifact';
       if (document?.sign_request_id) {
         const { documentWorkflowOrchestratorService } = await import('../documents/documentWorkflowOrchestrator.service');
         const activation = await documentWorkflowOrchestratorService.activateSigningPhase(
@@ -865,6 +866,7 @@ class ApprovalsService {
         );
 
         if (!activation.completedWithoutSigners) {
+          lifecycleStatus = 'pending_signature';
           await signRequestsService.dispatchPendingSigners(
             document.sign_request_id,
             tenantId,
@@ -873,18 +875,22 @@ class ApprovalsService {
           );
         }
       } else {
-        // No signing required, mark as completed
-        await workflowStateService.transitionDocument(prisma, {
-          documentId: approval.document_id,
-          status: 'completed',
-        });
-
-        if (document?.sign_request_id) {
-          await prisma.sign_requests.update({
-            where: { id: document.sign_request_id },
-            data: { status: 'completed' },
+        // Legacy approval-only documents without a linked sign request still
+        // require a persisted Final PDF before they can become completed.
+        await prisma.$transaction(async (tx) => {
+          await workflowStateService.transitionDocument(tx, {
+            documentId: approval.document_id,
+            status: 'generating_artifact',
           });
-        }
+          await tx.outbox_events.createMany({ data: [{
+            tenant_id: tenantId,
+            aggregate_type: 'document',
+            aggregate_id: String(approval.document_id),
+            event_type: 'SIGNED_ARTIFACT_REQUESTED',
+            payload: { document_id: approval.document_id, approval_only: true },
+            deduplication_key: `document-final-artifact:${approval.document_id}:${approval.workflow_instance_id}`,
+          }], skipDuplicates: true });
+        });
       }
 
       // Send completion notification to document owner
@@ -932,8 +938,8 @@ class ApprovalsService {
       }
 
       return {
-        message: 'Document approved! Workflow completed.',
-        status: 'completed',
+        message: lifecycleStatus === 'pending_signature' ? 'Document approved! Waiting for signatures.' : 'Document approved! Final PDF is being generated.',
+        status: lifecycleStatus,
       };
     }
   }

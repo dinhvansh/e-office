@@ -504,12 +504,11 @@ export class DocumentsController {
   // Download & View endpoints
   download = async (req: Request, res: Response): Promise<void> => {
     const documentId = idSchema.parse(req.params.id);
-    const file = await documentsService.getDocumentFile(
+    const file = await documentsService.getDocumentDeliveryFile(
       documentId,
       req.auth!.tenantId,
       req.auth!.userId
     );
-    const delivery = await documentsService.prepareDocumentDelivery(file);
 
     await auditService.record({
       tenantId: req.auth!.tenantId,
@@ -524,17 +523,16 @@ export class DocumentsController {
     res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
 
-    res.send(delivery.fileBytes);
+    res.send(file.fileBytes);
   };
 
   view = async (req: Request, res: Response): Promise<void> => {
     const documentId = idSchema.parse(req.params.id);
-    const file = await documentsService.getDocumentFile(
+    const file = await documentsService.getDocumentDeliveryFile(
       documentId,
       req.auth!.tenantId,
       req.auth!.userId
     );
-    const delivery = await documentsService.prepareDocumentDelivery(file);
 
     await auditService.record({
       tenantId: req.auth!.tenantId,
@@ -549,7 +547,7 @@ export class DocumentsController {
     res.setHeader('Content-Type', file.mimeType || 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${file.fileName}"`);
 
-    res.send(delivery.fileBytes);
+    res.send(file.fileBytes);
   };
 
   downloadSigned = async (req: Request, res: Response): Promise<void> => {
@@ -559,7 +557,6 @@ export class DocumentsController {
       req.auth!.tenantId,
       req.auth!.userId
     );
-    const delivery = await documentsService.prepareDocumentDelivery(file);
 
     await auditService.record({
       tenantId: req.auth!.tenantId,
@@ -574,7 +571,7 @@ export class DocumentsController {
     res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
 
-    res.send(delivery.fileBytes);
+    res.send(file.fileBytes);
   };
 
   viewSigned = async (req: Request, res: Response): Promise<void> => {
@@ -584,7 +581,6 @@ export class DocumentsController {
       req.auth!.tenantId,
       req.auth!.userId
     );
-    const delivery = await documentsService.prepareDocumentDelivery(file);
 
     await auditService.record({
       tenantId: req.auth!.tenantId,
@@ -604,7 +600,7 @@ export class DocumentsController {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
-    res.send(delivery.fileBytes);
+    res.send(file.fileBytes);
   };
 
   submitForApproval = async (req: Request, res: Response): Promise<void> => {

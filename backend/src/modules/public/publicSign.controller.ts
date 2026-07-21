@@ -11,7 +11,9 @@ import { prisma } from "../../config/prisma";
 import { createSigningSession, getSigningSessionErrorCode, isSigningSessionValid, PUBLIC_SIGNING_COOKIE_PATH, SIGNING_SESSION_COOKIE, SIGNING_SESSION_TTL_SECONDS } from "./signingSession.service";
 import { publicSigningCommandService } from "./publicSigningCommand.service";
 import { buildPreOtpSigningMetadata, buildVerifiedSigningMetadata } from "./publicSigning.response";
-import { documentsService } from "../documents/documents.service";
+import { assertPublicSigningActionable } from "./publicSigningLifecycle.policy";
+
+const OTP_MAX_VERIFY_ATTEMPTS = 5;
 
 const parseCookies = (cookieHeader?: string): Record<string, string> => {
   if (!cookieHeader) return {};
@@ -135,19 +137,12 @@ export class PublicSignController {
     } catch {
       throw ApiError.notFound("Document file not found");
     }
-    const watermarkedBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded({
-      fileBytes: pdfBuffer,
-      mimeType: "application/pdf",
-      documentStatus: document.status,
-      tenantId: document.tenant_id,
-    });
-
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
       `inline; filename="${document.original_file_name || "document.pdf"}"`,
     );
-    res.send(watermarkedBuffer || Buffer.from(pdfBuffer));
+    res.send(Buffer.from(pdfBuffer));
   };
 
   sendOtp = async (req: Request, res: Response): Promise<void> => {
@@ -157,13 +152,14 @@ export class PublicSignController {
     const signer = await prisma.signers.findUnique({
       where: { signing_token: token },
       include: {
-        sign_request: true,
+        sign_request: { include: { document: true } },
       },
     });
 
     if (!signer) {
-      throw ApiError.notFound("Invalid signing link");
+      throw ApiError.notFound("Invalid signing link", "INVALID_SIGNING_LINK");
     }
+    assertPublicSigningActionable(signer);
     if (body.email && signer.email !== body.email) {
       throw ApiError.badRequest("Email does not match", "SIGNER_EMAIL_MISMATCH");
     }
@@ -183,10 +179,18 @@ export class PublicSignController {
 
     const signer = await prisma.signers.findUnique({
       where: { signing_token: token },
+      include: { sign_request: { include: { document: true } } },
     });
 
     if (!signer) {
       throw ApiError.notFound("Invalid signing link", "INVALID_TOKEN");
+    }
+    assertPublicSigningActionable(signer);
+    if (signer.otp_verified_at) {
+      throw ApiError.badRequest("OTP has already been used", "OTP_ALREADY_USED");
+    }
+    if (signer.otp_attempt_count >= OTP_MAX_VERIFY_ATTEMPTS) {
+      throw ApiError.badRequest("Too many invalid OTP attempts", "OTP_ATTEMPTS_EXCEEDED");
     }
     if (!signer.otp) {
       throw ApiError.badRequest("OTP not issued. Please request OTP first.", "OTP_NOT_ISSUED");
@@ -197,7 +201,19 @@ export class PublicSignController {
 
     const isValid = await bcrypt.compare(normalizedOtp, signer.otp);
     if (!isValid) {
+      await prisma.signers.updateMany({
+        where: { id: signer.id, otp: signer.otp, otp_verified_at: null },
+        data: { otp_attempt_count: { increment: 1 } },
+      });
       throw ApiError.badRequest("Invalid OTP. Please check your email.", "OTP_INVALID");
+    }
+
+    const consumed = await prisma.signers.updateMany({
+      where: { id: signer.id, otp: signer.otp, otp_verified_at: null, otp_attempt_count: { lt: OTP_MAX_VERIFY_ATTEMPTS } },
+      data: { otp_verified_at: new Date() },
+    });
+    if (consumed.count !== 1) {
+      throw ApiError.badRequest("OTP has already been used", "OTP_ALREADY_USED");
     }
 
     const signingSession = createSigningSession(signer.id, signer.sign_request_id, signer.otp);
@@ -237,13 +253,7 @@ export class PublicSignController {
       throw ApiError.notFound("Signed PDF file not found");
     }
 
-    const watermarkedBuffer = await documentsService.getWatermarkedDocumentBufferIfNeeded({
-      fileBytes: pdfBuffer,
-      mimeType: "application/pdf",
-      documentStatus: document.status,
-      tenantId: document.tenant_id,
-    });
-    const responseBuffer = watermarkedBuffer || Buffer.from(pdfBuffer);
+    const responseBuffer = Buffer.from(pdfBuffer);
     const filename = `${document.document_number || document.original_file_name || "document"}_signed.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

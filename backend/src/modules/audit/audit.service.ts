@@ -121,32 +121,45 @@ export class AuditService {
     };
 
     for (const log of logs) {
-      const viewer = ensureViewer(log);
-      if (!viewer.lastActivityAt || viewer.lastActivityAt < log.created_at) {
-        viewer.lastActivityAt = log.created_at;
-      }
-
+      // The per-user table is a delivery-activity report, not a list of every
+      // audit actor. Background worker events intentionally have no user_id
+      // and must not become a fake "unknown user" row.
       switch (log.event) {
-        case "document.viewed":
+        case "document.viewed": {
+          const viewer = ensureViewer(log);
+          if (!viewer.lastActivityAt || viewer.lastActivityAt < log.created_at) viewer.lastActivityAt = log.created_at;
           summary.totalViews += 1;
           viewer.views += 1;
           break;
-        case "document.downloaded":
+        }
+        case "document.downloaded": {
+          const viewer = ensureViewer(log);
+          if (!viewer.lastActivityAt || viewer.lastActivityAt < log.created_at) viewer.lastActivityAt = log.created_at;
           summary.totalDownloads += 1;
           viewer.downloads += 1;
           break;
-        case "document.signed_viewed":
+        }
+        case "document.signed_viewed": {
+          const viewer = ensureViewer(log);
+          if (!viewer.lastActivityAt || viewer.lastActivityAt < log.created_at) viewer.lastActivityAt = log.created_at;
           summary.totalSignedViews += 1;
           viewer.signedViews += 1;
           break;
-        case "document.signed_downloaded":
+        }
+        case "document.signed_downloaded": {
+          const viewer = ensureViewer(log);
+          if (!viewer.lastActivityAt || viewer.lastActivityAt < log.created_at) viewer.lastActivityAt = log.created_at;
           summary.totalSignedDownloads += 1;
           viewer.signedDownloads += 1;
           break;
-        case "document.attachment_downloaded":
+        }
+        case "document.attachment_downloaded": {
+          const viewer = ensureViewer(log);
+          if (!viewer.lastActivityAt || viewer.lastActivityAt < log.created_at) viewer.lastActivityAt = log.created_at;
           summary.totalAttachmentDownloads += 1;
           viewer.attachmentDownloads += 1;
           break;
+        }
       }
     }
 

@@ -37,7 +37,7 @@ class CompletionCertificateService {
       where: { id: input.documentId, tenant_id: input.tenantId },
       include: {
         owner: { select: { full_name: true, email: true } },
-        sign_request: { select: { signers: { select: { id: true }, take: 1 } } },
+        sign_request: { select: { signers: { select: { id: true, name: true, email: true, status: true, signed_at: true, ip_address: true }, orderBy: { signing_order: "asc" } } } },
         workflow_instances: {
           orderBy: { run_number: "desc" },
           take: 1,
@@ -56,8 +56,9 @@ class CompletionCertificateService {
     });
 
     const run = document?.workflow_instances[0];
-    const approvalOnly = (document?.sign_request?.signers.length || 0) === 0;
-    if (!document || document.status !== "completed" || !approvalOnly || run?.status !== "completed" || !run.approvals.length) {
+    const completedSigners = (document?.sign_request?.signers || []).filter((signer) => ["signed", "completed"].includes(signer.status || ""));
+    const approvals = run?.status === "completed" ? run.approvals : [];
+    if (!document || (approvals.length === 0 && completedSigners.length === 0)) {
       return { fileBytes: Buffer.from(input.fileBytes), applied: false };
     }
 
@@ -66,9 +67,10 @@ class CompletionCertificateService {
     const boldFont = await embedUnicodeFont(pdf, true);
     const originalPageCount = pdf.getPageCount();
     const chunks: CertificateApproval[][] = [];
-    for (let index = 0; index < run.approvals.length; index += ROWS_PER_PAGE) {
-      chunks.push(run.approvals.slice(index, index + ROWS_PER_PAGE));
+    for (let index = 0; index < approvals.length; index += ROWS_PER_PAGE) {
+      chunks.push(approvals.slice(index, index + ROWS_PER_PAGE));
     }
+    if (chunks.length === 0) chunks.push([]);
 
     chunks.forEach((approvals, pageIndex) => {
       const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
@@ -87,14 +89,14 @@ class CompletionCertificateService {
         drawText(page, String(originalPageCount), 425, y, font, 8);
         y -= 18;
         drawText(page, "Workflow", 42, y, boldFont, 8);
-        drawText(page, safeText(run.workflow.name, 52), 125, y, font, 8);
+        drawText(page, safeText(run?.workflow.name || "Signing workflow", 52), 125, y, font, 8);
         drawText(page, "Run", 330, y, boldFont, 8);
-        drawText(page, String(run.run_number), 425, y, font, 8);
+        drawText(page, String(run?.run_number || "-"), 425, y, font, 8);
         y -= 18;
         drawText(page, "Owner", 42, y, boldFont, 8);
         drawText(page, safeText(document.owner?.full_name || document.owner?.email, 52), 125, y, font, 8);
         drawText(page, "Completed", 330, y, boldFont, 8);
-        drawText(page, run.completed_at ? run.completed_at.toISOString() : "-", 425, y, font, 7);
+        drawText(page, run?.completed_at ? run.completed_at.toISOString() : (completedSigners[completedSigners.length - 1]?.signed_at?.toISOString() || "-"), 425, y, font, 7);
         y -= 30;
       }
 
@@ -117,8 +119,21 @@ class CompletionCertificateService {
         page.drawLine({ start: { x: 42, y: y + 8 }, end: { x: PAGE_WIDTH - 42, y: y + 8 }, thickness: 0.3, color: rgb(0.82, 0.84, 0.87) });
       });
 
+      if (pageIndex === chunks.length - 1 && completedSigners.length > 0) {
+        y -= 8;
+        page.drawRectangle({ x: 36, y: y - 18, width: PAGE_WIDTH - 72, height: 22, color: rgb(0.9, 0.97, 0.92) });
+        drawText(page, "SIGNING HISTORY", 42, y - 10, boldFont, 7);
+        y -= 30;
+        completedSigners.slice(0, 16).forEach((signer) => {
+          drawText(page, safeText(signer.name || signer.email, 38), 42, y, font, 7);
+          drawText(page, signer.status?.toUpperCase() || "SIGNED", 260, y, boldFont, 7);
+          drawText(page, signer.signed_at ? signer.signed_at.toISOString() : "-", 340, y, font, 6.5);
+          y -= 16;
+        });
+      }
+
       page.drawLine({ start: { x: 42, y: 58 }, end: { x: PAGE_WIDTH - 42, y: 58 }, thickness: 0.5, color: rgb(0.55, 0.6, 0.66) });
-      drawText(page, `Document ID ${document.id} | Workflow run ${run.run_number} | Certificate page ${pageIndex + 1}/${chunks.length}`, 42, 42, font, 6.5);
+      drawText(page, `Document ID ${document.id} | Workflow run ${run?.run_number || "-"} | Certificate page ${pageIndex + 1}/${chunks.length}`, 42, 42, font, 6.5);
     });
 
     return { fileBytes: Buffer.from(await pdf.save()), applied: true };

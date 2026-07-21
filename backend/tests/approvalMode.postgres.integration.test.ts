@@ -279,7 +279,14 @@ test('Approval Mode PostgreSQL integration', { skip: !postgresEnabled }, async (
       const document = await prisma.documents.findUniqueOrThrow({ where: { id: fixture.document.id } });
       assert.equal(run.status, 'completed');
       assert.ok(actions.every((item) => item.action === 'approved'));
-      assert.equal(document.status, 'completed');
+      assert.equal(document.status, 'generating_artifact');
+      assert.equal(await prisma.outbox_events.count({
+        where: {
+          event_type: 'SIGNED_ARTIFACT_REQUESTED',
+          aggregate_type: 'document',
+          aggregate_id: String(document.id),
+        },
+      }), 1);
     } finally {
       await cleanupFixture(fixture);
     }

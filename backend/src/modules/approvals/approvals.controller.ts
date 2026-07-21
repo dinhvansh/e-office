@@ -79,17 +79,16 @@ export class ApprovalsController {
       req.auth!.tenantId
     );
 
-    const file = await documentsService.getDocumentFile(
+    const file = await documentsService.getDocumentDeliveryFile(
       approval.document.id,
       req.auth!.tenantId,
       req.auth!.userId
     );
-    const delivery = await documentsService.prepareDocumentDelivery(file);
 
     res.setHeader('Content-Type', file.mimeType || 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${file.fileName}"`);
 
-    res.send(delivery.fileBytes);
+    res.send(file.fileBytes);
   };
 
   downloadDocument = async (req: Request, res: Response): Promise<void> => {
@@ -100,17 +99,16 @@ export class ApprovalsController {
       req.auth!.tenantId
     );
 
-    const file = await documentsService.getDocumentFile(
+    const file = await documentsService.getDocumentDeliveryFile(
       approval.document.id,
       req.auth!.tenantId,
       req.auth!.userId
     );
-    const delivery = await documentsService.prepareDocumentDelivery(file);
 
     res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
 
-    res.send(delivery.fileBytes);
+    res.send(file.fileBytes);
   };
 
   // Submit document for approval

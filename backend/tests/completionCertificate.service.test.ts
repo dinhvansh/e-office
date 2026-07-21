@@ -60,20 +60,30 @@ test("completed approval-only delivery appends one completion certificate page",
   }
 });
 
-test("documents with signers keep their stored signed-certificate behavior", async () => {
+test("signing-only documents receive a completion certificate with signing history", async () => {
+  assert.ok(regularFont && boldFont, "Unicode PDF fonts are required");
+  const previousRegular = process.env.PDF_UNICODE_FONT_PATH;
+  const previousBold = process.env.PDF_UNICODE_BOLD_FONT_PATH;
   const originalFindFirst = prisma.documents.findFirst;
+  process.env.PDF_UNICODE_FONT_PATH = regularFont;
+  process.env.PDF_UNICODE_BOLD_FONT_PATH = boldFont;
   (prisma.documents.findFirst as unknown as { (...args: unknown[]): Promise<unknown> }) = async () => ({
     id: 42,
-    status: "completed",
-    sign_request: { signers: [{ id: 7 }] },
-    workflow_instances: [{ status: "completed", approvals: [{ id: 1 }] }],
+    title: "Signing only document",
+    original_file_name: "signing.pdf",
+    document_number: "DOC-42",
+    owner: { full_name: "Document Owner", email: "owner@example.test" },
+    sign_request: { signers: [{ id: 7, name: "External Signer", email: "external@example.test", status: "signed", signed_at: new Date("2026-07-20T08:00:00.000Z"), ip_address: "127.0.0.1" }] },
+    workflow_instances: [],
   }) as never;
   try {
     const input = await onePagePdf();
     const result = await completionCertificateService.appendApprovalCertificate({ documentId: 42, tenantId: 3, fileBytes: input });
-    assert.equal(result.applied, false);
-    assert.equal((await PDFDocument.load(result.fileBytes)).getPageCount(), 1);
+    assert.equal(result.applied, true);
+    assert.equal((await PDFDocument.load(result.fileBytes)).getPageCount(), 2);
   } finally {
     prisma.documents.findFirst = originalFindFirst;
+    process.env.PDF_UNICODE_FONT_PATH = previousRegular;
+    process.env.PDF_UNICODE_BOLD_FONT_PATH = previousBold;
   }
 });

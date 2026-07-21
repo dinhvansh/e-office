@@ -1,6 +1,7 @@
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { Request } from 'express';
 import { env } from '../config/env';
+import crypto from 'node:crypto';
 
 const authRateLimitBypassEmails = new Set(
   (env.RATE_LIMIT_BYPASS_EMAILS ?? '')
@@ -89,6 +90,18 @@ export const strictLimiter = rateLimit({
 });
 
 // Rate limiter for OTP resend endpoint exposed publicly
+export const publicSendOtpIpLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  message: {
+    success: false,
+    error: { message: "Too many OTP requests. Please try again later.", code: "OTP_SEND_RATE_LIMITED" },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => ipKeyGenerator(req.ip || 'unknown'),
+});
+
 export const publicSendOtpLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
   max: 10,
@@ -96,11 +109,12 @@ export const publicSendOtpLimiter = rateLimit({
     success: false,
     error: {
       message: "Too many OTP resend attempts. Please try again later.",
-      code: "TOO_MANY_REQUESTS",
+      code: "OTP_SEND_RATE_LIMITED",
     },
   },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req: Request) => crypto.createHash('sha256').update(String(req.params.token || '')).digest('hex'),
 });
 
 // Rate limiter for OTP verification endpoint exposed publicly
@@ -111,7 +125,7 @@ export const publicVerifyOtpLimiter = rateLimit({
     success: false,
     error: {
       message: "Too many OTP verification attempts. Please try again later.",
-      code: "TOO_MANY_REQUESTS",
+      code: "OTP_VERIFY_RATE_LIMITED",
     },
   },
   standardHeaders: true,

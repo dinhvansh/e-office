@@ -21,23 +21,25 @@ test("approval-only download and dossier preserve the actual artifact and run hi
   assert.match(download, /hasSignedArtifact \? 'download-signed' : 'download'/);
   assert.doesNotMatch(download, /completed \|\| signedFilePath/);
   assert.match(documents, /signed_artifact_available: hasSignedArtifact/);
-  assert.match(documents, /const deliveredPrimary = await this\.prepareDocumentDelivery\(primary\)/);
-  assert.match(documents, /completion_certificate_applied: deliveredPrimary\.certificateApplied/);
-  assert.match(documents, /delivery_watermark_applied: deliveredPrimary\.watermarkApplied/);
+  assert.match(documents, /completion_certificate_applied: Boolean\(\(document\.artifact_metadata/);
+  assert.match(documents, /delivery_watermark_applied: Boolean\(\(document\.artifact_metadata/);
   assert.match(documents, /workflow_history: workflowHistory/);
   assert.match(documents, /run_number: run\.run_number/);
   assert.match(documents, /outcome: approval\.action/);
 });
 
-test("approval-only completion delivery appends a certificate before watermarking", () => {
-  const documents = read("src/modules/documents/documents.service.ts");
+test("approval-only completion creates a persisted final artifact before COMPLETED", () => {
+  const orchestrator = read("src/modules/documents/documentWorkflowOrchestrator.service.ts");
+  const worker = read("src/modules/signRequests/signedArtifact.worker.ts");
   const certificate = read("src/modules/documents/completionCertificate.service.ts");
-  assert.match(documents, /completionCertificateService\.appendApprovalCertificate/);
-  assert.match(documents, /fileBytes = certificate\.fileBytes/);
-  assert.match(documents, /getWatermarkedBufferIfNeeded\(\{ \.\.\.input, fileBytes \}\)/);
+  assert.match(orchestrator, /documentStatus: "generating_artifact"/);
+  assert.match(orchestrator, /event_type: "SIGNED_ARTIFACT_REQUESTED"/);
+  assert.match(worker, /processDocumentOnlyArtifact/);
+  assert.match(worker, /getWatermarkedBufferIfNeeded/);
+  assert.match(worker, /appendApprovalCertificate/);
+  assert.match(worker, /signedFilePath: storageKey, hash/);
   assert.match(certificate, /CERTIFICATE OF COMPLETION/);
-  assert.match(certificate, /run\?\.status !== "completed"/);
-  assert.match(certificate, /approvalOnly/);
+  assert.match(certificate, /completedSigners/);
 });
 
 test("notification producers contain valid Vietnamese and migration repairs existing rows", () => {

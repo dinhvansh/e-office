@@ -13,7 +13,7 @@ export class SignersRepository {
   findById(id: number, db: DbClient = prisma) {
     return db.signers.findFirst({
       where: { id },
-      include: { sign_request: true },
+      include: { sign_request: { include: { document: true } } },
     });
   }
 

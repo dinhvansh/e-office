@@ -23,7 +23,6 @@ import {
   normalizeDocumentTypePolicyV2,
 } from "../settings/document-type-policy.helper";
 import { documentFileService, type DocumentFileResult } from "./documentFile.service";
-import { completionCertificateService } from "./completionCertificate.service";
 import { documentLifecycleService } from "./documentLifecycle.service";
 import { outboxDeliveryService } from "../outbox/outboxDelivery.service";
 import { notificationsService } from "../notifications/notifications.service";
@@ -523,10 +522,9 @@ class DocumentsService {
       }),
     ]);
     const activeAttachments = attachments.filter((attachment) => attachment.status === "ACTIVE");
-    const deliveredPrimary = await this.prepareDocumentDelivery(primary);
     const files: Array<{ name: string; content: Buffer }> = [{
       name: hasSignedArtifact ? `signed/${primary.fileName}` : `current/${primary.fileName}`,
-      content: deliveredPrimary.fileBytes,
+      content: primary.fileBytes,
     }];
     const manifestAttachments: Array<Record<string, unknown>> = [];
     for (const attachment of activeAttachments) {
@@ -564,8 +562,8 @@ class DocumentsService {
         hash: document.hash,
         completed: lifecycleCompleted,
         signed_artifact_available: hasSignedArtifact,
-        completion_certificate_applied: deliveredPrimary.certificateApplied,
-        delivery_watermark_applied: deliveredPrimary.watermarkApplied,
+        completion_certificate_applied: Boolean((document.artifact_metadata as Record<string, unknown> | null)?.certificate_applied),
+        delivery_watermark_applied: Boolean((document.artifact_metadata as Record<string, unknown> | null)?.watermark_applied),
       },
       primary_file: primary.fileName,
       workflow_history: workflowHistory,
@@ -600,11 +598,23 @@ class DocumentsService {
     if (!input.base64 && !input.storagePath) {
       throw ApiError.badRequest("Either base64 or storagePath must be provided", "DOCUMENT_PAYLOAD_REQUIRED");
     }
+    if (input.forceSignRequest && !input.fileName.toLowerCase().endsWith(".pdf")) {
+      throw ApiError.badRequest(
+        "Only PDF files are supported for signing requests",
+        "SIGN_REQUEST_PDF_REQUIRED"
+      );
+    }
     await licenseService.enforceDocumentLimit(tenantId);
     let filePath: string;
     let hash: string;
     if (input.base64) {
       const buffer = Buffer.from(input.base64, "base64");
+      if (input.forceSignRequest && buffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
+        throw ApiError.badRequest(
+          "The signing request file must be a valid PDF",
+          "SIGN_REQUEST_PDF_REQUIRED"
+        );
+      }
       hash = crypto.createHash("sha256").update(buffer).digest("hex");
       filePath = await saveBase64Document(tenantId, input.fileName, input.base64);
     } else {
@@ -623,6 +633,12 @@ class DocumentsService {
       
       filePath = storagePath;
       const buffer = await readStoredFile(storageService, filePath);
+      if (input.forceSignRequest && buffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
+        throw ApiError.badRequest(
+          "The signing request file must be a valid PDF",
+          "SIGN_REQUEST_PDF_REQUIRED"
+        );
+      }
       hash = crypto.createHash("sha256").update(buffer).digest("hex");
     }
 
@@ -1255,36 +1271,25 @@ class DocumentsService {
   }
 
   async getSignedDocumentFile(documentId: number, tenantId: number, userId?: number): Promise<DocumentFileResult> {
-    return documentFileService.getSignedFile(await this.getDocument(documentId, tenantId, userId));
-  }
-
-  async getWatermarkedDocumentBufferIfNeeded(input: {
-    fileBytes: Uint8Array;
-    mimeType: string;
-    documentStatus: string | null;
-    tenantId: number;
-  }): Promise<Buffer | null> {
-    return documentFileService.getWatermarkedBufferIfNeeded(input);
-  }
-
-  async prepareDocumentDelivery(input: DocumentFileResult) {
-    let fileBytes = input.fileBytes;
-    let certificateApplied = false;
-    if (input.mimeType === "application/pdf" && input.sourceKind === "original" && input.documentStatus === "completed") {
-      const certificate = await completionCertificateService.appendApprovalCertificate({
-        documentId: input.documentId,
-        tenantId: input.tenantId,
-        fileBytes,
-      });
-      fileBytes = certificate.fileBytes;
-      certificateApplied = certificate.applied;
+    const document = await this.getDocument(documentId, tenantId, userId);
+    if (document.status === "completed") {
+      const metadata = document.artifact_metadata as Record<string, unknown> | null;
+      if (!document.signed_file_path || !document.hash || metadata?.certificate_applied !== true) {
+        throw ApiError.conflict("Final PDF is not ready", "FINAL_ARTIFACT_NOT_READY");
+      }
     }
-    const watermarked = await documentFileService.getWatermarkedBufferIfNeeded({ ...input, fileBytes });
-    return {
-      fileBytes: watermarked || fileBytes,
-      certificateApplied,
-      watermarkApplied: Boolean(watermarked),
-    };
+    return documentFileService.getSignedFile(document);
+  }
+
+  async getDocumentDeliveryFile(documentId: number, tenantId: number, userId?: number): Promise<DocumentFileResult> {
+    const document = await this.getDocument(documentId, tenantId, userId);
+    if (document.status === "completed") {
+      if (!document.signed_file_path || !document.hash) {
+        throw ApiError.conflict("Final PDF is not ready", "FINAL_ARTIFACT_NOT_READY");
+      }
+      return documentFileService.getSignedFile(document);
+    }
+    return documentFileService.getOriginalFile(document);
   }
 
   /**

@@ -12,7 +12,7 @@ export type DocumentWorkflowStatus =
 
 const allowedDocumentTransitions: Record<DocumentWorkflowStatus, readonly DocumentWorkflowStatus[]> = {
   draft: ["pending_approval", "pending_signature", "cancelled"],
-  pending_approval: ["pending_signature", "completed", "rejected", "cancelled"],
+  pending_approval: ["pending_signature", "generating_artifact", "rejected", "cancelled"],
   pending_signature: ["in_progress", "generating_artifact", "rejected", "cancelled"],
   in_progress: ["generating_artifact", "rejected", "cancelled"],
   generating_artifact: ["completed", "artifact_failed"],

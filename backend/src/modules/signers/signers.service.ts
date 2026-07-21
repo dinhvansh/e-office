@@ -9,6 +9,8 @@ import { signersRepository } from "./signers.repository";
 import { pdfGenerationService } from "../signRequests/pdfGeneration.service";
 import { notificationsService } from "../notifications/notifications.service";
 import { NotificationType } from "../notifications/notifications.types";
+import { assertPublicSigningActionable } from "../public/publicSigningLifecycle.policy";
+import { workflowStateService } from "../workflows/workflowState.service";
 
 const OTP_EXPIRY_MINUTES = 10;
 const OTP_RESEND_COOLDOWN_SECONDS = 30;
@@ -70,8 +72,9 @@ class SignersService {
     if (!signer || signer.sign_request.tenant_id !== tenantId) {
       throw ApiError.notFound("Signer not found", "SIGNER_NOT_FOUND");
     }
+    assertPublicSigningActionable(signer);
 
-    const sentAt = signer.otp_expire ? signer.otp_expire.getTime() - OTP_EXPIRY_MINUTES * 60 * 1000 : 0;
+    const sentAt = signer.otp_sent_at?.getTime() || (signer.otp_expire ? signer.otp_expire.getTime() - OTP_EXPIRY_MINUTES * 60 * 1000 : 0);
     const retryAfterSeconds = Math.ceil((sentAt + OTP_RESEND_COOLDOWN_SECONDS * 1000 - Date.now()) / 1000);
     if (retryAfterSeconds > 0) {
       throw ApiError.badRequest("Please wait before requesting another code", "OTP_RESEND_COOLDOWN", { retry_after_seconds: retryAfterSeconds });
@@ -79,7 +82,19 @@ class SignersService {
 
     const otp = this.generateOtp();
     const hashed = await bcrypt.hash(otp, 10);
-    const otpExpire = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+    const now = new Date();
+    const otpExpire = new Date(now.getTime() + OTP_EXPIRY_MINUTES * 60 * 1000);
+    const claimed = await prisma.signers.updateMany({
+      where: {
+        id: signerId,
+        status: { in: ["pending", "otp_sent"] },
+        OR: [{ otp_sent_at: null }, { otp_sent_at: { lte: new Date(now.getTime() - OTP_RESEND_COOLDOWN_SECONDS * 1000) } }],
+      },
+      data: { otp: hashed, otp_expire: otpExpire, otp_sent_at: now, otp_verified_at: null, otp_attempt_count: 0, status: "otp_sent" },
+    });
+    if (claimed.count !== 1) {
+      throw ApiError.badRequest("Please wait before requesting another code", "OTP_RESEND_COOLDOWN", { retry_after_seconds: OTP_RESEND_COOLDOWN_SECONDS });
+    }
 
     try {
       await emailService.sendOtpEmail({
@@ -92,14 +107,12 @@ class SignersService {
       });
     } catch (error) {
       console.error("Failed to send OTP email:", error);
+      await prisma.signers.updateMany({
+        where: { id: signerId, otp: hashed },
+        data: { otp: null, otp_expire: null, otp_sent_at: null, otp_verified_at: null, otp_attempt_count: 0, status: signer.status },
+      });
       throw ApiError.internal("OTP delivery is temporarily unavailable", "OTP_DELIVERY_UNAVAILABLE");
     }
-
-    await signersRepository.update(signerId, {
-      otp: hashed,
-      otp_expire: otpExpire,
-      status: "otp_sent",
-    });
 
     return { otp, expiresAt: otpExpire, cooldownSeconds: OTP_RESEND_COOLDOWN_SECONDS };
   }
@@ -142,11 +155,16 @@ class SignersService {
       signed_at: new Date(),
       otp: null,
       otp_expire: null,
+      otp_sent_at: null,
+      otp_verified_at: null,
+      otp_attempt_count: 0,
       position_data: input.signature_data ? (input.signature_data as Prisma.InputJsonValue) : undefined,
     });
     await this.updateSignRequestStatus(signer.sign_request_id);
     
-    // Generate progressive PDF after each signature
+    // A progressive PDF is only a preview while other signers are pending.
+    // The completed artifact is generated once by signedArtifact.worker, which
+    // is the sole producer of the watermark and completion certificate.
     try {
       const [completed, total] = await Promise.all([
         signersRepository.countCompleted(signer.sign_request_id),
@@ -157,20 +175,14 @@ class SignersService {
       console.log(`[Signers Service] Generating progressive PDF for sign request ${signer.sign_request_id}`);
       console.log(`[Signers Service] Progress: ${completed}/${total} signed, All signed: ${allSigned}`);
       
-      const pdfPath = await pdfGenerationService.generateProgressivePdf(
-        signer.sign_request_id,
-        {
-          includeAuditTrail: allSigned,
-        }
-      );
-      
-      // Update document with signed file path
-      await prisma.documents.update({
-        where: { id: signer.sign_request.document_id },
-        data: { signed_file_path: pdfPath }
-      });
-      
-      console.log(`[Signers Service] Progressive PDF generated: ${pdfPath}`);
+      if (!allSigned) {
+        const pdfPath = await pdfGenerationService.generateProgressivePdf(signer.sign_request_id);
+        await prisma.documents.update({
+          where: { id: signer.sign_request.document_id },
+          data: { signed_file_path: pdfPath }
+        });
+        console.log(`[Signers Service] Progressive PDF generated: ${pdfPath}`);
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.error(`[Signers Service] Failed to generate progressive PDF: ${message}`);
@@ -204,10 +216,21 @@ class SignersService {
       return;
     }
     if (total > 0 && completed === total) {
-      await prisma.sign_requests.update({ where: { id: signRequestId }, data: { status: "completed" } });
-      await prisma.documents.update({
-        where: { id: signRequest.document_id },
-        data: { status: "completed" },
+      await prisma.$transaction(async (tx) => {
+        await workflowStateService.transitionSigningPair(tx, {
+          documentId: signRequest.document_id,
+          signRequestId,
+          documentStatus: "generating_artifact",
+          signRequestStatus: "generating_artifact",
+        });
+        await tx.outbox_events.createMany({ data: [{
+          tenant_id: signRequest.tenant_id,
+          aggregate_type: "sign_request",
+          aggregate_id: String(signRequestId),
+          event_type: "SIGNED_ARTIFACT_REQUESTED",
+          payload: { sign_request_id: signRequestId, document_id: signRequest.document_id },
+          deduplication_key: `signed-artifact:${signRequestId}`,
+        }], skipDuplicates: true });
       });
     } else {
       await prisma.sign_requests.update({ where: { id: signRequestId }, data: { status: "in_progress" } });

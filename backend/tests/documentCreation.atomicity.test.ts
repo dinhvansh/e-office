@@ -43,7 +43,7 @@ afterEach(() => {
 
 function installDocumentCreation(documentId = 30) {
   replace(licenseService, "enforceDocumentLimit", async () => undefined);
-  replace(storageService, "get", async () => Readable.from(Buffer.from("source")));
+  replace(storageService, "get", async () => Readable.from(Buffer.from("%PDF-1.4\nsynthetic test document")));
   replace(documentsRepository, "create", async () => ({
     id: documentId,
     title: "Synthetic document",

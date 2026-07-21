@@ -6,6 +6,7 @@ import { signRequestsRepository } from "../signRequests/signRequests.repository"
 import { signersRepository } from "../signers/signers.repository";
 import type { CreateDocumentInput } from "./documents.service";
 import { isWorkflowAssigneeType, resolveAssigneeType } from "../workflows/workflowStepAssignment";
+import { workflowStateService } from "../workflows/workflowState.service";
 
 type CustomizedStepInput = {
   step_name?: string;
@@ -131,7 +132,7 @@ class DocumentWorkflowOrchestratorService {
 
     const activation = await this.activateSigningPhase(signRequestId, tenantId);
     return {
-      phase: activation.completedWithoutSigners ? ("completed" as const) : ("signing" as const),
+      phase: activation.completedWithoutSigners ? ("artifact_processing" as const) : ("signing" as const),
     };
   }
 
@@ -256,10 +257,23 @@ class DocumentWorkflowOrchestratorService {
   }
 
   private async completeSignRequestWithoutSigners(signRequest: NonNullable<Awaited<ReturnType<typeof signRequestsRepository.findById>>>) {
-    await signRequestsRepository.updateStatus(signRequest.id, signRequest.tenant_id, "completed");
-    if (signRequest.document_id) {
-      await documentsRepository.update(signRequest.document_id, { status: "completed" });
-    }
+    if (!signRequest.document_id) throw ApiError.badRequest("Document is required", "DOCUMENT_REQUIRED");
+    await prisma.$transaction(async (tx) => {
+      await workflowStateService.transitionSigningPair(tx, {
+        documentId: signRequest.document_id!,
+        signRequestId: signRequest.id,
+        documentStatus: "generating_artifact",
+        signRequestStatus: "generating_artifact",
+      });
+      await tx.outbox_events.createMany({ data: [{
+        tenant_id: signRequest.tenant_id,
+        aggregate_type: "sign_request",
+        aggregate_id: String(signRequest.id),
+        event_type: "SIGNED_ARTIFACT_REQUESTED",
+        payload: { sign_request_id: signRequest.id, document_id: signRequest.document_id, approval_only: true },
+        deduplication_key: `signed-artifact:${signRequest.id}`,
+      }], skipDuplicates: true });
+    });
   }
 
   private async resolveWorkflowSnapshot(input: PrepareDraftPackageInput, db: DbClient) {

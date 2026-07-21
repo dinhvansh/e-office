@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import test, { afterEach } from "node:test";
 import { Readable } from "node:stream";
 import bcrypt from "bcryptjs";
@@ -12,12 +13,11 @@ import { PublicSignController } from "../src/modules/public/publicSign.controlle
 import { PublicSigningCommandService } from "../src/modules/public/publicSigningCommand.service";
 import { createSigningSession, SIGNING_SESSION_COOKIE } from "../src/modules/public/signingSession.service";
 import { signersService } from "../src/modules/signers/signers.service";
-import { documentsService } from "../src/modules/documents/documents.service";
 
 const originalFindUnique = prisma.signers.findUnique;
 const originalStorageGet = storageService.get;
 const originalSendOtp = signersService.sendOtp;
-const originalWatermark = documentsService.getWatermarkedDocumentBufferIfNeeded;
+const originalUpdateMany = prisma.signers.updateMany;
 
 const replaceFindUnique = (value: unknown) => {
   (prisma.signers as unknown as { findUnique: unknown }).findUnique = value;
@@ -31,7 +31,7 @@ afterEach(() => {
   replaceFindUnique(originalFindUnique);
   replaceStorageGet(originalStorageGet);
   (signersService as unknown as { sendOtp: unknown }).sendOtp = originalSendOtp;
-  (documentsService as unknown as { getWatermarkedDocumentBufferIfNeeded: unknown }).getWatermarkedDocumentBufferIfNeeded = originalWatermark;
+  (prisma.signers as unknown as { updateMany: unknown }).updateMany = originalUpdateMany;
 });
 
 const signer = {
@@ -39,13 +39,18 @@ const signer = {
   signing_token: "invitation-token",
   sign_request_id: 20,
   otp: "otp-hash",
+  otp_verified_at: null,
+  otp_attempt_count: 0,
   status: "pending",
   sign_request: {
     id: 20,
     workflow_type: "parallel",
     tenant_id: 1,
+    status: "in_progress",
+    deadline: new Date(Date.now() + 60_000),
+    archived_at: null,
     document_id: 30,
-    document: { id: 30, file_path: "documents/original.pdf", original_file_name: "original.pdf" },
+    document: { id: 30, file_path: "documents/original.pdf", original_file_name: "original.pdf", status: "in_progress", archived_at: null },
   },
 };
 
@@ -80,7 +85,6 @@ test("an invitation token cannot fetch the original PDF before OTP verification"
 test("a verified signing session can fetch the original PDF", async () => {
   replaceFindUnique(async () => signer);
   replaceStorageGet(async () => Readable.from(Buffer.from("pdf")));
-  (documentsService as unknown as { getWatermarkedDocumentBufferIfNeeded: unknown }).getWatermarkedDocumentBufferIfNeeded = async () => null;
   const res = response();
   const session = createSigningSession(signer.id, signer.sign_request_id, signer.otp);
 
@@ -89,7 +93,7 @@ test("a verified signing session can fetch the original PDF", async () => {
   assert.equal(res.headers.get("Content-Type"), "application/pdf");
 });
 
-test("a verified signing session receives the in-progress delivery watermark", async () => {
+test("a verified signing session receives source bytes without delivery mutation", async () => {
   replaceFindUnique(async () => ({
     ...signer,
     sign_request: {
@@ -98,16 +102,16 @@ test("a verified signing session receives the in-progress delivery watermark", a
     },
   }));
   replaceStorageGet(async () => Readable.from(Buffer.from("canonical-pdf")));
-  (documentsService as unknown as { getWatermarkedDocumentBufferIfNeeded: unknown }).getWatermarkedDocumentBufferIfNeeded = async () => Buffer.from("in-progress-watermark");
   const res = response();
   const session = createSigningSession(signer.id, signer.sign_request_id, signer.otp);
 
   await new PublicSignController().getDocument(controllerRequest(`${SIGNING_SESSION_COOKIE}=${encodeURIComponent(session)}`), res as unknown as Response);
 
-  assert.deepEqual(res.body, Buffer.from("in-progress-watermark"));
+  assert.deepEqual(res.body, Buffer.from("canonical-pdf"));
 });
 
-test("public signed download applies the same delivery watermark policy", async () => {
+test("public signed download streams the stored Final PDF bytes unchanged", async () => {
+  const canonicalBytes = Buffer.from("canonical-pdf");
   replaceFindUnique(async () => ({
     ...signer,
     sign_request: {
@@ -118,17 +122,19 @@ test("public signed download applies the same delivery watermark policy", async 
         status: "completed",
         document_number: "DOC-30",
         signed_file_path: "storage/1/signed_30.pdf",
+        hash: crypto.createHash("sha256").update(canonicalBytes).digest("hex"),
       },
     },
   }));
-  replaceStorageGet(async () => Readable.from(Buffer.from("canonical-pdf")));
-  (documentsService as unknown as { getWatermarkedDocumentBufferIfNeeded: unknown }).getWatermarkedDocumentBufferIfNeeded = async () => Buffer.from("watermarked-pdf");
+  replaceStorageGet(async () => Readable.from(canonicalBytes));
   const res = response();
 
   await new PublicSignController().downloadSignedPdf(controllerRequest(), res as unknown as Response);
 
-  assert.deepEqual(res.body, Buffer.from("watermarked-pdf"));
-  assert.equal(res.headers.get("Content-Length"), Buffer.byteLength("watermarked-pdf"));
+  assert.deepEqual(res.body, canonicalBytes);
+  assert.equal(res.headers.get("Content-Length"), Buffer.byteLength("canonical-pdf"));
+  assert.equal(crypto.createHash("sha256").update(res.body as Buffer).digest("hex"),
+    crypto.createHash("sha256").update(canonicalBytes).digest("hex"));
 });
 
 test("an expired signing session cannot fetch the original PDF", async () => {
@@ -186,7 +192,7 @@ test("a completed signer sees the completion page after refresh without another 
         id: signer.sign_request.id,
         title: undefined,
         message: undefined,
-        deadline: undefined,
+        deadline: signer.sign_request.deadline,
         created_at: undefined,
       },
       document: {
@@ -205,6 +211,7 @@ test("OTP verification reports the stable OTP_INVALID code", async () => {
     otp: await bcrypt.hash("123456", 4),
     otp_expire: new Date(Date.now() + 60_000),
   }));
+  (prisma.signers as unknown as { updateMany: unknown }).updateMany = async () => ({ count: 1 });
 
   await assert.rejects(new PublicSignController().verifyOtp({
     params: { token: signer.signing_token },
@@ -218,6 +225,7 @@ test("OTP verification creates a short-lived signing session for a valid OTP", a
     otp: await bcrypt.hash("123456", 4),
     otp_expire: new Date(Date.now() + 60_000),
   }));
+  (prisma.signers as unknown as { updateMany: unknown }).updateMany = async () => ({ count: 1 });
   const res = response();
 
   await new PublicSignController().verifyOtp({
@@ -257,4 +265,47 @@ test("OTP resend resolves the recipient from the signing token without exposing 
   } as unknown as Request, res as unknown as Response);
 
   assert.deepEqual(res.body, { success: true, data: { otp_sent: true, otp_expires_at: "2026-07-14T10:00:00.000Z", resend_cooldown_seconds: 30 } });
+});
+
+for (const [name, override, expectedCode] of [
+  ["cancelled request", { sign_request: { ...signer.sign_request, status: "cancelled" } }, "SIGNING_REQUEST_EXPIRED"],
+  ["archived request", { sign_request: { ...signer.sign_request, archived_at: new Date() } }, "SIGNING_REQUEST_ARCHIVED"],
+  ["expired deadline", { sign_request: { ...signer.sign_request, deadline: new Date(Date.now() - 1_000) } }, "SIGNING_REQUEST_EXPIRED"],
+  ["completed signer", { status: "completed" }, "SIGNING_REQUEST_EXPIRED"],
+] as const) {
+  test(`OTP cannot be sent for a ${name}`, async () => {
+    replaceFindUnique(async () => ({ ...signer, ...override }));
+    await assert.rejects(new PublicSignController().sendOtp({
+      params: { token: signer.signing_token },
+      body: {},
+    } as unknown as Request, response() as unknown as Response), (error: unknown) => error instanceof ApiError && error.code === expectedCode);
+  });
+}
+
+test("OTP verification is blocked after the persisted attempt ceiling", async () => {
+  replaceFindUnique(async () => ({
+    ...signer,
+    otp: await bcrypt.hash("123456", 4),
+    otp_expire: new Date(Date.now() + 60_000),
+    otp_attempt_count: 5,
+  }));
+
+  await assert.rejects(new PublicSignController().verifyOtp({
+    params: { token: signer.signing_token },
+    body: { otp: "123456" },
+  } as unknown as Request, response() as unknown as Response), (error: unknown) => error instanceof ApiError && error.code === "OTP_ATTEMPTS_EXCEEDED");
+});
+
+test("a verified OTP cannot be replayed to mint another signing session", async () => {
+  replaceFindUnique(async () => ({
+    ...signer,
+    otp: await bcrypt.hash("123456", 4),
+    otp_expire: new Date(Date.now() + 60_000),
+    otp_verified_at: new Date(),
+  }));
+
+  await assert.rejects(new PublicSignController().verifyOtp({
+    params: { token: signer.signing_token },
+    body: { otp: "123456" },
+  } as unknown as Request, response() as unknown as Response), (error: unknown) => error instanceof ApiError && error.code === "OTP_ALREADY_USED");
 });

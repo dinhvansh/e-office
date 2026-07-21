@@ -12,7 +12,7 @@ export class WorkflowCancellationService {
       await tx.documents.update({ where: { id: document.id }, data: { status: "cancelled" } });
       if (document.sign_request_id) {
         await tx.sign_requests.update({ where: { id: document.sign_request_id }, data: { status: "cancelled", cancellation_reason: input.reason || "Cancelled", cancelled_at: new Date(), cancelled_by: input.userId } });
-        await tx.signers.updateMany({ where: { sign_request_id: document.sign_request_id, status: { in: ["draft", "pending", "waiting_approval", "waiting_signing", "otp_sent"] } }, data: { status: "cancelled", otp: null, otp_expire: null, signing_token: null } });
+        await tx.signers.updateMany({ where: { sign_request_id: document.sign_request_id, status: { in: ["draft", "pending", "waiting_approval", "waiting_signing", "otp_sent"] } }, data: { status: "cancelled", otp: null, otp_expire: null, otp_sent_at: null, otp_verified_at: null, otp_attempt_count: 0, signing_token: null } });
       }
       const runs = await tx.workflow_instances.findMany({ where: { document_id: document.id, status: "in_progress" }, select: { id: true } });
       const runIds = runs.map((run) => run.id);

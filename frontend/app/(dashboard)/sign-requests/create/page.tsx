@@ -599,8 +599,17 @@ export default function CreateSignRequestPage() {
                   id="file-upload"
                   type="file"
                   className="hidden"
-                  accept=".pdf,.doc,.docx"
-                  onChange={(event) => { setFile(event.target.files?.[0] || null); setHasUnsavedChanges(true); }}
+                  accept=".pdf,application/pdf"
+                  onChange={(event) => {
+                    const selectedFile = event.target.files?.[0] || null;
+                    if (selectedFile && !selectedFile.name.toLowerCase().endsWith('.pdf')) {
+                      toast.error('Chỉ hỗ trợ tệp PDF để tạo trình ký');
+                      event.target.value = '';
+                      return;
+                    }
+                    setFile(selectedFile);
+                    setHasUnsavedChanges(true);
+                  }}
                 />
                 <label htmlFor="file-upload" className="cursor-pointer">
                   <FileText className="mx-auto mb-3 h-10 w-10 text-slate-400" />
@@ -612,7 +621,7 @@ export default function CreateSignRequestPage() {
                   ) : (
                     <>
                       <p className="text-lg font-medium">Click để chọn file</p>
-                      <p className="mt-1 text-sm text-slate-500">Hỗ trợ PDF, DOC, DOCX</p>
+                      <p className="mt-1 text-sm text-slate-500">Chỉ hỗ trợ tệp PDF</p>
                     </>
                   )}
                 </label>

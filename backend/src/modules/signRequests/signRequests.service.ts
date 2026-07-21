@@ -466,7 +466,7 @@ class SignRequestsService {
         return this.getSignRequestWithFlowHints(id, tenantId);
       }
 
-      if (runtime.phase === "completed") {
+      if (runtime.phase === "artifact_processing") {
         return this.getSignRequestWithFlowHints(id, tenantId);
       }
 
@@ -635,6 +635,9 @@ class SignRequestsService {
           await signersRepository.update(signer.id, {
             otp: otpHash,
             otp_expire: otpExpire,
+            otp_sent_at: new Date(),
+            otp_verified_at: null,
+            otp_attempt_count: 0,
             status: "otp_sent",
           });
 
@@ -713,6 +716,9 @@ class SignRequestsService {
         user_agent: null,
         otp: null,
         otp_expire: null,
+        otp_sent_at: null,
+        otp_verified_at: null,
+        otp_attempt_count: 0,
         signing_token: null,
       });
     }
@@ -817,6 +823,9 @@ class SignRequestsService {
           await signersRepository.update(signer.id, {
             otp: otpHash,
             otp_expire: otpExpire,
+            otp_sent_at: new Date(),
+            otp_verified_at: null,
+            otp_attempt_count: 0,
             status: "otp_sent"
           });
         } catch (error: unknown) {
@@ -947,12 +956,7 @@ class SignRequestsService {
       console.log(`[Internal Signing] Generating progressive PDF for sign request ${signRequestId}`);
       const { pdfGenerationService } = await import('./pdfGeneration.service');
       
-      const signedPdfPath = await pdfGenerationService.generateProgressivePdf(
-        signRequestId,
-        {
-          includeAuditTrail: false,
-        }
-      );
+      const signedPdfPath = await pdfGenerationService.generateProgressivePdf(signRequestId);
       const artifactBytes = await readStoredFile(storageService, signedPdfPath);
       const artifactHash = crypto.createHash("sha256").update(artifactBytes).digest("hex");
       

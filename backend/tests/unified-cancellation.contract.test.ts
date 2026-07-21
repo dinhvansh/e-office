@@ -9,7 +9,7 @@ test("both cancellation entry points delegate to the unified cancellation comman
  assert.match(requestLifecycle,/workflowCancellationService\.cancel\(/);
  assert.match(shared,/status: "cancelled"/);
  assert.match(shared,/workflow_instances\.findMany\(\{ where: \{ document_id: document\.id, status: "in_progress"/);
- assert.match(shared,/otp: null, otp_expire: null, signing_token: null/);
+ assert.match(shared,/otp: null, otp_expire: null, otp_sent_at: null, otp_verified_at: null, otp_attempt_count: 0, signing_token: null/);
  assert.match(shared,/status: \{ in: \["draft", "pending", "waiting_approval", "waiting_signing", "otp_sent"\] \}/);
 });
 test("cancellation scopes workflow mutation to active runs and preserves historical signers",()=>{

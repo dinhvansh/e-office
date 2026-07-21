@@ -42,14 +42,8 @@ export class PdfGenerationService {
    * @param options - Generation options
    * @returns File path of generated PDF
    */
-  async generateProgressivePdf(
-    signRequestId: number,
-    options: {
-      includeAuditTrail?: boolean;
-    } = {}
-  ): Promise<string> {
+  async generateProgressivePdf(signRequestId: number): Promise<string> {
     console.log(`[Progressive PDF] Starting for sign request ${signRequestId}`);
-    console.log(`[Progressive PDF] Options:`, options);
 
     // 1. Load sign request with all related data
     const signRequest = await prisma.sign_requests.findUnique({
@@ -139,20 +133,14 @@ export class PdfGenerationService {
       await this.drawFieldValue(pdfDoc, pages, fieldValue, font);
     }
 
-    // 6. Add audit trail page if needed. Watermarks are deliberately applied
-    // only at delivery time so the canonical stored artifact and its hash stay
-    // stable and every download channel follows the same tenant policy.
-    if (options.includeAuditTrail) {
-      await this.createAuditTrailPage(pdfDoc, signRequest);
-      console.log(`[Progressive PDF] Added audit trail`);
-    }
+    // 6. A progressive PDF never includes a completion certificate. The
+    // canonical completed artifact is produced by signedArtifact.worker.
 
-    // 7. Save PDF with appropriate filename
+    // 7. Save the preview PDF.
     const signedPdfBytes = await pdfDoc.save();
     const filePath = await this.saveProgressivePdf(
       signedPdfBytes,
-      signRequest.document,
-      options.includeAuditTrail || false
+      signRequest.document
     );
 
     // 8. Cleanup old signing files
@@ -169,11 +157,9 @@ export class PdfGenerationService {
   private async saveProgressivePdf(
     pdfBytes: Uint8Array,
     document: StoredDocument,
-    isCompleted: boolean
   ): Promise<string> {
     const timestamp = Date.now();
-    const prefix = isCompleted ? 'signed' : 'signing';
-    const fileName = `${prefix}_${timestamp}_${document.id}.pdf`;
+    const fileName = `signing_${timestamp}_${document.id}.pdf`;
 
     // Extract tenant ID from file path
     const pathParts = document.file_path.split(/[/\\]/);
@@ -301,11 +287,9 @@ export class PdfGenerationService {
       await this.drawFieldValue(pdfDoc, pages, fieldValue, font);
     }
 
-    // 6. Add audit trail page
-    await this.createAuditTrailPage(pdfDoc, signRequest);
-
-    // 7. Save the canonical signed PDF without a watermark. Delivery endpoints
-    // apply the completed tenant variant consistently for internal/public/ZIP.
+    // 6. Save signatures into the artifact staging file. The artifact worker
+    // applies the completed watermark and completion certificate before this
+    // path is published as the canonical Final PDF.
     const signedPdfBytes = await pdfDoc.save();
     const signedFilePath = await this.saveSignedPdf(
       signedPdfBytes,

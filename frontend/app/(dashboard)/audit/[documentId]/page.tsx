@@ -21,6 +21,8 @@ const eventLabelMap: Record<string, string> = {
   "document.signed_viewed": "Mở bản đã ký",
   "document.signed_downloaded": "Tải bản đã ký",
   "document.attachment_downloaded": "Tải file đính kèm",
+  "artifact.generation_succeeded": "Hệ thống tạo Final PDF",
+  "artifact.generation_failed": "Hệ thống không thể tạo Final PDF",
 };
 
 const eventIconMap: Record<string, typeof Eye> = {
@@ -30,6 +32,10 @@ const eventIconMap: Record<string, typeof Eye> = {
   "document.signed_downloaded": FileDown,
   "document.attachment_downloaded": Paperclip,
 };
+
+function actorLabel(log: AuditLogRecord) {
+  return log.user?.full_name || log.user?.email || (log.user_id ? "Người dùng không xác định" : "Hệ thống");
+}
 
 const statCards = (summary?: DocumentAuditSummary) => [
   {
@@ -186,7 +192,7 @@ export default function AuditPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-slate-600">
-                      {log.user?.full_name || log.user?.email || "Người dùng không xác định"}
+                      {actorLabel(log)}
                     </p>
                     <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-400">
                       <span>IP: {log.ip || "-"}</span>

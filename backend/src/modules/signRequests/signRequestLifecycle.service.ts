@@ -93,6 +93,9 @@ class SignRequestLifecycleService {
         user_agent: null,
         otp: null,
         otp_expire: null,
+        otp_sent_at: null,
+        otp_verified_at: null,
+        otp_attempt_count: 0,
         signing_token: null,
       });
     }
