@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { DestructiveConfirmationDialog } from "@/components/ui/destructive-confirmation-dialog";
 
 type ConfirmationOptions = {
@@ -12,7 +12,10 @@ type ConfirmationOptions = {
   destructive?: boolean;
 };
 
-type ConfirmationRequest = ConfirmationOptions & { onConfirm: () => Promise<unknown> };
+type ConfirmationRequest = ConfirmationOptions & {
+  onConfirm: () => Promise<unknown>;
+  returnFocusElement: HTMLElement | null;
+};
 
 const DestructiveConfirmationContext = createContext<
   ((options: ConfirmationOptions, onConfirm: () => Promise<unknown>) => void) | undefined
@@ -20,9 +23,28 @@ const DestructiveConfirmationContext = createContext<
 
 export function DestructiveConfirmationProvider({ children }: { children: React.ReactNode }) {
   const [request, setRequest] = useState<ConfirmationRequest | null>(null);
+  const openTimerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (openTimerRef.current !== null) window.clearTimeout(openTimerRef.current);
+  }, []);
 
   const confirmDestructive = useCallback((options: ConfirmationOptions, onConfirm: () => Promise<unknown>) => {
-    setRequest({ ...options, onConfirm });
+    if (openTimerRef.current !== null) window.clearTimeout(openTimerRef.current);
+
+    const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const menuTrigger = document.querySelector<HTMLElement>(
+      '[aria-haspopup="menu"][aria-expanded="true"]',
+    );
+    const returnFocusElement = menuTrigger ?? activeElement;
+
+    // Actions commonly originate inside a Radix DropdownMenu. Let that modal
+    // layer finish closing before mounting the confirmation Dialog, otherwise
+    // the two pointer/focus locks can overlap and leave the page non-interactive.
+    openTimerRef.current = window.setTimeout(() => {
+      openTimerRef.current = null;
+      setRequest({ ...options, onConfirm, returnFocusElement });
+    }, 0);
   }, []);
 
   return (

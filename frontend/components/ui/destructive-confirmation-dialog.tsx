@@ -22,6 +22,7 @@ type DestructiveConfirmationDialogProps = {
   onConfirm: () => Promise<unknown>;
   errorMessage?: string;
   destructive?: boolean;
+  returnFocusElement?: HTMLElement | null;
 };
 
 export function DestructiveConfirmationDialog({
@@ -34,14 +35,16 @@ export function DestructiveConfirmationDialog({
   onConfirm,
   errorMessage = "Không thể hoàn tất thao tác này. Vui lòng thử lại.",
   destructive = true,
+  returnFocusElement = null,
 }: DestructiveConfirmationDialogProps) {
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(returnFocusElement);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) {
-      returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      returnFocusRef.current = returnFocusElement
+        ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
       setError(null);
       onOpenChange(true);
       return;
@@ -63,8 +66,8 @@ export function DestructiveConfirmationDialog({
       await onConfirm();
       onOpenChange(false);
       window.setTimeout(() => returnFocusRef.current?.focus(), 0);
-    } catch (error) {
-      setError(error instanceof Error && error.message ? error.message : errorMessage);
+    } catch {
+      setError(errorMessage);
     } finally {
       setIsPending(false);
     }

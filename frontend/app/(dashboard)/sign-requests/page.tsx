@@ -98,16 +98,16 @@ export default function SignRequestsPage() {
       const signerWithToken = externalSigner || internalSigner;
       
       if (!signerWithToken?.signing_token) {
-        alert('Chưa có link ký. Vui lòng gửi yêu cầu ký trước.');
+        toast.error(t("signRequests.copyLink.unavailable"));
         return;
       }
 
       const signingUrl = `${window.location.origin}/sign/${signerWithToken.signing_token}`;
       await navigator.clipboard.writeText(signingUrl);
-      alert(`✅ Đã copy link ký cho ${signerWithToken.name || signerWithToken.email}!`);
+      toast.success(t("signRequests.copyLink.success", { name: signerWithToken.name || signerWithToken.email }));
     } catch (error: any) {
       console.error('Copy link error:', error);
-      alert('❌ Lỗi: ' + (error.message || 'Không thể copy link'));
+      toast.error(error.message || t("signRequests.copyLink.error"));
     }
   };
 
