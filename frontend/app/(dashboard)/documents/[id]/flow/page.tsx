@@ -7,7 +7,7 @@ import { FlowTimeline } from '@/components/flow/FlowTimeline';
 import { FlowActivities } from '@/components/flow/FlowActivities';
 import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Check, ChevronsUpDown, FileText, Download, RefreshCw, Share2, Trash2, History, UserRound, Info } from 'lucide-react';
+import { ArrowLeft, Check, ChevronsUpDown, FileText, Download, RefreshCw, Share2, Trash2, History, UserRound, Info, XCircle } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -455,7 +455,6 @@ export default function DocumentFlowPage() {
   }
 
   const document = flowData?.document;
-  const phases = flowData?.phases || [];
   const steps = flowData?.steps || [];
   const activities = flowData?.activities || [];
   const can_approve = flowData?.can_approve;
@@ -478,22 +477,23 @@ export default function DocumentFlowPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0 flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+        <div className="max-w-7xl mx-auto px-3 py-2.5 sm:px-6 sm:py-4 lg:px-8">
+          <div className="flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 lg:flex-1">
+              <div className="min-w-0 flex items-start gap-2 sm:gap-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => router.back()}
-                className="w-fit shrink-0"
+                className="h-9 w-9 shrink-0 px-0 text-[0px] sm:w-fit sm:px-3 sm:text-sm"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Quay lại
               </Button>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-start gap-2">
-                  <FileText className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
-                  <h1 className="min-w-0 break-words text-lg font-semibold sm:text-xl">{document.title}</h1>
+                  <FileText className="mt-0.5 h-4 w-4 shrink-0 text-gray-400 sm:h-5 sm:w-5" />
+                  <h1 className="min-w-0 line-clamp-2 break-words text-base font-semibold sm:text-xl">{document.title}</h1>
                   {(document.status === 'in_progress' || document.status === 'pending') && (
                     <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-full">
                       <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse"></span>
@@ -501,7 +501,7 @@ export default function DocumentFlowPage() {
                     </span>
                   )}
                 </div>
-                <p className="mt-1 break-words text-sm text-gray-500">
+                <p className="mt-1 truncate text-xs text-gray-500 sm:break-words sm:text-sm">
                   {document.document_number} • {document.document_type}
                   {document.signed_file_path && (
                     <span className="ml-2 text-green-600">
@@ -510,16 +510,17 @@ export default function DocumentFlowPage() {
                   )}
                 </p>
               </div>
+              </div>
             </div>
-            <div className="flex w-full flex-wrap items-center justify-end gap-2 overflow-hidden lg:w-auto lg:flex-nowrap">
-              <DocumentDownloadMenu documentId={Number(documentId)} documentNumber={document.document_number} originalFileName={document.original_file_name} status={document.status} signedFilePath={document.signed_file_path} />
+            <div className="flex w-full flex-wrap items-center justify-start gap-1.5 sm:justify-end sm:gap-2 lg:w-auto lg:max-w-[52%] lg:shrink-0">
+              <DocumentDownloadMenu className="h-9 w-9 px-0 text-[0px] sm:w-auto sm:px-3 sm:text-sm [&>svg]:mr-0 sm:[&>svg]:mr-2" documentId={Number(documentId)} documentNumber={document.document_number} originalFileName={document.original_file_name} status={document.status} signedFilePath={document.signed_file_path} />
               {canRemind && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => remindMutation.mutate()}
                   disabled={remindMutation.isPending}
-                  className="min-w-0 max-w-full"
+                  className="h-9 w-9 px-0 text-[0px] sm:h-9 sm:w-auto sm:px-3 sm:text-sm [&>svg]:mr-0 sm:[&>svg]:mr-2"
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 shrink-0 ${remindMutation.isPending ? 'animate-spin' : ''}`} />
                   {remindMutation.isPending ? 'Đang nhắc...' : 'Nhắc nhở'}
@@ -529,23 +530,24 @@ export default function DocumentFlowPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="min-w-0 max-w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  className="h-9 w-9 px-0 text-[0px] sm:h-9 sm:w-auto sm:px-3 sm:text-sm border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
                   onClick={() => setCancelDialogOpen(true)}
                   disabled={cancelMutation.isPending}
                 >
+                  <XCircle className="h-4 w-4 shrink-0 sm:mr-2" />
                   {cancelMutation.isPending ? 'Đang hủy...' : 'Hủy request'}
                 </Button>
               )}
               {canDelete && (
-                <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmOpen(true)} disabled={deleteMutation.isPending}>
-                  <Trash2 className="mr-2 h-4 w-4" />{deleteMutation.isPending ? 'Đang xóa...' : 'Xóa request'}
+                <Button variant="destructive" size="sm" className="h-9 w-9 px-0 text-[0px] sm:h-9 sm:w-auto sm:px-3 sm:text-sm" onClick={() => setDeleteConfirmOpen(true)} disabled={deleteMutation.isPending}>
+                  <Trash2 className="h-4 w-4 sm:mr-2" />{deleteMutation.isPending ? 'Đang xóa...' : 'Xóa request'}
                 </Button>
               )}
               {canShareCompletedDocument && (
                 <Button
                   variant="outline"
                   size="sm"
-                  className="min-w-0 max-w-full"
+                  className="h-9 w-9 px-0 text-[0px] sm:h-9 sm:w-auto sm:px-3 sm:text-sm [&>svg]:mr-0 sm:[&>svg]:mr-2"
                   onClick={() => setShareDialogOpen(true)}
                 >
                   <Share2 className="h-4 w-4 shrink-0 sm:mr-2" />
@@ -556,7 +558,7 @@ export default function DocumentFlowPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="min-w-0 max-w-full"
+                  className="h-9 w-9 px-0 text-[0px] sm:h-9 sm:w-auto sm:px-3 sm:text-sm [&>svg]:mr-0 sm:[&>svg]:mr-2"
                   onClick={() => setViewersDialogOpen(true)}
                   title="Xem những người hiện có quyền xem tài liệu"
                 >
@@ -564,11 +566,11 @@ export default function DocumentFlowPage() {
                   <span className="hidden sm:inline">Quyền xem</span>
                 </Button>
               )}
-              {flowData?.can_view_audit && (
+              {isCompleted && flowData?.can_view_audit && (
               <Button
                 variant="outline"
                 size="sm"
-                className="min-w-0 max-w-full"
+                className="h-9 w-9 px-0 text-[0px] sm:h-9 sm:w-auto sm:px-3 sm:text-sm [&>svg]:mr-0 sm:[&>svg]:mr-2"
                 onClick={() => router.push(`/audit/${documentId}`)}
               >
                 <History className="h-4 w-4 shrink-0 sm:mr-2" />
@@ -578,43 +580,23 @@ export default function DocumentFlowPage() {
             </div>
           </div>
 
-          <div className={hasWorkflowSteps ? "mt-4 space-y-4" : "hidden"}>
+          <div className={hasWorkflowSteps ? "mt-3 hidden space-y-2 2xl:block" : "hidden"}>
           {/* Progress Bar */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">
+            <div className="mb-1 flex items-center justify-between sm:mb-2">
+              <span className="text-xs font-medium text-gray-700 sm:text-sm">
                 Tiến độ: {completedSteps}/{steps.length} bước
               </span>
-              <span className="text-sm text-gray-500">
+              <span className="text-xs text-gray-500 sm:text-sm">
                 {Math.round(progressPercent)}%
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="h-1.5 w-full rounded-full bg-gray-200 sm:h-2">
               <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                className="h-1.5 rounded-full bg-blue-600 transition-all duration-300 sm:h-2"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-          </div>
-
-          {/* Phase Indicators */}
-          <div className="flex gap-2">
-            {phases.map((phase: any) => (
-              <div
-                key={phase.key}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium text-center ${
-                  phase.status === 'completed'
-                    ? 'bg-green-100 text-green-700'
-                    : phase.status === 'in_progress'
-                    ? 'bg-blue-100 text-blue-700'
-                    : phase.status === 'rejected'
-                    ? 'bg-red-100 text-red-700'
-                    : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                {phase.label}
-              </div>
-            ))}
           </div>
             </div>
         </div>

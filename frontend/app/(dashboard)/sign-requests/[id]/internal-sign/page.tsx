@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, PenTool, Check, FileText, Download, XCircle } from 'lucide-react';
+import { ArrowLeft, PenTool, Check, FileText, XCircle } from 'lucide-react';
 import SignatureCanvas from 'react-signature-canvas';
 import InternalSigningSidebar from '@/components/signing/InternalSigningSidebar';
 import PDFSigningViewer from '@/components/pdf/PDFSigningViewer';
@@ -544,7 +544,7 @@ export default function InternalSigningPage() {
                             }}
                             disabled={rejecting || submitting}
                           >
-                            Há»§y
+                            Hủy
                           </Button>
                         </div>
                       </div>
@@ -567,7 +567,7 @@ export default function InternalSigningPage() {
                       className="w-full"
                       size="sm"
                     >
-                      Há»§y
+                      Hủy
                     </Button>
                   </div>
                 </div>
@@ -583,54 +583,6 @@ export default function InternalSigningPage() {
                     Bạn đã ký tài liệu này vào {new Date(mySigner.signed_at).toLocaleString('vi-VN')}
                   </p>
                   
-                  {/* Check if all signers completed */}
-                  {data.sign_request.signers.every(s => s.status === 'signed' || s.status === 'completed') && (
-                    <div className="mb-4 p-4 bg-white rounded-lg border border-green-300">
-                      <p className="text-sm text-gray-700 mb-3">
-                        ✅ Tất cả người ký đã hoàn thành. Bạn có thể tải xuống tài liệu đã ký.
-                      </p>
-                      <Button 
-                        onClick={async () => {
-                          try {
-                            // Public routes don't have /api/v1 prefix
-                            if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
-                              throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is required');
-                            }
-                            const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
-                            const response = await fetch(
-                              `${apiBaseUrl}/public/sign/${mySigner.signing_token}/download-signed`
-                            );
-                            
-                            if (!response.ok) {
-                              throw new Error('Không thể tải xuống');
-                            }
-                            
-                            const blob = await response.blob();
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `${data.sign_request.document.document_number}_signed.pdf`;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            URL.revokeObjectURL(url);
-                            
-                            toast.success('Đã tải xuống tài liệu đã ký');
-                          } catch (error: any) {
-                            toast.error(error.message || 'Không thể tải xuống');
-                          }
-                        }}
-                        className="w-full bg-blue-600 hover:bg-blue-700"
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Tải xuống tài liệu đã ký
-                      </Button>
-                    </div>
-                  )}
-                  
-                  <Button onClick={() => router.push('/sign-requests')} size="sm" variant="outline">
-                    Quay về danh sách
-                  </Button>
                 </div>
               </div>
             )}

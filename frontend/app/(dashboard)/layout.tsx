@@ -70,7 +70,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <LoadingBar />
       <div className={cn(
         "grid gap-0 transition-all duration-300 min-w-0",
-        isCollapsed ? "md:grid-cols-[100px_1fr]" : "md:grid-cols-[280px_1fr]"
+        isCollapsed
+          ? "md:grid-cols-[100px_1fr]"
+          : "md:grid-cols-[100px_1fr] 2xl:grid-cols-[280px_1fr]"
       )}>
         {/* Mobile Sidebar Overlay */}
         {isMobileMenuOpen && (
@@ -83,7 +85,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Sidebar - Desktop + Mobile */}
         <aside className={cn(
           "h-screen sticky top-0 flex-col border-r border-slate-200 bg-white shadow-xl overflow-visible transition-all duration-300 relative hide-scrollbar",
-          isCollapsed ? "p-3" : "p-6",
+          isCollapsed ? "p-3" : "p-4 md:p-3 2xl:p-6",
           // Mobile styles
           "md:flex",
           isMobileMenuOpen 
@@ -111,14 +113,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div className={cn(
             "mb-6 space-y-2 pb-4 border-b border-slate-100",
-            isCollapsed && "flex justify-center"
+            isCollapsed ? "flex justify-center" : "md:flex md:justify-center 2xl:block"
           )}>
             {isCollapsed ? (
               <Image src="/logo.png" alt="Logo" width={40} height={40} className="w-10 h-10 object-contain" />
             ) : (
               <div className="flex items-center gap-3">
                 <Image src="/logo.png" alt="Logo" width={40} height={40} className="w-10 h-10 object-contain" />
-                <div>
+                <div className="md:hidden 2xl:block">
                   <p className="text-lg font-bold text-slate-900">{tenant?.name ?? "WP Sign"}</p>
                   <p className="text-xs text-slate-500">{tenant?.plan ?? "Enterprise"}</p>
                 </div>
@@ -129,14 +131,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {filteredSidebar.map((group, groupIndex) => (
               <div key={groupIndex}>
                 {/* Group Label */}
-                {!isCollapsed ? (
-                  <h3 className="px-4 mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                {!isCollapsed && (
+                  <h3 className="px-4 mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 md:hidden 2xl:flex">
                     <span className="w-1 h-1 rounded-full bg-slate-300"></span>
                     {t(group.groupLabelKey)}
                   </h3>
-                ) : (
-                  <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mx-2 mb-3 mt-1" />
                 )}
+                <div className={cn(
+                  "h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mx-2 mb-3 mt-1",
+                  isCollapsed ? "hidden md:block" : "hidden md:block 2xl:hidden"
+                )} />
                 
                 {/* Group Items */}
                 <div className="space-y-0.5">
@@ -146,12 +150,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <Link
                         key={item.href}
                         href={item.href}
-                        title={isCollapsed ? t(item.labelKey) : ""}
+                        title={t(item.labelKey)}
                         className={cn(
                           "group rounded-lg text-sm transition-all duration-200 flex relative",
-                          isCollapsed 
-                            ? "justify-center py-3 px-2 mx-1" 
-                            : "items-start gap-3 px-3 py-2.5 mx-1",
+                          isCollapsed
+                            ? "justify-center py-3 px-2 mx-1"
+                            : "items-start gap-3 px-3 py-2.5 mx-1 md:justify-center md:gap-0 md:px-2 md:py-3 2xl:items-start 2xl:gap-3 2xl:px-3 2xl:py-2.5",
                           active 
                             ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-600/40 scale-[1.02]" 
                             : "text-slate-700 hover:bg-slate-50 hover:scale-[1.01]"
@@ -159,19 +163,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       >
                         {/* Active indicator bar */}
                         {active && !isCollapsed && (
-                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full md:hidden 2xl:block" />
                         )}
                         
                         <div className={cn(
                           "flex-shrink-0 transition-transform group-hover:scale-110",
-                          isCollapsed ? "" : "mt-0.5 ml-2",
+                          isCollapsed ? "" : "mt-0.5 ml-2 md:mt-0 md:ml-0 2xl:mt-0.5 2xl:ml-2",
                           active ? "text-white" : item.color
                         )}>
-                          <item.icon className={cn(isCollapsed ? "w-6 h-6" : "w-5 h-5")} />
+                          <item.icon className={cn(isCollapsed ? "w-6 h-6" : "w-5 h-5 md:w-6 md:h-6 2xl:w-5 2xl:h-5")} />
                         </div>
                         
                         {!isCollapsed && (
-                          <div className="flex-1 min-w-0">
+                          <div className="flex-1 min-w-0 md:hidden 2xl:block">
                             <p className={cn("font-semibold leading-tight", active ? "text-white" : "text-slate-900 group-hover:text-blue-600")}>{t(item.labelKey)}</p>
                             {item.captionKey && (
                               <p className={cn("text-[11px] truncate mt-0.5", active ? "text-blue-100" : "text-slate-500 group-hover:text-slate-600")}>{t(item.captionKey)}</p>
@@ -180,8 +184,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         )}
 
                         {/* Tooltip when collapsed */}
-                        {isCollapsed && (
-                          <div className="absolute left-full ml-3 bg-slate-900 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none shadow-xl">
+                        <div className={cn(
+                          "absolute left-full ml-3 bg-slate-900 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none shadow-xl",
+                          isCollapsed ? "hidden md:block" : "hidden md:block 2xl:hidden"
+                        )}>
                             <div className="font-semibold">{t(item.labelKey)}</div>
                             {item.captionKey && (
                               <div className="text-slate-300 text-[10px] mt-0.5">{t(item.captionKey)}</div>
@@ -189,7 +195,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             {/* Arrow */}
                             <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-slate-900" />
                           </div>
-                        )}
                       </Link>
                     );
                   })}
@@ -200,7 +205,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </aside>
         <div className="flex flex-col h-screen min-w-0 overflow-hidden">
           {/* Header */}
-          <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-4 md:px-6 py-3 flex items-center justify-between shadow-sm">
+          <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-3 py-2.5 md:px-4 2xl:px-6 2xl:py-3 flex items-center justify-between shadow-sm">
             {/* Mobile Hamburger Menu */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
@@ -264,7 +269,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </header>
           {/* Main content */}
-          <main className="flex-1 p-3 md:p-6 space-y-3 md:space-y-6 overflow-y-auto overflow-x-hidden pb-20 md:pb-6 min-w-0">
+          <main className="flex-1 p-3 md:p-4 2xl:p-6 space-y-3 md:space-y-4 2xl:space-y-6 overflow-y-auto overflow-x-hidden pb-20 md:pb-6 min-w-0">
             {children}
           </main>
         </div>
