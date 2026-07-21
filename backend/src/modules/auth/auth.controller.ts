@@ -103,6 +103,12 @@ export class AuthController {
           id: req.user.id,
           email: req.user.email,
           role: req.user.role,
+          full_name: req.user.full_name,
+          phone: req.user.phone,
+          avatar_url: req.user.avatar_url ? '/users/profile/avatar' : null,
+          signature_image_url: req.user.signature_image_path ? '/users/profile/signature' : null,
+          signature_type: req.user.signature_type,
+          signature_updated_at: req.user.signature_updated_at,
         },
         tenant: {
           id: req.tenant.id,

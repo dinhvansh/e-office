@@ -24,12 +24,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { tokens, user, tenant, logout, isLoading, permissions } = useAuth();
+  const { tokens, user, tenant, logout, isLoading, permissions, fetchMedia } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   
   // Filter sidebar based on user role
   const filteredSidebar = filterSidebarByPermissions(SIDEBAR_STRUCTURE, user?.role, permissions);
@@ -39,6 +40,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace("/login");
     }
   }, [isLoading, router, tokens]);
+
+  useEffect(() => {
+    if (!user?.avatar_url) {
+      return;
+    }
+    let active = true;
+    let objectUrl: string | undefined;
+    void fetchMedia(user.avatar_url).then((blob) => {
+      objectUrl = URL.createObjectURL(blob);
+      if (active) setAvatarPreview(objectUrl);
+    }).catch(() => { if (active) setAvatarPreview(null); });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [fetchMedia, user?.avatar_url]);
 
   if (isLoading) {
     return <div className="flex h-screen items-center justify-center text-slate-500">{t("navigation.loadingWorkspace")}</div>;
@@ -203,8 +220,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {/* User Menu Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-2 hover:bg-slate-50 rounded-lg p-1.5 transition-colors">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-bold text-sm">
-                    {user?.email?.[0]?.toUpperCase() ?? "U"}
+                  <div className="w-8 h-8 overflow-hidden rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-bold text-sm">
+                    {user?.avatar_url && avatarPreview ? <Image src={avatarPreview} alt="" width={32} height={32} unoptimized className="h-full w-full object-cover" /> : user?.email?.[0]?.toUpperCase() ?? "U"}
                   </div>
                   <div className="hidden sm:block text-left">
                     <p className="text-sm font-medium text-slate-900">{user?.full_name || user?.email}</p>

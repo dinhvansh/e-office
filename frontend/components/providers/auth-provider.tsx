@@ -2,12 +2,16 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-type AuthUser = {
+export type AuthUser = {
   id: number;
   email: string;
   role?: string | null;
   full_name?: string | null;
   phone?: string | null;
+  avatar_url?: string | null;
+  signature_image_url?: string | null;
+  signature_type?: 'drawn' | 'uploaded' | 'typed' | null;
+  signature_updated_at?: string | null;
 };
 
 type UserPermission = {
@@ -41,6 +45,8 @@ type AuthContextValue = {
   logout: () => void;
   hasPermission: (permission: string | string[]) => boolean;
   fetchJson: <T>(path: string, init?: RequestInit) => Promise<T>;
+  fetchMedia: (path: string) => Promise<Blob>;
+  syncUser: (profile: Partial<AuthUser>) => void;
 };
 
 import { getApiBaseUrl } from '@/lib/env';
@@ -109,13 +115,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const stored = readStoredSession();
-    if (stored?.tokens) {
-      setTokens(stored.tokens);
-      setUser(stored.user);
-      setTenant(stored.tenant);
-      setPermissions(stored.permissions ?? []);
-    }
-    setIsLoading(false);
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      if (stored?.tokens) {
+        setTokens(stored.tokens);
+        setUser(stored.user);
+        setTenant(stored.tenant);
+        setPermissions(stored.permissions ?? []);
+      }
+      setIsLoading(false);
+    });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -315,6 +326,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     [logout, refreshTokens, tokens?.accessToken],
   );
 
+  const fetchMedia = useCallback(async (path: string): Promise<Blob> => {
+    const apiBaseUrl = getApiBaseUrl();
+    const res = await fetch(`${apiBaseUrl}${path}`, {
+      credentials: 'include',
+      headers: tokens?.accessToken ? { Authorization: `Bearer ${tokens.accessToken}` } : {},
+    });
+    if (!res.ok) throw new Error(`Request failed with status ${res.status}`);
+    return res.blob();
+  }, [tokens]);
+
+  const syncUser = useCallback((profile: Partial<AuthUser>) => {
+    setUser((current) => current ? { ...current, ...profile } : current);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -326,8 +351,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       logout,
       hasPermission,
       fetchJson,
+      fetchMedia,
+      syncUser,
     }),
-    [fetchJson, hasPermission, isLoading, logout, performLogin, permissions, tenant, tokens, user],
+    [fetchJson, fetchMedia, hasPermission, isLoading, logout, performLogin, permissions, syncUser, tenant, tokens, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

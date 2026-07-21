@@ -20,6 +20,12 @@ export interface AuthResponse {
     id: number;
     email: string;
     role?: string | null;
+    full_name?: string | null;
+    phone?: string | null;
+    avatar_url?: string | null;
+    signature_image_url?: string | null;
+    signature_type?: string | null;
+    signature_updated_at?: Date | null;
   };
   tenant: {
     id: number;

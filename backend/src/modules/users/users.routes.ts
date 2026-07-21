@@ -9,6 +9,13 @@ router.use(authGuard);
 
 // Public routes (authenticated users)
 router.get('/profile', usersController.getProfile);
+router.patch('/profile', usersController.updateProfile);
+router.get('/profile/avatar', usersController.getAvatar);
+router.post('/profile/avatar', usersController.uploadAvatar);
+router.delete('/profile/avatar', usersController.deleteAvatar);
+router.get('/profile/signature', usersController.getSignature);
+router.post('/profile/signature', usersController.uploadSignature);
+router.delete('/profile/signature', usersController.deleteSignature);
 router.post('/change-password', usersController.changePassword);
 router.get('/directory', usersController.getDirectoryUsers);
 

@@ -7,6 +7,9 @@ interface SignatureCanvasProps {
   width?: number;
   height?: number;
   className?: string;
+  penColor?: string;
+  minWidth?: number;
+  maxWidth?: number;
 }
 
 export interface SignatureCanvasRef {
@@ -17,7 +20,7 @@ export interface SignatureCanvasRef {
 }
 
 const SignatureCanvas = forwardRef<SignatureCanvasRef, SignatureCanvasProps>(
-  ({ width = 500, height = 200, className = '' }, ref) => {
+  ({ width = 500, height = 200, className = '', penColor = '#111827', minWidth = 1, maxWidth = 3 }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const signaturePadRef = useRef<SignaturePad | null>(null);
 
@@ -30,7 +33,9 @@ const SignatureCanvas = forwardRef<SignatureCanvasRef, SignatureCanvasProps>(
         // usability, but a handwritten signature must not paint a white box
         // over the document when it is embedded into the PDF.
         backgroundColor: 'rgba(0, 0, 0, 0)',
-        penColor: 'rgb(0, 0, 0)',
+        penColor: '#111827',
+        minWidth: 1,
+        maxWidth: 3,
       });
 
       signaturePadRef.current = signaturePad;
@@ -53,6 +58,13 @@ const SignatureCanvas = forwardRef<SignatureCanvasRef, SignatureCanvasProps>(
       };
     }, []);
 
+    useEffect(() => {
+      if (!signaturePadRef.current) return;
+      signaturePadRef.current.penColor = penColor;
+      signaturePadRef.current.minWidth = minWidth;
+      signaturePadRef.current.maxWidth = maxWidth;
+    }, [maxWidth, minWidth, penColor]);
+
     useImperativeHandle(ref, () => ({
       clear: () => {
         signaturePadRef.current?.clear();
@@ -72,7 +84,7 @@ const SignatureCanvas = forwardRef<SignatureCanvasRef, SignatureCanvasProps>(
       <canvas
         ref={canvasRef}
         className={`border border-gray-300 rounded-lg bg-transparent ${className}`}
-        style={{ width: `${width}px`, height: `${height}px` }}
+        style={{ width: '100%', maxWidth: `${width}px`, height: `${height}px` }}
       />
     );
   }

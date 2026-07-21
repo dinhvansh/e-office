@@ -5,6 +5,7 @@ import { documents } from "./documents";
 import { navigation } from "./navigation";
 import { signRequests } from "./signRequests";
 import { workflow } from "./workflow";
+import { profile } from "./profile";
 
 export const viMessages = {
   ...common,
@@ -14,4 +15,5 @@ export const viMessages = {
   ...signRequests,
   ...archive,
   ...approvals,
+  ...profile,
 } as const;

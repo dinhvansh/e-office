@@ -1,7 +1,12 @@
 import bcrypt from 'bcrypt';
+import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
+import sharp from 'sharp';
 import { usersRepository } from './users.repository';
 import { prisma } from '../../config/prisma';
+import { ApiError } from '../../core/errors/api-error';
+import { readStoredFile } from '../../core/storage/fileStorage';
+import { storageService } from '../../core/storage/storage.service';
 
 type UserFilters = {
   page?: number;
@@ -12,7 +17,134 @@ type UserFilters = {
   search?: string;
 };
 
+const decodeProfileImage = (value: string, maxBytes: number): Buffer => {
+  const base64 = value.replace(/^data:[^;]+;base64,/, '');
+  let buffer: Buffer;
+  try {
+    buffer = Buffer.from(base64, 'base64');
+  } catch {
+    throw ApiError.badRequest('Invalid image data', 'PROFILE_IMAGE_INVALID');
+  }
+  if (!buffer.length || buffer.length > maxBytes) {
+    throw ApiError.badRequest('Image exceeds the allowed size', 'PROFILE_IMAGE_TOO_LARGE');
+  }
+  return buffer;
+};
+
+const assertSupportedImage = async (buffer: Buffer) => {
+  try {
+    const metadata = await sharp(buffer, { failOn: 'error' }).metadata();
+    if (!metadata.format || !['jpeg', 'png', 'webp'].includes(metadata.format)) {
+      throw ApiError.badRequest('Only PNG, JPEG and WebP images are supported', 'PROFILE_IMAGE_TYPE_UNSUPPORTED');
+    }
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw ApiError.badRequest('Invalid image data', 'PROFILE_IMAGE_INVALID');
+  }
+};
+
 export const usersService = {
+  async getProfile(userId: number, tenantId: number) {
+    const user = await this.getUserById(userId, tenantId);
+    const safeUser = { ...user };
+    delete safeUser.signature_image_path;
+    return {
+      ...safeUser,
+      avatar_url: user.avatar_url ? '/users/profile/avatar' : null,
+      signature_image_url: user.signature_image_path ? '/users/profile/signature' : null,
+    };
+  },
+
+  async updateProfile(userId: number, tenantId: number, data: { full_name?: string; phone?: string | null }) {
+    const existing = await usersRepository.findById(userId, tenantId);
+    if (!existing) throw ApiError.notFound('User not found', 'USER_NOT_FOUND');
+    await usersRepository.update(userId, {
+      ...(data.full_name !== undefined ? { full_name: data.full_name.trim() } : {}),
+      ...(data.phone !== undefined ? { phone: data.phone?.trim() || null } : {}),
+    });
+    return this.getProfile(userId, tenantId);
+  },
+
+  async uploadAvatar(userId: number, tenantId: number, imageData: string) {
+    const existing = await usersRepository.findById(userId, tenantId);
+    if (!existing) throw ApiError.notFound('User not found', 'USER_NOT_FOUND');
+    const source = decodeProfileImage(imageData, 2 * 1024 * 1024);
+    await assertSupportedImage(source);
+    const output = await sharp(source).rotate().resize(256, 256, { fit: 'cover', position: 'centre' }).webp({ quality: 86 }).toBuffer();
+    const key = `storage/${tenantId}/profiles/${userId}/avatar-${randomUUID()}.webp`;
+    await storageService.put({ key, body: output, contentType: 'image/webp' });
+    try {
+      await usersRepository.update(userId, { avatar_url: key });
+    } catch (error) {
+      await storageService.delete(key).catch(() => undefined);
+      throw error;
+    }
+    if (existing.avatar_url && existing.avatar_url !== key) {
+      await storageService.delete(existing.avatar_url).catch(() => undefined);
+    }
+    return this.getProfile(userId, tenantId);
+  },
+
+  async deleteAvatar(userId: number, tenantId: number) {
+    const existing = await usersRepository.findById(userId, tenantId);
+    if (!existing) throw ApiError.notFound('User not found', 'USER_NOT_FOUND');
+    await usersRepository.update(userId, { avatar_url: null });
+    if (existing.avatar_url) await storageService.delete(existing.avatar_url).catch(() => undefined);
+    return this.getProfile(userId, tenantId);
+  },
+
+  async getAvatar(userId: number, tenantId: number) {
+    const user = await usersRepository.findById(userId, tenantId);
+    if (!user?.avatar_url) throw ApiError.notFound('Avatar not found', 'AVATAR_NOT_FOUND');
+    return { bytes: await readStoredFile(storageService, user.avatar_url), contentType: 'image/webp' };
+  },
+
+  async uploadSignature(userId: number, tenantId: number, imageData: string, signatureType: 'drawn' | 'uploaded' | 'typed') {
+    const existing = await usersRepository.findById(userId, tenantId);
+    if (!existing) throw ApiError.notFound('User not found', 'USER_NOT_FOUND');
+    const source = decodeProfileImage(imageData, 1024 * 1024);
+    await assertSupportedImage(source);
+    const output = await sharp(source).rotate().resize(600, 240, {
+      fit: 'contain',
+      withoutEnlargement: true,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    }).png().toBuffer();
+    const key = `storage/${tenantId}/profiles/${userId}/signature-${randomUUID()}.png`;
+    await storageService.put({ key, body: output, contentType: 'image/png' });
+    try {
+      await usersRepository.update(userId, {
+        signature_image_path: key,
+        signature_type: signatureType,
+        signature_updated_at: new Date(),
+      });
+    } catch (error) {
+      await storageService.delete(key).catch(() => undefined);
+      throw error;
+    }
+    if (existing.signature_image_path && existing.signature_image_path !== key) {
+      await storageService.delete(existing.signature_image_path).catch(() => undefined);
+    }
+    return this.getProfile(userId, tenantId);
+  },
+
+  async deleteSignature(userId: number, tenantId: number) {
+    const existing = await usersRepository.findById(userId, tenantId);
+    if (!existing) throw ApiError.notFound('User not found', 'USER_NOT_FOUND');
+    await usersRepository.update(userId, {
+      signature_image_path: null,
+      signature_type: null,
+      signature_updated_at: null,
+    });
+    if (existing.signature_image_path) await storageService.delete(existing.signature_image_path).catch(() => undefined);
+    return this.getProfile(userId, tenantId);
+  },
+
+  async getSignature(userId: number, tenantId: number) {
+    const user = await usersRepository.findById(userId, tenantId);
+    if (!user?.signature_image_path) throw ApiError.notFound('Signature not found', 'SIGNATURE_NOT_FOUND');
+    return { bytes: await readStoredFile(storageService, user.signature_image_path), contentType: 'image/png' };
+  },
+
   validateOrganizationalFields(data: {
     department_id?: number;
     position_id?: number;

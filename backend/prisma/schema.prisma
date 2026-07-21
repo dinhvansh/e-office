@@ -39,6 +39,9 @@ model users {
   full_name     String?
   phone         String?
   avatar_url    String?
+  signature_image_path String?
+  signature_type       String?
+  signature_updated_at DateTime?
   department_id Int?
   manager_id    Int?       // Quản lý trực tiếp
   position_id   Int?       // Chức danh

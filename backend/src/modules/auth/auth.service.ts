@@ -22,6 +22,12 @@ type AuthUser = {
   status: string | null;
   tenant_id: number;
   role: string | null;
+  full_name?: string | null;
+  phone?: string | null;
+  avatar_url?: string | null;
+  signature_image_path?: string | null;
+  signature_type?: string | null;
+  signature_updated_at?: Date | null;
   tenant: { name: string | null; plan: string | null; status: string | null } | null;
   user_roles: Array<{ role: { name: string } | null }>;
 };
@@ -63,7 +69,7 @@ export class AuthService {
     // Get primary role from user_roles (prioritize Admin role, then first role, fallback to user.role)
     const roles = user.user_roles?.map(ur => ur.role?.name).filter(Boolean) ?? [];
     const primaryRole = roles.includes('Admin') ? 'Admin' : (roles[0] ?? user.role);
-    return this.buildAuthResponse(user.id, user.tenant_id, user.email, primaryRole, user.tenant?.name ?? null, user.tenant?.plan ?? null, user.tenant?.status ?? null);
+    return this.buildAuthResponse(user, primaryRole);
   }
 
   async refresh(refreshToken: string): Promise<AuthResponse> {
@@ -98,7 +104,7 @@ export class AuthService {
     // Get primary role from user_roles (prioritize Admin role, then first role, fallback to user.role)
     const roles = user.user_roles?.map(ur => ur.role?.name).filter(Boolean) ?? [];
     const primaryRole = roles.includes('Admin') ? 'Admin' : (roles[0] ?? user.role);
-    const response = await this.buildAuthResponse(user.id, user.tenant_id, user.email, primaryRole, user.tenant?.name ?? null, user.tenant?.plan ?? null, user.tenant?.status ?? null, session.family_id ?? session.id);
+    const response = await this.buildAuthResponse(user, primaryRole, session.family_id ?? session.id);
     const nextSessionId = this.verifyRefreshToken(response.tokens.refreshToken).jti!;
     try {
       const revoked = await prisma.refresh_sessions.updateMany({
@@ -219,28 +225,29 @@ export class AuthService {
   }
 
   private async buildAuthResponse(
-    userId: number,
-    tenantId: number,
-    email: string,
+    user: AuthUser,
     role: string | null | undefined,
-    tenantName: string | null,
-    tenantPlan: string | null,
-    tenantStatus: string | null,
     familyId?: string,
   ): Promise<AuthResponse> {
-    const tokens = await this.issueTokens(userId, tenantId, role, familyId);
+    const tokens = await this.issueTokens(user.id, user.tenant_id, role, familyId);
     return {
       tokens,
       user: {
-        id: userId,
-        email,
+        id: user.id,
+        email: user.email,
         role: role ?? null,
+        full_name: user.full_name,
+        phone: user.phone,
+        avatar_url: user.avatar_url ? '/users/profile/avatar' : null,
+        signature_image_url: user.signature_image_path ? '/users/profile/signature' : null,
+        signature_type: user.signature_type,
+        signature_updated_at: user.signature_updated_at,
       },
       tenant: {
-        id: tenantId,
-        name: tenantName,
-        plan: tenantPlan,
-        status: tenantStatus,
+        id: user.tenant_id,
+        name: user.tenant?.name ?? null,
+        plan: user.tenant?.plan ?? null,
+        status: user.tenant?.status ?? null,
       },
     };
   }
