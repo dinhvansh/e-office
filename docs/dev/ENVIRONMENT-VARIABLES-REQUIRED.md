@@ -156,7 +156,6 @@ The following files contain localhost references but are **intentionally kept**:
 
 - Documentation files (`.md`)
 - Test scripts in `backend/scripts/` (development tools)
-- HTTP test files in `tests/http/` (manual testing)
 - Docker configuration files
 - Shell scripts for setup/deployment
 

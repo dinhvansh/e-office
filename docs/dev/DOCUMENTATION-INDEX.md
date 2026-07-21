@@ -28,7 +28,6 @@ This is the current documentation map for E-Office development and product readi
 ## Cleanup
 
 - [PROJECT-CLEANUP.md](PROJECT-CLEANUP.md): cleanup policy for generated outputs and historical scripts.
-- Historical documents: `docs/archive/dev-history/`
 
 ## Verification Commands
 

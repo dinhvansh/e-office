@@ -20,12 +20,4 @@ This folder now contains only the current, high-signal development documents for
 - [WORKFLOW-REFACTOR-E2E-REPORT.md](WORKFLOW-REFACTOR-E2E-REPORT.md)
 - [WORKFLOW-REFACTOR-PLAN-CHECKLIST.md](WORKFLOW-REFACTOR-PLAN-CHECKLIST.md)
 
-## Archive
-
-Historical session logs, feature notes, fix reports, and old handoff documents were moved to:
-
-```text
-docs/archive/dev-history/
-```
-
-Keep new operational docs in `docs/dev`. Move time-bound notes and one-off reports to the archive after they are no longer active.
+Keep operational and durable engineering documentation in `docs/dev`. Do not commit time-bound session notes or one-off reports.

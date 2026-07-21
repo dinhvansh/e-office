@@ -95,9 +95,6 @@ docs/
 │   └── reports/                  # Reports & summaries
 │       ├── PHASE-1-COMPLETE-REPORT.md
 │       └── REFACTOR-SUMMARY.md
-│
-└── archive/                      # Old/deprecated docs
-    └── [old files moved here]
 ```
 
 ### Naming Convention

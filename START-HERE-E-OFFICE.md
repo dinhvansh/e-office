@@ -87,10 +87,9 @@ Khi bấm gửi:
 - PDF test output và backup JSON bị track trong repo
 - docs chính được viết lại để bám theo code hiện tại
 
-## 6. Những thư mục không nên coi là hiện hành
+## 6. Tài liệu tham khảo
 
-- `docs/archive`
 - `docs/dev`
 - `docs/specs`
 
-Chúng có ích để tra cứu lịch sử, nhưng không phải nguồn sự thật.
+Các tài liệu này hỗ trợ phát triển và thiết kế; source code và tài liệu chính vẫn là nguồn sự thật.

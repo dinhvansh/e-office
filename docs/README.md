@@ -1,9 +1,6 @@
 # Documentation Index
 
-Thư mục này được chia thành 2 lớp:
-
-- tài liệu chính đang còn hiệu lực
-- tài liệu lịch sử để tra cứu
+Thư mục này chứa tài liệu chính và tài liệu tham khảo cho phát triển, triển khai, kiểm thử.
 
 ## Tài liệu chính
 
@@ -15,9 +12,8 @@ Thư mục này được chia thành 2 lớp:
 - [testing-guide.md](testing-guide.md): cách build, smoke test, kiểm tra các flow chính
 - [email-setup.md](email-setup.md): cấu hình SMTP
 
-## Tài liệu lịch sử
+## Tài liệu tham khảo
 
-- `archive/`: tài liệu cũ, bản nháp, handoff, checklist theo phiên
 - `dev/`: ghi chú kỹ thuật, phân tích, log sửa lỗi, đề xuất nội bộ
 - `setup/`, `setup-and-backup/`, `docker/`, `specs/`: tài liệu tham khảo theo giai đoạn cũ
 
