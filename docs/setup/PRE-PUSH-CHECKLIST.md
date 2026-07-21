@@ -58,10 +58,6 @@
   - DONE.md
   ```
 
-- [ ] **Xóa hoặc archive:**
-  - [ ] `Main/__archive_original/` - Có thể xóa nếu không cần
-  - [ ] `Main/reference_original_libresign/` - Có thể xóa nếu không cần
-
 ## 🔍 Final Check
 
 ```bash
