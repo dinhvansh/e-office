@@ -49,7 +49,7 @@ test("lifecycle helpers distinguish draft, terminal, active and completed states
 
 test("Documents hides lifecycle mutations for completed and exposes only valid actions", async ({ page }) => {
   await authenticate(page);
-  await page.route("http://127.0.0.1:4010/**", async (route) => {
+  await page.route("**/api/v1/**", async (route) => {
     const url = route.request().url();
     if (url.includes("/documents?")) return route.fulfill({ contentType: "application/json", body: JSON.stringify({ documents: [document(1, "completed"), document(2, "cancelled"), document(3, "pending_approval"), document(4, "draft")], pagination: { page: 1, limit: 10, total: 4, totalPages: 1 } }) });
     if (url.includes("/document-types") || url.includes("/workflows")) return route.fulfill({ contentType: "application/json", body: "[]" });
@@ -68,22 +68,21 @@ test("Documents hides lifecycle mutations for completed and exposes only valid a
 
 test("Sign Requests hides completed mutations and separates archive from cancel", async ({ page }) => {
   await authenticate(page);
-  await page.route("http://127.0.0.1:4010/**", async (route) => {
+  await page.route("**/api/v1/**", async (route) => {
     const url = route.request().url();
     if (url.includes("/sign-requests/my-requests")) return route.fulfill({ contentType: "application/json", body: JSON.stringify({ sign_requests: [{ ...request(11, "completed", "COMPLETED"), signers: [{ id: 1, name: "External", email: "external@example.test", status: "completed", signed_at: new Date().toISOString(), signing_order: 1, is_internal: false, user_id: null }] }, request(12, "cancelled", "CANCELLED"), request(13, "rejected", "REJECTED"), request(14, "in_progress", "AWAITING_SIGNATURES")], pagination: { page: 1, limit: 10, total: 4, totalPages: 1, hasNext: false, hasPrev: false } }) });
     return route.fulfill({ contentType: "application/json", body: "[]" });
   });
 
   await page.goto("/sign-requests");
+  const completed = page.locator("tr").filter({ hasText: "DOC-11" });
+  await expect(completed.locator('[aria-haspopup="menu"]')).toHaveCount(0);
   const openMenu = async (id: number) => {
     const row = page.locator("tr").filter({ hasText: `DOC-${id}` });
-    await row.locator("button").last().click();
+    await row.getByRole("button", { name: "Thao tác khác" }).click();
     return page.getByRole("menu");
   };
-  let menu = await openMenu(11);
-  await expect(menu.getByText(/Xóa|Lưu trữ|Hủy luồng ký|Copy link|Gửi lại/)).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  menu = await openMenu(12);
+  let menu = await openMenu(12);
   await expect(menu.getByText("Lưu trữ", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   menu = await openMenu(13);

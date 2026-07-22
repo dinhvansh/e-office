@@ -7,8 +7,16 @@ export interface CreateDocumentData {
   file_path: string;
   original_file_name?: string | null;
   hash?: string | null;
+  signed_file_path?: string | null;
+  artifact_metadata?: Prisma.InputJsonValue;
   status?: string | null;
   version?: number;
+  root_document_id?: number | null;
+  supersedes_document_id?: number | null;
+  revision_no?: number;
+  revision_comment?: string | null;
+  source_kind?: string;
+  external_signature_status?: string | null;
   document_type_id?: number | null;
   department_id?: number | null;
   document_number?: string | null;
@@ -18,6 +26,8 @@ export interface CreateDocumentData {
   priority_level?: string | null;
   confidential_level?: string | null;
   visibility_scope?: string | null;
+  effective_date?: Date | null;
+  expiration_date?: Date | null;
   sign_request_id?: number | null;
 }
 
@@ -62,6 +72,7 @@ export class DocumentsRepository {
     documentTypeId?: number,
     confidentialLevel?: string,
     db: DbClient = prisma,
+    currentOnly = false,
   ): Promise<PaginatedResult<documents>> {
     const page = params.page || 1;
     const limit = params.limit || 10;
@@ -87,6 +98,10 @@ export class DocumentsRepository {
     if (confidentialLevel) {
       whereClause.confidential_level = confidentialLevel;
     }
+    if (currentOnly) {
+      whereClause.status = { in: ['active', 'completed'] };
+      whereClause.superseded_by = { none: { archived_at: null } };
+    }
     
     if (search) {
       whereClause.OR = [
@@ -102,6 +117,7 @@ export class DocumentsRepository {
         where: whereClause,
         include: {
           document_type: true,
+          superseded_by: { select: { id: true }, take: 1 },
           department: { select: { id: true, code: true, manager_id: true } },
           owner: {
             select: {
@@ -139,6 +155,7 @@ export class DocumentsRepository {
     documentTypeId?: number,
     confidentialLevel?: string,
     db: DbClient = prisma,
+    currentOnly = false,
   ) {
     const whereClause: Prisma.documentsWhereInput = { tenant_id: tenantId };
 
@@ -146,6 +163,10 @@ export class DocumentsRepository {
     if (status) whereClause.status = status;
     if (documentTypeId) whereClause.document_type_id = documentTypeId;
     if (confidentialLevel) whereClause.confidential_level = confidentialLevel;
+    if (currentOnly) {
+      whereClause.status = { in: ['active', 'completed'] };
+      whereClause.superseded_by = { none: { archived_at: null } };
+    }
     if (search) {
       whereClause.OR = [
         { title: { contains: search, mode: "insensitive" } },
@@ -159,6 +180,7 @@ export class DocumentsRepository {
       where: whereClause,
       include: {
         document_type: true,
+        superseded_by: { select: { id: true }, take: 1 },
         department: { select: { id: true, code: true, manager_id: true, support_managers: { select: { user_id: true } } } },
         owner: { select: { id: true, manager_id: true, department_id: true } },
       },
@@ -173,6 +195,7 @@ export class DocumentsRepository {
         cc_emails: true,
         attachments: true,
         document_type: true,
+        superseded_by: { select: { id: true }, take: 1 },
         owner: {
           select: {
             id: true,

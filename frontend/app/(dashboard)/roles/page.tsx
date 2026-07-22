@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Shield, Users, Edit, Trash2, Search, FileText, User, Building2, Briefcase } from 'lucide-react';
-import { PageHeader } from '@/components/ui/page-header';
+import { DashboardHeaderPortal as PageHeader } from '@/components/ui/dashboard-header-portal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';

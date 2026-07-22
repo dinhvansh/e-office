@@ -14,10 +14,13 @@ import { AttachmentsSection } from '@/components/documents/AttachmentsSection';
 import { CCEmailsSection } from '@/components/documents/CCEmailsSection';
 import { Signer, SignersSection } from '@/components/documents/SignersSection';
 import { InternalSigner, InternalSignersSelector } from '@/components/documents/InternalSignersSelector';
-import { PageHeader } from '@/components/ui/page-header';
+import { DashboardHeaderPortal as PageHeader } from '@/components/ui/dashboard-header-portal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AsyncErrorState, InlineActionFeedback } from '@/components/ui/async-state';
 
@@ -82,7 +85,23 @@ interface ExistingDocumentResponse {
   document?: {
     id: number;
     cc_emails?: string[];
+    effective_date?: string | null;
+    expiration_date?: string | null;
   };
+}
+
+interface RevisionSource {
+  id: number;
+  document_type_id: number | null;
+  document_type?: string | null;
+  title?: string | null;
+  original_file_name?: string | null;
+  document_number?: string | null;
+  revision_no?: number;
+  status?: string | null;
+  effective_date?: string | null;
+  expiration_date?: string | null;
+  sign_request_id?: number | null;
 }
 
 export default function CreateSignRequestPage() {
@@ -94,8 +113,15 @@ export default function CreateSignRequestPage() {
   const isEditMode = Number.isFinite(existingSignRequestId) && existingSignRequestId > 0;
   const replacedSignRequestId = Number(searchParams.get('replaces') || '');
   const isReplacementDraft = Number.isFinite(replacedSignRequestId) && replacedSignRequestId > 0;
+  const revisionOfId = Number(searchParams.get('revisionOf') || '');
 
   const [file, setFile] = useState<File | null>(null);
+  const [intakeMode, setIntakeMode] = useState<'new' | 'revision'>(Number.isFinite(revisionOfId) && revisionOfId > 0 ? 'revision' : 'new');
+  const [revisionSearch, setRevisionSearch] = useState('');
+  const [revisionSource, setRevisionSource] = useState<RevisionSource | null>(null);
+  const [revisionComment, setRevisionComment] = useState('');
+  const [effectiveDate, setEffectiveDate] = useState('');
+  const [expirationDate, setExpirationDate] = useState('');
   const [documentTypeId, setDocumentTypeId] = useState<number | null>(null);
   const [selectedDocType, setSelectedDocType] = useState<DocumentType | null>(null);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<number | null>(null);
@@ -124,6 +150,9 @@ export default function CreateSignRequestPage() {
     if (step === 1) {
       if (!isEditMode && !file) errors.file = 'Vui lòng chọn tệp trước khi tiếp tục.';
       if (!documentTypeId) errors.documentType = 'Vui lòng chọn loại văn bản.';
+      if (effectiveDate && expirationDate && expirationDate < effectiveDate) {
+        errors.validity = 'Ngày hết hiệu lực phải sau hoặc bằng ngày có hiệu lực.';
+      }
     }
     if (step === 2 && selectedDocType?.require_approval && !hasConfiguredApprovalStep) {
       errors.workflow = 'Loại văn bản này cần ít nhất một bước phê duyệt hợp lệ.';
@@ -145,6 +174,30 @@ export default function CreateSignRequestPage() {
     queryKey: ['document-types', 'sign-request-purpose'],
     queryFn: async () => fetchJson<DocumentType[]>('/document-types?purpose=sign_request'),
   });
+
+  const { data: revisionSourcesData, isFetching: isFetchingRevisionSources } = useQuery({
+    queryKey: ['document-revision-sources', 'sign_request', revisionSearch],
+    enabled: !isEditMode && intakeMode === 'revision',
+    queryFn: async () => fetchJson<{ documents: RevisionSource[] }>(`/documents/revision-sources?mode=sign_request&search=${encodeURIComponent(revisionSearch)}`),
+  });
+  const revisionSources = revisionSourcesData?.documents || [];
+  const { data: requestedRevisionSource } = useQuery<{ document?: RevisionSource }>({
+    queryKey: ['requested-revision-source', revisionOfId],
+    enabled: !isEditMode && intakeMode === 'revision' && Number.isFinite(revisionOfId) && revisionOfId > 0,
+    queryFn: async () => fetchJson(`/documents/${revisionOfId}`),
+  });
+
+  useEffect(() => {
+    if (requestedRevisionSource?.document && !revisionSource) {
+      const frame = window.requestAnimationFrame(() => {
+        setRevisionSource(requestedRevisionSource.document!);
+        setDocumentTypeId(requestedRevisionSource.document!.document_type_id || null);
+        setEffectiveDate(requestedRevisionSource.document!.effective_date ? String(requestedRevisionSource.document!.effective_date).slice(0, 10) : '');
+        setExpirationDate(requestedRevisionSource.document!.expiration_date ? String(requestedRevisionSource.document!.expiration_date).slice(0, 10) : '');
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }
+  }, [requestedRevisionSource, revisionSource]);
 
   const { data: workflowsData } = useQuery({
     queryKey: ['workflows'],
@@ -310,7 +363,11 @@ export default function CreateSignRequestPage() {
   useEffect(() => {
     if (!isEditMode || !existingDocumentData?.document) return;
     const ccEmails = existingDocumentData.document.cc_emails || [];
-    void Promise.resolve().then(() => setCcEmails(ccEmails));
+    void Promise.resolve().then(() => {
+      setCcEmails(ccEmails);
+      setEffectiveDate(existingDocumentData.document!.effective_date ? String(existingDocumentData.document!.effective_date).slice(0, 10) : '');
+      setExpirationDate(existingDocumentData.document!.expiration_date ? String(existingDocumentData.document!.expiration_date).slice(0, 10) : '');
+    });
   }, [existingDocumentData, isEditMode]);
 
   useEffect(() => {
@@ -348,6 +405,9 @@ export default function CreateSignRequestPage() {
       setSubmitSuccess(null);
       if (!documentTypeId) {
         throw new Error('Vui lòng chọn loại văn bản');
+      }
+      if (!isEditMode && intakeMode === 'revision' && !revisionSource) {
+        throw new Error('Vui lòng chọn tài liệu gốc để tạo phiên bản mới');
       }
 
       if (!selectedDocType || (!selectedDocType.require_approval && !selectedDocType.require_digital_signing)) {
@@ -433,6 +493,11 @@ export default function CreateSignRequestPage() {
         document_type_id: documentTypeId,
         title: file.name.replace(/\.[^/.]+$/, ''),
         create_sign_request: true,
+        intake_mode: intakeMode,
+        source_document_id: intakeMode === 'revision' ? revisionSource?.id : undefined,
+        revision_comment: intakeMode === 'revision' ? revisionComment.trim() || undefined : undefined,
+        effective_date: effectiveDate || undefined,
+        expiration_date: expirationDate || undefined,
       };
 
       if (workflowMode === 'strict' && selectedDocType?.default_workflow_id) {
@@ -583,6 +648,21 @@ export default function CreateSignRequestPage() {
               </p>
             </div>
 
+            {!isEditMode && (
+              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <Label>Loại yêu cầu</Label>
+                <div className="inline-flex rounded-lg border bg-white p-1">
+                  <Button type="button" size="sm" variant={intakeMode === 'new' ? 'default' : 'ghost'} onClick={() => { setIntakeMode('new'); setRevisionSource(null); setDocumentTypeId(null); }}>Tài liệu mới</Button>
+                  <Button type="button" size="sm" variant={intakeMode === 'revision' ? 'default' : 'ghost'} onClick={() => { setIntakeMode('revision'); setHasUnsavedChanges(true); }}>Phiên bản mới</Button>
+                </div>
+                {intakeMode === 'revision' && <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 p-4">
+                  <div><Label htmlFor="revision-source-search">Tài liệu gốc</Label><Input id="revision-source-search" className="mt-2 bg-white" value={revisionSearch} onChange={(event) => setRevisionSearch(event.target.value)} placeholder="Tìm theo tên hoặc mã văn bản..." /></div>
+                  {!revisionSource && <div className="max-h-48 space-y-2 overflow-y-auto">{isFetchingRevisionSources ? <p className="text-sm text-muted-foreground">Đang tìm tài liệu...</p> : revisionSources.map((source) => <button key={source.id} type="button" className="w-full rounded-lg border bg-white p-3 text-left hover:border-blue-400 hover:bg-blue-50" onClick={() => { setRevisionSource(source); setDocumentTypeId(source.document_type_id); setEffectiveDate(source.effective_date ? String(source.effective_date).slice(0, 10) : ''); setExpirationDate(source.expiration_date ? String(source.expiration_date).slice(0, 10) : ''); setHasUnsavedChanges(true); }}><p className="font-medium">{source.document_number || `#${source.id}`} · {source.title || source.original_file_name}</p><p className="mt-1 text-xs text-muted-foreground">{source.document_type || 'Chưa có loại'} · v{source.revision_no || 1} · {source.status || 'Không rõ trạng thái'}</p></button>)}{!isFetchingRevisionSources && revisionSources.length === 0 && <p className="text-sm text-muted-foreground">Không có bản hiện hành phù hợp để tạo phiên bản mới.</p>}</div>}
+                  {revisionSource && <><div className="rounded-lg border border-blue-200 bg-white p-3"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{revisionSource.document_number || `#${revisionSource.id}`} · {revisionSource.title || revisionSource.original_file_name}</p><p className="mt-1 text-sm text-muted-foreground">{revisionSource.document_type || 'Chưa có loại'} · v{revisionSource.revision_no || 1} → <strong>v{(revisionSource.revision_no || 1) + 1}</strong></p><p className="mt-1 text-xs text-muted-foreground">{revisionSource.sign_request_id ? 'Có lịch sử quy trình; phiên bản mới dùng workflow hiện hành.' : 'Không có workflow cũ để sao chép.'}</p></div><Button type="button" size="sm" variant="ghost" onClick={() => { setRevisionSource(null); setDocumentTypeId(null); setRevisionComment(''); setEffectiveDate(''); setExpirationDate(''); }}>Đổi</Button></div><p className="mt-2 text-sm text-blue-700">Sẽ tạo phiên bản v{(revisionSource.revision_no || 1) + 1}; workflow và người tham gia được tạo mới.</p></div><div className="space-y-2"><Label htmlFor="revision-comment">Ghi chú thay thế</Label><Textarea id="revision-comment" value={revisionComment} onChange={(event) => setRevisionComment(event.target.value)} placeholder="Ví dụ: Cập nhật điều khoản thanh toán theo phụ lục mới" maxLength={1000} className="bg-white" /><p className="text-xs text-muted-foreground">Ghi chú sẽ được hiển thị trong lịch sử phiên bản sau khi phiên bản mới hoàn tất.</p></div></>}
+                </div>}
+              </div>
+            )}
+
             {isEditMode ? (
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center">
                 <FileText className="mx-auto mb-3 h-10 w-10 text-slate-400" />
@@ -633,7 +713,7 @@ export default function CreateSignRequestPage() {
               <Select
                 value={documentTypeId?.toString() || ''}
                 onValueChange={(value) => { setDocumentTypeId(Number(value)); setHasUnsavedChanges(true); }}
-                disabled={isEditMode}
+                disabled={isEditMode || (intakeMode === 'revision' && !!revisionSource)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Chọn loại văn bản" />
@@ -646,6 +726,7 @@ export default function CreateSignRequestPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {intakeMode === 'revision' && revisionSource && <p className="text-xs text-muted-foreground">Loại văn bản được kế thừa từ bản gốc và không thể thay đổi.</p>}
               {selectedDocType && (
                 <div className="flex flex-wrap gap-2 text-xs">
                   {selectedDocType.require_approval && <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-800">Yêu cầu phê duyệt</span>}
@@ -655,6 +736,7 @@ export default function CreateSignRequestPage() {
               {stepErrors.file && <p className="text-sm text-destructive" role="alert">{stepErrors.file}</p>}
               {stepErrors.documentType && <p className="text-sm text-destructive" role="alert">{stepErrors.documentType}</p>}
             </div>
+            {!isEditMode && <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="effective-date">Ngày có hiệu lực</Label><DatePicker id="effective-date" value={effectiveDate} onChange={(value) => { setEffectiveDate(value); setHasUnsavedChanges(true); }} placeholder="Chọn ngày có hiệu lực" /></div><div className="space-y-2"><Label htmlFor="expiration-date">Ngày hết hiệu lực</Label><DatePicker id="expiration-date" min={effectiveDate || undefined} value={expirationDate} onChange={(value) => { setExpirationDate(value); setHasUnsavedChanges(true); }} placeholder="Không thời hạn" /><p className="text-xs text-muted-foreground">Để trống nếu văn bản không có thời hạn.</p></div>{stepErrors.validity && <p className="sm:col-span-2 text-sm text-destructive" role="alert">{stepErrors.validity}</p>}</div>}
           </CardContent>
         </Card>}
 

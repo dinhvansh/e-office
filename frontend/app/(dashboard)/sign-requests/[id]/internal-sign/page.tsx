@@ -152,10 +152,8 @@ export default function InternalSigningPage() {
         }
       }
 
-      // Check if already signed
-      if (currentSigner.status === 'signed' || currentSigner.status === 'completed') {
-        toast.success('Bạn đã ký tài liệu này rồi');
-      }
+      // The completed state is rendered in the page itself. This loader also
+      // runs after signing, so it must not emit duplicate success feedback.
     } catch (error: any) {
       toast.error(error.message || 'Không thể tải dữ liệu');
       router.push('/sign-requests');

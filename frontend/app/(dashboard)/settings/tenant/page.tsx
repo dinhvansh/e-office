@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
 import { TenantProfile } from '@/lib/types';
-import { PageHeader } from '@/components/ui/page-header';
+import { DashboardHeaderPortal as PageHeader } from '@/components/ui/dashboard-header-portal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

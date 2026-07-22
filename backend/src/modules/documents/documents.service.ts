@@ -19,7 +19,6 @@ import { permissionsService } from "./permissions.service";
 import {
   canCreateFromDocumentTypePolicy,
   DocumentTypePolicyV2,
-  mapSecurityLevelToDocumentConfidentialLevel,
   normalizeDocumentTypePolicyV2,
 } from "../settings/document-type-policy.helper";
 import { documentFileService, type DocumentFileResult } from "./documentFile.service";
@@ -39,6 +38,11 @@ export interface CreateDocumentInput {
   priorityLevel?: string;
   confidentialLevel?: string;
   visibilityScope?: string;
+  effectiveDate?: Date;
+  expirationDate?: Date;
+  intakeMode?: 'new' | 'revision' | 'external_signed_import';
+  sourceDocumentId?: number;
+  revisionComment?: string;
   workflowId?: number;
   signers?: Array<{
     email: string;
@@ -131,7 +135,6 @@ class DocumentsService {
     ownerId: number
   ): Promise<{
     visibilityScope?: string;
-    confidentialLevel?: string;
     departmentId?: number | null;
     policy?: DocumentTypePolicyV2;
   }> {
@@ -162,9 +165,6 @@ class DocumentsService {
       visibilityScope: policy.visibility.force_private_on_create
         ? "private"
         : policy.visibility.default_visibility_scope,
-      confidentialLevel: mapSecurityLevelToDocumentConfidentialLevel(
-        policy.visibility.default_security_level
-      ),
       departmentId,
       policy,
     };
@@ -273,9 +273,95 @@ class DocumentsService {
     status?: string,
     search?: string,
     documentTypeId?: number,
-    confidentialLevel?: string
+    confidentialLevel?: string,
+    currentOnly = false,
   ) {
-    return documentQueriesService.listDocumentsPaginated(tenantId, userId, page, limit, noSigningOnly, status, search, documentTypeId, confidentialLevel);
+    return documentQueriesService.listDocumentsPaginated(tenantId, userId, page, limit, noSigningOnly, status, search, documentTypeId, confidentialLevel, currentOnly);
+  }
+
+  async listRevisionSources(
+    tenantId: number,
+    userId: number,
+    mode: 'repository' | 'sign_request',
+    search?: string,
+  ) {
+    const workflowRequired = mode === 'sign_request';
+    const candidates = await prisma.documents.findMany({
+      where: {
+        tenant_id: tenantId,
+        archived_at: null,
+        status: { in: ['active', 'completed'] },
+        document_type: workflowRequired
+          ? { OR: [{ require_approval: true }, { require_digital_signing: true }] }
+          : { require_approval: false, require_digital_signing: false },
+        superseded_by: {
+          none: {
+            archived_at: null,
+            status: { in: ['active', 'completed', 'draft', 'submitted', 'awaiting_approval', 'in_progress', 'signing', 'generating_artifact'] },
+          },
+        },
+        ...(search
+          ? {
+              OR: [
+                { title: { contains: search, mode: 'insensitive' as const } },
+                { original_file_name: { contains: search, mode: 'insensitive' as const } },
+                { document_number: { contains: search, mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
+      },
+      include: {
+        document_type: { select: { id: true, name: true, code: true, require_approval: true, require_digital_signing: true } },
+        owner: { select: { id: true, full_name: true, email: true } },
+        workflow_instances: { where: { status: 'in_progress' }, select: { id: true }, take: 1 },
+      },
+      orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+      take: 30,
+    });
+
+    const editable = [] as typeof candidates;
+    for (const candidate of candidates) {
+      const permission = await authorizationService.resolveDocumentPermission(userId, tenantId, candidate.id);
+      if (permission.canEdit) editable.push(candidate);
+    }
+    return editable;
+  }
+
+  async getRevisionHistory(documentId: number, tenantId: number, userId: number) {
+    const target = await prisma.documents.findFirst({
+      where: { id: documentId, tenant_id: tenantId, archived_at: null },
+      select: { id: true, root_document_id: true },
+    });
+    if (!target) throw ApiError.notFound('Không tìm thấy tài liệu', 'DOCUMENT_NOT_FOUND');
+    const permission = await authorizationService.resolveDocumentPermission(userId, tenantId, documentId);
+    if (!permission.canView) throw ApiError.forbidden('Bạn không có quyền xem lịch sử phiên bản', 'DOCUMENT_ACCESS_DENIED');
+    const rootId = target.root_document_id ?? target.id;
+    const items = await prisma.documents.findMany({
+      where: { tenant_id: tenantId, OR: [{ id: rootId }, { root_document_id: rootId }] },
+      include: {
+        owner: { select: { id: true, full_name: true, email: true } },
+        document_type: { select: { name: true } },
+        sign_request: { select: { id: true, status: true } },
+        superseded_by: { select: { id: true }, take: 1 },
+      },
+      orderBy: [{ revision_no: 'asc' }, { id: 'asc' }],
+    });
+    return items.map((item) => ({
+      id: item.id,
+      title: item.title || item.original_file_name || `Document #${item.id}`,
+      document_number: item.document_number,
+      revision_no: item.revision_no || 1,
+      revision_comment: item.revision_comment || null,
+      status: item.status,
+      created_at: item.created_at,
+      effective_date: item.effective_date,
+      expiration_date: item.expiration_date,
+      owner: item.owner,
+      document_type: item.document_type?.name || null,
+      sign_request_id: item.sign_request_id,
+      is_current: item.superseded_by.length === 0 && ['active', 'completed'].includes(item.status || ''),
+      is_superseded: item.superseded_by.length > 0,
+    }));
   }
 
   async getDocument(documentId: number, tenantId: number, userId?: number): Promise<documents> {
@@ -598,6 +684,18 @@ class DocumentsService {
     if (!input.base64 && !input.storagePath) {
       throw ApiError.badRequest("Either base64 or storagePath must be provided", "DOCUMENT_PAYLOAD_REQUIRED");
     }
+    // A revision may be created through either intake. The document-type
+    // guard below keeps workflow document types in the sign-request path.
+    const intakeMode: NonNullable<CreateDocumentInput['intakeMode']> = input.intakeMode ?? 'new';
+    if (input.effectiveDate && input.expirationDate && input.effectiveDate > input.expirationDate) {
+      throw ApiError.badRequest('Ngày hết hiệu lực phải sau ngày có hiệu lực', 'INVALID_VALIDITY_RANGE');
+    }
+    if (intakeMode === 'revision' && !input.sourceDocumentId) {
+      throw ApiError.badRequest('Phiên bản mới cần chọn tài liệu gốc', 'REVISION_SOURCE_REQUIRED');
+    }
+    if (intakeMode === 'external_signed_import' && !input.fileName.toLowerCase().endsWith('.pdf')) {
+      throw ApiError.badRequest('Tài liệu đã ký ngoài hệ thống phải là PDF', 'EXTERNAL_SIGNED_PDF_REQUIRED');
+    }
     if (input.forceSignRequest && !input.fileName.toLowerCase().endsWith(".pdf")) {
       throw ApiError.badRequest(
         "Only PDF files are supported for signing requests",
@@ -665,6 +763,19 @@ class DocumentsService {
         throw ApiError.notFound("Document type not found", "DOCUMENT_TYPE_NOT_FOUND");
       }
 
+      // The generic Documents upload is a repository intake only. Any type
+      // that needs approval or signing must enter through Sign Requests so it
+      // cannot be accidentally published without its required workflow.
+      if (
+        (documentType.require_approval || documentType.require_digital_signing) &&
+        !input.forceSignRequest
+      ) {
+        throw ApiError.badRequest(
+          'Loại văn bản này cần được tạo tại Yêu cầu Ký duyệt',
+          'DOCUMENT_TYPE_REQUIRES_SIGN_REQUEST',
+        );
+      }
+
       if (
         input.forceSignRequest &&
         !documentType.require_approval &&
@@ -701,12 +812,40 @@ class DocumentsService {
     }
 
     const shouldCreateSignRequest =
-      !!input.forceSignRequest ||
+      intakeMode !== 'external_signed_import' && (!!input.forceSignRequest ||
       !!documentType?.require_digital_signing ||
-      !!(input.signers && input.signers.length > 0);
+      !!(input.signers && input.signers.length > 0));
 
     const initialStatus =
-      documentType?.require_approval || shouldCreateSignRequest ? "draft" : "active";
+      intakeMode === 'external_signed_import' ? 'completed' : documentType?.require_approval || shouldCreateSignRequest ? "draft" : "active";
+
+    let sourceDocument: documents | null = null;
+    let rootDocumentId: number | null = null;
+    let revisionNo = 1;
+    if (intakeMode === 'revision') {
+      sourceDocument = await prisma.documents.findFirst({ where: { id: input.sourceDocumentId!, tenant_id: tenantId, archived_at: null } });
+      if (!sourceDocument) throw ApiError.notFound('Không tìm thấy tài liệu gốc', 'REVISION_SOURCE_NOT_FOUND');
+      const sourcePermissions = await authorizationService.resolveDocumentPermission(ownerId, tenantId, sourceDocument.id);
+      if (!sourcePermissions.canEdit) throw ApiError.forbidden('Bạn không có quyền tạo phiên bản mới', 'REVISION_SOURCE_EDIT_DENIED');
+      if (sourceDocument.document_type_id !== documentTypeId) {
+        throw ApiError.badRequest('Phiên bản mới phải giữ nguyên loại văn bản của bản gốc', 'REVISION_DOCUMENT_TYPE_MISMATCH');
+      }
+      const newerRevision = await prisma.documents.findFirst({
+        where: {
+          tenant_id: tenantId,
+          supersedes_document_id: sourceDocument.id,
+          archived_at: null,
+          status: { in: ['active', 'completed', 'draft', 'submitted', 'awaiting_approval', 'in_progress', 'signing', 'generating_artifact'] },
+        },
+        select: { id: true },
+      });
+      if (newerRevision) {
+        throw ApiError.conflict('Tài liệu này đã có phiên bản mới đang là bản hiện hành hoặc đang xử lý', 'REVISION_SOURCE_NOT_CURRENT');
+      }
+      rootDocumentId = sourceDocument.root_document_id ?? sourceDocument.id;
+      const latestRevision = await prisma.documents.aggregate({ where: { tenant_id: tenantId, OR: [{ id: rootDocumentId }, { root_document_id: rootDocumentId }] }, _max: { revision_no: true } });
+      revisionNo = (latestRevision._max.revision_no ?? 1) + 1;
+    }
 
     const documentTypeDefaults = await this.resolveDocumentTypeDefaults(
       tenantId,
@@ -738,25 +877,40 @@ class DocumentsService {
       file_path: filePath,
       original_file_name: input.fileName,
       hash,
+      signed_file_path: intakeMode === 'external_signed_import' ? filePath : null,
+      artifact_metadata: intakeMode === 'external_signed_import' ? { origin: 'external_signed_import', certificate_applied: false, imported_at: new Date().toISOString() } : undefined,
       status: initialStatus,
+      root_document_id: rootDocumentId,
+      supersedes_document_id: sourceDocument?.id ?? null,
+      revision_no: revisionNo,
+      revision_comment: intakeMode === 'revision' ? input.revisionComment?.trim() || null : null,
+      source_kind: intakeMode === 'revision' ? 'revision' : intakeMode === 'external_signed_import' ? 'external_signed_import' : 'native',
+      external_signature_status: intakeMode === 'external_signed_import' ? 'unverified' : null,
       document_type_id: documentTypeId,
       document_number: documentNumber,
       numbering_rule_id: numberingRuleId,
       title: input.title,
       summary: input.summary,
       priority_level: input.priorityLevel,
-      confidential_level: input.confidentialLevel ?? documentTypeDefaults.confidentialLevel,
+      // Confidentiality is no longer a standalone access-control axis. New
+      // documents rely on visibility scope and document-type ACL policies.
+      confidential_level: "normal",
       visibility_scope:
         documentTypeDefaults.policy?.visibility.force_private_on_create
           ? "private"
           : input.visibilityScope ?? documentTypeDefaults.visibilityScope,
       department_id: input.departmentId ?? documentTypeDefaults.departmentId,
+      effective_date: input.effectiveDate ?? null,
+      expiration_date: input.expirationDate ?? null,
     };
     const document = await documentsRepository.create(payload);
     const createdAttachmentPaths: string[] = [];
 
     try {
-    if (input.detailPermissions && input.detailPermissions.length > 0) {
+    if (intakeMode === 'revision' && sourceDocument) {
+      const sourceAcl = await prisma.document_permissions.findMany({ where: { document_id: sourceDocument.id } });
+      if (sourceAcl.length > 0) await prisma.document_permissions.createMany({ data: sourceAcl.map(({ id, document_id, ...permission }) => ({ ...permission, document_id: document.id })) });
+    } else if (input.detailPermissions && input.detailPermissions.length > 0) {
       for (const permission of input.detailPermissions) {
         await permissionsService.grantPermission(
           document.id,
@@ -881,7 +1035,7 @@ class DocumentsService {
     await auditService.record({
       tenantId,
       documentId: document.id,
-      event: "document.uploaded",
+      event: intakeMode === 'revision' ? 'document.revision_created' : intakeMode === 'external_signed_import' ? 'document.external_signed_imported' : "document.uploaded",
       userId: ownerId,
       ip: requesterIp,
       ua: userAgent,
@@ -1285,7 +1439,10 @@ class DocumentsService {
     const document = await this.getDocument(documentId, tenantId, userId);
     if (document.status === "completed") {
       if (!document.signed_file_path || !document.hash) {
-        throw ApiError.conflict("Final PDF is not ready", "FINAL_ARTIFACT_NOT_READY");
+        // A workflow may complete without a generated signing artifact (for
+        // example approval-only and legacy requests). Its original PDF remains
+        // the authoritative delivery file until an artifact actually exists.
+        return documentFileService.getOriginalFile(document);
       }
       return documentFileService.getSignedFile(document);
     }

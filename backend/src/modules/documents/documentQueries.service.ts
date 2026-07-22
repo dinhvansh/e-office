@@ -31,15 +31,16 @@ class DocumentQueriesService {
     search?: string,
     documentTypeId?: number,
     confidentialLevel?: string,
+    currentOnly = false,
   ) {
     if (!userId) {
-      return documentsRepository.listByTenantPaginated(tenantId, { page, limit }, noSigningOnly, status, search, documentTypeId, confidentialLevel);
+      return documentsRepository.listByTenantPaginated(tenantId, { page, limit }, noSigningOnly, status, search, documentTypeId, confidentialLevel, prisma, currentOnly);
     }
     const hasModulePermission = await rolesService.checkPermission(userId, "documents", "read");
     if (!hasModulePermission) {
       return { data: [], pagination: { page, limit, total: 0, totalPages: 0 } };
     }
-    const candidates = await documentsRepository.listByTenantForAccess(tenantId, noSigningOnly, status, search, documentTypeId, confidentialLevel);
+    const candidates = await documentsRepository.listByTenantForAccess(tenantId, noSigningOnly, status, search, documentTypeId, confidentialLevel, prisma, currentOnly);
     const decisions = await documentPermissionResolverService.resolveDocumentPermissionsBatch(userId, tenantId, candidates);
     return paginateAccessibleItems(candidates.filter((document) => decisions.get(document.id)?.canView), page, limit);
   }

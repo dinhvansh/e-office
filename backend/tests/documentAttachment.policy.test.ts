@@ -10,11 +10,13 @@ import { documentsService } from "../src/modules/documents/documents.service";
 const originalFindDocument = documentsRepository.findById;
 const originalCanAccess = authorizationService.canAccessDocument;
 const originalFindApproval = prisma.document_approvals.findFirst;
+const originalFindSigner = prisma.signers.findFirst;
 
 afterEach(() => {
   (documentsRepository as unknown as { findById: unknown }).findById = originalFindDocument;
   (authorizationService as unknown as { canAccessDocument: unknown }).canAccessDocument = originalCanAccess;
   (prisma.document_approvals as unknown as { findFirst: unknown }).findFirst = originalFindApproval;
+  (prisma.signers as unknown as { findFirst: unknown }).findFirst = originalFindSigner;
 });
 
 test("attachment upload is denied to a waiting or completed approver", async () => {
@@ -25,6 +27,7 @@ test("attachment upload is denied to a waiting or completed approver", async () 
     approvalWhere = where;
     return null;
   };
+  (prisma.signers as unknown as { findFirst: unknown }).findFirst = async () => null;
 
   await assert.rejects(
     () => documentsService.addAttachment(31, 4, 9, { file_name: "evidence.pdf", file_base64: "YQ==" }),

@@ -9,6 +9,8 @@ export enum NotificationType {
   DOCUMENT_SHARED = 'document_shared',
   DOCUMENT_COMMENTED = 'document_commented',
   DOCUMENT_ATTACHMENT_ADDED = 'document_attachment_added',
+  DOCUMENT_EXPIRING = 'document_expiring',
+  DOCUMENT_EXPIRED = 'document_expired',
 }
 
 export interface CreateNotificationData {

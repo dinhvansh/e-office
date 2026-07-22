@@ -8,7 +8,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
-import { PageHeader } from '@/components/ui/page-header';
+import { DashboardHeaderPortal as PageHeader } from '@/components/ui/dashboard-header-portal';
 import { SelectWithIcon } from '@/components/ui/select-with-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
@@ -23,8 +23,6 @@ type VisibilityScope =
   | 'workflow_only'
   | 'company'
   | 'custom_acl';
-
-type SecurityLevel = 'normal' | 'internal' | 'confidential' | 'secret';
 
 type AclSubjectType =
   | 'creator'
@@ -83,13 +81,6 @@ const visibilityOptions: Array<{ value: VisibilityScope; label: string }> = [
   { value: 'custom_acl', label: 'Theo ACL tùy chỉnh' },
 ];
 
-const securityLevelOptions: Array<{ value: SecurityLevel; label: string }> = [
-  { value: 'normal', label: 'Thông thường' },
-  { value: 'internal', label: 'Nội bộ' },
-  { value: 'confidential', label: 'Bảo mật' },
-  { value: 'secret', label: 'Mật' },
-];
-
 const aclSubjectOptions: Array<{ value: AclSubjectType; label: string }> = [
   { value: 'creator', label: 'Người tạo' },
   { value: 'creator_department', label: 'Phòng ban người tạo' },
@@ -136,7 +127,6 @@ export default function DocumentTypesPage() {
   const [defaultWorkflowId, setDefaultWorkflowId] = useState<number | null>(null);
   const [allowWorkflowOverride, setAllowWorkflowOverride] = useState(false);
   const [defaultVisibilityScope, setDefaultVisibilityScope] = useState<VisibilityScope>('department');
-  const [defaultSecurityLevel, setDefaultSecurityLevel] = useState<SecurityLevel>('normal');
   const [autoAssignCreatorDepartment, setAutoAssignCreatorDepartment] = useState(true);
   const [forcePrivateOnCreate, setForcePrivateOnCreate] = useState(false);
   const [isPolicyLoading, setIsPolicyLoading] = useState(false);
@@ -195,7 +185,6 @@ export default function DocumentTypesPage() {
     setAllowWorkflowOverride(type?.allow_workflow_override || false);
     setShowNumberingPattern(type?.require_numbering ?? true);
     setDefaultVisibilityScope('department');
-    setDefaultSecurityLevel('normal');
     setAutoAssignCreatorDepartment(true);
     setForcePrivateOnCreate(false);
     setIsPolicyLoading(Boolean(type?.id));
@@ -256,7 +245,6 @@ export default function DocumentTypesPage() {
       .then((policy) => {
         if (cancelled) return;
         setDefaultVisibilityScope(policy.visibility?.default_visibility_scope || 'department');
-        setDefaultSecurityLevel(policy.visibility?.default_security_level || 'normal');
         setAutoAssignCreatorDepartment(policy.visibility?.auto_assign_creator_department ?? true);
         setForcePrivateOnCreate(Boolean(policy.visibility?.force_private_on_create));
         setAclTemplates(
@@ -278,7 +266,6 @@ export default function DocumentTypesPage() {
       .catch(() => {
         if (cancelled) return;
         setDefaultVisibilityScope('department');
-        setDefaultSecurityLevel('normal');
         setAutoAssignCreatorDepartment(true);
         setForcePrivateOnCreate(false);
         resetAclTemplateForm();
@@ -346,7 +333,7 @@ export default function DocumentTypesPage() {
     () => ({
       visibility: {
         default_visibility_scope: forcePrivateOnCreate ? 'private' : defaultVisibilityScope,
-        default_security_level: defaultSecurityLevel,
+        default_security_level: 'normal',
         auto_assign_creator_department: autoAssignCreatorDepartment,
         force_private_on_create: forcePrivateOnCreate,
       },
@@ -366,7 +353,6 @@ export default function DocumentTypesPage() {
       aclTemplates,
       advancedPolicies,
       autoAssignCreatorDepartment,
-      defaultSecurityLevel,
       defaultVisibilityScope,
       forcePrivateOnCreate,
     ]
@@ -1066,21 +1052,6 @@ export default function DocumentTypesPage() {
                         Đang ghi đè về Riêng tư vì đã bật “Luôn để riêng tư khi mới tạo”.
                       </p>
                     )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-700">Mức độ bảo mật mặc định</label>
-                    <select
-                      value={defaultSecurityLevel}
-                      onChange={(event) => setDefaultSecurityLevel(event.target.value as SecurityLevel)}
-                      className="h-12 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                    >
-                      {securityLevelOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
                   </div>
 
                   <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 md:col-span-2">

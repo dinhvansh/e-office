@@ -6,7 +6,7 @@ import { Archive, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useI18n } from "@/components/providers/i18n-provider";
-import { PageHeader } from "@/components/ui/page-header";
+import { DashboardHeaderPortal as PageHeader } from "@/components/ui/dashboard-header-portal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

@@ -10,9 +10,9 @@ export async function hasDepartmentLeadershipAccess(userId: number, tenantId: nu
 
   const user = await prisma.users.findFirst({
     where: { id: userId, tenant_id: tenantId, department_id: departmentId, status: "active" },
-    select: { position: { select: { is_active: true, can_manage_department: true } } },
+    select: { id: true },
   });
-  if (!user?.position?.is_active || !user.position.can_manage_department) return false;
+  if (!user) return false;
 
   const department = await prisma.departments.findFirst({
     where: { id: departmentId, tenant_id: tenantId, is_active: true },

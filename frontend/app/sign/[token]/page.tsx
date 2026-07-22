@@ -116,10 +116,8 @@ export default function PublicSigningPage() {
       setData(signingData);
       setOtpVerified(Boolean(signingData.document && signingData.sign_request?.id && signingData.signer?.id));
 
-      // Check if already signed
-      if (signingData.already_signed) {
-        toast.success('Bạn đã ký tài liệu này rồi');
-      }
+      // The completed state is rendered by the page. A post-sign refresh must
+      // not repeat the success toast.
       return signingData;
     } catch (error: any) {
       const message = error.message || 'Không thể tải dữ liệu';

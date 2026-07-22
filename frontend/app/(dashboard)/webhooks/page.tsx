@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DashboardHeaderPortal } from "@/components/ui/dashboard-header-portal";
 
 const AVAILABLE_EVENTS = [
   { value: "document.created", label: "Tài liệu được tạo" },
@@ -233,12 +234,9 @@ export default function WebhooksPage() {
 
   return (
     <div className="space-y-6">
+      <DashboardHeaderPortal icon={Webhook} title="Webhooks và API Token" description="Kết nối E-Office với các hệ thống bên ngoài" iconColor="text-orange-600" />
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Webhooks và API Token</h1>
-          <p className="text-muted-foreground">
-            Cấu hình webhook để nhận sự kiện và tạo API token để hệ thống ngoài gọi vào E-Office.
-          </p>
           <Link
             href="/docs/webhooks-api-token"
             target="_blank"

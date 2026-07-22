@@ -108,6 +108,22 @@ export const departmentsService = {
   },
 
   async deleteDepartment(id: number, tenantId: number) {
+    const [documentCount, workflowStepCount, permissionCount] = await Promise.all([
+      prisma.documents.count({ where: { tenant_id: tenantId, department_id: id } }),
+      prisma.workflow_steps.count({ where: { assignee_department_id: id, workflow: { tenant_id: tenantId } } }),
+      prisma.document_permissions.count({
+        where: {
+          document: { tenant_id: tenantId },
+          OR: [
+            { subject_type: 'department', subject_id: id },
+            { subject_type: 'position_in_department', scope_department_id: id },
+          ],
+        },
+      }),
+    ]);
+    if (documentCount || workflowStepCount || permissionCount) {
+      throwError('DEPARTMENT_IN_USE');
+    }
     return departmentsRepository.delete(id, tenantId);
   },
 };

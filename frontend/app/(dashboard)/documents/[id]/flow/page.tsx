@@ -24,6 +24,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { DashboardHeaderPortal as PageHeader } from '@/components/ui/dashboard-header-portal';
 
 type SharePermissionRecord = {
   id: number;
@@ -247,6 +248,12 @@ export default function DocumentFlowPage() {
   }, [dataUpdatedAt, documentId, flowData]);
 
   const isCompleted = (flowData?.document?.status || '').toLowerCase() === 'completed';
+
+  const { data: revisionHistoryData } = useQuery<{ revisions: Array<{ id: number; title: string; revision_no: number; revision_comment?: string | null; status: string | null; created_at: string; owner?: { full_name?: string | null; email?: string } | null; is_current: boolean; is_superseded: boolean }> }>({
+    queryKey: ['document-revision-history', documentId],
+    enabled: Boolean(documentId),
+    queryFn: () => fetchJson(`/documents/${documentId}/revision-history`),
+  });
 
   const { data: sharePermissionsData } = useQuery<{ permissions: SharePermissionRecord[] }>({
     queryKey: ['document-share-permissions', documentId],
@@ -473,137 +480,25 @@ export default function DocumentFlowPage() {
   ).length;
   const progressPercent = steps.length > 0 ? (completedSteps / steps.length) * 100 : 0;
 
+  const flowHeaderActions = (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <Button variant="ghost" size="sm" onClick={() => router.back()} className="h-9 px-3 text-sm"><ArrowLeft className="mr-2 h-4 w-4" />Quay lại</Button>
+      <DocumentDownloadMenu documentId={Number(documentId)} documentNumber={document.document_number} originalFileName={document.original_file_name} status={document.status} signedFilePath={document.signed_file_path} />
+      {canRemind ? <Button variant="outline" size="sm" onClick={() => remindMutation.mutate()} disabled={remindMutation.isPending}><RefreshCw className={`mr-2 h-4 w-4 ${remindMutation.isPending ? 'animate-spin' : ''}`} />{remindMutation.isPending ? 'Đang nhắc...' : 'Nhắc nhở'}</Button> : null}
+      {canCancel ? <Button variant="outline" size="sm" className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setCancelDialogOpen(true)} disabled={cancelMutation.isPending}><XCircle className="mr-2 h-4 w-4" />{cancelMutation.isPending ? 'Đang hủy...' : 'Hủy request'}</Button> : null}
+      {canDelete ? <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmOpen(true)} disabled={deleteMutation.isPending}><Trash2 className="mr-2 h-4 w-4" />{deleteMutation.isPending ? 'Đang xóa...' : 'Xóa request'}</Button> : null}
+      {canShareCompletedDocument ? <Button variant="outline" size="sm" onClick={() => setShareDialogOpen(true)}><Share2 className="mr-2 h-4 w-4" />Chia sẻ</Button> : null}
+      {!canShareCompletedDocument && canViewCompletedDocument ? <Button variant="outline" size="sm" onClick={() => setViewersDialogOpen(true)}><Info className="mr-2 h-4 w-4" />Quyền xem</Button> : null}
+      {isCompleted && flowData?.can_view_audit ? <Button variant="outline" size="sm" onClick={() => router.push(`/audit/${documentId}`)}><History className="mr-2 h-4 w-4" />Log tài liệu</Button> : null}
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-3 py-2.5 sm:px-6 sm:py-4 lg:px-8">
-          <div className="flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0 lg:flex-1">
-              <div className="min-w-0 flex items-start gap-2 sm:gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.back()}
-                className="h-9 w-9 shrink-0 px-0 text-[0px] sm:w-fit sm:px-3 sm:text-sm"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Quay lại
-              </Button>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-start gap-2">
-                  <FileText className="mt-0.5 h-4 w-4 shrink-0 text-gray-400 sm:h-5 sm:w-5" />
-                  <h1 className="min-w-0 line-clamp-2 break-words text-base font-semibold sm:text-xl">{document.title}</h1>
-                  {(document.status === 'in_progress' || document.status === 'pending') && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-full">
-                      <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse"></span>
-                      Tự động cập nhật
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 truncate text-xs text-gray-500 sm:break-words sm:text-sm">
-                  {document.document_number} • {document.document_type}
-                  {document.signed_file_path && (
-                    <span className="ml-2 text-green-600">
-                      • {document.status === 'completed' ? 'Có PDF hoàn thành' : 'Có PDF đang ký'}
-                    </span>
-                  )}
-                </p>
-              </div>
-              </div>
-            </div>
-            <div className="flex w-full flex-wrap items-center justify-start gap-1.5 sm:justify-end sm:gap-2 lg:w-auto lg:max-w-[52%] lg:shrink-0">
-              <DocumentDownloadMenu className="h-9 w-9 px-0 text-[0px] sm:w-auto sm:px-3 sm:text-sm [&>svg]:mr-0 sm:[&>svg]:mr-2" documentId={Number(documentId)} documentNumber={document.document_number} originalFileName={document.original_file_name} status={document.status} signedFilePath={document.signed_file_path} />
-              {canRemind && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => remindMutation.mutate()}
-                  disabled={remindMutation.isPending}
-                  className="h-9 w-9 px-0 text-[0px] sm:h-9 sm:w-auto sm:px-3 sm:text-sm [&>svg]:mr-0 sm:[&>svg]:mr-2"
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 shrink-0 ${remindMutation.isPending ? 'animate-spin' : ''}`} />
-                  {remindMutation.isPending ? 'Đang nhắc...' : 'Nhắc nhở'}
-                </Button>
-              )}
-              {canCancel && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 w-9 px-0 text-[0px] sm:h-9 sm:w-auto sm:px-3 sm:text-sm border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                  onClick={() => setCancelDialogOpen(true)}
-                  disabled={cancelMutation.isPending}
-                >
-                  <XCircle className="h-4 w-4 shrink-0 sm:mr-2" />
-                  {cancelMutation.isPending ? 'Đang hủy...' : 'Hủy request'}
-                </Button>
-              )}
-              {canDelete && (
-                <Button variant="destructive" size="sm" className="h-9 w-9 px-0 text-[0px] sm:h-9 sm:w-auto sm:px-3 sm:text-sm" onClick={() => setDeleteConfirmOpen(true)} disabled={deleteMutation.isPending}>
-                  <Trash2 className="h-4 w-4 sm:mr-2" />{deleteMutation.isPending ? 'Đang xóa...' : 'Xóa request'}
-                </Button>
-              )}
-              {canShareCompletedDocument && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 w-9 px-0 text-[0px] sm:h-9 sm:w-auto sm:px-3 sm:text-sm [&>svg]:mr-0 sm:[&>svg]:mr-2"
-                  onClick={() => setShareDialogOpen(true)}
-                >
-                  <Share2 className="h-4 w-4 shrink-0 sm:mr-2" />
-                  Chia sẻ
-                </Button>
-              )}
-              {!canShareCompletedDocument && canViewCompletedDocument && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 w-9 px-0 text-[0px] sm:h-9 sm:w-auto sm:px-3 sm:text-sm [&>svg]:mr-0 sm:[&>svg]:mr-2"
-                  onClick={() => setViewersDialogOpen(true)}
-                  title="Xem những người hiện có quyền xem tài liệu"
-                >
-                  <Info className="h-4 w-4 shrink-0 sm:mr-2" />
-                  <span className="hidden sm:inline">Quyền xem</span>
-                </Button>
-              )}
-              {isCompleted && flowData?.can_view_audit && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 w-9 px-0 text-[0px] sm:h-9 sm:w-auto sm:px-3 sm:text-sm [&>svg]:mr-0 sm:[&>svg]:mr-2"
-                onClick={() => router.push(`/audit/${documentId}`)}
-              >
-                <History className="h-4 w-4 shrink-0 sm:mr-2" />
-                Log tài liệu
-              </Button>
-              )}
-            </div>
-          </div>
-
-          <div className={hasWorkflowSteps ? "mt-3 hidden space-y-2 2xl:block" : "hidden"}>
-          {/* Progress Bar */}
-          <div>
-            <div className="mb-1 flex items-center justify-between sm:mb-2">
-              <span className="text-xs font-medium text-gray-700 sm:text-sm">
-                Tiến độ: {completedSteps}/{steps.length} bước
-              </span>
-              <span className="text-xs text-gray-500 sm:text-sm">
-                {Math.round(progressPercent)}%
-              </span>
-            </div>
-            <div className="h-1.5 w-full rounded-full bg-gray-200 sm:h-2">
-              <div
-                className="h-1.5 rounded-full bg-blue-600 transition-all duration-300 sm:h-2"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-          </div>
-            </div>
-        </div>
-      </div>
-
+    <div className="space-y-5">
+      <PageHeader icon={FileText} title={document.title || document.original_file_name || 'Tài liệu'} description={`${document.document_number || `#${document.id}`} · ${document.document_type || 'Chưa phân loại'}`} actions={flowHeaderActions} />
       <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
         <WorkflowStatusPanel summary={flowData.status_summary} />
+        {document.revision_comment ? <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3"><p className="text-sm font-medium text-blue-950">Ghi chú thay thế phiên bản</p><p className="mt-1 text-sm text-blue-800">{document.revision_comment}</p></div> : null}
       </div>
 
       {/* Main Content */}
@@ -632,8 +527,9 @@ export default function DocumentFlowPage() {
           {/* Right: discussion and audit activity. Participant state is already shown in the workflow timeline. */}
           <div className={hasWorkflowSteps ? "lg:col-span-3" : "lg:col-span-4"}>
             <div className="space-y-6">
-              {document.sign_request_id ? <SignRequestDiscussion signRequestId={document.sign_request_id} documentId={Number(documentId)} readOnly={isCompleted} /> : null}
+              {document.sign_request_id ? <SignRequestDiscussion signRequestId={document.sign_request_id} activeApprovalId={flowData.active_approval_id} documentId={Number(documentId)} readOnly={isCompleted} /> : null}
               <DossierAttachments documentId={Number(documentId)} readOnly={isCompleted} />
+              {revisionHistoryData?.revisions && revisionHistoryData.revisions.length > 1 ? <section className="rounded-lg border bg-white shadow-sm"><div className="border-b px-4 py-3 text-sm font-semibold text-slate-900">Lịch sử phiên bản</div><div className="space-y-2 p-4">{revisionHistoryData.revisions.map((revision) => <button key={revision.id} type="button" onClick={() => router.push(`/documents/${revision.id}/flow`)} className="flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm hover:border-blue-300 hover:bg-blue-50"><span className="min-w-0"><span className="font-medium">v{revision.revision_no} · {revision.title}</span><span className="block text-xs text-muted-foreground">{revision.owner?.full_name || revision.owner?.email || 'Không rõ người tạo'} · {new Date(revision.created_at).toLocaleDateString('vi-VN')}</span>{revision.revision_comment ? <span className="mt-1 block text-xs text-slate-600">Thay thế: {revision.revision_comment}</span> : null}</span><Badge variant={revision.is_current ? 'default' : 'secondary'}>{revision.is_current ? 'Bản hiện hành' : revision.is_superseded ? 'Đã thay thế' : revision.status || 'Lịch sử'}</Badge></button>)}</div></section> : null}
               <WorkflowRunHistory runs={flowData.workflow_runs} />
               <section className="rounded-lg border bg-white shadow-sm">
                 <div className="border-b px-4 py-3 text-sm font-semibold text-slate-900">Hoạt động</div>

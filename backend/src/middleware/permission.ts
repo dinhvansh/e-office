@@ -66,3 +66,22 @@ export const requireAnyPermission = (...permissions: Array<[string, string]>) =>
     }
   };
 };
+
+// Helper to check multiple permissions (AND logic)
+export const requireAllPermissions = (...permissions: Array<[string, string]>) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.auth?.userId;
+      if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+      for (const [resource, action] of permissions) {
+        if (!await rolesService.checkPermission(userId, resource, action)) {
+          return res.status(403).json({ success: false, error: `Permission denied: ${resource}:${action}` });
+        }
+      }
+      next();
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: errorMessage(error) });
+    }
+  };
+};

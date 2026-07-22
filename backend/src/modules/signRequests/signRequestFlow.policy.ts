@@ -66,7 +66,7 @@ export function isEditableSignRequestStatus(status: string | null | undefined): 
 }
 
 export function canSendSignRequestStatus(status: string | null | undefined): boolean {
-  return status !== "completed";
+  return status !== "completed" && status !== "cancelled";
 }
 
 export function buildSignRequestFlowHints(

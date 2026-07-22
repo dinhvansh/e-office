@@ -4,7 +4,7 @@ const session = {
   tokens: { accessToken: "sign-request-type-requirements" },
   user: { id: 1, email: "admin@example.test", role: "super_admin" },
   tenant: { id: 1, name: "Requirements", plan: "test", status: "active" },
-  permissions: [],
+  permissions: ["sign_requests:create", "sign_requests:read", "documents:read"],
 };
 
 test("create sign request hides unsupported types and blocks digital signing without a signer", async ({ page }) => {

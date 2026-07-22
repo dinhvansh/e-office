@@ -3,6 +3,9 @@ import { signedArtifactWorker } from "../modules/signRequests/signedArtifact.wor
 import { webhookService } from "../modules/webhooks/webhooks.service";
 import { emailService } from "../modules/common/email.service";
 import { DeliveryError } from "../modules/outbox/deliveryError";
+import { documentValidityReminderService } from "../modules/documents/documentValidityReminder.service";
+import { notificationsService } from "../modules/notifications/notifications.service";
+import { NotificationType } from "../modules/notifications/notifications.types";
 
 const MAX_ATTEMPTS = 5;
 const STALE_LOCK_MS = 5 * 60 * 1000;
@@ -13,6 +16,16 @@ export function retryAt(attemptCount: number): Date {
 }
 
 export async function dispatchOutboxEvent(event: { tenant_id: number | null; event_type: string; payload: unknown }): Promise<void> {
+  if (event.event_type === 'DOCUMENT_VALIDITY_REMINDER') {
+    if (event.tenant_id === null) throw new Error('DOCUMENT_VALIDITY_REMINDER requires a tenant');
+    const payload = event.payload as { document_id: number; title: string; kind: 'expiring' | 'expired'; remaining_days: number; recipient_ids: number[] };
+    const title = payload.kind === 'expired' ? 'Tài liệu đã hết hiệu lực' : 'Tài liệu sắp hết hiệu lực';
+    const message = payload.kind === 'expired'
+      ? `“${payload.title}” đã hết hiệu lực. Hãy tạo phiên bản mới hoặc gia hạn.`
+      : `“${payload.title}” sẽ hết hiệu lực sau ${payload.remaining_days} ngày.`;
+    await Promise.all(payload.recipient_ids.map((userId) => notificationsService.createNotification({ tenantId: event.tenant_id!, userId, type: payload.kind === 'expired' ? NotificationType.DOCUMENT_EXPIRED : NotificationType.DOCUMENT_EXPIRING, title, message, link: `/documents/${payload.document_id}` })));
+    return;
+  }
   if (event.event_type === "SIGNED_ARTIFACT_REQUESTED") {
     await signedArtifactWorker.processSignedArtifactEvent(event);
     return;
@@ -124,11 +137,16 @@ export async function processOutboxBatch(limit = 20): Promise<number> {
 export async function runOutboxWorker(): Promise<void> {
   const pollInterval = Math.max(250, Number(process.env.OUTBOX_POLL_INTERVAL_MS || 2000));
   let stopping = false;
+  let nextValidityScanAt = 0;
   const stop = () => { stopping = true; };
   process.once("SIGTERM", stop);
   process.once("SIGINT", stop);
 
   while (!stopping) {
+    if (Date.now() >= nextValidityScanAt) {
+      await documentValidityReminderService.enqueueDueReminders();
+      nextValidityScanAt = Date.now() + 6 * 60 * 60 * 1000;
+    }
     const processed = await processOutboxBatch();
     if (processed === 0) await new Promise((resolve) => setTimeout(resolve, pollInterval));
   }

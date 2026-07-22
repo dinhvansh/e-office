@@ -7,6 +7,7 @@ import {
 } from './document-type-policy.helper';
 
 import { Prisma } from '@prisma/client';
+import { prisma } from '../../config/prisma';
 
 type SettingsRecord = Record<string, unknown>;
 type EmailConfig = SettingsRecord & { smtp_port: number; smtp_secure: boolean };
@@ -29,6 +30,80 @@ function toInputJsonValue(value: unknown): Prisma.InputJsonValue | Prisma.JsonNu
     ) as Prisma.InputJsonObject;
   }
   return Prisma.JsonNull;
+}
+
+async function requireTenantDocumentType(tenantId: number, documentTypeId: number) {
+  const documentType = await prisma.document_types.findFirst({
+    where: { id: documentTypeId, tenant_id: tenantId },
+    select: { id: true },
+  });
+  if (!documentType) {
+    throw new Error('Document type not found in current tenant');
+  }
+}
+
+async function validateDocumentTypePolicyReferences(
+  tenantId: number,
+  policy: ReturnType<typeof normalizeDocumentTypePolicyV2>,
+) {
+  const userIds = new Set<number>();
+  const departmentIds = new Set<number>([
+    ...policy.legacy_rules.allow_departments,
+    ...policy.legacy_rules.deny_departments,
+  ]);
+  const roleIds = new Set<number>();
+  const positionIds = new Set<number>();
+
+  for (const template of policy.acl_templates) {
+    if (template.subject_type === 'specific_user' && template.subject_id) userIds.add(template.subject_id);
+    if (template.subject_type === 'specific_department' && template.subject_id) departmentIds.add(template.subject_id);
+    if (template.subject_type === 'specific_role' && template.subject_id) roleIds.add(template.subject_id);
+    if (template.subject_type === 'legacy_position_in_department' && template.subject_id) positionIds.add(template.subject_id);
+    if (template.scope_department_id) departmentIds.add(template.scope_department_id);
+  }
+
+  const [users, departments, roles, positions, tenantRoleNames, legacyRoleValues] = await Promise.all([
+    userIds.size
+      ? prisma.users.findMany({ where: { tenant_id: tenantId, id: { in: [...userIds] } }, select: { id: true } })
+      : Promise.resolve([]),
+    departmentIds.size
+      ? prisma.departments.findMany({ where: { tenant_id: tenantId, id: { in: [...departmentIds] } }, select: { id: true } })
+      : Promise.resolve([]),
+    roleIds.size
+      ? prisma.roles.findMany({ where: { tenant_id: tenantId, id: { in: [...roleIds] } }, select: { id: true } })
+      : Promise.resolve([]),
+    positionIds.size
+      ? prisma.positions.findMany({ where: { tenant_id: tenantId, id: { in: [...positionIds] } }, select: { id: true } })
+      : Promise.resolve([]),
+    prisma.roles.findMany({ where: { tenant_id: tenantId }, select: { name: true } }),
+    prisma.users.findMany({ where: { tenant_id: tenantId, role: { not: null } }, distinct: ['role'], select: { role: true } }),
+  ]);
+
+  const assertAllFound = (expected: Set<number>, actual: Array<{ id: number }>, label: string) => {
+    const actualIds = new Set(actual.map((item) => item.id));
+    const invalidIds = [...expected].filter((id) => !actualIds.has(id));
+    if (invalidIds.length) {
+      throw new Error(`${label} not found in current tenant: ${invalidIds.join(', ')}`);
+    }
+  };
+
+  assertAllFound(userIds, users, 'User');
+  assertAllFound(departmentIds, departments, 'Department');
+  assertAllFound(roleIds, roles, 'Role');
+  assertAllFound(positionIds, positions, 'Position');
+
+  const validRoleNames = new Set([
+    ...tenantRoleNames.map((item) => item.name.trim().toLowerCase()),
+    ...legacyRoleValues.map((item) => String(item.role || '').trim().toLowerCase()).filter(Boolean),
+  ]);
+  const configuredRoleNames = [
+    ...policy.legacy_rules.allow_roles,
+    ...policy.legacy_rules.deny_roles,
+  ];
+  const invalidRoleNames = configuredRoleNames.filter((name) => !validRoleNames.has(name.trim().toLowerCase()));
+  if (invalidRoleNames.length) {
+    throw new Error(`Role not found in current tenant: ${Array.from(new Set(invalidRoleNames)).join(', ')}`);
+  }
 }
 
 function normalizeEmailConfig(config: unknown): EmailConfig {
@@ -168,18 +243,22 @@ export const settingsService = {
   },
 
   async getDocumentTypePolicy(tenantId: number, documentTypeId: number) {
+    await requireTenantDocumentType(tenantId, documentTypeId);
     const key = `doc_type_policy:${documentTypeId}`;
     const setting = await settingsRepository.getSetting(tenantId, key);
     return normalizeDocumentTypePolicyV2(setting?.setting_value || {});
   },
 
   async saveDocumentTypePolicy(tenantId: number, documentTypeId: number, policy: unknown, userId?: number) {
+    await requireTenantDocumentType(tenantId, documentTypeId);
     const key = `doc_type_policy:${documentTypeId}`;
     const normalized = normalizeDocumentTypePolicyV2(policy);
+    await validateDocumentTypePolicyReferences(tenantId, normalized);
     return settingsRepository.upsertSetting(tenantId, key, toInputJsonValue(serializeDocumentTypePolicyV2(normalized)), userId);
   },
 
   async deleteDocumentTypePolicy(tenantId: number, documentTypeId: number) {
+    await requireTenantDocumentType(tenantId, documentTypeId);
     const key = `doc_type_policy:${documentTypeId}`;
     return settingsRepository.deleteSetting(tenantId, key);
   }

@@ -5,7 +5,7 @@ import NextImage from "next/image";
 import { Image as ImageIcon, Loader2, Mail, Save, Settings, TestTube } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { PageHeader } from "@/components/ui/page-header";
+import { DashboardHeaderPortal as PageHeader } from "@/components/ui/dashboard-header-portal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

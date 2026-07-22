@@ -68,7 +68,7 @@ function createBlankPermissions(): Omit<ResolvedDocumentPermissions, "reasons"> 
 }
 
 type ResolverUser = Prisma.usersGetPayload<{
-  include: { position: true; user_roles: true };
+  include: { position: true; user_roles: { include: { role: true } } };
 }>;
 
 type ResolverDocument = Prisma.documentsGetPayload<{
@@ -94,6 +94,13 @@ type PreloadedResolution = {
 };
 
 class DocumentPermissionResolverService {
+  private getUserRoleNames(user: ResolverUser): Set<string> {
+    return new Set([
+      String(user.role || '').trim().toLowerCase(),
+      ...user.user_roles.map((item) => item.role.name.trim().toLowerCase()),
+    ].filter(Boolean));
+  }
+
   private normalizePermissionArray(value: unknown): string[] {
     return Array.isArray(value)
       ? Array.from(new Set(value.map((item) => String(item || "").trim().toUpperCase()).filter(Boolean)))
@@ -139,36 +146,12 @@ class DocumentPermissionResolverService {
     return permissionName === "read";
   }
 
-  private getUserRank(user: users & { position?: { level: number | null } | null }): number {
-    return user.position?.level ?? 0;
-  }
-
   private setAllowed(target: Omit<ResolvedDocumentPermissions, "reasons">, key: PermissionKey) {
     target[key] = true;
   }
 
   private applyDeny(target: Omit<ResolvedDocumentPermissions, "reasons">, key: PermissionKey) {
     target[key] = true;
-  }
-
-  private getSecurityLevelRank(level: string | null | undefined): number {
-    const normalized = String(level || "normal").toLowerCase();
-    if (normalized === "internal") return 1;
-    if (normalized === "confidential") return 2;
-    if (normalized === "secret") return 4;
-    if (normalized === "top_secret") return 6;
-    return 0;
-  }
-
-  private passSecurityLevel(
-    securityLevel: string | null | undefined,
-    user: users & { position?: { level: number | null } | null },
-    isOwner: boolean,
-    isSuperAdmin: boolean
-  ) {
-    if (isOwner || isSuperAdmin) return true;
-    const requiredRank = this.getSecurityLevelRank(securityLevel);
-    return this.getUserRank(user) >= requiredRank;
   }
 
   private async getDocumentTypePolicy(tenantId: number, documentTypeId: number | null) {
@@ -424,7 +407,7 @@ class DocumentPermissionResolverService {
       where: { id: userId },
       include: {
         position: true,
-        user_roles: true,
+        user_roles: { include: { role: true } },
       },
     });
 
@@ -522,20 +505,6 @@ class DocumentPermissionResolverService {
     });
     reasons.push(...aclSnapshot.reasons);
 
-    if (!this.passSecurityLevel(document.confidential_level, user, isOwner, false)) {
-      deny.canView = true;
-      deny.canDownload = true;
-      reasons.push("Security level denied document view");
-    } else {
-      reasons.push("Security level check passed");
-    }
-
-    if (typePolicy?.legacy_rules.min_position_level && this.getUserRank(user) < typePolicy.legacy_rules.min_position_level) {
-      deny.canView = true;
-      deny.canDownload = true;
-      reasons.push("Legacy min position level denied access");
-    }
-
     if (typePolicy?.legacy_rules.deny_departments?.includes(user.department_id || 0)) {
       deny.canView = true;
       deny.canDownload = true;
@@ -550,6 +519,28 @@ class DocumentPermissionResolverService {
         reasons.push("Legacy allow department did not match");
       } else {
         reasons.push("Legacy allow department matched");
+      }
+    }
+
+    const userRoleNames = this.getUserRoleNames(user);
+    const deniedRole = typePolicy?.legacy_rules.deny_roles
+      .map((role) => role.trim().toLowerCase())
+      .find((role) => userRoleNames.has(role));
+    if (deniedRole) {
+      deny.canView = true;
+      deny.canDownload = true;
+      reasons.push(`Legacy deny role matched: ${deniedRole}`);
+    }
+
+    if (typePolicy?.legacy_rules.allow_roles?.length) {
+      const allowedRoles = typePolicy.legacy_rules.allow_roles.map((role) => role.trim().toLowerCase());
+      const matchedRole = allowedRoles.find((role) => userRoleNames.has(role));
+      if (!matchedRole) {
+        deny.canView = true;
+        deny.canDownload = true;
+        reasons.push('Legacy allow role did not match');
+      } else {
+        reasons.push(`Legacy allow role matched: ${matchedRole}`);
       }
     }
 
@@ -644,7 +635,7 @@ class DocumentPermissionResolverService {
 
     const user = await prisma.users.findUnique({
       where: { id: userId },
-      include: { position: true, user_roles: true },
+      include: { position: true, user_roles: { include: { role: true } } },
     });
     if (!user || user.tenant_id !== tenantId) {
       for (const document of documents) {

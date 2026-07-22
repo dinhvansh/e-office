@@ -215,9 +215,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Menu className="w-5 h-5 text-slate-600" />
             </button>
 
-            <div className="flex-1 md:flex-none">
-              {/* Breadcrumb or page title can go here */}
-            </div>
+            <div id="dashboard-page-header" className="min-w-0 flex-1" aria-live="polite" />
             <div className="flex items-center gap-2 md:gap-3">
               <NotificationBell />
               <div className="h-6 w-px bg-slate-200" />

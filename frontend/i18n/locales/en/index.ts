@@ -6,6 +6,7 @@ import { navigation } from "./navigation";
 import { signRequests } from "./signRequests";
 import { workflow } from "./workflow";
 import { profile } from "./profile";
+import { organization } from "./organization";
 
 export const enMessages = {
   ...common,
@@ -16,4 +17,5 @@ export const enMessages = {
   ...archive,
   ...approvals,
   ...profile,
+  ...organization,
 };

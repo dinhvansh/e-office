@@ -116,11 +116,23 @@ export class DocumentFlowService {
     const currentWorkflowInstance = loadedDocument.workflow_instances.find(
       (instance) => instance.status === 'in_progress'
     ) || loadedDocument.workflow_instances[0] || null;
+    // Earlier requests can have approval history created before workflow runs
+    // were persisted. Keep that history visible instead of rendering an empty
+    // "0/0" approval screen for the assigned approver.
+    const visibleApprovals = currentWorkflowInstance
+      ? loadedDocument.approvals.filter((approval) => approval.workflow_instance_id === currentWorkflowInstance.id)
+      : loadedDocument.approvals.filter((approval) => approval.workflow_instance_id == null);
     const document = {
       ...loadedDocument,
       workflow_instance: currentWorkflowInstance,
-      approvals: loadedDocument.approvals.filter((approval) => approval.workflow_instance_id === currentWorkflowInstance?.id),
+      approvals: visibleApprovals,
     };
+    // An active approval task is the authority for an assigned approver to
+    // participate in the workflow discussion. It must not depend on the
+    // broader sign-request update permission.
+    const activeApprovalForCurrentUser = document.approvals.find(
+      (approval) => approval.approver_user_id === userId && approval.action === 'pending',
+    ) || null;
 
     // 2. Build phases
     const phases: FlowPhase[] = [];
@@ -167,7 +179,16 @@ export class DocumentFlowService {
 
     // 3. Build steps array
     const steps: FlowStep[] = [];
-    let orderCounter = 1;
+    // Keep the persisted workflow order. Approval and signing records are
+    // intentionally collected from separate relations, so assigning a new
+    // counter here would incorrectly put every approval before every signer.
+    const configuredOrders = [
+      ...(document.approvals || []).map((approval) => approval.workflow_step.step_order),
+      ...(document.sign_request?.signers || [])
+        .map((signer) => signer.signing_order)
+        .filter((order): order is number => order != null),
+    ];
+    let fallbackSignerOrder = Math.max(0, ...configuredOrders);
 
     // Add approval steps
     if (document.workflow_instance && document.approvals) {
@@ -175,7 +196,7 @@ export class DocumentFlowService {
         steps.push({
           id: `approval-${approval.id}`,
           type: 'approval',
-          order: orderCounter++,
+          order: approval.workflow_step.step_order,
           user: approval.approver ? {
             id: approval.approver.id,
             name: approval.approver.full_name || approval.approver.email,
@@ -195,7 +216,10 @@ export class DocumentFlowService {
         steps.push({
           id: `signing-${signer.id}`,
           type: 'signing',
-          order: orderCounter++,
+          // Older/manual signer records can have no configured order. Keep
+          // those at the end deterministically instead of showing a giant
+          // synthetic order number or moving configured steps around.
+          order: signer.signing_order ?? ++fallbackSignerOrder,
           sign_request_id: document.sign_request.id,
           user: signer.user ? {
             id: signer.user.id,
@@ -213,6 +237,15 @@ export class DocumentFlowService {
         });
       }
     }
+
+    // Prisma relation queries do not guarantee a combined ordering. The
+    // explicit tie breakers make parallel steps stable across refreshes and
+    // after a signer/approver changes status.
+    steps.sort((left, right) =>
+      left.order - right.order ||
+      (left.type === right.type ? 0 : left.type === 'approval' ? -1 : 1) ||
+      left.id.localeCompare(right.id),
+    );
 
     // 4. Build activities timeline
     const activities: FlowActivity[] = [];
@@ -317,6 +350,7 @@ export class DocumentFlowService {
       status_summary: this.buildStatusSummary(document, userId),
       // User permissions for actions
       can_approve: this.canUserApprove(document, userId),
+      active_approval_id: activeApprovalForCurrentUser?.id || null,
       can_sign: this.canUserSign(document, userId, currentUser?.email || null),
       can_manage_sign_request: document.owner.id === userId && !!document.sign_request?.id,
       can_share: documentPermissions.canShare,

@@ -1,4 +1,5 @@
 import { PositionFilters, positionsRepository } from './positions.repository';
+import { prisma } from '../../config/prisma';
 
 export const positionsService = {
   async getPositions(tenantId: number, filters?: PositionFilters) {
@@ -65,6 +66,20 @@ export const positionsService = {
     // Check if position is in use
     if (existing._count.users > 0) {
       throw new Error('Cannot delete position that is in use by users');
+    }
+
+    const [workflowStepCount, permissionCount] = await Promise.all([
+      prisma.workflow_steps.count({ where: { assignee_position_id: id, workflow: { tenant_id: tenantId } } }),
+      prisma.document_permissions.count({
+        where: {
+          document: { tenant_id: tenantId },
+          subject_type: 'position_in_department',
+          subject_id: id,
+        },
+      }),
+    ]);
+    if (workflowStepCount || permissionCount) {
+      throw new Error('Cannot delete position referenced by a workflow or document permission');
     }
 
     return positionsRepository.delete(id);

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { departmentsController } from './departments.controller';
 import { authGuard } from '../auth/auth.middleware';
-import { requirePermission } from '../../middleware/permission';
+import { requireAllPermissions, requirePermission } from '../../middleware/permission';
 
 const router = Router();
 
@@ -9,6 +9,8 @@ router.use(authGuard);
 
 router.get('/', requirePermission('departments', 'read'), departmentsController.getDepartments);
 router.get('/tree', requirePermission('departments', 'read'), departmentsController.getDepartmentTree);
+router.get('/:id/organization', requireAllPermissions(['departments', 'read'], ['users', 'read'], ['positions', 'read']), departmentsController.getOrganizationStructure);
+router.put('/:id/organization', requireAllPermissions(['departments', 'update'], ['users', 'update']), departmentsController.updateOrganizationStructure);
 router.get('/:id', requirePermission('departments', 'read'), departmentsController.getDepartmentById);
 router.post('/', requirePermission('departments', 'create'), departmentsController.createDepartment);
 router.put('/:id', requirePermission('departments', 'update'), departmentsController.updateDepartment);

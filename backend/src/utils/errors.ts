@@ -5,6 +5,7 @@ export const ErrorCodes = {
   DEPARTMENT_CODE_DUPLICATE: 'Mã phòng ban đã tồn tại. Vui lòng chọn mã khác',
   DEPARTMENT_HAS_USERS: 'Không thể xóa phòng ban đang có nhân viên',
   DEPARTMENT_HAS_CHILDREN: 'Không thể xóa phòng ban đang có phòng ban con',
+  DEPARTMENT_IN_USE: 'Không thể xóa phòng ban đang được tài liệu, workflow hoặc phân quyền sử dụng',
   DEPARTMENT_CIRCULAR_REFERENCE: 'Phòng ban không thể là phòng ban cha của chính nó',
   DEPARTMENT_PARENT_NOT_FOUND: 'Không tìm thấy phòng ban cha',
 

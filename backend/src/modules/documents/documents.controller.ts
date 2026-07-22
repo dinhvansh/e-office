@@ -19,6 +19,11 @@ const createSchema = z
     priority_level: z.string().optional(),
     confidential_level: z.string().optional(),
     visibility_scope: z.string().optional(),
+    effective_date: z.coerce.date().optional(),
+    expiration_date: z.coerce.date().optional(),
+    intake_mode: z.enum(['new', 'revision', 'external_signed_import']).default('new'),
+    source_document_id: z.coerce.number().int().positive().optional(),
+    revision_comment: z.string().trim().max(1000).optional(),
     
     // Workflow options
     workflow_id: z.coerce.number().int().positive().optional(),
@@ -133,6 +138,7 @@ export class DocumentsController {
     const search = req.query.search as string | undefined;
     const documentTypeId = req.query.document_type_id ? parseInt(req.query.document_type_id as string) : undefined;
     const confidentialLevel = req.query.confidential_level as string | undefined;
+    const currentOnly = req.query.current_only === 'true';
 
     if (page || limit) {
       // Use paginated endpoint
@@ -145,7 +151,8 @@ export class DocumentsController {
         status,
         search,
         documentTypeId,
-        confidentialLevel
+        confidentialLevel,
+        currentOnly,
       );
       res.json(ok({
         documents: toDocumentDTOs(result.data),
@@ -179,6 +186,11 @@ export class DocumentsController {
         priorityLevel: body.priority_level,
         confidentialLevel: body.confidential_level,
         visibilityScope: body.visibility_scope,
+        effectiveDate: body.effective_date,
+        expirationDate: body.expiration_date,
+        intakeMode: body.intake_mode,
+        sourceDocumentId: body.source_document_id,
+        revisionComment: body.revision_comment,
         workflowId: body.workflow_id, // ✅ Pass workflow_id to service
         adhocSteps: body.adhoc_steps?.map((step) => ({
           approver_user_id: step.approver_user_id!,
@@ -296,6 +308,24 @@ export class DocumentsController {
     res.setHeader('Content-Type', mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.send(fileBytes);
+  };
+
+  listRevisionSources = async (req: Request, res: Response): Promise<void> => {
+    const mode = req.query.mode === 'sign_request' ? 'sign_request' : 'repository';
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : undefined;
+    const documents = await documentsService.listRevisionSources(
+      req.auth!.tenantId,
+      req.auth!.userId,
+      mode,
+      search || undefined,
+    );
+    res.json(ok({ documents: toDocumentDTOs(documents) }));
+  };
+
+  getRevisionHistory = async (req: Request, res: Response): Promise<void> => {
+    const documentId = idSchema.parse(req.params.id);
+    const revisions = await documentsService.getRevisionHistory(documentId, req.auth!.tenantId, req.auth!.userId);
+    res.json(ok({ revisions }));
   };
 
   downloadDossier = async (req: Request, res: Response): Promise<void> => {

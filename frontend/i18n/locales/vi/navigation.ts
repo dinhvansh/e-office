@@ -1,4 +1,6 @@
 export const navigation = {
+  "navigation.organization.label": "Cơ cấu tổ chức",
+  "navigation.organization.caption": "Phòng ban, chức danh & nhân sự",
   "navigation.group.workspace": "Không gian làm việc",
   "navigation.group.organization": "Tổ chức",
   "navigation.group.configuration": "Cấu hình",

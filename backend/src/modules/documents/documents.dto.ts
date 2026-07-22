@@ -4,6 +4,7 @@ type DocumentDTOInput = documents & {
   document_type?: Pick<document_types, 'name'> | null;
   cc_emails?: document_cc_emails[];
   attachments?: document_attachments[];
+  superseded_by?: Array<{ id: number }>;
 };
 
 /**
@@ -21,6 +22,14 @@ export interface DocumentResponseDTO {
   hash: string | null;
   status: string | null;
   version: number;
+  root_document_id: number | null;
+  supersedes_document_id: number | null;
+  revision_no: number;
+  revision_comment: string | null;
+  is_current_revision?: boolean;
+  is_superseded?: boolean;
+  source_kind: string;
+  external_signature_status: string | null;
   document_number: string | null;
   numbering_rule_id: number | null;
   title: string | null;
@@ -30,6 +39,7 @@ export interface DocumentResponseDTO {
   visibility_scope: string | null;
   effective_date: Date | null;
   expiration_date: Date | null;
+  validity_status: 'no_expiry' | 'upcoming' | 'effective' | 'expiring_soon' | 'expired';
   issued_date: Date | null;
   sign_request_id: number | null;
   created_at: Date;
@@ -82,6 +92,16 @@ export function toDocumentAttachmentDTOs(attachments: AttachmentWithUploader[] =
  * Excludes file_path for security
  */
 export function toDocumentDTO(doc: DocumentDTOInput): DocumentResponseDTO {
+  const now = new Date();
+  const validityStatus: DocumentResponseDTO['validity_status'] = !doc.expiration_date
+    ? 'no_expiry'
+    : doc.expiration_date < now
+      ? 'expired'
+      : doc.effective_date && doc.effective_date > now
+        ? 'upcoming'
+        : (doc.expiration_date.getTime() - now.getTime()) <= 30 * 24 * 60 * 60 * 1000
+          ? 'expiring_soon'
+          : 'effective';
   return {
     id: doc.id,
     tenant_id: doc.tenant_id,
@@ -93,6 +113,14 @@ export function toDocumentDTO(doc: DocumentDTOInput): DocumentResponseDTO {
     hash: doc.hash,
     status: doc.status,
     version: doc.version,
+    root_document_id: doc.root_document_id ?? null,
+    supersedes_document_id: doc.supersedes_document_id ?? null,
+    revision_no: doc.revision_no,
+    revision_comment: doc.revision_comment || null,
+    is_current_revision: Array.isArray(doc.superseded_by) ? doc.superseded_by.length === 0 : undefined,
+    is_superseded: Array.isArray(doc.superseded_by) ? doc.superseded_by.length > 0 : undefined,
+    source_kind: doc.source_kind,
+    external_signature_status: doc.external_signature_status ?? null,
     document_number: doc.document_number || null,
     numbering_rule_id: doc.numbering_rule_id || null,
     title: doc.title || null,
@@ -102,6 +130,7 @@ export function toDocumentDTO(doc: DocumentDTOInput): DocumentResponseDTO {
     visibility_scope: doc.visibility_scope || null,
     effective_date: doc.effective_date || null,
     expiration_date: doc.expiration_date || null,
+    validity_status: validityStatus,
     issued_date: doc.issued_date || null,
     sign_request_id: doc.sign_request_id ?? null,
     created_at: doc.created_at,

@@ -6,6 +6,17 @@ export type DocumentRecord = {
   title?: string | null;
   status: string | null;
   version: number;
+  root_document_id?: number | null;
+  supersedes_document_id?: number | null;
+  revision_no?: number;
+  revision_comment?: string | null;
+  is_current_revision?: boolean;
+  is_superseded?: boolean;
+  source_kind?: 'native' | 'revision' | 'external_signed_import' | string;
+  external_signature_status?: string | null;
+  effective_date?: string | null;
+  expiration_date?: string | null;
+  validity_status?: 'no_expiry' | 'upcoming' | 'effective' | 'expiring_soon' | 'expired';
   created_at: string;
     document_type_id?: number | null;
     // List DTOs return the resolved type name, while a few legacy/detail
@@ -96,7 +107,6 @@ export type DocumentTypePolicy = {
     deny_roles?: string[];
     allow_departments?: number[];
     deny_departments?: number[];
-    min_position_level?: number | null;
   };
 };
 

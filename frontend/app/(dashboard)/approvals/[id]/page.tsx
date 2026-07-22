@@ -1,7 +1,6 @@
 'use client';
 
 import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle, Download, FileText, MessageSquare, Paperclip, RefreshCw, Send, Upload, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,12 +10,13 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import SimplePDFViewer from '@/components/pdf/SimplePDFViewer';
-import SignatureModal from '@/components/signature/SignatureModal';
 import { getApiBaseUrl } from '@/lib/env';
 import { WorkflowStatusPanel, type WorkflowStatusSummary } from '@/components/workflow/WorkflowStatusPanel';
 import { DossierAttachments } from '@/components/documents/dossier-attachments';
 import { SignRequestDiscussion } from '@/components/sign-requests/sign-request-discussion';
 import { DocumentDownloadMenu } from '@/components/documents/document-download-menu';
+import { FlowTimeline } from '@/components/flow/FlowTimeline';
+import { DashboardHeaderPortal as PageHeader } from '@/components/ui/dashboard-header-portal';
 
 interface ApprovalDetail {
   id: number;
@@ -38,6 +38,8 @@ interface ApprovalDetail {
     status?: string | null;
     signed_file_path?: string | null;
     sign_request_id?: number | null;
+    revision_no?: number | null;
+    revision_comment?: string | null;
     owner: {
       id: number;
       full_name: string | null;
@@ -84,6 +86,25 @@ interface DocumentAttachment {
   uploaded_at: string;
 }
 
+interface WorkflowFlowStep {
+  id: string;
+  type: 'approval' | 'signing';
+  order: number;
+  sign_request_id?: number;
+  user: { id: number; name: string; email: string } | null;
+  status: 'pending' | 'in_progress' | 'approved' | 'rejected' | 'signed' | 'info_requested';
+  started_at?: string;
+  completed_at?: string;
+  comment?: string;
+  signer_kind?: 'internal' | 'external';
+}
+
+interface WorkflowFlowData {
+  steps: WorkflowFlowStep[];
+  can_approve: boolean;
+  can_sign: boolean;
+}
+
 export default function ApprovalDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -94,15 +115,13 @@ export default function ApprovalDetailPage() {
   const [approval, setApproval] = useState<ApprovalDetail | null>(null);
   const [selectedAction, setSelectedAction] = useState<ApprovalAction | null>(null);
   const [actionComment, setActionComment] = useState('');
-  const [showSignatureModal, setShowSignatureModal] = useState(false);
-  const [signatureData, setSignatureData] = useState('');
-  const [signatureType, setSignatureType] = useState<'drawn' | 'uploaded' | 'typed'>('drawn');
   const [submitting, setSubmitting] = useState(false);
   const [comments, setComments] = useState<DiscussionComment[]>([]);
   const [commentBody, setCommentBody] = useState('');
   const [postingComment, setPostingComment] = useState(false);
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [workflowFlow, setWorkflowFlow] = useState<WorkflowFlowData | null>(null);
 
   const fileUrl = useMemo(() => `${getApiBaseUrl()}/approvals/${approvalId}/document/view`, [approvalId]);
   const isProcessed = approval ? approval.action !== 'pending' : false;
@@ -140,6 +159,17 @@ export default function ApprovalDetailPage() {
     }
   }, [fetchJson]);
 
+  const fetchWorkflowFlow = useCallback(async (documentId: number) => {
+    try {
+      const data = await fetchJson<WorkflowFlowData>(`/documents/${documentId}/flow`);
+      setWorkflowFlow(data);
+    } catch {
+      // The approval itself remains usable if a legacy document cannot expose
+      // its full flow. Do not turn a supplemental panel into a blocking error.
+      setWorkflowFlow(null);
+    }
+  }, [fetchJson]);
+
   useEffect(() => {
     void Promise.resolve().then(fetchApprovalDetail);
   }, [fetchApprovalDetail]);
@@ -147,9 +177,9 @@ export default function ApprovalDetailPage() {
   useEffect(() => {
     const documentId = approval?.document.id;
     if (documentId) {
-      void Promise.resolve().then(() => Promise.all([fetchComments(), fetchAttachments(documentId)]));
+      void Promise.resolve().then(() => Promise.all([fetchComments(), fetchAttachments(documentId), fetchWorkflowFlow(documentId)]));
     }
-  }, [approval?.id, approval?.document.id, approval?.document.sign_request_id, fetchAttachments, fetchComments]);
+  }, [approval?.id, approval?.document.id, approval?.document.sign_request_id, fetchAttachments, fetchComments, fetchWorkflowFlow]);
 
   const fileToBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -224,26 +254,10 @@ export default function ApprovalDetailPage() {
 
   const handleActionClick = (actionType: ApprovalAction) => {
     setSelectedAction(actionType);
-    if (actionType === 'approve') {
-      setShowSignatureModal(true);
-    }
-  };
-
-  const handleSignatureConfirm = (data: string, type: 'drawn' | 'uploaded' | 'typed') => {
-    setSignatureData(data);
-    setSignatureType(type);
-    setShowSignatureModal(false);
-    toast.success('Đã tạo chữ ký');
   };
 
   const handleSubmitAction = async () => {
     if (!selectedAction) return;
-
-    if (selectedAction === 'approve' && !signatureData) {
-      toast.error('Vui lòng tạo chữ ký trước khi phê duyệt');
-      setShowSignatureModal(true);
-      return;
-    }
 
     if (selectedAction === 'reject' && !actionComment.trim()) {
       toast.error('Vui lòng nhập lý do');
@@ -253,12 +267,7 @@ export default function ApprovalDetailPage() {
     setSubmitting(true);
     try {
       const endpoint = `/approvals/${approvalId}/${selectedAction.replace('_', '-')}`;
-      const body: any = { comment: actionComment.trim() || undefined };
-
-      if (selectedAction === 'approve') {
-        body.signature_data = signatureData;
-        body.signature_type = signatureType;
-      }
+      const body = { comment: actionComment.trim() || undefined };
 
       await fetchJson(endpoint, {
         method: 'POST',
@@ -322,7 +331,6 @@ export default function ApprovalDetailPage() {
   const resetAction = () => {
     setSelectedAction(null);
     setActionComment('');
-    setSignatureData('');
   };
 
   if (loading) {
@@ -341,31 +349,32 @@ export default function ApprovalDetailPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="border-b bg-white/90 px-6 py-4 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-          <div className="min-w-0">
-            <button onClick={() => router.push('/my-tasks')} className="mb-2 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900">
-              <ArrowLeft className="h-4 w-4" />
-              Quay lại công việc
-            </button>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="truncate text-2xl font-semibold text-slate-950">Phê duyệt tài liệu</h1>
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                Bước {approval.workflow_step.step_order}: {approval.workflow_step.step_name}
-              </span>
-              <span className={`rounded-full px-3 py-1 text-xs font-medium ${isProcessed ? 'bg-slate-100 text-slate-700' : 'bg-amber-50 text-amber-700'}`}>
-                {isProcessed ? 'Đã xử lý' : 'Đang chờ xử lý'}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-slate-500">{approval.workflow.name}</p>
-          </div>
-          <DocumentDownloadMenu documentId={approval.document.id} documentNumber={approval.document.document_number} originalFileName={approval.document.original_file_name} status={approval.document.status} signedFilePath={approval.document.signed_file_path} />
-        </div>
-      </div>
+  const workflowSteps = workflowFlow?.steps || [];
+  const hasWorkflowSteps = workflowSteps.length > 0;
 
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-6 py-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        icon={FileText}
+        title="Phê duyệt tài liệu"
+        description={`${approval.workflow.name} · Bước ${approval.workflow_step.step_order}: ${approval.workflow_step.step_name}`}
+        actions={<DocumentDownloadMenu documentId={approval.document.id} documentNumber={approval.document.document_number} originalFileName={approval.document.original_file_name} status={approval.document.status} signedFilePath={approval.document.signed_file_path} />}
+      />
+      <div className="flex items-center justify-between gap-3 md:hidden">
+        <button onClick={() => router.push('/my-tasks')} className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-950"><ArrowLeft className="h-4 w-4" />Quay lại công việc</button>
+        <span className={`rounded-full px-3 py-1 text-xs font-medium ${isProcessed ? 'bg-slate-100 text-slate-700' : 'bg-amber-50 text-amber-700'}`}>{isProcessed ? 'Đã xử lý' : 'Đang chờ xử lý'}</span>
+      </div>
+      <div className={`grid grid-cols-1 gap-5 ${hasWorkflowSteps ? 'xl:grid-cols-[280px_minmax(0,1fr)_360px]' : 'xl:grid-cols-[minmax(0,1fr)_360px]'}`}>
+        {hasWorkflowSteps ? (
+          <aside className="min-w-0">
+            <FlowTimeline
+              steps={workflowSteps}
+              canApprove={Boolean(workflowFlow?.can_approve)}
+              canSign={Boolean(workflowFlow?.can_sign)}
+              currentUserId={user?.id}
+            />
+          </aside>
+        ) : null}
         <main className="min-w-0 space-y-5">
           <WorkflowStatusPanel summary={approval.status_summary} />
           <section className="rounded-2xl border bg-white p-5 shadow-sm">
@@ -384,6 +393,7 @@ export default function ApprovalDetailPage() {
                 <div className="text-xs text-slate-500">{approval.document.owner.email}</div>
               </div>
             </div>
+            {approval.document.revision_comment ? <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3"><p className="text-sm font-medium text-blue-950">Ghi chú thay thế phiên bản</p><p className="mt-1 text-sm text-blue-800">{approval.document.revision_comment}</p></div> : null}
           </section>
 
           <section className="min-w-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
@@ -426,22 +436,6 @@ export default function ApprovalDetailPage() {
                   <span className="text-slate-500">Đang chọn:</span>{' '}
                   <span className="font-medium text-slate-950">{actionLabels[selectedAction]}</span>
                 </div>
-
-                {selectedAction === 'approve' && signatureData && (
-                  <div className="rounded-xl border p-4">
-                    <Label>Chữ ký phê duyệt</Label>
-                    <Image src={signatureData} alt="Signature" width={500} height={96} unoptimized className="mx-auto mt-3 max-h-24" />
-                    <Button onClick={() => setShowSignatureModal(true)} variant="outline" size="sm" className="mt-3 w-full">
-                      Thay đổi chữ ký
-                    </Button>
-                  </div>
-                )}
-
-                {selectedAction === 'approve' && !signatureData && (
-                  <Button onClick={() => setShowSignatureModal(true)} variant="outline" className="w-full">
-                    Tạo chữ ký
-                  </Button>
-                )}
 
                 <div>
                   <Label>Nhận xét</Label>
@@ -518,7 +512,7 @@ export default function ApprovalDetailPage() {
             </div>
           </section>
 
-          {approval.document.sign_request_id ? <SignRequestDiscussion signRequestId={approval.document.sign_request_id} documentId={approval.document.id} /> : null}
+          {approval.document.sign_request_id ? <SignRequestDiscussion signRequestId={approval.document.sign_request_id} activeApprovalId={approval.id} documentId={approval.document.id} readOnly={isProcessed} /> : null}
           <section className="hidden order-2 rounded-2xl border bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 font-semibold text-slate-950">
@@ -568,12 +562,6 @@ export default function ApprovalDetailPage() {
         </aside>
       </div>
 
-      <SignatureModal
-        open={showSignatureModal}
-        onClose={() => setShowSignatureModal(false)}
-        onConfirm={handleSignatureConfirm}
-        signerName={user?.email || 'User'}
-      />
     </div>
   );
 }

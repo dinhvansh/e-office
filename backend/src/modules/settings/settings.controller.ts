@@ -21,7 +21,21 @@ const aclTemplateSchema = z.object({
   scope_department_id: z.coerce.number().int().positive().nullable().optional(),
   scope: z.enum(['OWN', 'DEPARTMENT', 'COMPANY', 'ASSIGNED_ONLY', 'ALL']).optional(),
   permissions: z.array(z.enum(['CREATE', 'VIEW', 'DOWNLOAD', 'EDIT', 'COMMENT', 'APPROVE', 'SIGN', 'SHARE', 'DELETE'])).min(1),
-  status_limit: z.array(z.enum(['DRAFT', 'REJECTED', 'SUBMITTED', 'APPROVED', 'SIGNED'])).optional().nullable(),
+  status_limit: z.array(z.enum([
+    'DRAFT',
+    'PENDING_APPROVAL',
+    'APPROVED',
+    'PENDING_SIGNATURE',
+    'IN_PROGRESS',
+    'GENERATING_ARTIFACT',
+    'ARTIFACT_FAILED',
+    'COMPLETED',
+    'REJECTED',
+    'CANCELLED',
+    'ARCHIVED',
+    'SUBMITTED',
+    'SIGNED',
+  ])).optional().nullable(),
   is_active: z.boolean().optional(),
 });
 
@@ -33,6 +47,13 @@ const advancedPolicySchema = z.object({
   condition_json: z.record(z.any()),
   permission_json: z.record(z.any()),
   is_active: z.boolean(),
+});
+
+const legacyRulesSchema = z.object({
+  allow_roles: z.array(z.string()).optional(),
+  deny_roles: z.array(z.string()).optional(),
+  allow_departments: z.array(z.coerce.number().int().positive()).optional(),
+  deny_departments: z.array(z.coerce.number().int().positive()).optional(),
 });
 
 const documentTypePolicySchema = z.object({
@@ -54,11 +75,12 @@ const documentTypePolicySchema = z.object({
   acl_templates: z.array(aclTemplateSchema).optional(),
   advanced_policies: z.array(advancedPolicySchema).optional(),
   detail_permissions: z.array(z.any()).optional(),
+  legacy_detail_permissions: z.array(z.any()).optional(),
+  legacy_rules: legacyRulesSchema.optional(),
   allow_roles: z.array(z.string()).optional(),
   deny_roles: z.array(z.string()).optional(),
   allow_departments: z.array(z.coerce.number().int().positive()).optional(),
   deny_departments: z.array(z.coerce.number().int().positive()).optional(),
-  min_position_level: z.coerce.number().int().positive().nullable().optional(),
   default_visibility_scope: z.string().optional(),
   default_confidential_level: z.string().optional(),
   inherit_creator_department: z.boolean().optional(),

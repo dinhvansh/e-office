@@ -100,7 +100,8 @@ export function FlowTimeline({ steps, canApprove, canSign, currentUserId }: Flow
 
   return (
     <div className="bg-white rounded-lg shadow-sm border p-6">
-      <h2 className="text-lg font-semibold mb-4">Quy trình</h2>
+      <h2 className="text-lg font-semibold mb-1">Quy trình phê duyệt</h2>
+      <p className="mb-4 text-sm text-slate-500">Theo dõi người đang xử lý và kết quả từng bước.</p>
       
       <div className="space-y-4">
         {steps.map((step, index) => {

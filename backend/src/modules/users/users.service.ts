@@ -210,6 +210,27 @@ export const usersService = {
     }
 
     const { role_ids, password, ...userData } = data;
+    const requestedRoleIds = [...new Set(role_ids ?? [])];
+    let effectiveRoleIds = requestedRoleIds;
+
+    if (requestedRoleIds.length > 0) {
+      const tenantRoles = await prisma.roles.findMany({
+        where: { tenant_id: tenantId, id: { in: requestedRoleIds } },
+        select: { id: true },
+      });
+      if (tenantRoles.length !== requestedRoleIds.length) {
+        throw new Error('One or more roles are invalid for this tenant');
+      }
+    } else {
+      const defaultRole = await prisma.roles.findFirst({
+        where: { tenant_id: tenantId, name: { equals: 'User', mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (!defaultRole) {
+        throw new Error('Default User role is not configured for this tenant');
+      }
+      effectiveRoleIds = [defaultRole.id];
+    }
 
     // Hash password
     const password_hash = await bcrypt.hash(password, 10);
@@ -224,9 +245,7 @@ export const usersService = {
     });
 
     // Assign roles
-    if (role_ids && role_ids.length > 0) {
-      await usersRepository.assignRoles(user.id, role_ids);
-    }
+    await usersRepository.assignRoles(user.id, effectiveRoleIds);
 
     return usersRepository.findById(user.id, tenantId);
   },
@@ -243,6 +262,10 @@ export const usersService = {
   }) {
     this.validateOrganizationalFields(data);
 
+    if (data.status !== undefined && !['active', 'inactive'].includes(data.status)) {
+      throw new Error('User status must be active or inactive');
+    }
+
     const existing = await usersRepository.findById(id, tenantId);
     if (!existing) {
       throw new Error('User not found');
@@ -250,6 +273,23 @@ export const usersService = {
 
     if (data.manager_id && data.manager_id === id) {
       throw new Error('Manager cannot be the same user');
+    }
+
+    if (data.status === 'inactive' && existing.status !== 'inactive') {
+      if (existing.managed_departments.length > 0) {
+        throw new Error('Assign a replacement department manager before deactivating this user');
+      }
+      const [pendingApprovals, pendingSigners] = await Promise.all([
+        prisma.document_approvals.count({ where: { approver_user_id: id, action: 'pending' } }),
+        prisma.signers.count({ where: { user_id: id, status: { in: ['draft', 'pending', 'otp_sent', 'waiting_approval', 'waiting_signing'] } } }),
+      ]);
+      if (pendingApprovals > 0 || pendingSigners > 0) {
+        throw new Error('Reassign pending approval and signing tasks before deactivating this user');
+      }
+      await prisma.$transaction([
+        prisma.department_support_managers.deleteMany({ where: { user_id: id } }),
+        prisma.users.updateMany({ where: { tenant_id: existing.tenant_id, manager_id: id }, data: { manager_id: null } }),
+      ]);
     }
 
     const { role_ids, password, ...userData } = data;

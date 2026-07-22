@@ -3,7 +3,6 @@ import {
   FileText,
   PenTool,
   Users,
-  Building,
   Shield,
   FileType,
   Settings,
@@ -72,20 +71,20 @@ export const SIDEBAR_STRUCTURE: SidebarGroup[] = [
     groupLabelKey: "navigation.group.organization",
     items: [
       {
+        labelKey: "navigation.organization.label",
+        href: "/organization",
+        icon: Building2,
+        captionKey: "navigation.organization.caption",
+        color: "text-cyan-600",
+        requiredPermissions: ["departments:read", "users:read", "positions:read"]
+      },
+      {
         labelKey: "navigation.users.label",
         href: "/users",
         icon: Users,
         captionKey: "navigation.users.caption",
         color: "text-indigo-600",
         requiredPermissions: ["users:read"]
-      },
-      {
-        labelKey: "navigation.departments.label",
-        href: "/departments",
-        icon: Building,
-        captionKey: "navigation.departments.caption",
-        color: "text-teal-600",
-        requiredPermissions: ["departments:read"]
       },
       {
         labelKey: "navigation.roles.label",

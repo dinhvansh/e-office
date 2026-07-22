@@ -92,7 +92,6 @@ export type DocumentTypePolicyV2 = {
     deny_roles: string[];
     allow_departments: number[];
     deny_departments: number[];
-    min_position_level: number | null;
   };
 };
 
@@ -385,7 +384,10 @@ function asPolicyRecord(value: unknown): PolicyRecord {
 export function normalizeDocumentTypePolicyV2(policy: unknown): DocumentTypePolicyV2 {
   const source = asPolicyRecord(policy);
   const visibility = asPolicyRecord(source.visibility);
-  const legacyDetailPermissions = normalizeLegacyDetailPermissions(source.detail_permissions);
+  const legacyRules = asPolicyRecord(source.legacy_rules);
+  const legacyDetailPermissions = normalizeLegacyDetailPermissions(
+    source.detail_permissions ?? source.legacy_detail_permissions
+  );
   const aclTemplates = normalizeAclTemplates(source.acl_templates);
   const advancedPolicies = normalizeAdvancedPolicies(source.advanced_policies);
 
@@ -413,14 +415,10 @@ export function normalizeDocumentTypePolicyV2(policy: unknown): DocumentTypePoli
     advanced_policies: advancedPolicies,
     legacy_detail_permissions: legacyDetailPermissions,
     legacy_rules: {
-      allow_roles: normalizeStringArray(source.allow_roles),
-      deny_roles: normalizeStringArray(source.deny_roles),
-      allow_departments: normalizeNumberArray(source.allow_departments),
-      deny_departments: normalizeNumberArray(source.deny_departments),
-      min_position_level:
-        Number.isFinite(Number(source.min_position_level)) && Number(source.min_position_level) > 0
-          ? Number(source.min_position_level)
-          : null,
+      allow_roles: normalizeStringArray(source.allow_roles ?? legacyRules.allow_roles),
+      deny_roles: normalizeStringArray(source.deny_roles ?? legacyRules.deny_roles),
+      allow_departments: normalizeNumberArray(source.allow_departments ?? legacyRules.allow_departments),
+      deny_departments: normalizeNumberArray(source.deny_departments ?? legacyRules.deny_departments),
     },
   };
 
@@ -444,7 +442,6 @@ export function serializeDocumentTypePolicyV2(policy: DocumentTypePolicyV2) {
     deny_roles: policy.legacy_rules.deny_roles,
     allow_departments: policy.legacy_rules.allow_departments,
     deny_departments: policy.legacy_rules.deny_departments,
-    min_position_level: policy.legacy_rules.min_position_level,
     default_visibility_scope: policy.visibility.default_visibility_scope,
     default_confidential_level: policy.visibility.default_security_level,
     inherit_creator_department: policy.visibility.auto_assign_creator_department,

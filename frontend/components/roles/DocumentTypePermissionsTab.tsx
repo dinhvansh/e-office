@@ -56,7 +56,28 @@ const permissionOptions: Array<{ value: PermissionKey; label: string }> = [
   { value: 'DELETE', label: 'Xóa' },
 ];
 
-const statusOptions = ['DRAFT', 'REJECTED', 'SUBMITTED', 'APPROVED', 'SIGNED'];
+const statusOptions = [
+  'DRAFT',
+  'PENDING_APPROVAL',
+  'APPROVED',
+  'PENDING_SIGNATURE',
+  'IN_PROGRESS',
+  'GENERATING_ARTIFACT',
+  'ARTIFACT_FAILED',
+  'COMPLETED',
+  'REJECTED',
+  'CANCELLED',
+  'ARCHIVED',
+  // Kept for policies created before the current lifecycle names.
+  'SUBMITTED',
+  'SIGNED',
+];
+
+const editableSubjectTypes = new Set([
+  'specific_user',
+  'specific_department',
+  'legacy_position_in_department',
+]);
 
 const blankForm = (): PermissionForm => ({
   subject_type: 'specific_user',
@@ -188,16 +209,19 @@ export function DocumentTypePermissionsTab({ fetchJson }: { fetchJson: FetchJson
       const nextPolicy: DocumentTypePolicy = {
         version: policy?.version || 2,
         visibility: policy?.visibility || defaultVisibility,
-        acl_templates: entries.map((item) => ({
-          id: item.id,
-          subject_type: item.subject_type,
-          subject_id: item.subject_id ? Number(item.subject_id) : null,
-          scope_department_id: item.scope_department_id ? Number(item.scope_department_id) : null,
-          scope: 'ASSIGNED_ONLY',
-          permissions: item.permissions,
-          status_limit: item.status_limit.length ? item.status_limit : null,
-          is_active: item.is_active,
-        })),
+        acl_templates: [
+          ...(policy?.acl_templates || []).filter((item) => !editableSubjectTypes.has(item.subject_type)),
+          ...entries.map((item) => ({
+            id: item.id,
+            subject_type: item.subject_type,
+            subject_id: item.subject_id ? Number(item.subject_id) : null,
+            scope_department_id: item.scope_department_id ? Number(item.scope_department_id) : null,
+            scope: 'ASSIGNED_ONLY' as const,
+            permissions: item.permissions,
+            status_limit: item.status_limit.length ? item.status_limit : null,
+            is_active: item.is_active,
+          })),
+        ],
         advanced_policies: policy?.advanced_policies || [],
         legacy_detail_permissions: policy?.legacy_detail_permissions || [],
         legacy_rules: policy?.legacy_rules || {},

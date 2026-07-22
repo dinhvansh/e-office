@@ -15,6 +15,7 @@ documentsRouter.use(authGuard);
 // Read operations - require 'documents:read' permission
 documentsRouter.get("/", requirePermission('documents', 'read'), asyncHandler(controller.list));
 documentsRouter.get("/tags/all", requirePermission('documents', 'read'), asyncHandler(controller.getAllTags));
+documentsRouter.get("/revision-sources", requirePermission('documents', 'read'), asyncHandler(controller.listRevisionSources));
 documentsRouter.get("/:id/download", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.download));
 documentsRouter.get("/:id/download-signed", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.downloadSigned));
 documentsRouter.get("/:id/dossier/download", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.downloadDossier));
@@ -29,6 +30,7 @@ documentsRouter.get("/:id/permissions/effective", requirePermission('documents',
 documentsRouter.get("/:id/access-viewers", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.getEffectiveViewers));
 documentsRouter.get("/:id/versions", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.getVersions));
 documentsRouter.get("/:id/versions/latest", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.getLatestVersion));
+documentsRouter.get("/:id/revision-history", requirePermission('documents', 'read'), requireDocumentAccess("read"), asyncHandler(controller.getRevisionHistory));
 
 // Create operations - require 'documents:create' permission
 documentsRouter.post("/", requirePermission('documents', 'create'), asyncHandler(controller.create));

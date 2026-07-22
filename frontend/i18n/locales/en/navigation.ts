@@ -2,6 +2,8 @@ import type { MessageShape } from "../../types";
 import { navigation as vi } from "../vi/navigation";
 
 export const navigation = {
+  "navigation.organization.label": "Organization structure",
+  "navigation.organization.caption": "Departments, positions & people",
   "navigation.group.workspace": "Workspace",
   "navigation.group.organization": "Organization",
   "navigation.group.configuration": "Configuration",

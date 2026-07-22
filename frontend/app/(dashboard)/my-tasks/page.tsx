@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 import { AsyncStatus } from '@/components/ui/async-state';
+import { DashboardHeaderPortal } from '@/components/ui/dashboard-header-portal';
 
 interface Task {
   task_type: 'approval' | 'signing';
@@ -180,11 +181,7 @@ export default function MyTasksPage() {
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold">Công việc của tôi</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Quản lý phê duyệt và ký tài liệu</p>
-      </div>
+      <DashboardHeaderPortal icon={CheckCircle} title="Công việc của tôi" description="Quản lý phê duyệt và ký tài liệu" iconColor="text-orange-600" />
 
       {/* Statistics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">

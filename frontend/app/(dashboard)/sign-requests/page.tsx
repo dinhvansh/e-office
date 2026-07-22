@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
 import { Archive, PenTool, Eye, Search, Edit, Upload, GitBranch, MoreVertical, Trash2, XCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
-import { PageHeader } from '@/components/ui/page-header';
+import { DashboardHeaderPortal as PageHeader } from '@/components/ui/dashboard-header-portal';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -63,6 +63,11 @@ interface SignRequest {
     percentage: number;
   };
 }
+
+const hasSignRequestOverflowActions = (request: SignRequest) => {
+  const actions = getSignRequestLifecycleActions(request.status, request.flow_state);
+  return actions.canDelete || actions.canArchive || actions.canCancel;
+};
 
 export default function SignRequestsPage() {
   const { t } = useI18n();
@@ -495,13 +500,14 @@ export default function SignRequestsPage() {
                           </Button>
                           
                           {/* More Actions Dropdown */}
-                          <DropdownMenu>
+                          {hasSignRequestOverflowActions(request) && <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 className="h-7 w-7 p-0"
                                 disabled={deleteMutation.isPending || cancelMutation.isPending}
+                                aria-label={t("signRequests.actions.more")}
                               >
                                 <MoreVertical className="w-3.5 h-3.5" />
                               </Button>
@@ -556,7 +562,7 @@ export default function SignRequestsPage() {
                                 </>
                               )}
                             </DropdownMenuContent>
-                          </DropdownMenu>
+                          </DropdownMenu>}
                         </div>
                       </td>
                     </tr>
@@ -704,9 +710,9 @@ export default function SignRequestsPage() {
                     <Button size="sm" variant="outline" onClick={() => router.push(`/documents/${request.document.id}/flow`)} className="flex-1 text-xs h-8">
                         <Eye className="w-3.5 h-3.5 mr-1" />{t("common.view")}
                     </Button>
-                    <DropdownMenu>
+                    {hasSignRequestOverflowActions(request) && <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" aria-label={t("signRequests.actions.more")}>
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -734,7 +740,7 @@ export default function SignRequestsPage() {
                           </>
                         )}
                       </DropdownMenuContent>
-                    </DropdownMenu>
+                    </DropdownMenu>}
                   </div>
                 </CardContent>
               </Card>

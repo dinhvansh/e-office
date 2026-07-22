@@ -116,33 +116,6 @@ async function seedRBAC() {
     })),
   });
 
-  const managerRole = await prisma.roles.upsert({
-    where: { tenant_id_name: { tenant_id: tenant.id, name: 'Manager' } },
-    update: {
-      description: 'Manage documents, workflows, and approvals',
-      is_system: true,
-    },
-    create: {
-      tenant_id: tenant.id,
-      name: 'Manager',
-      description: 'Manage documents, workflows, and approvals',
-      is_system: true,
-    },
-  });
-
-  const managerPermissions = allPermissions.filter(
-    (permission) =>
-      ['documents', 'sign_requests', 'users', 'approvals', 'workflows'].includes(permission.resource) &&
-      ['create', 'read', 'update', 'approve'].includes(permission.action)
-  );
-  await prisma.role_permissions.deleteMany({ where: { role_id: managerRole.id } });
-  await prisma.role_permissions.createMany({
-    data: managerPermissions.map((permission) => ({
-      role_id: managerRole.id,
-      permission_id: permission.id,
-    })),
-  });
-
   const userRole = await prisma.roles.upsert({
     where: { tenant_id_name: { tenant_id: tenant.id, name: 'User' } },
     update: {
@@ -288,12 +261,6 @@ async function seedRBAC() {
   const tenantUsers = await prisma.users.findMany({
     where: { tenant_id: tenant.id },
     include: {
-      managed_departments: {
-        select: { id: true },
-      },
-      subordinates: {
-        select: { id: true },
-      },
       user_roles: {
         select: { role_id: true },
       },
@@ -306,11 +273,6 @@ async function seedRBAC() {
       user.id === adminUser?.id ||
       user.role === 'super_admin' ||
       user.role === 'admin';
-    const isManagerLike =
-      user.role === 'manager' ||
-      user.managed_departments.length > 0 ||
-      user.subordinates.length > 0;
-
     if (isAdminLike && !existingRoleIds.has(adminRole.id)) {
       await prisma.user_roles.upsert({
         where: {
@@ -323,23 +285,6 @@ async function seedRBAC() {
         create: {
           user_id: user.id,
           role_id: adminRole.id,
-        },
-      });
-      continue;
-    }
-
-    if (isManagerLike && !existingRoleIds.has(managerRole.id)) {
-      await prisma.user_roles.upsert({
-        where: {
-          user_id_role_id: {
-            user_id: user.id,
-            role_id: managerRole.id,
-          },
-        },
-        update: {},
-        create: {
-          user_id: user.id,
-          role_id: managerRole.id,
         },
       });
       continue;
@@ -360,11 +305,18 @@ async function seedRBAC() {
         },
       });
     }
+
+    if (String(user.role || '').toLowerCase() === 'manager') {
+      await prisma.users.update({
+        where: { id: user.id },
+        data: { role: 'user' },
+      });
+    }
   }
 
   console.log('RBAC system seeded successfully.');
   console.log(`  - ${allPermissions.length} permissions`);
-  console.log('  - 4 default roles (Admin, Manager, User, Viewer)');
+  console.log('  - 3 default roles (Admin, User, Viewer)');
   console.log('  - 3 sample departments');
 }
 

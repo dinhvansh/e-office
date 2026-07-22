@@ -96,7 +96,11 @@ export const usersController = {
       const isSuperAdmin = user?.role === 'super_admin';
       
       const { id } = req.params;
-      const updatedUser = await usersService.updateUser(parseInt(id), isSuperAdmin ? null : tenantId, req.body);
+      const targetUserId = parseInt(id);
+      if (targetUserId === req.auth!.userId && req.body?.status && req.body.status !== 'active') {
+        return res.status(400).json({ success: false, error: 'Cannot deactivate the currently authenticated user' });
+      }
+      const updatedUser = await usersService.updateUser(targetUserId, isSuperAdmin ? null : tenantId, req.body);
       res.json({ success: true, data: updatedUser });
     } catch (error: unknown) {
       res.status(400).json({ success: false, error: errorMessage(error) });
@@ -112,7 +116,11 @@ export const usersController = {
       const isSuperAdmin = user?.role === 'super_admin';
       
       const { id } = req.params;
-      await usersService.deleteUser(parseInt(id), isSuperAdmin ? null : tenantId);
+      const targetUserId = parseInt(id);
+      if (targetUserId === req.auth!.userId) {
+        return res.status(400).json({ success: false, error: 'Cannot delete the currently authenticated user' });
+      }
+      await usersService.deleteUser(targetUserId, isSuperAdmin ? null : tenantId);
       res.json({ success: true, message: 'User deleted' });
     } catch (error: unknown) {
       res.status(400).json({ success: false, error: errorMessage(error) });

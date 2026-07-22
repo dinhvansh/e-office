@@ -16,6 +16,7 @@ export const signRequests = {
   "signRequests.actions.deleteDraft": "Delete draft",
   "signRequests.actions.edit": "Edit signing workflow",
   "signRequests.actions.view": "View document",
+  "signRequests.actions.more": "More actions",
   "signRequests.copyLink.unavailable": "No signing link is available. Send the signing request first.",
   "signRequests.copyLink.success": "Signing link copied for {name}.",
   "signRequests.copyLink.error": "Unable to copy the signing link.",

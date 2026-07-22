@@ -14,6 +14,16 @@ test("artifact worker finalizes watermark and certificate before storage and has
   assert.match(worker, /createHash\("sha256"\)\.update\(artifactBytes\)/);
 });
 
+test("completion certificate keeps signing history aligned and includes signer IP evidence", () => {
+  const certificate = read("src/modules/documents/completionCertificate.service.ts");
+
+  assert.match(certificate, /SIGNING HISTORY/);
+  assert.match(certificate, /IP address/);
+  assert.match(certificate, /signer\.ip_address \|\| "Not recorded"/);
+  assert.match(certificate, /tenant: \{ select: \{ name: true, logo_url: true \} \}/);
+  assert.match(certificate, /loadTenantLogo/);
+});
+
 test("every primary document delivery channel streams persisted bytes without mutation", () => {
   const documentsController = read("src/modules/documents/documents.controller.ts");
   const approvalsController = read("src/modules/approvals/approvals.controller.ts");
@@ -26,6 +36,15 @@ test("every primary document delivery channel streams persisted bytes without mu
   assert.doesNotMatch(documentsService, /prepareDocumentDelivery|getWatermarkedDocumentBufferIfNeeded|appendApprovalCertificate/);
   assert.match(documentsService, /getDocumentDeliveryFile/);
   assert.match(documentsService, /FINAL_ARTIFACT_NOT_READY/);
+});
+
+test("completed approval-only documents fall back to their original PDF when no signed artifact exists", () => {
+  const documentsService = read("src/modules/documents/documents.service.ts");
+
+  assert.match(
+    documentsService,
+    /if \(!document\.signed_file_path \|\| !document\.hash\) \{\s*\/\/ A workflow may complete[\s\S]*?return documentFileService\.getOriginalFile\(document\);/,
+  );
 });
 
 test("progressive signing previews cannot become a completed certificate artifact", () => {

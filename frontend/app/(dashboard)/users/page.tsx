@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusTag } from '@/components/ui/status-tag';
-import { PageHeader } from '@/components/ui/page-header';
+import { DashboardHeaderPortal as PageHeader } from '@/components/ui/dashboard-header-portal';
 import { useAuth } from '@/components/providers/auth-provider';
 import { toast } from 'sonner';
 import { ApproveRejectDialog } from '@/components/users/ApproveRejectDialog';

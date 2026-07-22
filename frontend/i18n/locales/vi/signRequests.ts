@@ -13,6 +13,7 @@ export const signRequests = {
   "signRequests.actions.deleteDraft": "Xóa bản nháp",
   "signRequests.actions.edit": "Chỉnh sửa luồng ký",
   "signRequests.actions.view": "Xem tài liệu",
+  "signRequests.actions.more": "Thao tác khác",
   "signRequests.copyLink.unavailable": "Chưa có link ký. Vui lòng gửi yêu cầu ký trước.",
   "signRequests.copyLink.success": "Đã sao chép link ký cho {name}.",
   "signRequests.copyLink.error": "Không thể sao chép link ký.",

@@ -80,6 +80,14 @@ model documents {
   artifact_metadata  Json?
   status             String?
   version            Int           @default(1)
+  // A revision is a new immutable document lifecycle, never an overwrite of
+  // the original file/artifact. root_document_id groups the family.
+  root_document_id   Int?
+  supersedes_document_id Int?
+  revision_no        Int           @default(1)
+  revision_comment   String?
+  source_kind        String        @default("native") // native | revision | external_signed_import
+  external_signature_status String?
   document_number    String?
   numbering_rule_id  Int?
   title              String?
@@ -111,10 +119,16 @@ model documents {
   sign_fields        sign_request_fields[]
   cc_emails          document_cc_emails[]
   attachments        document_attachments[]
+  root_document      documents?    @relation("document_root", fields: [root_document_id], references: [id])
+  revisions          documents[]   @relation("document_root")
+  supersedes_document documents?   @relation("document_supersedes", fields: [supersedes_document_id], references: [id])
+  superseded_by      documents[]   @relation("document_supersedes")
 
   @@index([department_id])
   @@index([sign_request_id])
   @@index([tenant_id, archived_at])
+  @@index([tenant_id, root_document_id, revision_no])
+  @@index([tenant_id, expiration_date])
 }
 
 model sign_requests {

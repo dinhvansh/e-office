@@ -4,14 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { ChangeEvent, KeyboardEvent, MouseEvent, useState, useEffect, useMemo } from "react";
-import { Archive, Download, Eye, FileText, FileType2, FolderArchive, Search, Send, Trash2, Upload, XCircle } from "lucide-react";
+import { Archive, Download, Eye, FileText, FileType2, FolderArchive, Search, Send, Trash2, Upload, XCircle, GitBranch } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { DocumentRecord, DocumentType } from "@/lib/types";
-import { PageHeader } from "@/components/ui/page-header";
+import { DashboardHeaderPortal as PageHeader } from "@/components/ui/dashboard-header-portal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -19,6 +20,7 @@ import { StatusTag } from "@/components/ui/status-tag";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { SelectWithIcon } from "@/components/ui/select-with-icon";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WorkflowPreview } from "@/components/workflow/WorkflowPreview";
 import { WorkflowCustomizer } from "@/components/workflow/WorkflowCustomizer";
 import { AdhocWorkflowBuilder } from "@/components/workflow/AdhocWorkflowBuilder";
@@ -31,12 +33,28 @@ import { MoreVertical } from "lucide-react";
 import { useDestructiveConfirmation } from "@/components/providers/destructive-confirmation-provider";
 import { AsyncErrorState } from "@/components/ui/async-state";
 import { getDocumentLifecycleActions } from "@/lib/document-lifecycle";
+import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/providers/i18n-provider";
 import { getDocumentStatusMeta } from "@/lib/status-localization";
 
 const getDocumentTypeName = (document: DocumentRecord): string | null => {
   if (typeof document.document_type === "string") return document.document_type;
   return document.document_type?.name || null;
+};
+
+const getExpirationLabel = (document: DocumentRecord) => {
+  if (!document.expiration_date) {
+    return { label: 'Không thời hạn', className: 'text-muted-foreground' };
+  }
+
+  const formattedDate = dayjs(document.expiration_date).format('DD/MM/YYYY');
+  if (document.validity_status === 'expired') {
+    return { label: `Đã hết hạn · ${formattedDate}`, className: 'font-medium text-destructive' };
+  }
+  if (document.validity_status === 'expiring_soon') {
+    return { label: `Sắp hết · ${formattedDate}`, className: 'font-medium text-amber-700' };
+  }
+  return { label: formattedDate, className: 'text-foreground' };
 };
 
 export default function DocumentsPage() {
@@ -53,10 +71,15 @@ export default function DocumentsPage() {
   const [fileName, setFileName] = useState("");
   const [selectedDocumentTypeId, setSelectedDocumentTypeId] = useState<number | null>(null);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<number | null>(null);
-  const [confidentialLevel, setConfidentialLevel] = useState("normal");
   const [visibilityScope, setVisibilityScope] = useState("public");
+  const [effectiveDate, setEffectiveDate] = useState('');
+  const [expirationDate, setExpirationDate] = useState('');
   const [customizedSteps, setCustomizedSteps] = useState<any[] | null>(null);
   const [adhocSteps, setAdhocSteps] = useState<any[] | null>(null);
+  const [intakeMode, setIntakeMode] = useState<'new' | 'revision'>('new');
+  const [revisionSearch, setRevisionSearch] = useState('');
+  const [revisionSource, setRevisionSource] = useState<DocumentRecord | null>(null);
+  const [revisionComment, setRevisionComment] = useState('');
   
   // Recipients dialog state
   const [showRecipientsDialog, setShowRecipientsDialog] = useState(false);
@@ -72,24 +95,22 @@ export default function DocumentsPage() {
   const [limit, setLimit] = useState(10);
   
   // Filter and search state
-  const statusFilter = 'completed';
+  // Repository documents are normally ACTIVE; signed/approved documents are
+  // COMPLETED. Showing both is necessary to make a revision chain visible.
+  const statusFilter = '';
   const [searchQuery, setSearchQuery] = useState('');
   const [documentTypeFilter, setDocumentTypeFilter] = useState<string>('all');
-  const [confidentialLevelFilter, setConfidentialLevelFilter] = useState<string>('all');
 
   const { data: documentsData, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["documents", page, limit, statusFilter, searchQuery, documentTypeFilter, confidentialLevelFilter],
+    queryKey: ["documents", page, limit, statusFilter, searchQuery, documentTypeFilter],
     enabled: canReadDocuments,
     queryFn: async () => {
-      let url = `/documents?page=${page}&limit=${limit}&status=completed`;
+      let url = `/documents?page=${page}&limit=${limit}&current_only=true`;
       if (searchQuery) {
         url += `&search=${encodeURIComponent(searchQuery)}`;
       }
       if (documentTypeFilter && documentTypeFilter !== 'all') {
         url += `&document_type_id=${documentTypeFilter}`;
-      }
-      if (confidentialLevelFilter && confidentialLevelFilter !== 'all') {
-        url += `&confidential_level=${confidentialLevelFilter}`;
       }
       const data = await fetchJson<{ 
         documents: DocumentRecord[];
@@ -133,6 +154,13 @@ export default function DocumentsPage() {
     },
   });
 
+  const { data: revisionSourcesData, isFetching: isFetchingRevisionSources } = useQuery({
+    queryKey: ['document-revision-sources', 'repository', revisionSearch],
+    enabled: canReadDocuments && intakeMode === 'revision',
+    queryFn: async () => fetchJson<{ documents: DocumentRecord[] }>(`/documents/revision-sources?mode=repository&search=${encodeURIComponent(revisionSearch)}`),
+  });
+  const revisionSources = revisionSourcesData?.documents || [];
+
   // Fetch external organizations once at parent level
   const { data: externalOrgs } = useQuery({
     queryKey: ["external-orgs"],
@@ -145,9 +173,10 @@ export default function DocumentsPage() {
   });
 
 
-  // Only show document types that DON'T require digital signing
+  // This screen is the managed document repository, not the signing intake.
+  // Types with approval or signing requirements must go through /sign-requests/create.
   const activeDocumentTypes = useMemo(
-    () => (creatableDocumentTypesData ?? []).filter((type) => type.is_active && !type.require_digital_signing),
+    () => (creatableDocumentTypesData ?? []).filter((type) => type.is_active && !type.require_approval && !type.require_digital_signing),
     [creatableDocumentTypesData],
   );
   const activeWorkflows = Array.isArray(workflowsData) ? workflowsData.filter((wf) => wf.is_active) : [];
@@ -206,9 +235,17 @@ export default function DocumentsPage() {
         file_name: fileName || selectedFile.name,
         file_base64: base64,
         document_type_id: selectedDocumentTypeId,
-        confidential_level: confidentialLevel,
         visibility_scope: visibilityScope,
+        effective_date: effectiveDate || undefined,
+        expiration_date: expirationDate || undefined,
+        intake_mode: intakeMode,
+        source_document_id: intakeMode === 'revision' ? revisionSource?.id : undefined,
+        revision_comment: intakeMode === 'revision' ? revisionComment.trim() || undefined : undefined,
       };
+
+      if (intakeMode === 'revision' && !revisionSource) {
+        throw new Error('Vui lòng chọn tài liệu gốc để tạo phiên bản mới');
+      }
       
       // Add workflow data based on mode
       if (workflowMode === 'strict' && selectedDocType?.default_workflow_id) {
@@ -265,7 +302,6 @@ export default function DocumentsPage() {
       setFileName("");
       setSelectedDocumentTypeId(null);
       setSelectedWorkflowId(null);
-      setConfidentialLevel("normal");
       setVisibilityScope("public");
       setSigners([]);
       setCcEmails([]);
@@ -594,6 +630,35 @@ export default function DocumentsPage() {
             )}
           </div>
 
+          <div className="space-y-3 border-t pt-4">
+            <Label>Tạo tài liệu</Label>
+            <div className="inline-flex rounded-lg border bg-slate-50 p-1">
+              <Button type="button" size="sm" variant={intakeMode === 'new' ? 'default' : 'ghost'} onClick={() => {
+                if (intakeMode === 'revision' && revisionSource) {
+                  confirmDestructive({ title: 'Chuyển sang tài liệu mới?', targetName: revisionSource.title || revisionSource.original_file_name || `Tài liệu #${revisionSource.id}`, description: 'Tài liệu gốc sẽ không còn được chọn. File và các thông tin đã nhập vẫn được giữ lại.', confirmLabel: 'Chuyển', destructive: false }, async () => {
+                    setIntakeMode('new'); setRevisionSource(null); setSelectedDocumentTypeId(null);
+                    return undefined;
+                  });
+                  return;
+                }
+                setIntakeMode('new'); setRevisionSource(null);
+              }}>Tài liệu mới</Button>
+              <Button type="button" size="sm" variant={intakeMode === 'revision' ? 'default' : 'ghost'} onClick={() => setIntakeMode('revision')}>
+                <GitBranch className="mr-2 h-4 w-4" />Phiên bản mới
+              </Button>
+            </div>
+            {intakeMode === 'revision' && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 space-y-3">
+                <div>
+                  <Label htmlFor="revision-source-search">Tài liệu gốc</Label>
+                  <Input id="revision-source-search" value={revisionSearch} onChange={(event) => setRevisionSearch(event.target.value)} placeholder="Tìm theo tên hoặc mã văn bản..." className="mt-2 bg-white" />
+                </div>
+                {!revisionSource && <div className="max-h-48 space-y-2 overflow-y-auto">{isFetchingRevisionSources ? <p className="text-sm text-muted-foreground">Đang tìm tài liệu...</p> : revisionSources.map((source) => <button key={source.id} type="button" className="w-full rounded-lg border bg-white p-3 text-left hover:border-blue-400 hover:bg-blue-50" onClick={() => { setRevisionSource(source); setSelectedDocumentTypeId(source.document_type_id ?? null); setVisibilityScope(source.visibility_scope || 'public'); setEffectiveDate(source.effective_date ? String(source.effective_date).slice(0, 10) : ''); setExpirationDate(source.expiration_date ? String(source.expiration_date).slice(0, 10) : ''); }}><p className="font-medium">{source.document_number || `#${source.id}`} · {source.title || source.original_file_name}</p><p className="mt-1 text-xs text-muted-foreground">{getDocumentTypeName(source) || 'Chưa có loại'} · v{source.revision_no || 1}</p></button>)}{!isFetchingRevisionSources && revisionSources.length === 0 && <p className="text-sm text-muted-foreground">Không có tài liệu hiện hành phù hợp để tạo phiên bản mới.</p>}</div>}
+                {revisionSource && <><div className="rounded-lg border border-blue-200 bg-white p-3"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{revisionSource.document_number || `#${revisionSource.id}`} · {revisionSource.title || revisionSource.original_file_name}</p><p className="mt-1 text-sm text-muted-foreground">{getDocumentTypeName(revisionSource) || 'Chưa có loại'} · v{revisionSource.revision_no || 1} → <strong>v{(revisionSource.revision_no || 1) + 1}</strong></p><p className="mt-1 text-xs text-muted-foreground">Hiệu lực: {revisionSource.effective_date ? dayjs(revisionSource.effective_date).format('DD/MM/YYYY') : 'Chưa đặt'} · Hết hiệu lực: {revisionSource.expiration_date ? dayjs(revisionSource.expiration_date).format('DD/MM/YYYY') : 'Không thời hạn'}</p></div><Button type="button" variant="ghost" size="sm" onClick={() => { setRevisionSource(null); setSelectedDocumentTypeId(null); setRevisionComment(''); }}>Đổi</Button></div><p className="mt-2 text-sm text-blue-700">Sẽ tạo phiên bản v{(revisionSource.revision_no || 1) + 1} của tài liệu này.</p></div><div className="space-y-2"><Label htmlFor="revision-comment">Ghi chú thay thế</Label><Textarea id="revision-comment" value={revisionComment} onChange={(event) => setRevisionComment(event.target.value)} placeholder="Ví dụ: Cập nhật điều khoản thanh toán theo phụ lục mới" maxLength={1000} className="bg-white" /><p className="text-xs text-muted-foreground">Ghi chú này xuất hiện trong lịch sử phiên bản để giải thích bản mới thay thế nội dung nào.</p></div></>}
+              </div>
+            )}
+          </div>
+
           {/* Step 2: Configuration - Only show after file is selected */}
           {selectedFile && (
             <>
@@ -602,60 +667,32 @@ export default function DocumentsPage() {
                   <Label htmlFor="document-type">
                     Loại văn bản <span className="text-red-500">*</span>
                   </Label>
-                  <SelectWithIcon
-                    options={documentTypeOptions}
-                    value={selectedDocumentTypeId}
-                    onChange={(value) => setSelectedDocumentTypeId(Number(value))}
-                    placeholder="-- Chọn loại văn bản --"
+                  {intakeMode === 'revision' && revisionSource ? <div className="rounded-lg border bg-slate-50 px-3 py-2 text-sm">{getDocumentTypeName(revisionSource) || 'Loại văn bản của tài liệu gốc'} <span className="ml-2 text-muted-foreground">(kế thừa, không thể thay đổi)</span></div> : <SelectWithIcon options={documentTypeOptions} value={selectedDocumentTypeId} onChange={(value) => setSelectedDocumentTypeId(Number(value))} placeholder="-- Chọn loại văn bản --" />}
+                  <p className="text-xs text-muted-foreground">{intakeMode === 'revision' ? 'Loại văn bản được kế thừa để giữ lịch sử phiên bản nhất quán.' : 'Chỉ hiển thị loại văn bản không yêu cầu phê duyệt hoặc ký. Tài liệu cần xử lý hãy tạo tại Yêu cầu Ký duyệt.'}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="file-name">Tên hiển thị</Label>
+                  <Input
+                    id="file-name"
+                    value={fileName}
+                    placeholder="Hợp đồng đối tác 2025"
+                    onChange={(e) => setFileName(e.target.value)}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Quy trình phê duyệt sẽ tự động hiển thị dựa trên loại văn bản
-                  </p>
-                  {selectedDocType?.require_digital_signing && (
-                    <div className="flex items-center gap-2 p-2 bg-purple-50 rounded border border-purple-200">
-                      <span className="text-purple-600 font-semibold text-xs">✍️ Loại văn bản này yêu cầu chữ ký điện tử</span>
-                    </div>
-                  )}
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="file-name">Tên hiển thị</Label>
-                    <Input
-                      id="file-name"
-                      value={fileName}
-                      placeholder="Hợp đồng đối tác 2025"
-                      onChange={(e) => setFileName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confidential-level">Mức độ mật</Label>
-                    <select
-                      id="confidential-level"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      value={confidentialLevel}
-                      onChange={(e) => setConfidentialLevel(e.target.value)}
-                    >
-                      <option value="normal">🔓 Normal (Thông thường)</option>
-                      <option value="confidential">🔒 Confidential (Bảo mật)</option>
-                      <option value="secret">🔐 Secret (Tuyệt mật)</option>
-                    </select>
-                  </div>
+                  <div className="space-y-2"><Label htmlFor="effective-date">Ngày có hiệu lực</Label><Input id="effective-date" type="date" value={effectiveDate} onChange={(event) => setEffectiveDate(event.target.value)} /></div>
+                  <div className="space-y-2"><Label htmlFor="expiration-date">Ngày hết hiệu lực</Label><Input id="expiration-date" type="date" min={effectiveDate || undefined} value={expirationDate} onChange={(event) => setExpirationDate(event.target.value)} /><p className="text-xs text-muted-foreground">Hệ thống nhắc trước 30, 14, 7 và 1 ngày; sau đó nhắc lại mỗi tuần.</p></div>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="visibility-scope">Phạm vi hiển thị</Label>
-                    <select
-                      id="visibility-scope"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      value={visibilityScope}
-                      onChange={(e) => setVisibilityScope(e.target.value)}
-                    >
-                      <option value="public">🌐 Public (Công khai)</option>
-                      <option value="department">🏢 Department (Phòng ban)</option>
-                      <option value="private">🔒 Private (Riêng tư)</option>
-                    </select>
+                    <Select value={visibilityScope} onValueChange={setVisibilityScope}>
+                      <SelectTrigger id="visibility-scope"><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem value="public">🌐 Công khai</SelectItem><SelectItem value="department">🏢 Trong phòng ban</SelectItem><SelectItem value="private">🔒 Riêng tư</SelectItem></SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -732,7 +769,7 @@ export default function DocumentsPage() {
                 <div className="flex justify-end pt-4 border-t">
                   <Button
                     onClick={() => uploadMutation.mutate()}
-                    disabled={uploadMutation.isPending || !selectedFile || !selectedDocumentTypeId}
+                    disabled={uploadMutation.isPending || !selectedFile || !selectedDocumentTypeId || (intakeMode === 'revision' && !revisionSource)}
                     size="lg"
                   >
                     {uploadMutation.isPending ? (
@@ -746,7 +783,7 @@ export default function DocumentsPage() {
                     ) : (
                       <>
                         <Upload className="w-4 h-4 mr-2" />
-                        Tải tài liệu
+                        {intakeMode === 'revision' && revisionSource ? `Tạo phiên bản v${(revisionSource.revision_no || 1) + 1}` : 'Tải tài liệu'}
                       </>
                     )}
                   </Button>
@@ -813,21 +850,6 @@ export default function DocumentsPage() {
                 ))}
               </select>
             </div>
-            <div className="sm:w-48">
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                value={confidentialLevelFilter}
-                onChange={(e) => {
-                  setConfidentialLevelFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="all">Tất cả mức bảo mật</option>
-                <option value="normal">Thường</option>
-                <option value="confidential">Mật</option>
-                <option value="secret">Tối mật</option>
-              </select>
-            </div>
           </div>
           {isLoading ? (
             <>
@@ -842,6 +864,7 @@ export default function DocumentsPage() {
                         <th className="px-4 py-3 text-left font-medium">Người tạo</th>
                         <th className="px-4 py-3 text-left font-medium">Số văn bản</th>
                         <th className="px-4 py-3 text-left font-medium">Trạng thái</th>
+                        <th className="px-4 py-3 text-left font-medium">Hết hiệu lực</th>
                         <th className="px-4 py-3 text-left font-medium">Ngày tạo</th>
                         <th className="px-4 py-3 text-right font-medium">Thao tác</th>
                       </tr>
@@ -855,6 +878,7 @@ export default function DocumentsPage() {
                           <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
                           <td className="px-4 py-3"><Skeleton className="h-5 w-24" /></td>
                           <td className="px-4 py-3"><Skeleton className="h-6 w-20" /></td>
+                          <td className="px-4 py-3"><Skeleton className="h-5 w-28" /></td>
                           <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-2">
@@ -893,16 +917,16 @@ export default function DocumentsPage() {
             <>
             <div className="rounded-lg border hidden md:block overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[800px]">
+                <table className="w-full text-sm min-w-[920px]">
                   <thead className="bg-muted/50 border-b">
                     <tr>
                       <th className="px-2 py-2 text-left text-xs font-medium">ID</th>
                       <th className="px-2 py-2 text-left text-xs font-medium">Tên file</th>
                       <th className="px-2 py-2 text-left text-xs font-medium">Số VB</th>
                       <th className="w-40 px-2 py-2 text-left text-xs font-medium">Loại</th>
-                      <th className="px-2 py-2 text-left text-xs font-medium">Bảo mật</th>
                       <th className="px-2 py-2 text-left text-xs font-medium">Trạng thái</th>
-                      <th className="px-2 py-2 text-left text-xs font-medium">Ngày</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium">Hết hiệu lực</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium">Ngày tạo</th>
                       <th className="px-2 py-2 text-right text-xs font-medium">Thao tác</th>
                     </tr>
                   </thead>
@@ -917,11 +941,20 @@ export default function DocumentsPage() {
                       >
                         <td className="px-2 py-3 font-semibold text-xs">#{doc.id}</td>
                         <td className="px-2 py-3">
+                          <div className="min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0">
                             <FileText className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                             <span className="truncate text-sm">
                               {doc.original_file_name || doc.title || `Document #${doc.id}`}
                             </span>
+                          </div>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {(doc.revision_no || 1) > 1 ? <Badge variant="secondary" className="h-5 text-[10px]">Phiên bản v{doc.revision_no}</Badge> : null}
+                            {doc.is_current_revision ? <Badge variant="outline" className="h-5 border-emerald-300 text-[10px] text-emerald-700">Bản hiện hành</Badge> : null}
+                            {doc.is_superseded ? <Badge variant="outline" className="h-5 border-slate-300 text-[10px] text-slate-600">Đã thay thế</Badge> : null}
+                            {doc.source_kind === 'external_signed_import' ? <Badge variant="outline" className="h-5 border-amber-300 text-[10px] text-amber-800">Ký ngoài hệ thống</Badge> : null}
+                            {doc.validity_status === 'expired' ? <Badge variant="destructive" className="h-5 text-[10px]">Đã hết hiệu lực</Badge> : doc.validity_status === 'expiring_soon' ? <Badge variant="outline" className="h-5 border-amber-300 text-[10px] text-amber-800">Sắp hết hiệu lực</Badge> : null}
+                          </div>
                           </div>
                         </td>
                         <td className="px-2 py-3">
@@ -941,13 +974,10 @@ export default function DocumentsPage() {
                           )}
                         </td>
                         <td className="px-2 py-3">
-                          {doc.confidential_level === 'high' && <Badge variant="destructive" className="text-xs whitespace-nowrap">Mật</Badge>}
-                          {doc.confidential_level === 'medium' && <Badge variant="outline" className="border-orange-500 text-orange-700 text-xs whitespace-nowrap">Hạn chế</Badge>}
-                          {doc.confidential_level === 'normal' && <Badge variant="secondary" className="text-xs whitespace-nowrap">Thường</Badge>}
-                          {!doc.confidential_level && <span className="text-muted-foreground text-xs">—</span>}
-                        </td>
-                        <td className="px-2 py-3">
                           <StatusTag status={getDocumentStatusMeta(doc.status, t).label} variant={getDocumentStatusMeta(doc.status, t).variant} className="whitespace-nowrap" />
+                        </td>
+                        <td className={cn("px-2 py-3 text-xs whitespace-nowrap", getExpirationLabel(doc).className)}>
+                          {getExpirationLabel(doc).label}
                         </td>
                         <td className="px-2 py-3 text-muted-foreground text-xs whitespace-nowrap">
                           {dayjs(doc.created_at).format("DD/MM/YY")}
@@ -1123,8 +1153,12 @@ export default function DocumentsPage() {
                       <p className="font-medium truncate">{getDocumentTypeName(doc) || '—'}</p>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Ngày:</span>
+                      <span className="text-muted-foreground">Ngày tạo:</span>
                       <p className="font-medium">{dayjs(doc.created_at).format('DD/MM/YY')}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Hết hiệu lực:</span>
+                      <p className={cn('font-medium', getExpirationLabel(doc).className)}>{getExpirationLabel(doc).label}</p>
                     </div>
                   </div>
 

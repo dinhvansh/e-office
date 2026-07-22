@@ -1,5 +1,11 @@
 import { rolesRepository } from './roles.repository';
 
+function rejectRemovedManagerRole(name: string | undefined) {
+  if (name?.trim().toLowerCase() === 'manager') {
+    throw new Error('Manager is an organizational relationship, not an assignable system role');
+  }
+}
+
 export const rolesService = {
   async getRoles(tenantId: number) {
     return rolesRepository.findByTenant(tenantId);
@@ -18,6 +24,7 @@ export const rolesService = {
     description?: string;
     permission_ids?: number[];
   }) {
+    rejectRemovedManagerRole(data.name);
     const { permission_ids, ...roleData } = data;
 
     const role = await rolesRepository.create({
@@ -46,6 +53,8 @@ export const rolesService = {
     if (existing.is_system) {
       throw new Error('Cannot modify system role');
     }
+
+    rejectRemovedManagerRole(data.name);
 
     const { permission_ids, ...roleData } = data;
 

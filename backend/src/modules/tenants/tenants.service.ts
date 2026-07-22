@@ -148,14 +148,6 @@ class TenantsService {
         }
       });
 
-      const managerRole = await tx.roles.create({
-        data: {
-          tenant_id: tenant.id,
-          name: 'Manager',
-          description: 'Department manager'
-        }
-      });
-
       const userRole = await tx.roles.create({
         data: {
           tenant_id: tenant.id,
@@ -163,7 +155,6 @@ class TenantsService {
           description: 'Regular user'
         }
       });
-      void managerRole;
       void userRole;
 
       // 5. Assign admin role to admin user

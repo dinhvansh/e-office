@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/auth-provider';
-import { PageHeader } from '@/components/ui/page-header';
+import { DashboardHeaderPortal as PageHeader } from '@/components/ui/dashboard-header-portal';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -20,58 +20,11 @@ interface Position {
   code: string;
   name: string;
   description?: string;
-  level?: number;
   is_active: boolean;
   can_manage_department?: boolean;
   _count?: {
     users: number;
   };
-}
-
-type SecurityAccessBand = 'normal' | 'confidential' | 'secret' | 'top_secret';
-
-const SECURITY_ACCESS_OPTIONS: Array<{
-  value: SecurityAccessBand;
-  threshold: number;
-  label: string;
-  description: string;
-}> = [
-  {
-    value: 'normal',
-    threshold: 1,
-    label: 'Thông thường',
-    description: 'Chỉ dùng cho tài liệu thông thường.',
-  },
-  {
-    value: 'confidential',
-    threshold: 2,
-    label: 'Bảo mật',
-    description: 'Đọc được tài liệu mức Bảo mật trở xuống.',
-  },
-  {
-    value: 'secret',
-    threshold: 4,
-    label: 'Mật',
-    description: 'Đọc được tài liệu mức Mật trở xuống.',
-  },
-  {
-    value: 'top_secret',
-    threshold: 6,
-    label: 'Tuyệt mật',
-    description: 'Đọc được mọi mức tài liệu bảo mật.',
-  },
-];
-
-function resolveSecurityBand(level?: number): SecurityAccessBand {
-  if (!level || level < 2) return 'normal';
-  if (level >= 6) return 'top_secret';
-  if (level >= 4) return 'secret';
-  return 'confidential';
-}
-
-function getSecurityAccessMeta(level?: number) {
-  const band = resolveSecurityBand(level);
-  return SECURITY_ACCESS_OPTIONS.find((option) => option.value === band) ?? SECURITY_ACCESS_OPTIONS[0];
 }
 
 export default function PositionsPage() {
@@ -85,12 +38,10 @@ export default function PositionsPage() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [filter, setFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [securityBand, setSecurityBand] = useState<SecurityAccessBand>('normal');
   const [formData, setFormData] = useState({
     code: '',
     name: '',
     description: '',
-    level: '1',
     can_manage_department: false,
   });
 
@@ -215,14 +166,11 @@ export default function PositionsPage() {
         code: position.code,
         name: position.name,
         description: position.description || '',
-        level: position.level?.toString() || '',
         can_manage_department: !!position.can_manage_department,
       });
-      setSecurityBand(resolveSecurityBand(position.level));
     } else {
       setEditingPosition(null);
-      setFormData({ code: '', name: '', description: '', level: '1', can_manage_department: false });
-      setSecurityBand('normal');
+      setFormData({ code: '', name: '', description: '', can_manage_department: false });
     }
     setIsDialogOpen(true);
   };
@@ -230,8 +178,7 @@ export default function PositionsPage() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingPosition(null);
-    setFormData({ code: '', name: '', description: '', level: '1', can_manage_department: false });
-    setSecurityBand('normal');
+    setFormData({ code: '', name: '', description: '', can_manage_department: false });
   };
 
   const totalStats = {
@@ -247,7 +194,6 @@ export default function PositionsPage() {
       code: formData.code,
       name: formData.name,
       description: formData.description || undefined,
-      level: formData.level ? parseInt(formData.level) : undefined,
       can_manage_department: formData.can_manage_department,
     };
 
@@ -350,7 +296,6 @@ export default function PositionsPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên chức danh</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mô tả</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mức truy cập</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nhân viên</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
@@ -359,7 +304,7 @@ export default function PositionsPage() {
             <tbody className="divide-y">
               {filteredPositions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                     {searchQuery ? 'Không tìm thấy chức danh nào' : 'Chưa có chức danh nào'}
                   </td>
                 </tr>
@@ -369,13 +314,6 @@ export default function PositionsPage() {
                   <td className="px-4 py-3 text-sm font-mono">{position.code}</td>
                   <td className="px-4 py-3 text-sm font-medium">{position.name}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">{position.description || '-'}</td>
-                  <td className="px-4 py-3 text-sm">
-                    {position.level ? (
-                      <Badge variant="outline">
-                        {getSecurityAccessMeta(position.level).label}
-                      </Badge>
-                    ) : '-'}
-                  </td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex items-center gap-1">
                       <Users className="w-4 h-4 text-gray-400" />
@@ -534,37 +472,6 @@ export default function PositionsPage() {
                 placeholder="Mô tả về chức danh này..."
                 rows={3}
               />
-            </div>
-
-            <div>
-              <Label htmlFor="level">Cấp truy cập bảo mật</Label>
-              <Select
-                value={securityBand}
-                onValueChange={(value: SecurityAccessBand) => {
-                  const selectedOption = SECURITY_ACCESS_OPTIONS.find((option) => option.value === value);
-                  setSecurityBand(value);
-                  if (selectedOption) {
-                    setFormData({ ...formData, level: selectedOption.threshold.toString() });
-                  }
-                }}
-              >
-                <SelectTrigger id="level" className="h-11">
-                  <SelectValue placeholder="Chọn mức truy cập bảo mật" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SECURITY_ACCESS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500 mt-1">
-                {SECURITY_ACCESS_OPTIONS.find((option) => option.value === securityBand)?.description}
-              </p>
-              <p className="text-xs text-gray-400">
-                Hệ thống sẽ tự quy đổi sang mức kỹ thuật phù hợp khi lưu.
-              </p>
             </div>
 
             <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/40">

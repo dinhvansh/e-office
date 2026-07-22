@@ -27,7 +27,7 @@ import {
 } from "recharts";
 import { useAuth } from "@/components/providers/auth-provider";
 import { DocumentRecord, TenantProfile } from "@/lib/types";
-import { PageHeader } from "@/components/ui/page-header";
+import { DashboardHeaderPortal as PageHeader } from "@/components/ui/dashboard-header-portal";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

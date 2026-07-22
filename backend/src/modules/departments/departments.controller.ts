@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { departmentsService } from './departments.service';
 import { AppError } from '../../utils/errors';
+import { organizationStructureService, type OrganizationStructureInput } from './organization-structure.service';
 
 const idSchema = z.coerce.number().int().positive();
 const departmentPayloadSchema = z.object({
@@ -15,6 +16,20 @@ const departmentPayloadSchema = z.object({
 });
 
 const updateDepartmentPayloadSchema = departmentPayloadSchema.partial();
+const organizationStructureSchema = z.object({
+  manager_id: z.number().int().positive().nullable(),
+  support_manager_ids: z.array(z.number().int().positive()).max(20).default([]),
+  members: z.array(z.object({
+    user_id: z.number().int().positive(),
+    position_id: z.number().int().positive().nullable(),
+    manager_id: z.number().int().positive().nullable(),
+  })).max(1000),
+  manager_replacements: z.array(z.object({
+    department_id: z.number().int().positive(),
+    outgoing_user_id: z.number().int().positive(),
+    replacement_user_id: z.number().int().positive(),
+  })).default([]),
+});
 type CreateDepartmentInput = {
   name: string;
   code?: string;
@@ -27,6 +42,27 @@ type CreateDepartmentInput = {
 const errorMessage = (error: unknown): string => error instanceof Error ? error.message : 'Unexpected error';
 
 export const departmentsController = {
+  async getOrganizationStructure(req: Request, res: Response) {
+    try {
+      const data = await organizationStructureService.get(req.auth!.tenantId, idSchema.parse(req.params.id));
+      res.json({ success: true, data });
+    } catch (error: unknown) {
+      const appError = error instanceof AppError ? error : null;
+      res.status(appError?.statusCode ?? 400).json({ success: false, error: { code: appError?.code ?? 'ORGANIZATION_LOAD_FAILED', message: errorMessage(error), details: appError?.details } });
+    }
+  },
+
+  async updateOrganizationStructure(req: Request, res: Response) {
+    try {
+      const payload = organizationStructureSchema.parse(req.body) as OrganizationStructureInput;
+      const data = await organizationStructureService.update(req.auth!.tenantId, idSchema.parse(req.params.id), payload);
+      res.json({ success: true, data });
+    } catch (error: unknown) {
+      const appError = error instanceof AppError ? error : null;
+      res.status(appError?.statusCode ?? 400).json({ success: false, error: { code: appError?.code ?? 'ORGANIZATION_UPDATE_FAILED', message: errorMessage(error), details: appError?.details } });
+    }
+  },
+
   async getDepartments(req: Request, res: Response) {
     try {
       const tenantId = req.auth!.tenantId;
