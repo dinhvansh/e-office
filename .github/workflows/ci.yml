@@ -45,6 +45,7 @@ jobs:
       JWT_SECRET: ci-jwt-secret-at-least-32-chars-long
       REFRESH_TOKEN_SECRET: ci-refresh-secret-at-least-32-chars-long
       DEMO_ADMIN_PASSWORD: ci-demo-admin-password-unique-2026
+      E2E_ROLE_PASSWORD: ci-e2e-role-password-unique-2026
       REDIS_URL: redis://localhost:6379
       NODE_ENV: test
       PORT: 4000
