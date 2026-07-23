@@ -44,3 +44,22 @@ test("login and refresh send refresh tokens only in HttpOnly cookies", async () 
     assert.match(response.header("Set-Cookie") || "", /raw-refresh-token/);
   }
 });
+
+test("login forwards a short non-empty password to the credential check", async () => {
+  let receivedPassword: string | undefined;
+  const result = {
+    tokens: { accessToken: "access-token", refreshToken: "raw-refresh-token" },
+    user: { id: 41, email: "active@example.test", role: "User" },
+    tenant: { id: 9, name: "Test", plan: "free", status: "active" },
+  };
+  (authService as unknown as { login: unknown }).login = async (input: { password: string }) => {
+    receivedPassword = input.password;
+    return result;
+  };
+
+  const controller = new AuthController();
+  const response = responseHarness();
+  await controller.login({ body: { email: "active@example.test", password: "x" } } as never, response as never);
+
+  assert.equal(receivedPassword, "x");
+});

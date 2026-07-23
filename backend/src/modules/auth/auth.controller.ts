@@ -7,7 +7,10 @@ import { authService } from "./auth.service";
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  // Password policy applies when a password is created or changed. During
+  // login, any non-empty candidate must reach the credential check so a short
+  // wrong password receives the same 401 response as every other mismatch.
+  password: z.string().min(1),
 });
 
 const refreshSchema = z.object({

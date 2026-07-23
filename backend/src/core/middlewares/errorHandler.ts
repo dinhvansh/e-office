@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import { ZodError } from "zod";
 import { ApiError } from "../errors/api-error";
 
 interface ApiErrorResponse {
@@ -24,6 +25,24 @@ export const errorHandler = (err: unknown, req: Request, res: Response, _next: N
       },
     };
     res.status(err.statusCode).json(payload);
+    return;
+  }
+
+  if (err instanceof ZodError) {
+    const payload: ApiErrorResponse = {
+      success: false,
+      error: {
+        message: "Invalid request data",
+        code: "VALIDATION_ERROR",
+        details: err.issues.map((issue) => ({
+          code: issue.code,
+          path: issue.path,
+          message: issue.message,
+        })),
+        requestId: req.context?.requestId,
+      },
+    };
+    res.status(400).json(payload);
     return;
   }
 
