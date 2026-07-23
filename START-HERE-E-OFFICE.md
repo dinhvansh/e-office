@@ -23,20 +23,18 @@ Stack chính:
 ### Docker
 
 ```bash
-cp .env.compose.example .env
-docker compose up -d --build
-docker exec eoffice-backend npx prisma migrate deploy
-docker exec eoffice-backend node scripts/seed.js
-docker exec eoffice-backend node scripts/seed-rbac.js
-docker exec eoffice-backend node scripts/seed-document-types.js
-docker exec eoffice-backend node scripts/seed-workflows-simple.js
+DEMO_ADMIN_PASSWORD='replace-with-a-unique-password' ./install.sh demo
 ```
+
+Xem `INSTALL-DEMO.md` cho môi trường thử nghiệm và
+`INSTALL-PRODUCTION.md` cho dữ liệu cần lưu giữ. Không chạy `prisma db push`
+trên database staging hoặc production.
 
 ### URL
 
 - frontend: `http://localhost:3000`
 - backend: `http://localhost:4000`
-- license server: `http://localhost:5000`
+- license server: optional profile; xem `docs/docker/README.md`
 
 ### Login mẫu
 

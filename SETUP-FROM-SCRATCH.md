@@ -1,5 +1,10 @@
 # Setup From Scratch - Hướng dẫn cài đặt từ đầu
 
+> **Obsolete installation guide.** Các lệnh bên dưới là ghi chú lịch sử và
+> không khớp Compose hiện tại. Dùng `INSTALL-DEMO.md` hoặc
+> `INSTALL-PRODUCTION.md`; không dùng `prisma db push` hay force reset với dữ
+> liệu cần lưu giữ.
+
 ## 🔄 Reset và Clone từ Git
 
 ### 1. Backup data cũ (nếu cần)

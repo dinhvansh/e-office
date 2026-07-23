@@ -1,5 +1,9 @@
 # Docker Deployment Guide - Hướng dẫn Deploy với Docker
 
+> **Hướng dẫn chi tiết lỗi thời.** Dùng [`README.md`](README.md) cho hành vi
+> Docker hiện tại và
+> [`../../INSTALL-PRODUCTION.md`](../../INSTALL-PRODUCTION.md) để cài đặt.
+
 ## 📋 Yêu cầu hệ thống
 
 ### Máy Windows

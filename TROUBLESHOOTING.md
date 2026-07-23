@@ -1,5 +1,10 @@
 # 🔧 E-Office Troubleshooting Guide
 
+> Một số lệnh bên dưới dùng tên container lịch sử. Với bản hiện tại, ưu tiên
+> `docker compose logs <service>`, `docker compose exec <service> ...` và quy
+> trình trong `docs/BACKUP-RESTORE.md`. Không xóa volume hoặc dọn Docker toàn
+> host khi chưa xác nhận chính xác target và backup.
+
 ## Khi Nào Cần Clean Reset?
 
 Sử dụng `clean-reset.sh` khi gặp các vấn đề sau:

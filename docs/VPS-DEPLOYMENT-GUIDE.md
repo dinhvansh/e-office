@@ -1,5 +1,8 @@
 # VPS Deployment Guide - E-Office
 
+> **Hướng dẫn lỗi thời.** Nội dung bên dưới chứa lệnh Compose v1 và giả định
+> triển khai cũ. Dùng [`../INSTALL-PRODUCTION.md`](../INSTALL-PRODUCTION.md).
+
 ## Thông Tin VPS
 
 - **IP**: 36.50.27.139

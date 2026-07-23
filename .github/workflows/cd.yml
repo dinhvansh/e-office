@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to VPS (docker-compose)
+    name: Deploy to VPS (Docker Compose)
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 
@@ -31,11 +31,12 @@ jobs:
           script: |
             set -e
 
-            echo "🔄 Pull latest code"
+            echo "Pull latest reviewed code"
             cd /opt/e-office
-            git pull origin main
+            git fetch origin
+            git pull --ff-only origin main
 
-            echo "🚀 Run deploy.sh (docker-compose.prod.yml)"
+            echo "Run the retained-deployment helper"
             chmod +x deploy.sh || true
             ./deploy.sh production
 

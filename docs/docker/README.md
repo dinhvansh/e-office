@@ -2,6 +2,11 @@
 
 ## Secure default startup
 
+For end-to-end installation instructions, use
+[`../../INSTALL-DEMO.md`](../../INSTALL-DEMO.md) or
+[`../../INSTALL-PRODUCTION.md`](../../INSTALL-PRODUCTION.md). The commands below
+explain the Compose layer rather than defining a separate installation path.
+
 ```powershell
 # 1. Create a private environment file and replace every GENERATE_* value.
 Copy-Item .env.compose.example .env
@@ -117,7 +122,7 @@ or pushing an existing database.
 ## Services
 
 - Backend: Node.js + TypeScript + Prisma (port 4000)
-- Frontend: Next.js 14 (port 3000)
+- Frontend: Next.js 16 (port 3000)
 - Database: PostgreSQL 16 (internal by default; development override port 5432)
 - Redis: 7-alpine (internal by default; development override port 6379)
 - License Server: Node.js (optional `license` profile)

@@ -1,5 +1,9 @@
 # Deployment Guide
 
+> **Hướng dẫn lỗi thời.** Chỉ giữ lại để tham khảo lịch sử. Dùng
+> [`../INSTALL-PRODUCTION.md`](../INSTALL-PRODUCTION.md) và
+> [`BACKUP-RESTORE.md`](BACKUP-RESTORE.md).
+
 Tài liệu deploy chuẩn cho trạng thái repo hiện tại.
 
 ## 1. Mô hình deploy

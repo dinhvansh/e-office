@@ -7,6 +7,8 @@
 backend/.env
 frontend/.env.local
 license-server/.env
+.credentials.txt
+backups/
 
 # Dependencies
 node_modules/

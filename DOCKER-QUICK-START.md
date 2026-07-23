@@ -1,32 +1,14 @@
 # Docker Quick Start
 
-## Start Services
-```bash
-docker-compose up -d
-```
+This compatibility page replaces an obsolete guide that used Compose v1,
+hard-coded container names, and `prisma db push`.
 
-## Setup Database (First Time)
-```bash
-docker-compose exec backend npx prisma db push
-docker-compose exec backend node scripts/seed-rbac.js
-docker-compose exec backend node scripts/seed-document-types.js
-docker-compose exec backend node scripts/seed-workflows-simple.js
-docker-compose exec backend node scripts/seed-org-final.js
-```
+Use:
 
-## Access
-- Frontend: http://localhost:3000
-- Backend: http://localhost:4000
-- Login: `admin@acme.local` with the unique value supplied through
-  `DEMO_ADMIN_PASSWORD` before running a demo seed.
+- [INSTALL-DEMO.md](INSTALL-DEMO.md) for disposable evaluation;
+- [INSTALL-PRODUCTION.md](INSTALL-PRODUCTION.md) for retained deployments;
+- [docs/docker/README.md](docs/docker/README.md) for Docker architecture and
+  test stacks.
 
-## Useful Commands
-```bash
-docker-compose ps              # Check status
-docker-compose logs -f         # View logs
-docker-compose restart backend # Restart service
-docker-compose down            # Stop all
-```
-
-## Full Documentation
-See `docs/docker/` for complete guide.
+Do not run `prisma db push` against retained data. The backend applies committed
+migrations automatically with `prisma migrate deploy`.

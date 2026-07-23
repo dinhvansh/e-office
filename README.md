@@ -81,20 +81,26 @@ Browser → Next.js frontend → Express/TypeScript API → PostgreSQL and Redis
 
 ## Quick Start
 
-1. Copy `.env.compose.example` to `.env` and set unique secrets and URLs.
-2. Start the stack:
+Choose one supported installation path:
 
-   ```bash
-   docker compose up -d --build
-   ```
+- [Disposable local demo](INSTALL-DEMO.md)
+- [Retained self-hosted / production deployment](INSTALL-PRODUCTION.md)
+- [Backup and restore](docs/BACKUP-RESTORE.md)
 
-3. Open `http://localhost:3000`; the API is available at `http://localhost:4000`.
+For a local demo:
 
-For a demo-only database, set `AUTO_INIT_DB=true` explicitly before starting the backend. It runs destructive schema initialization and seed data, so never use it with retained data.
+```bash
+DEMO_ADMIN_PASSWORD='choose-a-unique-password' ./install.sh demo
+```
+
+Open `http://localhost:3000`; the API is available at
+`http://localhost:4000`.
 
 ## Deployment guide (first-time self-hosting)
 
-This section is for a small server or VM running Docker Compose. Start with a fresh Ubuntu/Debian server, a DNS name, and a firewall that permits only SSH plus the HTTP/HTTPS ports you intend to publish.
+The canonical retained-deployment procedure is
+[INSTALL-PRODUCTION.md](INSTALL-PRODUCTION.md). The summary below is intentionally
+short so installation instructions have one source of truth.
 
 ### 1. Prepare the server
 
@@ -121,7 +127,9 @@ cp .env.compose.example .env
 chmod 600 .env
 ```
 
-Open `.env` and replace every `GENERATE_...` placeholder with a unique secret. On Linux, a suitable random value can be generated with:
+Open `.env` and replace every `GENERATE_...` placeholder with a unique secret.
+Make sure the password in `POSTGRES_PASSWORD` is also used in `DATABASE_URL`.
+On Linux, a suitable random value can be generated with:
 
 ```bash
 openssl rand -base64 48
@@ -164,7 +172,11 @@ By default the UI listens on `http://SERVER_IP:3000` and the API on `http://SERV
 
 ### 4. Initial administrator setup
 
-For a retained deployment, do not rely on demo seed data. Complete the initial administrator/bootstrap setup supplied by your deployment process, then create users through Tenant Admin or invitations. The Open Source Core intentionally has no public self-service registration endpoint.
+For a retained deployment, do not rely on demo seed data. Use the documented
+one-time bootstrap command in
+[INSTALL-PRODUCTION.md](INSTALL-PRODUCTION.md#5-bootstrap-the-first-tenant-owner).
+The Open Source Core intentionally has no public self-service registration
+endpoint.
 
 After signing in, configure in this order:
 
@@ -179,7 +191,7 @@ After signing in, configure in this order:
 The default Docker volumes are `db_data`, `backend_storage`, and `backend_backups`. Back them up before upgrades. A database-only backup example is:
 
 ```bash
-docker compose exec -T db pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > eoffice-$(date +%F).sql
+./scripts/backup.sh
 ```
 
 For object storage, configure the `S3_*` values in `.env` and set `FILE_STORAGE_DRIVER` to the supported S3-compatible driver for your deployment. For outbound mail, set `SMTP_ENABLED=true` only after configuring the SMTP host, credentials, sender address, and TLS setting. Treat `.env`, backups, and generated PDFs as sensitive data.
@@ -195,7 +207,11 @@ docker compose up -d --build
 docker compose ps
 ```
 
-The backend applies additive Prisma migrations at startup. Review release notes and migration SQL before upgrading a production system. Do not use `docker compose down -v` unless you explicitly intend to delete the database and stored documents.
+The backend applies additive Prisma migrations at startup. Review release notes
+and migration SQL before upgrading a production system. Do not use
+`docker compose down -v` unless you explicitly intend to delete the database and
+stored documents. See [docs/BACKUP-RESTORE.md](docs/BACKUP-RESTORE.md) before
+upgrades.
 
 ## Storage
 

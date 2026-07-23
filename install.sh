@@ -1,414 +1,207 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# ╔═══════════════════════════════════════════════════════════╗
-# ║           E-OFFICE - ONE-CLICK INSTALLER                  ║
-# ║   Hệ thống quản lý văn bản & phê duyệt điện tử          ║
-# ╚═══════════════════════════════════════════════════════════╝
+set -Eeuo pipefail
 
-set -e
+usage() {
+  cat <<'EOF'
+Usage:
+  ./install.sh demo [--no-start] [--force-env]
+  ./install.sh production [--no-start] [--force-env]
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+Demo environment:
+  DEMO_ADMIN_PASSWORD     Required, at least 16 characters.
 
-# Functions
-print_header() {
-    echo -e "${BLUE}"
-    echo "╔═══════════════════════════════════════════════════════════╗"
-    echo "║           E-OFFICE - ONE-CLICK INSTALLER                  ║"
-    echo "║   Hệ thống quản lý văn bản & phê duyệt điện tử          ║"
-    echo "╚═══════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
-}
+Production environment:
+  APP_BASE_URL            Required public HTTPS application URL.
+  CORS_ORIGIN             Required explicit public origin.
+  NEXT_PUBLIC_API_URL     Required public API URL ending in /api/v1.
+  NEXT_PUBLIC_API_BASE_URL Required public API URL ending in /api/v1.
 
-print_success() {
-    echo -e "${GREEN}✓ $1${NC}"
-}
+Optional:
+  INSTALL_ENV_FILE        Alternate output env file (default: .env).
+  COMPOSE_PROJECT_NAME    Alternate Compose project name.
 
-print_error() {
-    echo -e "${RED}✗ $1${NC}"
-}
-
-print_info() {
-    echo -e "${YELLOW}ℹ $1${NC}"
-}
-
-print_step() {
-    echo -e "${BLUE}▶ $1${NC}"
-}
-
-# Check if running as root
-check_root() {
-    if [ "$EUID" -ne 0 ]; then 
-        print_error "Vui lòng chạy với quyền root:"
-        echo "  sudo bash install.sh"
-        exit 1
-    fi
-}
-
-# Detect OS
-detect_os() {
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        OS=$ID
-        VER=$VERSION_ID
-    else
-        print_error "Không thể xác định hệ điều hành"
-        exit 1
-    fi
-}
-
-# Install Docker
-install_docker() {
-    print_step "Kiểm tra Docker..."
-    
-    if command -v docker &> /dev/null; then
-        print_success "Docker đã được cài đặt"
-        return
-    fi
-    
-    print_info "Đang cài đặt Docker..."
-    curl -fsSL https://get.docker.com | sh
-    systemctl enable docker
-    systemctl start docker
-    
-    # Install Docker Compose
-    apt-get update
-    apt-get install -y docker-compose-plugin
-    
-    print_success "Docker đã được cài đặt thành công"
-}
-
-# Get server info
-get_server_info() {
-    print_step "Thu thập thông tin server..."
-    
-    # Get IP
-    SERVER_IP=$(curl -s ifconfig.me || hostname -I | awk '{print $1}')
-    
-    # Ask for domain
-    echo ""
-    read -p "Bạn có domain không? (y/n): " HAS_DOMAIN
-    
-    if [[ $HAS_DOMAIN == "y" || $HAS_DOMAIN == "Y" ]]; then
-        read -p "Nhập domain (vd: eoffice.com): " DOMAIN
-        read -p "Nhập API domain (vd: api.eoffice.com): " API_DOMAIN
-        USE_DOMAIN=true
-    else
-        DOMAIN=$SERVER_IP
-        API_DOMAIN=$SERVER_IP
-        USE_DOMAIN=false
-    fi
-    
-    print_success "Thông tin server đã được thu thập"
-}
-
-# Setup application
-setup_app() {
-    print_step "Cài đặt ứng dụng..."
-    
-    # Create directory
-    INSTALL_DIR="/opt/e-office"
-    mkdir -p $INSTALL_DIR
-    cd $INSTALL_DIR
-    
-    # Clone or download
-    if [ -d ".git" ]; then
-        print_info "Cập nhật code mới nhất..."
-        git pull origin main
-    else
-        print_info "Tải code từ GitHub..."
-        git clone https://github.com/dinhvansh/e-office.git .
-    fi
-    
-    # Generate secrets
-    JWT_SECRET=$(openssl rand -hex 32)
-    DB_PASSWORD=$(openssl rand -base64 16 | tr -d "=+/" | cut -c1-16)
-    
-    # Setup backend .env
-    print_info "Cấu hình backend..."
-    cd backend
-    cat > .env << EOF
-# Database
-DATABASE_URL="postgresql://postgres:${DB_PASSWORD}@postgres:5432/eoffice"
-
-# JWT
-JWT_SECRET="${JWT_SECRET}"
-JWT_EXPIRES_IN="7d"
-
-# Server
-NODE_ENV="production"
-PORT=4000
-CORS_ORIGIN="http://${DOMAIN}:3000"
-
-# Redis
-REDIS_URL="redis://redis:6379"
-
-# Email (cấu hình sau)
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=""
-SMTP_PASS=""
-SMTP_FROM="E-Office <noreply@${DOMAIN}>"
-
-# Storage
-STORAGE_PATH="/app/storage"
-MAX_FILE_SIZE=26214400
-
-# License
-LICENSE_SERVER_URL="http://license-server:3001"
+The installer requires Docker Compose v2, OpenSSL, and curl. It does not install
+host packages, modify firewall rules, configure DNS, or issue TLS certificates.
 EOF
-    
-    # Setup frontend .env.local
-    print_info "Cấu hình frontend..."
-    cd ../frontend
-    if [ "$USE_DOMAIN" = true ]; then
-        echo "NEXT_PUBLIC_API_URL=https://${API_DOMAIN}" > .env.local
-    else
-        echo "NEXT_PUBLIC_API_URL=http://${SERVER_IP}:4000" > .env.local
-    fi
-    
-    # Setup docker-compose .env
-    cd ..
-    echo "POSTGRES_PASSWORD=${DB_PASSWORD}" > .env
-    
-    print_success "Ứng dụng đã được cấu hình"
 }
 
-# Start services
-start_services() {
-    print_step "Khởi động dịch vụ..."
-    
-    cd /opt/e-office
-    docker compose up -d
-    
-    print_info "Đợi services khởi động (30 giây)..."
-    sleep 30
-    
-    print_success "Dịch vụ đã được khởi động"
-}
+MODE="${1:-}"
+if [[ "$MODE" != "demo" && "$MODE" != "production" ]]; then
+  usage
+  exit 2
+fi
+shift
 
-# Setup database
-setup_database() {
-    print_step "Thiết lập cơ sở dữ liệu..."
-    
-    cd /opt/e-office
-    
-    # Run migrations
-    docker exec e-sign-backend npx prisma migrate deploy
-    
-    # Seed data
-    docker exec e-sign-backend node scripts/seed.js
-    docker exec e-sign-backend node scripts/seed-rbac.js
-    docker exec e-sign-backend node scripts/seed-document-types.js
-    docker exec e-sign-backend node scripts/seed-workflows-simple.js
-    
-    print_success "Cơ sở dữ liệu đã được thiết lập"
-}
-
-# Setup Nginx (if domain)
-setup_nginx() {
-    if [ "$USE_DOMAIN" = false ]; then
-        return
-    fi
-    
-    print_step "Cài đặt Nginx & SSL..."
-    
-    # Install Nginx
-    apt-get update
-    apt-get install -y nginx certbot python3-certbot-nginx
-    
-    # Create Nginx config
-    cat > /etc/nginx/sites-available/eoffice << EOF
-server {
-    listen 80;
-    server_name ${DOMAIN};
-    client_max_body_size 30M;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-}
-
-server {
-    listen 80;
-    server_name ${API_DOMAIN};
-    client_max_body_size 30M;
-
-    location / {
-        proxy_pass http://localhost:4000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-}
-EOF
-    
-    # Enable site
-    ln -sf /etc/nginx/sites-available/eoffice /etc/nginx/sites-enabled/
-    nginx -t
-    systemctl reload nginx
-    
-    # Setup SSL
-    print_info "Cài đặt SSL certificate..."
-    certbot --nginx -d ${DOMAIN} -d ${API_DOMAIN} --non-interactive --agree-tos --register-unsafely-without-email
-    
-    print_success "Nginx & SSL đã được cài đặt"
-}
-
-# Setup firewall
-setup_firewall() {
-    print_step "Cấu hình firewall..."
-    
-    if command -v ufw &> /dev/null; then
-        ufw allow 22/tcp
-        ufw allow 80/tcp
-        ufw allow 443/tcp
-        echo "y" | ufw enable
-        print_success "Firewall đã được cấu hình"
-    else
-        print_info "UFW không có sẵn, bỏ qua cấu hình firewall"
-    fi
-}
-
-# Create management script
-create_management_script() {
-    print_step "Tạo script quản lý..."
-    
-    cat > /usr/local/bin/eoffice << 'EOF'
-#!/bin/bash
-
-case "$1" in
-    start)
-        cd /opt/e-office && docker compose up -d
-        echo "✓ E-Office đã được khởi động"
-        ;;
-    stop)
-        cd /opt/e-office && docker compose down
-        echo "✓ E-Office đã được dừng"
-        ;;
-    restart)
-        cd /opt/e-office && docker compose restart
-        echo "✓ E-Office đã được khởi động lại"
-        ;;
-    logs)
-        cd /opt/e-office && docker compose logs -f
-        ;;
-    status)
-        cd /opt/e-office && docker compose ps
-        ;;
-    update)
-        cd /opt/e-office
-        git pull origin main
-        docker compose up -d --build
-        docker exec e-sign-backend npx prisma migrate deploy
-        echo "✓ E-Office đã được cập nhật"
-        ;;
-    backup)
-        BACKUP_DIR="/opt/e-office/backups"
-        mkdir -p $BACKUP_DIR
-        DATE=$(date +%Y-%m-%d_%H-%M-%S)
-        docker exec e-sign-postgres pg_dump -U postgres eoffice > "$BACKUP_DIR/db_$DATE.sql"
-        echo "✓ Backup đã được tạo: $BACKUP_DIR/db_$DATE.sql"
-        ;;
+START_STACK=true
+FORCE_ENV=false
+while (($#)); do
+  case "$1" in
+    --no-start) START_STACK=false ;;
+    --force-env) FORCE_ENV=true ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
     *)
-        echo "E-Office Management Script"
-        echo ""
-        echo "Sử dụng: eoffice [command]"
-        echo ""
-        echo "Commands:"
-        echo "  start    - Khởi động E-Office"
-        echo "  stop     - Dừng E-Office"
-        echo "  restart  - Khởi động lại E-Office"
-        echo "  logs     - Xem logs"
-        echo "  status   - Xem trạng thái"
-        echo "  update   - Cập nhật phiên bản mới"
-        echo "  backup   - Backup database"
-        ;;
-esac
-EOF
-    
-    chmod +x /usr/local/bin/eoffice
-    print_success "Script quản lý đã được tạo"
+      echo "Unknown option: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+  shift
+done
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${INSTALL_ENV_FILE:-$ROOT_DIR/.env}"
+TEMPLATE_FILE="$ROOT_DIR/.env.compose.example"
+
+for command_name in docker openssl curl sed grep; do
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "Required command not found: $command_name" >&2
+    exit 1
+  fi
+done
+
+if ! docker compose version >/dev/null 2>&1; then
+  echo "Docker Compose v2 is required (docker compose)." >&2
+  exit 1
+fi
+
+if [[ ! -f "$TEMPLATE_FILE" ]]; then
+  echo "Missing environment template: $TEMPLATE_FILE" >&2
+  exit 1
+fi
+
+if [[ "$MODE" == "demo" ]]; then
+  if [[ -z "${DEMO_ADMIN_PASSWORD:-}" ]] && [[ -t 0 ]]; then
+    read -r -s -p "Demo admin password (minimum 16 characters): " DEMO_ADMIN_PASSWORD
+    echo
+  fi
+  if [[ -z "${DEMO_ADMIN_PASSWORD:-}" || ${#DEMO_ADMIN_PASSWORD} -lt 16 ]]; then
+    echo "DEMO_ADMIN_PASSWORD must be a unique value of at least 16 characters." >&2
+    exit 1
+  fi
+else
+  : "${APP_BASE_URL:?APP_BASE_URL is required for production}"
+  : "${CORS_ORIGIN:?CORS_ORIGIN is required for production}"
+  : "${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required for production}"
+  : "${NEXT_PUBLIC_API_BASE_URL:?NEXT_PUBLIC_API_BASE_URL is required for production}"
+
+  case "$APP_BASE_URL $CORS_ORIGIN $NEXT_PUBLIC_API_URL $NEXT_PUBLIC_API_BASE_URL" in
+    *http://*)
+      echo "Production public URLs must use https://." >&2
+      exit 1
+      ;;
+  esac
+fi
+
+escape_sed_replacement() {
+  printf '%s' "$1" | sed 's/[&|\\]/\\&/g'
 }
 
-# Print final info
-print_final_info() {
-    echo ""
-    echo -e "${GREEN}"
-    echo "╔═══════════════════════════════════════════════════════════╗"
-    echo "║          CÀI ĐẶT THÀNH CÔNG! 🎉                          ║"
-    echo "╚═══════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
-    echo ""
-    
-    if [ "$USE_DOMAIN" = true ]; then
-        echo -e "${BLUE}🌐 Truy cập ứng dụng:${NC}"
-        echo "   Frontend: https://${DOMAIN}"
-        echo "   Backend:  https://${API_DOMAIN}"
-    else
-        echo -e "${BLUE}🌐 Truy cập ứng dụng:${NC}"
-        echo "   Frontend: http://${SERVER_IP}:3000"
-        echo "   Backend:  http://${SERVER_IP}:4000"
+set_env_value() {
+  local key="$1"
+  local value="$2"
+  local escaped
+  escaped="$(escape_sed_replacement "$value")"
+  if grep -q "^${key}=" "$ENV_FILE"; then
+    sed -i.bak "s|^${key}=.*|${key}=${escaped}|" "$ENV_FILE"
+    rm -f "${ENV_FILE}.bak"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$ENV_FILE"
+  fi
+}
+
+read_env_value() {
+  local key="$1"
+  grep -E "^${key}=" "$ENV_FILE" | tail -n 1 | cut -d= -f2-
+}
+
+if [[ -e "$ENV_FILE" && "$FORCE_ENV" != true ]]; then
+  echo "Environment file already exists: $ENV_FILE" >&2
+  echo "Review it and run Docker Compose directly, or rerun with --force-env." >&2
+  exit 1
+fi
+
+cp "$TEMPLATE_FILE" "$ENV_FILE"
+
+DB_PASSWORD="$(openssl rand -hex 24)"
+JWT_SECRET="$(openssl rand -hex 32)"
+REFRESH_SECRET="$(openssl rand -hex 32)"
+LICENSE_SECRET="$(openssl rand -hex 32)"
+
+set_env_value POSTGRES_PASSWORD "$DB_PASSWORD"
+set_env_value DATABASE_URL "postgresql://eoffice:${DB_PASSWORD}@db:5432/eoffice_db"
+set_env_value JWT_SECRET "$JWT_SECRET"
+set_env_value REFRESH_TOKEN_SECRET "$REFRESH_SECRET"
+set_env_value LICENSE_SIGNING_SECRET "$LICENSE_SECRET"
+set_env_value RATE_LIMIT_BYPASS_EMAILS ""
+set_env_value SMTP_ENABLED "false"
+set_env_value BACKEND_PORT "${BACKEND_PORT:-4000}"
+set_env_value FRONTEND_PORT "${FRONTEND_PORT:-3000}"
+
+if [[ "$MODE" == "demo" ]]; then
+  set_env_value APP_BASE_URL "${APP_BASE_URL:-http://localhost:3000}"
+  set_env_value CORS_ORIGIN "${CORS_ORIGIN:-http://localhost:3000}"
+  set_env_value NEXT_PUBLIC_API_URL "${NEXT_PUBLIC_API_URL:-http://localhost:4000/api/v1}"
+  set_env_value NEXT_PUBLIC_API_BASE_URL "${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4000/api/v1}"
+  set_env_value AUTH_COOKIE_SECURE "false"
+  set_env_value AUTO_INIT_DB "true"
+  set_env_value DEMO_ADMIN_PASSWORD "$DEMO_ADMIN_PASSWORD"
+else
+  set_env_value APP_BASE_URL "$APP_BASE_URL"
+  set_env_value CORS_ORIGIN "$CORS_ORIGIN"
+  set_env_value NEXT_PUBLIC_API_URL "$NEXT_PUBLIC_API_URL"
+  set_env_value NEXT_PUBLIC_API_BASE_URL "$NEXT_PUBLIC_API_BASE_URL"
+  set_env_value AUTH_COOKIE_SECURE "true"
+  set_env_value AUTO_INIT_DB "false"
+  set_env_value DEMO_ADMIN_PASSWORD ""
+fi
+
+chmod 600 "$ENV_FILE" 2>/dev/null || true
+
+compose=(docker compose --env-file "$ENV_FILE")
+"${compose[@]}" config --quiet
+echo "Validated Compose configuration: $ENV_FILE"
+
+if [[ "$START_STACK" != true ]]; then
+  echo "Configuration created. Start with:"
+  echo "  docker compose --env-file \"$ENV_FILE\" up -d --build"
+  exit 0
+fi
+
+"${compose[@]}" up -d --build
+
+BACKEND_PORT="$(read_env_value BACKEND_PORT)"
+FRONTEND_PORT="$(read_env_value FRONTEND_PORT)"
+BACKEND_PORT="${BACKEND_PORT:-4000}"
+FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+
+wait_for_url() {
+  local name="$1"
+  local url="$2"
+  for _ in $(seq 1 90); do
+    if curl --fail --silent --show-error "$url" >/dev/null 2>&1; then
+      echo "$name is ready: $url"
+      return 0
     fi
-    
-    echo ""
-    echo -e "${BLUE}🔐 Đăng nhập:${NC}"
-    echo "   Email:    admin@acme.local"
-    echo "   Password: set DEMO_ADMIN_PASSWORD before running the seed"
-    echo ""
-    echo -e "${YELLOW}⚠️  Nhớ đổi password ngay sau khi đăng nhập!${NC}"
-    echo ""
-    echo -e "${BLUE}📝 Quản lý hệ thống:${NC}"
-    echo "   eoffice start    - Khởi động"
-    echo "   eoffice stop     - Dừng"
-    echo "   eoffice restart  - Khởi động lại"
-    echo "   eoffice logs     - Xem logs"
-    echo "   eoffice status   - Xem trạng thái"
-    echo "   eoffice update   - Cập nhật"
-    echo "   eoffice backup   - Backup database"
-    echo ""
-    echo -e "${BLUE}📚 Tài liệu:${NC}"
-    echo "   /opt/e-office/docs/DEPLOY-SIMPLE.md"
-    echo ""
-    echo -e "${GREEN}Cảm ơn bạn đã sử dụng E-Office!${NC}"
-    echo ""
+    sleep 2
+  done
+  echo "$name did not become ready: $url" >&2
+  "${compose[@]}" ps >&2 || true
+  "${compose[@]}" logs --tail=200 backend frontend >&2 || true
+  return 1
 }
 
-# Main installation flow
-main() {
-    print_header
-    
-    check_root
-    detect_os
-    install_docker
-    get_server_info
-    setup_app
-    start_services
-    setup_database
-    setup_nginx
-    setup_firewall
-    create_management_script
-    
-    print_final_info
-}
+wait_for_url "Backend" "http://localhost:${BACKEND_PORT}/health"
+wait_for_url "Frontend" "http://localhost:${FRONTEND_PORT}/"
 
-# Run installation
-main
+"${compose[@]}" ps
+echo "Installation complete."
+if [[ "$MODE" == "demo" ]]; then
+  echo "Login email: admin@acme.local"
+  echo "Login password: the value supplied through DEMO_ADMIN_PASSWORD"
+else
+  echo "Next: bootstrap the first tenant owner using INSTALL-PRODUCTION.md."
+fi

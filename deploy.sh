@@ -1,79 +1,41 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# E-Office Quick Deployment Script
-# Usage: ./deploy.sh [environment]
-# Example: ./deploy.sh production
+set -Eeuo pipefail
 
-set -e
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
 
-ENVIRONMENT=${1:-production}
-COMPOSE_FILE="docker-compose.prod.yml"
-
-echo "🚀 Deploying E-Office to $ENVIRONMENT..."
-
-# Check if docker is installed
-if ! command -v docker &> /dev/null; then
-    echo "❌ Docker is not installed. Please install Docker first."
-    exit 1
+if [[ ! -f .env ]]; then
+  echo "Missing .env. Follow INSTALL-PRODUCTION.md first." >&2
+  exit 1
+fi
+if grep -q '^AUTO_INIT_DB=true$' .env; then
+  echo "Refusing retained deployment while AUTO_INIT_DB=true." >&2
+  exit 1
 fi
 
-# Check if docker-compose is installed
-if ! command -v docker compose &> /dev/null; then
-    echo "❌ Docker Compose is not installed. Please install Docker Compose first."
-    exit 1
+docker compose version >/dev/null
+docker compose config --quiet
+
+if [[ "${SKIP_BACKUP:-false}" != "true" ]] &&
+  docker compose ps --status running --services | grep -qx db; then
+  ./scripts/backup.sh
 fi
 
-# Pull latest code
-echo "📥 Pulling latest code..."
-git pull origin main
+docker compose up -d --build
 
-# Build images
-echo "🏗️  Building Docker images..."
-docker compose -f $COMPOSE_FILE build --no-cache
+BACKEND_PORT_VALUE="$(sed -n 's/^BACKEND_PORT=//p' .env | tail -n 1)"
+BACKEND_PORT_VALUE="${BACKEND_PORT_VALUE:-4000}"
+for _ in $(seq 1 90); do
+  if curl --fail --silent "http://localhost:${BACKEND_PORT_VALUE}/health" >/dev/null; then
+    docker compose ps
+    echo "Deployment completed."
+    exit 0
+  fi
+  sleep 2
+done
 
-# Stop old containers
-echo "🛑 Stopping old containers..."
-docker compose -f $COMPOSE_FILE down
-
-# Start new containers
-echo "▶️  Starting new containers..."
-docker compose -f $COMPOSE_FILE up -d
-
-# Wait for services to be healthy
-echo "⏳ Waiting for services to be healthy..."
-sleep 10
-
-# Run database migrations
-echo "🗄️  Running database migrations..."
-docker exec eoffice-backend npx prisma migrate deploy
-
-# Check if seed is needed (first deployment)
-if docker exec eoffice-postgres psql -U eoffice_user -d eoffice_prod -c "SELECT COUNT(*) FROM tenants;" 2>/dev/null | grep -q " 0"; then
-    echo "🌱 Seeding initial data..."
-    docker exec eoffice-backend node scripts/seed.js
-    docker exec eoffice-backend node scripts/seed-rbac.js
-    docker exec eoffice-backend node scripts/seed-document-types.js
-    docker exec eoffice-backend node scripts/seed-workflows-simple.js
-fi
-
-# Show status
-echo ""
-echo "✅ Deployment complete!"
-echo ""
-echo "📊 Service Status:"
-docker compose -f $COMPOSE_FILE ps
-
-echo ""
-echo "📝 View logs:"
-echo "  docker compose -f $COMPOSE_FILE logs -f"
-echo ""
-echo "🌐 Access your application:"
-echo "  Frontend: http://localhost:3000"
-echo "  Backend:  http://localhost:4000"
-echo "  Health:   http://localhost:4000/health"
-echo ""
-echo "🔐 Default login:"
-echo "  Email:    admin@acme.local"
-echo "  Password: [Check INSTALL.md or contact admin]"
-echo ""
-echo "⚠️  Remember to change the default password immediately!"
+echo "Backend did not become healthy after deployment." >&2
+docker compose ps >&2 || true
+docker compose logs --tail=200 backend frontend outbox-worker >&2 || true
+exit 1

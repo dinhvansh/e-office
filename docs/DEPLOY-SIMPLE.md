@@ -1,5 +1,9 @@
 # 🚀 Deploy Đơn Giản Lên VPS
 
+> **Hướng dẫn lỗi thời.** Không dùng các tên container, giá trị môi trường,
+> `prisma db push`, seed hoặc backup bên dưới. Hướng dẫn được hỗ trợ là
+> [`../INSTALL-PRODUCTION.md`](../INSTALL-PRODUCTION.md).
+
 Hướng dẫn deploy nhanh nhất, đơn giản nhất.
 
 ---

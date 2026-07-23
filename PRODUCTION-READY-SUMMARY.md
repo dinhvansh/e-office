@@ -1,5 +1,9 @@
 # ✅ Production Ready Summary - E-Office
 
+> **Historical release note.** This document predates the current Compose and
+> installation workflow. Use `README.md`, `INSTALL-PRODUCTION.md`, and
+> `docs/BACKUP-RESTORE.md` for current operational instructions.
+
 **Date:** 2024-12-02  
 **Status:** Ready for Production Deployment  
 **Version:** 1.0.0
