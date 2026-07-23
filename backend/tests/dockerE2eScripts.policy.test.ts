@@ -17,6 +17,7 @@ test("authorization-matrix script preserves Docker database host unless local mo
   const source = fs.readFileSync(path.join(backendRoot, "scripts", "test-authorization-matrix.js"), "utf8");
 
   assert.match(source, /process\.env\.E2E_USE_LOCAL_DB === "1"/);
+  assert.doesNotMatch(source, /ensureRoleUser\([^)]*,\s*"Manager"/);
 });
 
 test("fresh RBAC seed grants the documented document-type permissions", () => {

@@ -152,12 +152,10 @@ async function run() {
     }
 
     await ensureRoleUser(tenant.id, "Admin", "admin.matrix@acme.local", "admin");
-    await ensureRoleUser(tenant.id, "Manager", "manager.matrix@acme.local", "manager");
     await ensureRoleUser(tenant.id, "User", "user.matrix@acme.local", "user");
     await ensureRoleUser(tenant.id, "Viewer", "viewer.matrix@acme.local", "viewer");
 
     const adminToken = await issueAccessToken("admin.matrix@acme.local");
-    const managerToken = await issueAccessToken("manager.matrix@acme.local");
     const userToken = await issueAccessToken("user.matrix@acme.local");
     const viewerToken = await issueAccessToken("viewer.matrix@acme.local");
 
@@ -238,20 +236,6 @@ async function run() {
         expectOk: false,
       },
       {
-        name: "Manager can create document",
-        fn: () =>
-          axios.post(
-            `${API_BASE}/documents`,
-            {
-              file_name: `manager-${Date.now()}.txt`,
-              file_base64: Buffer.from("manager can create").toString("base64"),
-              mime_type: "text/plain",
-            },
-            { headers: { Authorization: `Bearer ${managerToken}` } }
-          ),
-        expectOk: true,
-      },
-      {
         name: "User can create document",
         fn: () =>
           axios.post(
@@ -280,16 +264,6 @@ async function run() {
             `${API_BASE}/departments`,
             { code: `VW${Date.now()}`.slice(-6), name: "Viewer Dept" },
             { headers: { Authorization: `Bearer ${viewerToken}` } }
-          ),
-        expectOk: false,
-      },
-      {
-        name: "Manager cannot update department",
-        fn: () =>
-          axios.put(
-            `${API_BASE}/departments/${departmentId}`,
-            { description: "Manager should not update" },
-            { headers: { Authorization: `Bearer ${managerToken}` } }
           ),
         expectOk: false,
       },
