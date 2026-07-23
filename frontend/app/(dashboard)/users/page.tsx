@@ -41,6 +41,8 @@ interface Role {
   name: string;
 }
 
+const MIN_PASSWORD_LENGTH = 6;
+
 export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -455,6 +457,10 @@ export default function UsersPage() {
                 toast.error('Vui lòng nhập mật khẩu');
                 return;
               }
+              if (submitData.password && submitData.password.length < MIN_PASSWORD_LENGTH) {
+                toast.error(`Mật khẩu phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự`);
+                return;
+              }
               if (editingUser && !submitData.password) {
                 delete submitData.password;
               }
@@ -486,7 +492,22 @@ export default function UsersPage() {
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 placeholder="••••••••"
                 required={!editingUser}
+                minLength={MIN_PASSWORD_LENGTH}
+                aria-invalid={formData.password.length > 0 && formData.password.length < MIN_PASSWORD_LENGTH}
+                aria-describedby="password-help"
               />
+              <p
+                id="password-help"
+                className={`text-xs ${
+                  formData.password.length > 0 && formData.password.length < MIN_PASSWORD_LENGTH
+                    ? 'text-destructive'
+                    : 'text-muted-foreground'
+                }`}
+              >
+                {editingUser
+                  ? `Để trống nếu không đổi. Mật khẩu mới phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự.`
+                  : `Mật khẩu phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự.`}
+              </p>
             </div>
 
             <div className="space-y-2">

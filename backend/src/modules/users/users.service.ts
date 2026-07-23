@@ -7,6 +7,7 @@ import { prisma } from '../../config/prisma';
 import { ApiError } from '../../core/errors/api-error';
 import { readStoredFile } from '../../core/storage/fileStorage';
 import { storageService } from '../../core/storage/storage.service';
+import { assertValidUserPassword } from './user-password.policy';
 
 type UserFilters = {
   page?: number;
@@ -202,6 +203,7 @@ export const usersService = {
     role_ids?: number[];
   }) {
     this.validateOrganizationalFields(data, true);
+    assertValidUserPassword(data.password);
 
     // Check if email already exists
     const existing = await usersRepository.findByEmail(data.email);
@@ -296,6 +298,7 @@ export const usersService = {
 
     // Hash new password if provided
     if (password) {
+      assertValidUserPassword(password);
       const updateData: Prisma.usersUncheckedUpdateInput = {
         ...userData,
         password_hash: await bcrypt.hash(password, 10),
@@ -339,6 +342,7 @@ export const usersService = {
   },
 
   async changePassword(userId: number, tenantId: number, oldPassword: string, newPassword: string) {
+    assertValidUserPassword(newPassword);
     const user = await usersRepository.findById(userId, tenantId);
     if (!user) {
       throw new Error('User not found');
