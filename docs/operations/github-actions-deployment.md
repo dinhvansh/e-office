@@ -41,6 +41,29 @@ The SSH username is intentionally fixed to `eoffice-deploy`.
 Do not edit `/opt/e-office` manually. Every deployment hard-resets and cleans
 that checkout before selecting the tested commit.
 
+The forced command reads the requested commit from `SSH_ORIGINAL_COMMAND`.
+Preserve only that variable when the dedicated SSH user crosses the `sudo`
+boundary. `/etc/sudoers.d/eoffice-deploy` must contain:
+
+```sudoers
+Defaults:eoffice-deploy env_keep += "SSH_ORIGINAL_COMMAND"
+eoffice-deploy ALL=(root) NOPASSWD: /usr/local/sbin/eoffice-deploy
+```
+
+Keep the file owned by `root`, mode `0440`, and validate it before enabling the
+CI key:
+
+```bash
+sudo visudo -cf /etc/sudoers.d/eoffice-deploy
+```
+
+Restrict the corresponding public key in
+`/home/eoffice-deploy/.ssh/authorized_keys`:
+
+```text
+restrict,command="sudo -n /usr/local/sbin/eoffice-deploy" ssh-ed25519 <public-key> eoffice-github-actions
+```
+
 For Nginx Proxy Manager, set `PROXY_NETWORK_NAME` in the production env. The
 deploy command creates that network, connects the existing `nginx-proxy`
 container, and exposes the aliases `eoffice-frontend` and `eoffice-backend`.
