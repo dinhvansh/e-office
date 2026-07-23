@@ -7,7 +7,7 @@ export const getEmailBase = (content: string) => `
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WP Sign E-Office</title>
+  <title>E-Office</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { 
@@ -175,7 +175,7 @@ export const getOtpEmailTemplate = (data: {
   </div>
 </div>
 <div class="footer">
-  <p><strong>WP Sign E-Office</strong></p>
+  <p><strong>E-Office</strong></p>
   <p>Email tự động - Vui lòng không trả lời</p>
 </div>
 `);

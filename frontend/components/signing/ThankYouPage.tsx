@@ -41,9 +41,9 @@ export default function ThankYouPage({
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex h-24 max-w-7xl items-center justify-between px-5 sm:px-8">
           <div className="flex items-center gap-3">
-            <Image src="/logo.png" alt="WP Sign" width={56} height={56} priority className="h-14 w-14 rounded-2xl object-contain shadow-sm" />
+            <Image src="/logo.png" alt="E-Office" width={56} height={56} priority className="h-14 w-14 rounded-2xl object-contain shadow-sm" />
             <div>
-              <p className="text-2xl font-bold tracking-tight">WP Sign</p>
+              <p className="text-2xl font-bold tracking-tight">E-Office</p>
               <p className="text-sm font-medium text-slate-500">Nền tảng ký duyệt điện tử</p>
             </div>
           </div>
@@ -107,7 +107,7 @@ export default function ThankYouPage({
           </div>
         </section>
 
-        <p className="mt-6 text-center text-sm text-slate-400">Được bảo vệ bởi WP Sign</p>
+        <p className="mt-6 text-center text-sm text-slate-400">Được bảo vệ bởi E-Office</p>
       </main>
     </div>
   );

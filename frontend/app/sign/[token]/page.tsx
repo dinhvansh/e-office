@@ -569,9 +569,9 @@ export default function PublicSigningPage() {
         <header className="border-b bg-white">
           <div className="mx-auto flex h-24 max-w-7xl items-center justify-between px-5 sm:px-8">
             <div className="flex items-center gap-3">
-              <Image src="/logo.png" alt="WP Sign" width={56} height={56} priority className="h-14 w-14 rounded-2xl object-contain shadow-sm" />
+              <Image src="/logo.png" alt="E-Office" width={56} height={56} priority className="h-14 w-14 rounded-2xl object-contain shadow-sm" />
               <div>
-                <div className="text-2xl font-bold tracking-tight text-slate-900">WP Sign</div>
+                <div className="text-2xl font-bold tracking-tight text-slate-900">E-Office</div>
                 <div className="text-sm font-medium text-slate-500">Nền tảng ký duyệt điện tử</div>
               </div>
             </div>
@@ -633,7 +633,7 @@ export default function PublicSigningPage() {
               </div>
             </section>
 
-            <p className="mt-5 text-center text-sm text-slate-400">Được bảo vệ bởi WP Sign</p>
+            <p className="mt-5 text-center text-sm text-slate-400">Được bảo vệ bởi E-Office</p>
           </div>
         </main>
       </div>
@@ -650,9 +650,9 @@ export default function PublicSigningPage() {
         <div className="sticky top-0 z-20 mb-4 rounded-lg border bg-white px-4 py-3 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <Image src="/logo.png" alt="WP Sign" width={42} height={42} priority className="h-10 w-10 shrink-0 rounded-xl object-contain" />
+              <Image src="/logo.png" alt="E-Office" width={42} height={42} priority className="h-10 w-10 shrink-0 rounded-xl object-contain" />
               <div className="hidden shrink-0 sm:block">
-                <p className="font-bold leading-5 text-slate-950">WP Sign</p>
+                <p className="font-bold leading-5 text-slate-950">E-Office</p>
                 <p className="text-xs text-slate-500">Nền tảng ký duyệt</p>
               </div>
               <div className="hidden h-9 w-px shrink-0 bg-slate-200 sm:block" />

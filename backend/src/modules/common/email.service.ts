@@ -31,7 +31,7 @@ class EmailService {
     await sendEmail({
       tenantId: data.tenantId,
       to: data.recipientEmail,
-      subject: `Mã OTP ký tài liệu - ${data.documentTitle || "WP Sign"}`,
+      subject: `Mã OTP ký tài liệu - ${data.documentTitle || "E-Office"}`,
       html,
       text,
     });
@@ -344,7 +344,7 @@ Link k?: ${data.signUrl}`,
             <p style="color: #666; font-size: 14px;">Hoặc copy link sau vào trình duyệt:<br>${data.approvalUrl}</p>
           </div>
           <div class="footer">
-            <p>Email này được gửi tự động từ WP Sign E-Office.</p>
+            <p>Email này được gửi tự động từ E-Office.</p>
           </div>
         </div>
       </body>
@@ -429,7 +429,7 @@ Vui lòng truy cập: ${data.approvalUrl}`;
             <a href="${data.documentUrl}" class="button">Xem tài liệu</a>
           </div>
           <div class="footer">
-            <p>Email này được gửi tự động từ WP Sign E-Office.</p>
+            <p>Email này được gửi tự động từ E-Office.</p>
           </div>
         </div>
       </body>
@@ -499,7 +499,7 @@ ${data.comment ? `Nhận xét: ${data.comment}\n\n` : ''}Xem chi tiết: ${data.
             <a href="${data.documentUrl}" class="button">Xem tài liệu</a>
           </div>
           <div class="footer">
-            <p>Email này được gửi tự động từ WP Sign E-Office.</p>
+            <p>Email này được gửi tự động từ E-Office.</p>
           </div>
         </div>
       </body>
@@ -565,7 +565,7 @@ Xem tài liệu: ${data.documentUrl}`;
             ${data.documentUrl ? `<p><a href="${data.documentUrl}" class="button">Xem và tải tài liệu đã ký</a></p>` : ''}
           </div>
           <div class="footer">
-            <p>Email này được gửi tự động từ WP Sign.</p>
+            <p>Email này được gửi tự động từ E-Office.</p>
           </div>
         </div>
       </body>
@@ -606,7 +606,7 @@ Mã này có hiệu lực trong ${data.expiryMinutes} phút.
 Không chia sẻ mã này với bất kỳ ai.
 
 ---
-Email này được gửi tự động từ WP Sign.
+Email này được gửi tự động từ E-Office.
     `.trim();
   }
   /**
@@ -655,10 +655,10 @@ Email này được gửi tự động từ WP Sign.
             
             <p>Nếu có thắc mắc, vui lòng liên hệ với người hủy yêu cầu.</p>
             
-            <p>Trân trọng,<br><strong>WP Sign System</strong></p>
+            <p>Trân trọng,<br><strong>Hệ thống E-Office</strong></p>
           </div>
           <div class="footer">
-            <p>Email này được gửi tự động từ hệ thống WP Sign</p>
+            <p>Email này được gửi tự động từ hệ thống E-Office</p>
             <p>Vui lòng không trả lời email này</p>
           </div>
         </div>
@@ -681,7 +681,7 @@ Mã yêu cầu: #${data.signRequestId}
 Bạn không cần thực hiện thêm hành động nào cho yêu cầu này.
 
 Trân trọng,
-WP Sign System
+Hệ thống E-Office
     `;
 
     await sendEmail({

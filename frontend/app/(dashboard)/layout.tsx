@@ -121,7 +121,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div className="flex items-center gap-3">
                 <Image src="/logo.png" alt="Logo" width={40} height={40} className="w-10 h-10 object-contain" />
                 <div className="md:hidden 2xl:block">
-                  <p className="text-lg font-bold text-slate-900">{tenant?.name ?? "WP Sign"}</p>
+                  <p className="text-lg font-bold text-slate-900">{tenant?.name ?? "E-Office"}</p>
                   <p className="text-xs text-slate-500">{tenant?.plan ?? "Enterprise"}</p>
                 </div>
               </div>

@@ -8,8 +8,21 @@ import { ApiConfigurationGuard } from "@/components/system/api-configuration-gua
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "WP Sign - E-Office System",
-  description: "Multi-tenant e-signature workspace",
+  applicationName: "E-Office",
+  title: "E-Office - Quản lý văn bản nội bộ",
+  description: "Hệ thống quản lý, phê duyệt và lưu trữ văn bản nội bộ.",
+  openGraph: {
+    type: "website",
+    locale: "vi_VN",
+    siteName: "E-Office",
+    title: "E-Office - Quản lý văn bản nội bộ",
+    description: "Hệ thống quản lý, phê duyệt và lưu trữ văn bản nội bộ.",
+  },
+  twitter: {
+    card: "summary",
+    title: "E-Office - Quản lý văn bản nội bộ",
+    description: "Hệ thống quản lý, phê duyệt và lưu trữ văn bản nội bộ.",
+  },
   icons: {
     icon: '/logo.png',
     shortcut: '/logo.png',
