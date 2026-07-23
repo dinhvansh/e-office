@@ -186,6 +186,7 @@ async function run() {
         tenant_id: tenantId,
         code: `E2E_ROLLBACK_${Date.now()}`,
         name: "E2E package rollback",
+        require_numbering: false,
         require_approval: true,
         require_digital_signing: true,
         default_workflow_id: null,
@@ -215,8 +216,9 @@ async function run() {
     } catch (error) {
       packageFailureError = error;
     }
-    if (packageFailureError?.response?.data?.error?.code !== "WORKFLOW_TEMPLATE_REQUIRED") {
-      throw new Error(`Expected package creation failure, got ${packageFailureError?.response?.status || "success"}`);
+    const packageFailureCode = packageFailureError?.response?.data?.error?.code;
+    if (packageFailureCode !== "WORKFLOW_TEMPLATE_REQUIRED") {
+      throw new Error(`Expected package creation failure, got ${packageFailureCode || packageFailureError?.response?.status || "success"}`);
     }
     const [orphanDocumentCount, orphanSignRequestCount, orphanPermissionCount] = await Promise.all([
       prisma.documents.count({ where: { tenant_id: tenantId, title: packageFailureMarker } }),
