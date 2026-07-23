@@ -243,6 +243,12 @@ async function run() {
         document_type_id: docType.id,
         create_sign_request: true,
         require_digital_signing: true,
+        signers: [{
+          email: INTERNAL_SIGNER_EMAIL,
+          name: "Internal E2E Signer",
+          order: 1,
+          type: "manual",
+        }],
         file_name: `e2e-${Date.now()}.pdf`,
         file_base64: MINIMAL_PDF_BASE64,
         mime_type: "application/pdf",
