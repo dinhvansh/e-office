@@ -194,7 +194,13 @@ The default Docker volumes are `db_data`, `backend_storage`, and `backend_backup
 ./scripts/backup.sh
 ```
 
-For object storage, configure the `S3_*` values in `.env` and set `FILE_STORAGE_DRIVER` to the supported S3-compatible driver for your deployment. For outbound mail, set `SMTP_ENABLED=true` only after configuring the SMTP host, credentials, sender address, and TLS setting. Treat `.env`, backups, and generated PDFs as sensitive data.
+For object storage, follow the complete
+[S3/MinIO setup guide](docs/operations/file-storage.md). It includes AWS S3,
+external MinIO, the bundled MinIO Compose overlay, required permissions, a
+read/write probe, migration cautions, and backup requirements. For outbound
+mail, set `SMTP_ENABLED=true` only after configuring the SMTP host, credentials,
+sender address, and TLS setting. Treat `.env`, backups, and generated PDFs as
+sensitive data.
 
 ### 6. Upgrade safely
 
@@ -215,7 +221,11 @@ upgrades.
 
 ## Storage
 
-Local filesystem storage is the default. S3-compatible storage, including MinIO, is supported for source documents and final artifacts. Artifact metadata and hashes are persisted with the completed request.
+Local filesystem storage is the default. S3-compatible storage, including
+MinIO, is supported for source documents and final artifacts. Artifact metadata
+and hashes are persisted with the completed request. See
+[S3/MinIO configuration](docs/operations/file-storage.md) for exact environment
+values and deployment commands.
 
 ## Project Status
 

@@ -14,21 +14,26 @@ if grep -q '^AUTO_INIT_DB=true$' .env; then
   exit 1
 fi
 
-docker compose version >/dev/null
-docker compose config --quiet
+compose=(docker compose)
+if grep -q '^S3_ENDPOINT=http://minio:9000$' .env; then
+  compose+=(-f docker-compose.yml -f docker-compose.minio.yml)
+fi
+
+"${compose[@]}" version >/dev/null
+"${compose[@]}" config --quiet
 
 if [[ "${SKIP_BACKUP:-false}" != "true" ]] &&
-  docker compose ps --status running --services | grep -qx db; then
+  "${compose[@]}" ps --status running --services | grep -qx db; then
   ./scripts/backup.sh
 fi
 
-docker compose up -d --build
+"${compose[@]}" up -d --build
 
 BACKEND_PORT_VALUE="$(sed -n 's/^BACKEND_PORT=//p' .env | tail -n 1)"
 BACKEND_PORT_VALUE="${BACKEND_PORT_VALUE:-4000}"
 for _ in $(seq 1 90); do
   if curl --fail --silent "http://localhost:${BACKEND_PORT_VALUE}/health" >/dev/null; then
-    docker compose ps
+    "${compose[@]}" ps
     echo "Deployment completed."
     exit 0
   fi
@@ -36,6 +41,6 @@ for _ in $(seq 1 90); do
 done
 
 echo "Backend did not become healthy after deployment." >&2
-docker compose ps >&2 || true
-docker compose logs --tail=200 backend frontend outbox-worker >&2 || true
+"${compose[@]}" ps >&2 || true
+"${compose[@]}" logs --tail=200 backend frontend outbox-worker >&2 || true
 exit 1

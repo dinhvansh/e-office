@@ -114,7 +114,10 @@ Keep `SMTP_ENABLED=false` until `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, and
 `EMAIL_FROM` are configured.
 
 Local named-volume storage is the default. For S3-compatible storage configure
-all `S3_*` variables before setting `FILE_STORAGE_DRIVER=s3`.
+all `S3_*` variables before setting `FILE_STORAGE_DRIVER=s3`. Follow
+[`docs/operations/file-storage.md`](docs/operations/file-storage.md) for AWS S3,
+external MinIO, or the optional bundled MinIO overlay. Existing local files are
+not migrated automatically when the driver changes.
 
 The license service is optional and disabled in the core stack. Its supported
 profile is documented in `docs/docker/README.md`.
