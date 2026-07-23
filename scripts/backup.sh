@@ -10,7 +10,7 @@ if ! docker compose ps --status running --services | grep -qx db; then
   exit 1
 fi
 
-BACKUP_ROOT="${1:-$ROOT_DIR/backups}"
+BACKUP_ROOT="${1:-${BACKUP_ROOT:-$ROOT_DIR/backups}}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_DIR="$BACKUP_ROOT/$STAMP"
 mkdir -p "$BACKUP_DIR"

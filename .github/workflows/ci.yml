@@ -1,12 +1,14 @@
 name: CI
 
 on:
-  # Temporarily disabled - build happens on VPS
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   auth-matrix:
@@ -79,7 +81,7 @@ jobs:
 
       - name: Wait for backend health
         run: |
-          for i in {1..30}; do
+          for _ in {1..30}; do
             curl -fsS http://localhost:4000/health && exit 0
             sleep 2
           done

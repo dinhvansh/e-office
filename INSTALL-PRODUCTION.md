@@ -135,3 +135,10 @@ git pull --ff-only origin main
 
 See [docs/BACKUP-RESTORE.md](docs/BACKUP-RESTORE.md) and test restores on an
 isolated deployment.
+
+## 8. GitHub Actions deployment
+
+For a gated deployment that keeps production secrets on the VPS, follow
+[`docs/operations/github-actions-deployment.md`](docs/operations/github-actions-deployment.md).
+The workflow deploys only an exact tested commit and uses a dedicated,
+command-restricted SSH key.

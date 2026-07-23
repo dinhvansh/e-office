@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+readonly REPOSITORY_URL="https://github.com/dinhvansh/e-office.git"
+readonly DEPLOY_ROOT="/opt/e-office"
+readonly ENV_FILE="/etc/eoffice/eoffice.env"
+readonly BACKUP_ROOT="/var/backups/eoffice"
+readonly LOCK_FILE="/run/lock/eoffice-deploy.lock"
+
+fail() {
+  echo "e-office deploy: $*" >&2
+  exit 1
+}
+
+[[ "$(id -u)" -eq 0 ]] || fail "must run as root"
+[[ -f "$ENV_FILE" ]] || fail "missing $ENV_FILE"
+[[ "$(stat -c '%a' "$ENV_FILE")" == "600" ]] ||
+  fail "$ENV_FILE must have mode 600"
+
+original_command="${SSH_ORIGINAL_COMMAND:-}"
+[[ "$original_command" =~ ^deploy[[:space:]]([0-9a-f]{40})$ ]] ||
+  fail "expected: deploy <40-character commit SHA>"
+deploy_sha="${BASH_REMATCH[1]}"
+
+exec 9>"$LOCK_FILE"
+flock -n 9 || fail "another deployment is already running"
+
+install -d -m 0755 "$DEPLOY_ROOT"
+install -d -m 0700 "$BACKUP_ROOT"
+
+if [[ ! -d "$DEPLOY_ROOT/.git" ]]; then
+  find "$DEPLOY_ROOT" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+  git clone --filter=blob:none "$REPOSITORY_URL" "$DEPLOY_ROOT"
+fi
+
+git -C "$DEPLOY_ROOT" remote set-url origin "$REPOSITORY_URL"
+git -C "$DEPLOY_ROOT" fetch --prune origin main
+git -C "$DEPLOY_ROOT" cat-file -e "${deploy_sha}^{commit}" ||
+  fail "commit is not available from origin"
+git -C "$DEPLOY_ROOT" merge-base --is-ancestor \
+  "$deploy_sha" refs/remotes/origin/main ||
+  fail "commit is not reachable from origin/main"
+
+git -C "$DEPLOY_ROOT" reset --hard
+git -C "$DEPLOY_ROOT" clean -ffdx
+git -C "$DEPLOY_ROOT" checkout --detach "$deploy_sha"
+ln -s "$ENV_FILE" "$DEPLOY_ROOT/.env"
+
+proxy_network="$(
+  sed -n 's/^PROXY_NETWORK_NAME=//p' "$ENV_FILE" | tail -n 1
+)"
+if [[ -n "$proxy_network" ]]; then
+  [[ "$proxy_network" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] ||
+    fail "invalid PROXY_NETWORK_NAME"
+  docker network inspect "$proxy_network" >/dev/null 2>&1 ||
+    docker network create "$proxy_network" >/dev/null
+  if docker container inspect nginx-proxy >/dev/null 2>&1; then
+    docker network connect "$proxy_network" nginx-proxy 2>/dev/null || true
+  fi
+fi
+
+cd "$DEPLOY_ROOT"
+export BACKUP_ROOT
+export COMPOSE_PROJECT_NAME=eoffice
+./deploy.sh production
+
+actual_sha="$(git rev-parse HEAD)"
+[[ "$actual_sha" == "$deploy_sha" ]] ||
+  fail "deployed commit does not match the requested commit"
+echo "e-office deploy complete: $actual_sha"

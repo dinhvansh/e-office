@@ -18,6 +18,15 @@ compose=(docker compose)
 if grep -q '^S3_ENDPOINT=http://minio:9000$' .env; then
   compose+=(-f docker-compose.yml -f docker-compose.minio.yml)
 fi
+PROXY_NETWORK_NAME_VALUE="$(sed -n 's/^PROXY_NETWORK_NAME=//p' .env | tail -n 1)"
+if [[ -n "$PROXY_NETWORK_NAME_VALUE" ]]; then
+  if [[ ! "$PROXY_NETWORK_NAME_VALUE" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]]; then
+    echo "Invalid PROXY_NETWORK_NAME." >&2
+    exit 1
+  fi
+  docker network inspect "$PROXY_NETWORK_NAME_VALUE" >/dev/null
+  compose+=(-f docker-compose.yml -f docker-compose.proxy.yml)
+fi
 
 "${compose[@]}" version >/dev/null
 "${compose[@]}" config --quiet

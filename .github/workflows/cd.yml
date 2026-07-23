@@ -1,42 +1,62 @@
 name: CD - Deploy to VPS
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Docker Storage E2E"]
+    types: [completed]
 
-# Skip CI checks for faster deployment
+permissions:
+  contents: read
+
 concurrency:
   group: production
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy to VPS (Docker Compose)
+    name: Deploy tested commit to VPS
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 45
+    environment: production
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.event == 'workflow_run' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
     steps:
-      - name: Checkout (for reference only)
-        uses: actions/checkout@v4
+      - name: Configure pinned SSH identity
+        shell: bash
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_SSH_KEY" > "$HOME/.ssh/eoffice_deploy"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/eoffice_deploy" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/eoffice_deploy" >/dev/null
+          ssh-keygen -F "${{ secrets.VPS_HOST }}" \
+            -f "$HOME/.ssh/known_hosts" >/dev/null
 
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || '22' }}
-          script: |
-            set -e
-
-            echo "Pull latest reviewed code"
-            cd /opt/e-office
-            git fetch origin
-            git pull --ff-only origin main
-
-            echo "Run the retained-deployment helper"
-            chmod +x deploy.sh || true
-            ./deploy.sh production
+      - name: Deploy exact tested commit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
+          ssh \
+            -i "$HOME/.ssh/eoffice_deploy" \
+            -p "${{ secrets.VPS_PORT }}" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o PubkeyAuthentication=unbound \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "eoffice-deploy@${{ secrets.VPS_HOST }}" \
+            "deploy $DEPLOY_SHA"
 
