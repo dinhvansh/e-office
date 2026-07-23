@@ -241,6 +241,7 @@ async function run() {
       {
         title: `E2E Flow ${Date.now()}`,
         document_type_id: docType.id,
+        create_sign_request: true,
         require_digital_signing: true,
         file_name: `e2e-${Date.now()}.pdf`,
         file_base64: MINIMAL_PDF_BASE64,
