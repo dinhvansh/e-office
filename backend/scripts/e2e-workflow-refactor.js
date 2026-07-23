@@ -181,12 +181,24 @@ async function run() {
 
     const packageFailureMarker = `e2e-package-rollback-${Date.now()}`;
     const packageFailureFile = `${packageFailureMarker}.pdf`;
+    const packageFailureDocType = await prisma.document_types.create({
+      data: {
+        tenant_id: tenantId,
+        code: `E2E_ROLLBACK_${Date.now()}`,
+        name: "E2E package rollback",
+        require_approval: true,
+        require_digital_signing: true,
+        default_workflow_id: null,
+        is_active: true,
+      },
+    });
     let packageFailureError;
     try {
       await axios.post(
         `${API_BASE}/documents`,
         {
           title: packageFailureMarker,
+          document_type_id: packageFailureDocType.id,
           file_name: packageFailureFile,
           file_base64: MINIMAL_PDF_BASE64,
           mime_type: "application/pdf",
@@ -217,6 +229,7 @@ async function run() {
     if (orphanDocumentCount !== 0 || orphanSignRequestCount !== 0 || orphanPermissionCount !== 0 || leftoverUploads.length !== 0) {
       throw new Error(`Package rollback left orphans: documents=${orphanDocumentCount}, signRequests=${orphanSignRequestCount}, permissions=${orphanPermissionCount}, uploads=${leftoverUploads.length}`);
     }
+    await prisma.document_types.delete({ where: { id: packageFailureDocType.id } });
     console.log("Failed package creation left no document, sign request, ACL, or upload orphan");
 
     const { docType } = await ensureApprovalWorkflowAndDocType(tenantId, userId);
