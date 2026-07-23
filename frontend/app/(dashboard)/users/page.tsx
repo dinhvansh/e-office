@@ -487,7 +487,9 @@ export default function UsersPage() {
               </Label>
               <Input
                 id="password"
+                name="new-password"
                 type="password"
+                autoComplete="new-password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 placeholder="••••••••"

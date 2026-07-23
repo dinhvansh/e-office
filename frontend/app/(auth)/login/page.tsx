@@ -41,7 +41,11 @@ export default function LoginPage() {
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,_#dbeafe,_transparent_55%)] px-4">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.15),transparent_60%)]" />
       <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-gradient-to-br from-blue-500/40 to-slate-900/60 blur-3xl md:block" />
-      <form onSubmit={handleSubmit} className="relative w-full max-w-lg rounded-[32px] border border-white/60 bg-white/80 p-10 shadow-[0_25px_70px_rgba(15,23,42,0.15)] backdrop-blur">
+      <form
+        onSubmit={handleSubmit}
+        autoComplete="on"
+        className="relative w-full max-w-lg rounded-[32px] border border-white/60 bg-white/80 p-10 shadow-[0_25px_70px_rgba(15,23,42,0.15)] backdrop-blur"
+      >
         <div className="mb-8 space-y-4">
           <div className="flex justify-center">
             <Image src="/logo.png" alt="Logo" width={128} height={64} className="h-16 w-auto object-contain" priority />
@@ -66,11 +70,31 @@ export default function LoginPage() {
         )}
         <label className="mb-4 block text-sm font-medium text-slate-600">
           Email
-          <input value={email} onChange={(e) => setEmail(e.target.value)} className="input mt-2" type="email" required />
+          <input
+            id="login-email"
+            name="username"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="input mt-2"
+            type="email"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+          />
         </label>
         <label className="mb-2 block text-sm font-medium text-slate-600">
           Mật khẩu
-          <input value={password} onChange={(e) => setPassword(e.target.value)} className="input mt-2" type="password" required />
+          <input
+            id="login-password"
+            name="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="input mt-2"
+            type="password"
+            autoComplete="current-password"
+            required
+          />
         </label>
         <div className="mb-6 flex justify-end">
           <a href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
